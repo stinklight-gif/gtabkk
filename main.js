@@ -1989,6 +1989,58 @@ function makeRain(scene) {
 // 8. ENGINE / SCENE INIT
 // =============================================================================
 
+// =============================================================================
+//  SAVE / LOAD (localStorage) — autosaves money/gear/amulets/time/position
+// =============================================================================
+const SAVE_KEY = 'gtabkk_save_v1';
+
+function saveGame() {
+  try {
+    const p = G.player;
+    if (!p) return;
+    localStorage.setItem(SAVE_KEY, JSON.stringify({
+      cash: G.cash, armor: p.armor, dayT: G.time.dayT, copsKilled: _copsKilled,
+      weapons: { pistol: !!p.weapons.pistol, smg: !!p.weapons.smg },
+      pistolAmmo: p.pistolAmmo, pistolReserve: p.pistolReserve,
+      smgAmmo: p.smgAmmo, smgReserve: p.smgReserve,
+      amulets: (G.world.collectibles || []).map(a => a.taken),
+      collected: G.collected || 0,
+      welcomeDone: !!G._welcomeDone,
+      px: p.group.position.x, pz: p.group.position.z,
+    }));
+  } catch (e) { /* storage unavailable — ignore */ }
+}
+
+function loadGame() {
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { s = null; }
+  if (!s || !G.player) return;
+  const p = G.player;
+  if (typeof s.cash === 'number') G.cash = s.cash;
+  if (typeof s.armor === 'number') p.armor = s.armor;
+  if (typeof s.dayT === 'number') G.time.dayT = s.dayT;
+  if (typeof s.copsKilled === 'number') _copsKilled = s.copsKilled;
+  if (s.weapons) {
+    p.weapons.pistol = !!s.weapons.pistol;
+    p.weapons.smg = !!s.weapons.smg;
+    if (typeof s.pistolAmmo === 'number') p.pistolAmmo = s.pistolAmmo;
+    if (typeof s.pistolReserve === 'number') p.pistolReserve = s.pistolReserve;
+    if (typeof s.smgAmmo === 'number') p.smgAmmo = s.smgAmmo;
+    if (typeof s.smgReserve === 'number') p.smgReserve = s.smgReserve;
+  }
+  if (Array.isArray(s.amulets) && G.world.collectibles) {
+    s.amulets.forEach((taken, i) => {
+      const a = G.world.collectibles[i];
+      if (taken && a && !a.taken) { a.taken = true; G.scene.remove(a.mesh); }
+    });
+    G.collected = (typeof s.collected === 'number') ? s.collected : s.amulets.filter(Boolean).length;
+  }
+  if (typeof s.px === 'number' && typeof s.pz === 'number') p.group.position.set(s.px, 0, s.pz);
+  if (s.welcomeDone) { G._welcomeDone = true; if (G.mission.resume) G.mission.resume(true); }
+  G.hud.setCash(G.cash);
+  updateAmmoHud();
+}
+
 async function init() {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x1a1a26);
@@ -2112,6 +2164,10 @@ async function init() {
     if (G.audio.ctx.state === 'suspended') G.audio.ctx.resume();
     G.audio.bell();   // dawn bell to set tone
   });
+
+  // Restore saved progress, then autosave on unload
+  loadGame();
+  window.addEventListener('beforeunload', saveGame);
 
   // Start loop
   G.clock = new THREE.Clock();
@@ -2276,6 +2332,7 @@ function makeMissionSystem() {
           if (d2 < 7*7) {
             this.stage = 2;
             G.hud.showSubtitle("Uncle Seng: \"Good, kid. The envelope.\"", "ลุงเซ้ง: \"ดีแล้ว ส่งมา\"");
+            G._welcomeDone = true;
             G.cash += 800;
             G.hud.setCash(G.cash);
             if (GAMEPLAY.armor) G.player.armor = Math.min(G.player.armorMax, G.player.armor + 50);
@@ -2464,6 +2521,14 @@ function makeMissionSystem() {
     sys.active.onStart();
   };
   sys.update = dt => { if (sys.active && sys.active.update) sys.active.update(dt); };
+  // Resume from a save: if the intro was done, drop straight into free roam with
+  // Soi Run available at its marker (instead of replaying the welcome delivery).
+  sys.resume = welcomeDone => {
+    if (!welcomeDone) return;
+    if (G.world.poi.goldShopBeam) { G.scene.remove(G.world.poi.goldShopBeam); G.world.poi.goldShopBeam = null; }
+    sys.active = missions.soiRun;
+    missions.soiRun.toReoffer(null);
+  };
   return sys;
 }
 
@@ -3688,6 +3753,8 @@ function loop() {
     updateCamera(dt);
     updateBTS(dt);
     updateDayNight(dt);
+    G._saveTimer = (G._saveTimer || 0) + dt;
+    if (G._saveTimer > 8) { G._saveTimer = 0; saveGame(); }
     if (G.mission) G.mission.update(dt);
     G.hud.update(dt);
     G.hud.setBars(G.player.hp, G.player.armor, G.player.stam);

@@ -105,6 +105,17 @@ GAME.time.weather = 'rain';     // force monsoon
 GAME.player.weapons.pistol = true; GAME.player.pistolAmmo = 12;
 ```
 
+## Saving
+
+Progress (cash, weapons + ammo, armor, amulets found, time of day, and position)
+autosaves to `localStorage` every ~8 s and on exit, and restores on reload. If
+the intro delivery was done, you respawn straight into free roam with Soi Run
+available. Wipe the save to start fresh:
+
+```js
+localStorage.removeItem('gtabkk_save_v1');
+```
+
 ## Extending
 
 **Add a district.** Drop a `buildKlongToey(scene)` next to `buildWorld` and
