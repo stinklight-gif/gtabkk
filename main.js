@@ -1416,16 +1416,20 @@ function makePlayer(scene) {
 
   const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 0.6, 4, 8), bodyMat);
   torso.position.y = 1.05; torso.castShadow = true; group.add(torso);
-  const legs = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.55, 4, 8), pantsMat);
-  legs.position.y = 0.45; legs.castShadow = true; group.add(legs);
+  const legGeo = new THREE.CapsuleGeometry(0.28, 0.55, 4, 8);
+  legGeo.translate(0, -0.555, 0);   // origin at the hip so rotation pivots there, not mid-thigh
+  const legs = new THREE.Mesh(legGeo, pantsMat);
+  legs.position.y = 1.0; legs.castShadow = true; group.add(legs);
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), skinMat);
   head.position.y = 1.65; head.castShadow = true; group.add(head);
 
   // arms (used for swinging while punching)
-  const armL = new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.5, 4, 6), bodyMat);
-  armL.position.set(-0.42, 1.15, 0); armL.castShadow = true; group.add(armL);
-  const armR = new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.5, 4, 6), bodyMat);
-  armR.position.set( 0.42, 1.15, 0); armR.castShadow = true; group.add(armR);
+  const armGeo = new THREE.CapsuleGeometry(0.1, 0.5, 4, 6);
+  armGeo.translate(0, -0.35, 0);    // origin at the shoulder so swings pivot there, not mid-arm
+  const armL = new THREE.Mesh(armGeo, bodyMat);
+  armL.position.set(-0.42, 1.5, 0); armL.castShadow = true; group.add(armL);
+  const armR = new THREE.Mesh(armGeo, bodyMat);
+  armR.position.set( 0.42, 1.5, 0); armR.castShadow = true; group.add(armR);
 
   // pistol model (hidden by default)
   const pistol = new THREE.Group();
@@ -1459,6 +1463,7 @@ function makePlayer(scene) {
     // hit recovery
     hitFlashT: 0,
     deadT: 0,
+    gunRecoil: 0,
     // bribe
     canBribeUntil: 0,
   };
@@ -2648,6 +2653,7 @@ function updateCombat(dt) {
   if (p.attackTimer > 0) p.attackTimer -= dt;
   if (p.attackCooldown > 0) p.attackCooldown -= dt;
   if (p.hitFlashT > 0) p.hitFlashT -= dt;
+  if (p.gunRecoil > 0) p.gunRecoil = Math.max(0, p.gunRecoil - dt * 6);
 
   // weapon cycle
   if (G.input.pressed('KeyQ')) {
@@ -2706,10 +2712,11 @@ function updateCombat(dt) {
     G.hud.setCrosshair(false);
   } else if (p.activeWeapon === 'pistol' && p.weapons.pistol) {
     p.pistol.visible = true;
-    // hold pistol at right hand
-    const handLocal = new THREE.Vector3(0.42, 1.15, 0.4);
-    p.pistol.position.copy(handLocal);
-    p.pistol.rotation.set(0, 0, 0);
+    // raise the right arm to aim; it kicks back on each shot (gunRecoil)
+    const recoil = p.gunRecoil || 0;
+    p.armR.rotation.x = -0.6 + recoil * 0.5;
+    p.pistol.position.set(0.42, 1.25, 0.5);
+    p.pistol.rotation.set(-0.6 + recoil * 0.5, 0, 0);
 
     G.hud.setCrosshair(G.input.rightDown);
     if (G.input.mouseDown && p.attackCooldown <= 0 && p.pistolAmmo > 0) {
@@ -2722,12 +2729,15 @@ function updateCombat(dt) {
     }
   } else if (p.activeWeapon === 'smg' && p.weapons.smg) {
     p.pistol.visible = true; // reuse the held-weapon model
-    p.pistol.position.set(0.42, 1.15, 0.4);
-    p.pistol.rotation.set(0, 0, 0);
+    const recoil = p.gunRecoil || 0;
+    p.armR.rotation.x = -0.7 + recoil * 0.4;
+    p.pistol.position.set(0.42, 1.3, 0.5);
+    p.pistol.rotation.set(-0.7 + recoil * 0.4, 0, 0);
     G.hud.setCrosshair(G.input.rightDown);
     if (G.input.mouseDown && p.attackCooldown <= 0 && p.smgAmmo > 0) {
       fireSMG();
       p.smgAmmo--; p.attackCooldown = 0.07;   // fast, full-auto
+      p.gunRecoil = 1;
       updateAmmoHud();
     } else if (G.input.mouseDown && p.smgAmmo === 0 && p.attackCooldown <= 0) {
       G.audio.blip({freq: 200, dur: 0.04, type: 'square', gain: 0.05});
