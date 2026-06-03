@@ -4,7 +4,7 @@ A single-file browser-playable 3D open-world prototype set in Bangkok, in the
 spirit of GTA III but with its own identity. Implements the Phase 1 deliverables
 from `gta.md`: Sukhumvit district, three vehicles, on-foot Muay Thai melee, 9mm
 pistol, day/night cycle, light rain, traffic + peds + soi dogs, functional
-minimap, 1–2 star wanted system with bribe mechanic, tutorial mission, and
+minimap, 1–3 star wanted system with bribe mechanic, tutorial mission, and
 free-roam.
 
 ## Run it
@@ -78,7 +78,7 @@ Everything lives in two files:
 | 12 | Player update | Movement, sprint+stamina, jump, in-vehicle controls, exit on E, leg-bob animation, 7-Eleven door chime trigger. |
 | 13 | Peds + Dogs | Wander state machines; peds panic when attacked; dogs scatter when player approaches, settle back when far. |
 | 14 | Combat | Muay Thai jab/cross/kick (animated arm/leg swings), pistol fire (raycast hit + tracer sphere + muzzle flash + camera shake), reload. |
-| 15 | Cops + Wanted | Star-based heat with decay after 35 s out of sight. Spawns foot cops at 1★, cop-pickup chase cars at 2★. Bribe with B near a foot cop. |
+| 15 | Cops + Wanted | Star-based heat with decay after 35 s out of sight. Spawns foot cops at 1★, cop-pickup chase cars at 2★, unmarked Crime Suppression Fortuners at 3★ (after a few cop kills). Bribe with B near a foot cop (1–2★ only). |
 | 16 | Particles / FX | Smoke emitter (vehicles below 30% HP), explosion (light flash + smoke + camera shake + thunder SFX). |
 | 17 | Interaction | Vehicle proximity check + E to enter. |
 | 18 | Camera update | Follow rig with smoothed distance, shake decay, in-vehicle chase view auto-aligns to vehicle heading. |
@@ -142,8 +142,6 @@ chugs, raise the pedestrian/traffic despawn radius or drop pixel ratio.
 ## Roadmap (Phase 2+)
 
 See `gta.md` for the full vision. Next likely additions: Yaowarat (no-cars
-zone), Chao Phraya river + longtail boats,
-expanded weapon roster, expanded wanted system (3★ Crime Suppression
-unmarked Fortuners).
+zone), Chao Phraya river + longtail boats, expanded weapon roster.
 
 **Build the prototype. Ship it. Iterate.**
