@@ -74,6 +74,7 @@
   .hp   .bar-fill { background: linear-gradient(90deg, #ff4444, #ff8866); }
   .stam .bar-fill { background: linear-gradient(90deg, #44dd66, #99ffaa); }
   .armor .bar-fill { background: linear-gradient(90deg, #66aaff, #aaccff); }
+  .veh  .bar-fill { background: linear-gradient(90deg, #ffaa33, #ffd488); }
 
   #ammo {
     font-size: 18px; text-align: right;
@@ -214,6 +215,10 @@
       <div class="bar-row stam">
         <div class="bar-label">STAM</div>
         <div class="bar-outer"><div id="st-fill" class="bar-fill"></div></div>
+      </div>
+      <div class="bar-row veh" id="veh-row" style="display:none">
+        <div class="bar-label">CAR</div>
+        <div class="bar-outer"><div id="veh-fill" class="bar-fill"></div></div>
       </div>
     </div>
   </div>
