@@ -685,12 +685,14 @@ function buildWorld(scene) {
   const TEMPLE_I = 2, TEMPLE_J = -2;
   const RIVER_I = -GRID/2;  // westmost column (x ≈ -250..-200) is the Chao Phraya
   const GARAGE_I = 3, GARAGE_J = -1;  // block reserved for the U-Spray garage
+  const YAO_I = -2, YAO_J0 = 2, YAO_J1 = 3;  // two-block Yaowarat market street
 
   for (let i = -GRID/2; i < GRID/2; i++) {
     for (let j = -GRID/2; j < GRID/2; j++) {
       if (i === TEMPLE_I && j === TEMPLE_J) continue; // temple placed after loop
       if (i === RIVER_I) continue;                    // river column — no buildings
       if (i === GARAGE_I && j === GARAGE_J) continue; // U-Spray garage block
+      if (i === YAO_I && (j === YAO_J0 || j === YAO_J1)) continue; // Yaowarat market
       const cx = (i + 0.5) * BLOCK;
       const cz = (j + 0.5) * BLOCK;
 
@@ -1372,6 +1374,90 @@ function buildWorld(scene) {
     world.garages.push({ pos: new THREE.Vector3(gx, 0, gz), r: 7, cooldownUntil: 0 });
   }
 
+  // ---- Yaowarat: a dense Chinatown market street (blocks (-2, 2..3)) ----
+  {
+    const laneX = (YAO_I + 0.5) * BLOCK;        // -75: centre of the market lane
+    const zStart = YAO_J0 * BLOCK + 6;          // 106
+    const zEnd = (YAO_J1 + 1) * BLOCK - 6;      // 194
+    const crossZ = YAO_J1 * BLOCK;              // 150: internal cross-road to keep clear
+    const redMat = new THREE.MeshStandardMaterial({ color: 0xa8261f, roughness: 0.8 });
+    const goldMat = new THREE.MeshStandardMaterial({ color: 0xd9a134, roughness: 0.5, metalness: 0.6 });
+    const creamMat = new THREE.MeshStandardMaterial({ color: 0xe6d8b8, roughness: 0.85 });
+
+    // paifang gate across the south entrance
+    for (const gx of [laneX - 8, laneX + 8]) {
+      const pillar = new THREE.Mesh(new THREE.BoxGeometry(1.4, 9, 1.4), redMat);
+      pillar.position.set(gx, 4.5, zStart - 1); pillar.castShadow = true; scene.add(pillar);
+      world.buildings.push({ pos: new THREE.Vector3(gx, 4.5, zStart - 1), size: new THREE.Vector3(1.4, 9, 1.4), mesh: pillar });
+    }
+    for (let k = 0; k < 3; k++) {
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(20 - k*3, 0.7, 1.6), goldMat);
+      beam.position.set(laneX, 9 + k*1.2, zStart - 1); beam.castShadow = true; scene.add(beam);
+      const eaves = new THREE.Mesh(new THREE.BoxGeometry(21 - k*3, 0.22, 2.6), redMat);
+      eaves.position.set(laneX, 9.45 + k*1.2, zStart - 1); scene.add(eaves);
+    }
+
+    // shophouse rows lining the lane (low, dense) with neon + collision; gap at the cross-road
+    for (const sideSign of [-1, +1]) {
+      const rowX = laneX + sideSign * 14;       // -89 / -61
+      for (let z = zStart; z < zEnd; z += rand(7, 10)) {
+        if (Math.abs(z - crossZ) < 8) continue; // keep the cross-road clear of buildings
+        const w = rand(6, 8), d = rand(7, 9), h = rand(9, 16);
+        const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), Math.random() < 0.5 ? redMat : creamMat);
+        body.position.set(rowX, h/2, z); body.castShadow = true; body.receiveShadow = true; scene.add(body);
+        const shop = new THREE.Mesh(new THREE.BoxGeometry(w, 3, d + 0.2), redMat);
+        shop.position.set(rowX, 1.5, z); scene.add(shop);
+        world.buildings.push({ pos: new THREE.Vector3(rowX, h/2, z), size: new THREE.Vector3(w, h, d), mesh: body });
+        const neonColor = pick(COLORS.neon);
+        const nm = new THREE.MeshStandardMaterial({ color: neonColor, emissive: neonColor, emissiveIntensity: 0.2, roughness: 0.5 });
+        G.nightEmissive.push({ mat: nm, dayIntensity: 0.2, nightIntensity: 1.5 });
+        const sgn = new THREE.Mesh(new THREE.PlaneGeometry(0.8, rand(2, 3.5)), nm);
+        sgn.position.set(rowX - sideSign * (w/2 + 0.06), rand(3.5, 5.5), z);
+        sgn.rotation.y = sideSign > 0 ? -PI/2 : PI/2;
+        scene.add(sgn);
+      }
+    }
+
+    // hanging red lanterns strung over the lane
+    const lanternMat = new THREE.MeshStandardMaterial({ color: 0xd11a1a, emissive: 0xd11a1a, emissiveIntensity: 0.3, roughness: 0.6 });
+    G.nightEmissive.push({ mat: lanternMat, dayIntensity: 0.25, nightIntensity: 1.4 });
+    const lanternGeo = new THREE.SphereGeometry(0.32, 8, 8);
+    for (let z = zStart + 4; z < zEnd; z += 6) {
+      if (Math.abs(z - crossZ) < 8) continue;
+      for (const lx of [laneX - 3, laneX, laneX + 3]) {
+        const lan = new THREE.Mesh(lanternGeo, lanternMat);
+        lan.position.set(lx, rand(4.5, 6), z); lan.scale.y = 1.3; scene.add(lan);
+      }
+    }
+
+    // packed market stalls down the lane (decorative — walk among them)
+    const stallTop = [0xa8261f, 0xd9a134, 0x2a7d8e, 0x3a8a5a, 0xcfa83a];
+    const tableMat = new THREE.MeshStandardMaterial({ color: 0x6a5a45, roughness: 0.9 });
+    const legMat = new THREE.MeshStandardMaterial({ color: 0x444444 });
+    const stallLegGeo = new THREE.CylinderGeometry(0.04, 0.04, 2, 5);
+    const tableGeo = new THREE.BoxGeometry(3, 0.9, 2);
+    for (let z = zStart + 3; z < zEnd; z += rand(4.5, 6.5)) {
+      if (Math.abs(z - crossZ) < 8) continue;
+      for (const sx of [laneX - 4, laneX + 4]) {
+        const stall = new THREE.Group();
+        const table = new THREE.Mesh(tableGeo, tableMat); table.position.y = 0.45; stall.add(table);
+        const awn = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.1, 2.4), new THREE.MeshStandardMaterial({ color: pick(stallTop), roughness: 0.8, side: THREE.DoubleSide }));
+        awn.position.y = 2.0; stall.add(awn);
+        for (const px of [-1.4, 1.4]) for (const pz of [-0.9, 0.9]) {
+          const leg = new THREE.Mesh(stallLegGeo, legMat); leg.position.set(px, 1.0, pz); stall.add(leg);
+        }
+        for (let q = 0; q < 2; q++) {
+          const gbox = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.4), new THREE.MeshStandardMaterial({ color: pick(stallTop) }));
+          gbox.position.set(rand(-1, 1), 1.05, rand(-0.6, 0.6)); stall.add(gbox);
+        }
+        stall.position.set(sx, 0, z); stall.rotation.y = sx < laneX ? 0.1 : -0.1;
+        scene.add(stall);
+      }
+    }
+
+    world.poi.yaowarat = new THREE.Vector3(laneX, 0, (zStart + zEnd) / 2);
+  }
+
   // ---- Render minimap base (top-down 2D snapshot of roads/landmarks) ----
   world.minimap = makeMinimapBase(world);
 
@@ -1433,6 +1519,12 @@ function makeMinimapBase(world) {
   g.fillStyle = '#21f0ff';
   for (const ga of (world.garages || [])) {
     g.fillRect(mapW(ga.pos.x) - 3, mapW(ga.pos.z) - 3, 6, 6);
+  }
+
+  // Yaowarat market street
+  if (world.poi && world.poi.yaowarat) {
+    g.fillStyle = '#c0392b';
+    g.fillRect(mapW(world.poi.yaowarat.x) - 4, mapW(world.poi.yaowarat.z) - 9, 8, 18);
   }
 
   return c;
