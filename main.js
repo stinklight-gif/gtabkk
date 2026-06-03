@@ -246,6 +246,7 @@ function makeAudio() {
     o.start(t); o.stop(t + 1.0);
   }
   function thunder() { noise(1.5, 0.45, 400); }
+  function rumble() { noise(1.2, 0.06, 110); }   // low BTS pass-by rumble
   function rainBed() {
     // continuous filtered noise loop for rain
     const buf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
@@ -276,7 +277,7 @@ function makeAudio() {
 
   const audio = {
     ctx, master, chime, bell, step, punch, kick, hit, shot, ricochet, reload,
-    whistle, siren, thunder, honk, bark,
+    whistle, siren, thunder, rumble, honk, bark,
     engineLoop, tukTukLoop, blip, rainBed: null, ambienceBed: null,
   };
   audio.rainBed = rainBed();
@@ -2975,6 +2976,10 @@ function updateBTS(dt) {
   b.mesh.position.x += b.dir * b.speed * dt;
   if (b.mesh.position.x > b.max) b.dir = -1;
   else if (b.mesh.position.x < b.min) b.dir = 1;
+  // rumble as the train passes over a player near the track (z≈0)
+  const dx = b.mesh.position.x - G.player.group.position.x;
+  if ((b._dxPrev || 0) * dx < 0 && Math.abs(G.player.group.position.z) < 45 && G.audio.rumble) G.audio.rumble();
+  b._dxPrev = dx;
 }
 
 // Spin/bob the hidden amulets and collect them on touch.
@@ -4515,6 +4520,8 @@ function loop() {
     updateCamera(dt);
     updateBTS(dt);
     updateDayNight(dt);
+    // distant daytime traffic honks (ambient flavor)
+    if (Math.random() < 0.004 * (1 - (G.nightK || 0))) G.audio.blip({ freq: 360, dur: 0.2, type: 'square', gain: 0.03, freqEnd: 330 });
     G._saveTimer = (G._saveTimer || 0) + dt;
     if (G._saveTimer > 8) { G._saveTimer = 0; saveGame(); }
     // one-time 100% celebration (cheap: amulet counter + 3 mission flags)
