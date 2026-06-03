@@ -1487,42 +1487,45 @@ function buildWorld(scene) {
       }
     }
 
-    // hanging red lanterns strung over the lane
+    // hanging red lanterns strung over the lane (instanced)
     const lanternMat = new THREE.MeshStandardMaterial({ color: 0xd11a1a, emissive: 0xd11a1a, emissiveIntensity: 0.3, roughness: 0.6 });
     G.nightEmissive.push({ mat: lanternMat, dayIntensity: 0.25, nightIntensity: 1.4 });
     const lanternGeo = new THREE.SphereGeometry(0.32, 8, 8);
+    const lanternM = [];
     for (let z = zStart + 4; z < zEnd; z += 6) {
       if (Math.abs(z - crossZ) < 8) continue;
       for (const lx of [laneX - 3, laneX, laneX + 3]) {
-        const lan = new THREE.Mesh(lanternGeo, lanternMat);
-        lan.position.set(lx, rand(4.5, 6), z); lan.scale.y = 1.3; scene.add(lan);
+        _q.identity(); _s.set(1, 1.3, 1); _p.set(lx, rand(4.5, 6), z);
+        lanternM.push(_m.compose(_p, _q, _s).clone());
       }
     }
+    addInstanced(lanternGeo, lanternMat, lanternM, false, false);
 
-    // packed market stalls down the lane (decorative — walk among them)
+    // packed market stalls — tables + legs instanced; awnings/goods individual (varied colours)
     const stallTop = [0xa8261f, 0xd9a134, 0x2a7d8e, 0x3a8a5a, 0xcfa83a];
     const tableMat = new THREE.MeshStandardMaterial({ color: 0x6a5a45, roughness: 0.9 });
     const legMat = new THREE.MeshStandardMaterial({ color: 0x444444 });
     const stallLegGeo = new THREE.CylinderGeometry(0.04, 0.04, 2, 5);
     const tableGeo = new THREE.BoxGeometry(3, 0.9, 2);
+    const tableM = [], legM = [];
+    _q.identity(); _s.set(1, 1, 1);
     for (let z = zStart + 3; z < zEnd; z += rand(4.5, 6.5)) {
       if (Math.abs(z - crossZ) < 8) continue;
       for (const sx of [laneX - 4, laneX + 4]) {
-        const stall = new THREE.Group();
-        const table = new THREE.Mesh(tableGeo, tableMat); table.position.y = 0.45; stall.add(table);
-        const awn = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.1, 2.4), new THREE.MeshStandardMaterial({ color: pick(stallTop), roughness: 0.8, side: THREE.DoubleSide }));
-        awn.position.y = 2.0; stall.add(awn);
+        _p.set(sx, 0.45, z); tableM.push(_m.compose(_p, _q, _s).clone());
         for (const px of [-1.4, 1.4]) for (const pz of [-0.9, 0.9]) {
-          const leg = new THREE.Mesh(stallLegGeo, legMat); leg.position.set(px, 1.0, pz); stall.add(leg);
+          _p.set(sx + px, 1.0, z + pz); legM.push(_m.compose(_p, _q, _s).clone());
         }
+        const awn = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.1, 2.4), new THREE.MeshStandardMaterial({ color: pick(stallTop), roughness: 0.8, side: THREE.DoubleSide }));
+        awn.position.set(sx, 2.0, z); scene.add(awn);
         for (let q = 0; q < 2; q++) {
           const gbox = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.4), new THREE.MeshStandardMaterial({ color: pick(stallTop) }));
-          gbox.position.set(rand(-1, 1), 1.05, rand(-0.6, 0.6)); stall.add(gbox);
+          gbox.position.set(sx + rand(-1, 1), 1.05, z + rand(-0.6, 0.6)); scene.add(gbox);
         }
-        stall.position.set(sx, 0, z); stall.rotation.y = sx < laneX ? 0.1 : -0.1;
-        scene.add(stall);
       }
     }
+    addInstanced(tableGeo, tableMat, tableM, true, false);
+    addInstanced(stallLegGeo, legMat, legM, false, false);
 
     world.poi.yaowarat = new THREE.Vector3(laneX, 0, (zStart + zEnd) / 2);
   }
