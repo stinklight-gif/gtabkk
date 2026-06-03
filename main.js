@@ -2234,6 +2234,12 @@ function bindHud() {
     document.getElementById('ph-fares').textContent = (G.taxi && G.taxi.fares) || 0;
     document.getElementById('ph-cops').textContent = _copsKilled || 0;
   }
+  function setVehicle(hp, show) {
+    const row = document.getElementById('veh-row');
+    if (!row) return;
+    row.style.display = show ? '' : 'none';
+    if (show) document.getElementById('veh-fill').style.width = clamp(hp, 0, 100) + '%';
+  }
   function setClock(s) { document.getElementById('clock').textContent = s; document.getElementById('ph-time').textContent = s; }
   function setWeather(t) { document.getElementById('weather-tag').textContent = t; }
   function setCrosshair(show) { crosshair.classList.toggle('show', !!show); }
@@ -2298,7 +2304,7 @@ function bindHud() {
   }
 
   return {
-    setStars, setCash, setBars, setAmmo, setMissionText, setClock, setWeather, setCrosshair, setPhoneStats,
+    setStars, setCash, setBars, setAmmo, setMissionText, setClock, setWeather, setCrosshair, setPhoneStats, setVehicle,
     showSubtitle, showPrompt, showNotif, togglePhone, update, drawMinimap
   };
 }
@@ -2878,7 +2884,12 @@ function killPed(ped) {
 function updateVehicles(dt) {
   for (const v of G.vehicles) {
     if (v.dead) continue;
-    if (v.lights) for (const m of v.lights) m.emissiveIntensity = G.nightK || 0;
+    if (v.lights) {
+      const base = G.nightK || 0;
+      v.lights[0].emissiveIntensity = base;   // headlights
+      const braking = v.driver === 'player' && (G.input.down('KeyS') || G.input.down('Space'));
+      v.lights[1].emissiveIntensity = braking ? Math.max(base, 0.9) : base;  // tail/brake lights
+    }
     if (v.driver === 'player') continue;
     if (v.isCop && v.driver) updateCop(v, dt);
     else if (v.npc) updateTrafficCar(v, dt);
@@ -3914,6 +3925,7 @@ function loop() {
     if (G.mission) G.mission.update(dt);
     G.hud.update(dt);
     G.hud.setBars(G.player.hp, G.player.armor, G.player.stam);
+    G.hud.setVehicle(G.player.inVehicle ? G.player.inVehicle.hp : 0, !!G.player.inVehicle);
     G.hud.setCash(G.cash);
     G.hud.drawMinimap(G.player);
     if (G.input.endFrame) G.input.endFrame();
