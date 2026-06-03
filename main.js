@@ -1839,6 +1839,43 @@ function makeVehicleMesh(kind) {
     prop.position.set(0, 0.2, -4.6); g.add(prop);
     g.userData.dims = { L: 7.0, W: 1.7, H: 1.2 };
     g.userData.spec = { topSpeed: 18, accel: 8, brake: 7, turn: 1.2, mass: 800, kind: 'boat' };
+  } else if (kind === 'bus') {
+    const paint = pick([0x2a6a9a, 0x9a3a3a, 0x3a8a5a]);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2.4, 10.5), new THREE.MeshStandardMaterial({ color: paint, roughness: 0.5, metalness: 0.3 }));
+    body.position.y = 1.6; g.add(body);
+    const win = new THREE.Mesh(new THREE.BoxGeometry(2.52, 0.8, 9), new THREE.MeshBasicMaterial({ color: 0x223344, transparent: true, opacity: 0.7 }));
+    win.position.set(0, 2.1, 0); g.add(win);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+    for (const z of [-3.5, 0, 3.2]) for (const x of [-1.2, 1.2]) {
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.4, 14), wheelMat);
+      w.rotation.z = PI/2; w.position.set(x, 0.55, z); g.add(w);
+    }
+    g.userData.dims = { L: 10.8, W: 2.6, H: 3.3 };
+    g.userData.spec = { topSpeed: 16, accel: 6, brake: 13, turn: 1.0, mass: 6000, kind: 'bus' };
+  } else if (kind === 'luxsedan') {
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.75, 4.4), new THREE.MeshStandardMaterial({ color: pick([0x101015, 0x303842, 0x6a1020]), roughness: 0.25, metalness: 0.8 }));
+    body.position.y = 0.7; g.add(body);
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.6, 2.2), new THREE.MeshStandardMaterial({ color: 0x111418, roughness: 0.3, metalness: 0.6 }));
+    cab.position.set(0, 1.25, -0.1); g.add(cab);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+    for (const z of [-1.5, 1.5]) for (const x of [-0.9, 0.9]) {
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.3, 16), wheelMat);
+      w.rotation.z = PI/2; w.position.set(x, 0.42, z); g.add(w);
+    }
+    g.userData.dims = { L: 4.4, W: 1.9, H: 1.5 };
+    g.userData.spec = { topSpeed: 30, accel: 16, brake: 18, turn: 1.8, mass: 1500, kind: 'luxsedan' };
+  } else if (kind === 'supercar') {
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.5, 4.2), new THREE.MeshStandardMaterial({ color: pick([0xffcc00, 0xff2a2a, 0x10b0d0]), roughness: 0.2, metalness: 0.85 }));
+    body.position.y = 0.5; g.add(body);
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.45, 1.6), new THREE.MeshBasicMaterial({ color: 0x111418, transparent: true, opacity: 0.8 }));
+    cab.position.set(0, 0.92, -0.2); g.add(cab);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+    for (const z of [-1.5, 1.5]) for (const x of [-0.92, 0.92]) {
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.34, 16), wheelMat);
+      w.rotation.z = PI/2; w.position.set(x, 0.4, z); g.add(w);
+    }
+    g.userData.dims = { L: 4.2, W: 1.95, H: 1.0 };
+    g.userData.spec = { topSpeed: 40, accel: 22, brake: 22, turn: 2.0, mass: 1200, kind: 'supercar' };
   } else if (kind === 'camry' || kind === 'sedan') {
     const color = kind === 'sedan' ? pick([0x222, 0xf5f5f5, 0xc23a3a, 0x335a99, 0x8c8c8c]) : 0xeeeeee;
     const body = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.9, 3.6), new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.4 }));
@@ -1975,9 +2012,10 @@ function spawnDog(scene, pos) {
 
 function spawnTraffic(scene) {
   // Each road segment can hold some cars. We sample edges and place vehicles.
-  const kinds = ['camry','camry','camry','sedan','sedan','tuktuk','hilux','songthaew','songthaew','bike','bike'];
+  const kinds = ['camry','camry','camry','sedan','sedan','tuktuk','hilux','songthaew','songthaew','bus','luxsedan','luxsedan','bike','bike'];
   for (let n = 0; n < 28; n++) {
-    const kind = pick(kinds);
+    let kind = pick(kinds);
+    if (Math.random() < 0.04) kind = 'supercar';   // rare spawn
     const v = makeVehicle(kind, scene);
     // pick a random horizontal or vertical road
     const isEW = Math.random() < 0.5;
@@ -4046,7 +4084,7 @@ function updateGunShop(dt) {
 }
 
 function vehicleName(k) {
-  return { bike: 'motorbike', tuktuk: 'tuk-tuk', hilux: 'pickup', camry: 'car', sedan: 'sedan', cop: 'cop pickup', fortuner: 'unmarked SUV', songthaew: 'songthaew', boat: 'longtail boat' }[k] || k;
+  return { bike: 'motorbike', tuktuk: 'tuk-tuk', hilux: 'pickup', camry: 'car', sedan: 'sedan', cop: 'cop pickup', fortuner: 'unmarked SUV', songthaew: 'songthaew', boat: 'longtail boat', bus: 'bus', luxsedan: 'luxury sedan', supercar: 'supercar' }[k] || k;
 }
 
 // =============================================================================
