@@ -47,7 +47,8 @@ You start at Hua Lamphong with ฿100 cash. A motorbike and a tuk-tuk are parked
 beside the platform. Drive (or run) to the **gold pillar of light** marker at
 Uncle Seng's gold shop in the south-west corner of the map. ฿800 reward on
 arrival. After that the world is open — try the bike, hit peds (gain stars),
-bribe your way out, watch the rain roll in.
+bribe your way out, watch the monsoon roll in. Keep an eye out for **bag-snatchers**
+(orange-marked peds that bolt) — run one down for a bounty.
 
 **Soi Run (mission 2).** Once you've delivered the envelope, Uncle Seng has a
 second job. Leave his shop and return to the **pink marker** to start *Soi Run* —
