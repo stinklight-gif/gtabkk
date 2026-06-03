@@ -75,7 +75,7 @@ Everything lives in two files:
 | 3 | World | Procedural 10×10 block grid (BLOCK=50m), road grid, buildings with neon strips and lit-window planes, BTS Skytrain elevated track, street lamps, 7-Elevens, spirit-house shrines, gold-shop POI with pillar of light, temple compound, a U-Spray garage (drive a vehicle in to repair it and clear your wanted level for ฿500), a Yaowarat Chinatown market street (paifang gate, dense shophouses, hanging lanterns, market stalls), and a Chao Phraya river down the west edge (water + embankment + pier + longtail boats). Repeated props use `InstancedMesh`. Builds an off-screen canvas as the minimap base. |
 | 4 | Player + Camera | Capsule character (torso/legs/head/arms), arcade third-person camera rig (orbit yaw/pitch/distance, shake decay). |
 | 5 | Vehicles | `makeVehicleMesh(kind)` produces bike / tuk-tuk / hilux / cop / camry / sedan with per-kind `spec` (topSpeed, accel, brake, turn, mass). Tuk-tuk has a leaning wiggle, bike leans into turns. |
-| 6 | NPCs | Procedural ped/dog meshes. `spawnPeds`, `spawnDogs`, `spawnTraffic`. |
+| 6 | NPCs | Procedural ped/dog meshes with variety (locals, saffron-robed monks, backpacked tourists). `spawnPeds`, `spawnDogs`, `spawnTraffic`. District banners (`updateDistrict`) announce Yaowarat / The Wat / Riverside / Sukhumvit on entry. |
 | 7 | Rain | Particle points re-centered on the player each frame, opacity fades with weather. |
 | 8 | Engine init | Renderer, lights (sun + hemi + ambient), camera, audio, world build, player, vehicles, peds, dogs. Loading bar + start gate. |
 | 9 | HUD | Star/cash/HP/stamina/ammo/clock/weather binds, subtitle + prompt + notif queues, phone toggle, minimap renderer (camera-yaw rotated, mission marker + cop dots). |

@@ -1755,8 +1755,13 @@ function makeVehicle(kind, scene) {
 
 function makePedMesh() {
   const g = new THREE.Group();
-  const shirtColor = pick([0xffffff, 0xeeeeee, 0xdeb887, 0x223344, 0x556677, 0xb04040, 0xddcc88]);
-  const pantsColor = pick([0x222, 0x111, 0x445566, 0x804020]);
+  const roll = Math.random();
+  const monk = roll < 0.08;                 // saffron-robed monk
+  const tourist = !monk && roll < 0.26;     // bright shirt + backpack
+  const shirtColor = monk ? 0xe0892e
+    : tourist ? pick([0xff6a3a, 0x39c6c0, 0xffd23a, 0x6a3aff])
+    : pick([0xffffff, 0xeeeeee, 0xdeb887, 0x223344, 0x556677, 0xb04040, 0xddcc88]);
+  const pantsColor = monk ? 0xc8761f : pick([0x222, 0x111, 0x445566, 0x804020]);
   const skin = pick([0xc69472, 0xb88060, 0xd6a785, 0xa57755]);
   const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.3, 0.55, 4, 6), new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.8 }));
   torso.position.y = 0.95; g.add(torso);
@@ -1764,6 +1769,10 @@ function makePedMesh() {
   legs.position.y = 0.4; g.add(legs);
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), new THREE.MeshStandardMaterial({ color: skin }));
   head.position.y = 1.5; g.add(head);
+  if (tourist) {
+    const pack = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.42, 0.2), new THREE.MeshStandardMaterial({ color: pick([0x2a3a55, 0x803030, 0x2a5a3a]), roughness: 0.85 }));
+    pack.position.set(0, 1.0, -0.28); g.add(pack);
+  }
   g.userData.parts = { torso, legs, head };
   g.castShadow = true;
   return g;
@@ -2512,17 +2521,36 @@ function updatePlayer(dt) {
   // Combat
   updateCombat(dt);
 
-  // 7-Eleven proximity chime + armor top-up
+  // 7-Eleven proximity — snacks restore HP, a vest tops up armor
   for (const e of G.world.sevenElevens) {
     if (dist2(p.group.position, e.pos) < 7*7) {
       if (Date.now() - e.chimed > 4000) {
         G.audio.chime(); e.chimed = Date.now();
-        if (GAMEPLAY.armor && p.armor < 50) {
-          p.armor = 50;
-          G.hud.showNotif('Bought a vest — Armor restored');
+        const healed = p.hp < p.hpMax;
+        const vested = GAMEPLAY.armor && p.armor < 50;
+        if (healed) p.hp = p.hpMax;
+        if (vested) p.armor = 50;
+        if (healed || vested) {
+          G.hud.showNotif('7-Eleven — ' + (healed && vested ? 'HP & armor restored' : healed ? 'HP restored' : 'armor restored'));
         }
       }
     }
+  }
+}
+
+// Show a banner when the player crosses into a named district.
+function updateDistrict() {
+  const p = G.player.group.position;
+  const poi = G.world.poi;
+  let zone;
+  if (p.x < -185) zone = { en: 'Riverside', th: 'ริมแม่น้ำ' };
+  else if (poi.yaowarat && dist2(p, poi.yaowarat) < 62*62) zone = { en: 'Yaowarat', th: 'เยาวราช' };
+  else if (poi.temple && dist2(p, poi.temple) < 46*46) zone = { en: 'The Wat', th: 'วัด' };
+  else zone = { en: 'Sukhumvit', th: 'สุขุมวิท' };
+  if (zone.en !== G._districtName) {
+    const first = G._districtName === undefined;   // don't banner the spawn district
+    G._districtName = zone.en;
+    if (!first) G.hud.showSubtitle(zone.en, zone.th, 2.2);
   }
 }
 
@@ -3532,6 +3560,7 @@ function loop() {
 
   if (G.state === 'playing') {
     updatePlayer(dt);
+    updateDistrict();
     updateInteraction(dt);
     updateGarage(dt);
     updateVehicles(dt);
