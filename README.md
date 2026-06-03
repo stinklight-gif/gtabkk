@@ -38,6 +38,7 @@ on first load. Click **ENTER THE CITY** when the loader finishes.
 | H | Honk (in vehicle) |
 | J | Start a taxi fare (in a songthaew) |
 | T | Phone — pauses pointer lock and shows menu |
+| P | Photo mode — free-fly camera + hidden HUD (WASD/Space/Ctrl to fly, Shift faster) |
 | G | *(dev)* grant 9mm pistol |
 | Esc | Release mouse / pause (click to resume) |
 
