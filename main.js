@@ -3249,7 +3249,9 @@ function updatePeds(dt) {
   if (G.peds.length > target && Math.random() < 0.03) {
     let fi = -1, fd = 80 * 80;
     for (let i = 0; i < G.peds.length; i++) {
-      const d = dist2(G.peds[i].mesh.position, playerPos);
+      const ped = G.peds[i];
+      if (ped.isMugger || ped.isTarget) continue;   // never thin mission-relevant peds
+      const d = dist2(ped.mesh.position, playerPos);
       if (d > fd) { fd = d; fi = i; }
     }
     if (fi >= 0) { G.scene.remove(G.peds[fi].mesh); disposeObject(G.peds[fi].mesh); G.peds.splice(fi, 1); }
