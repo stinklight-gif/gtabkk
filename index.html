@@ -57,6 +57,11 @@
 
   #stars { font-size: 22px; letter-spacing: 4px; color: #555; }
   #stars .on { color: var(--gold); text-shadow: 0 0 8px var(--gold); }
+  #stars.flash { animation: wantedflash .55s ease-out; }
+  @keyframes wantedflash {
+    0%   { transform: scale(1.6); filter: brightness(2.6) drop-shadow(0 0 10px var(--gold)); }
+    100% { transform: scale(1); filter: none; }
+  }
   #cash {
     margin-top: 4px; font-size: 22px; font-weight: bold;
     color: var(--cream); text-shadow: 0 1px 0 #000;

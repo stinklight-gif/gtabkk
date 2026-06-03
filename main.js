@@ -83,9 +83,15 @@ let _copsKilled = 0;
 // Bump wanted level and refresh the "last seen" tracker. Replaces the same
 // three-line pattern that was copy-pasted across combat/cop code.
 function raiseWanted(n) {
+  const prev = G.wanted.stars;
   G.wanted.stars = Math.max(G.wanted.stars, n);
   G.wanted.lastSeenAt = performance.now();
   G.wanted.lastSeenPos.copy(G.player.group.position);
+  if (G.wanted.stars > prev) {                 // escalation feedback
+    if (G.hud && G.hud.flashWanted) G.hud.flashWanted();
+    if (G.hud) G.hud.showNotif('WANTED ' + '★'.repeat(G.wanted.stars));
+    if (G.audio && G.audio.siren) G.audio.siren();
+  }
 }
 
 // Apply damage to the player, soaking into armor first when enabled.
@@ -2276,6 +2282,13 @@ function bindHud() {
     const stars = document.getElementById('stars');
     stars.innerHTML = '★★★★★'.split('').map((s, i) => `<span class="${i < n ? 'on' : ''}">${s}</span>`).join('');
   }
+  function flashWanted() {
+    const el = document.getElementById('stars');
+    if (!el) return;
+    el.classList.remove('flash');
+    void el.offsetWidth;   // reflow so the animation restarts on repeat escalations
+    el.classList.add('flash');
+  }
   function setCash(c) {
     document.getElementById('cash').textContent = Math.floor(c).toLocaleString();
     document.getElementById('ph-cash').textContent = Math.floor(c).toLocaleString();
@@ -2400,7 +2413,7 @@ function bindHud() {
   }
 
   return {
-    setStars, setCash, setBars, setAmmo, setMissionText, setClock, setWeather, setCrosshair, setPhoneStats, setVehicle,
+    setStars, flashWanted, setCash, setBars, setAmmo, setMissionText, setClock, setWeather, setCrosshair, setPhoneStats, setVehicle,
     showSubtitle, showPrompt, showNotif, togglePhone, update, drawMinimap
   };
 }
