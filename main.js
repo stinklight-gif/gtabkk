@@ -2228,6 +2228,12 @@ function bindHud() {
     notifT = dur;
   }
   function setMissionText(t) { document.getElementById('ph-mission').textContent = t; }
+  function setPhoneStats() {
+    const total = (G.world && G.world.collectibles) ? G.world.collectibles.length : 0;
+    document.getElementById('ph-amulets').textContent = `${G.collected || 0} / ${total}`;
+    document.getElementById('ph-fares').textContent = (G.taxi && G.taxi.fares) || 0;
+    document.getElementById('ph-cops').textContent = _copsKilled || 0;
+  }
   function setClock(s) { document.getElementById('clock').textContent = s; document.getElementById('ph-time').textContent = s; }
   function setWeather(t) { document.getElementById('weather-tag').textContent = t; }
   function setCrosshair(show) { crosshair.classList.toggle('show', !!show); }
@@ -2292,7 +2298,7 @@ function bindHud() {
   }
 
   return {
-    setStars, setCash, setBars, setAmmo, setMissionText, setClock, setWeather, setCrosshair,
+    setStars, setCash, setBars, setAmmo, setMissionText, setClock, setWeather, setCrosshair, setPhoneStats,
     showSubtitle, showPrompt, showNotif, togglePhone, update, drawMinimap
   };
 }
@@ -3797,6 +3803,41 @@ function taxiClear(t) {
   if (t.beam) t.beam.visible = false;
 }
 
+// Full-screen, north-up map overlay (TAB). Draws the minimap base scaled up plus
+// live markers (amulets, mission/taxi, cops, player heading).
+let _fullmapCtx = null;
+function drawFullMap() {
+  const cv = document.getElementById('fullmap');
+  if (!cv) return;
+  const ctx = _fullmapCtx || (_fullmapCtx = cv.getContext('2d'));
+  const S = cv.width;
+  ctx.clearRect(0, 0, S, S);
+  if (G.world && G.world.minimap) ctx.drawImage(G.world.minimap, 0, 0, S, S);
+  const to = v => (v + HALF) / (2 * HALF) * S;
+  if (G.world.collectibles) {
+    ctx.fillStyle = '#ffcf4a';
+    for (const a of G.world.collectibles) if (!a.taken) {
+      ctx.beginPath(); ctx.arc(to(a.mesh.position.x), to(a.mesh.position.z), 3.5, 0, TAU); ctx.fill();
+    }
+  }
+  if (G.mission && G.mission.active && G.mission.active.markerPos) {
+    ctx.fillStyle = '#ff2a86';
+    ctx.beginPath(); ctx.arc(to(G.mission.active.markerPos.x), to(G.mission.active.markerPos.z), 7, 0, TAU); ctx.fill();
+  }
+  if (G.taxi && G.taxi.markerPos) {
+    ctx.fillStyle = G.taxi.stage === 'toDropoff' ? '#39ff7a' : '#ffcf4a';
+    ctx.beginPath(); ctx.arc(to(G.taxi.markerPos.x), to(G.taxi.markerPos.z), 7, 0, TAU); ctx.fill();
+  }
+  ctx.fillStyle = '#ff3333';
+  for (const v of G.vehicles) if (v.isCop && v.driver) { ctx.beginPath(); ctx.arc(to(v.pos.x), to(v.pos.z), 3.5, 0, TAU); ctx.fill(); }
+  const px = to(G.player.group.position.x), py = to(G.player.group.position.z);
+  const fx = -Math.sin(G.player.yaw), fz = -Math.cos(G.player.yaw);
+  ctx.strokeStyle = '#21f0ff'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + fx * 14, py + fz * 14); ctx.stroke();
+  ctx.fillStyle = '#21f0ff';
+  ctx.beginPath(); ctx.arc(px, py, 5, 0, TAU); ctx.fill();
+}
+
 function updateGarage(dt) {
   const p = G.player;
   if (!p.inVehicle || !G.world.garages) return;
@@ -3835,12 +3876,20 @@ function loop() {
   const dt = Math.min(0.05, G.clock.getDelta());
 
   // phone toggle
-  if (G.input && G.input.pressed && G.input.pressed('KeyT')) {
+  if (G.input && G.input.pressed && G.input.pressed('KeyT') && (G.state === 'playing' || G.state === 'phone')) {
     const open = !document.getElementById('phone').classList.contains('open');
     G.hud.togglePhone(open);
     G.state = open ? 'phone' : 'playing';
-    if (open) document.exitPointerLock();
+    if (open) { document.exitPointerLock(); G.hud.setPhoneStats(); }
     else G.input.requestLock();
+  }
+
+  // full-map overlay (TAB)
+  if (G.input && G.input.pressed && G.input.pressed('Tab') && (G.state === 'playing' || G.state === 'map')) {
+    G.showMap = !G.showMap;
+    document.getElementById('fullmap-wrap').classList.toggle('show', G.showMap);
+    G.state = G.showMap ? 'map' : 'playing';
+    if (G.showMap) document.exitPointerLock(); else G.input.requestLock();
   }
 
   if (G.state === 'playing') {
@@ -3870,6 +3919,9 @@ function loop() {
     if (G.input.endFrame) G.input.endFrame();
   } else if (G.state === 'phone') {
     updateCamera(dt);
+    if (G.input.endFrame) G.input.endFrame();
+  } else if (G.state === 'map') {
+    drawFullMap();
     if (G.input.endFrame) G.input.endFrame();
   }
 

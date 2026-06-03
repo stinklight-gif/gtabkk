@@ -87,7 +87,7 @@ Everything lives in two files:
 | 6 | NPCs | Procedural ped/dog meshes with variety (locals, saffron-robed monks, backpacked tourists). `spawnPeds`, `spawnDogs`, `spawnTraffic`. District banners (`updateDistrict`) announce Yaowarat / The Wat / Riverside / Sukhumvit on entry. |
 | 7 | Rain | Particle points re-centered on the player each frame, opacity fades with weather. |
 | 8 | Engine init | Renderer, lights (sun + hemi + ambient), camera, audio, world build, player, vehicles, peds, dogs. Loading bar + start gate. |
-| 9 | HUD | Star/cash/HP/stamina/ammo/clock/weather binds, subtitle + prompt + notif queues, phone toggle, minimap renderer (camera-yaw rotated, mission marker + cop dots). |
+| 9 | HUD | Star/cash/HP/stamina/ammo/clock/weather binds, subtitle + prompt + notif queues, phone (T) with live stats (amulets/fares/cops), full north-up map overlay (TAB), minimap renderer (camera-yaw rotated, mission + taxi markers + cop dots). |
 | 10 | Mission system | Stage-based; the `welcome` mission listens for player proximity to the gold shop POI. Add more to the `missions` object. |
 | 11 | Collisions | AABB pushback for player and vehicle vs buildings. World-bound clamping. |
 | 12 | Player update | Movement, sprint+stamina, jump, in-vehicle controls, exit on E, leg-bob animation, 7-Eleven door chime trigger. |

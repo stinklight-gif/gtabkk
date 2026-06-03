@@ -87,6 +87,10 @@
     background: #1a1d22;
   }
   #minimap { width: 100%; height: 100%; display: block; }
+  #fullmap-wrap { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(8,10,14,0.84); z-index: 60; }
+  #fullmap-wrap.show { display: flex; }
+  #fullmap { border: 2px solid var(--neon-cyan); box-shadow: 0 0 36px rgba(33,240,255,0.28); width: 86vmin; height: 86vmin; image-rendering: pixelated; }
+  #fullmap-wrap .map-hint { position: absolute; bottom: 4%; color: #9ffbe0; font-size: 13px; letter-spacing: 3px; }
   #compass {
     text-align: center; margin-top: 6px; font-size: 10px; letter-spacing: 4px; opacity: .8;
   }
@@ -233,6 +237,9 @@
     <div class="row"><span class="k">[$]</span> Cash: ฿<span id="ph-cash">0</span></div>
     <div class="row"><span class="k">[D]</span> District: <span id="ph-district">Sukhumvit</span></div>
     <div class="row"><span class="k">[T]</span> Time: <span id="ph-time">06:00</span></div>
+    <div class="row"><span class="k">[A]</span> Amulets: <span id="ph-amulets">0 / 15</span></div>
+    <div class="row"><span class="k">[F]</span> Fares run: <span id="ph-fares">0</span></div>
+    <div class="row"><span class="k">[K]</span> Cops down: <span id="ph-cops">0</span></div>
     <div class="row" style="opacity:.5;font-size:11px;margin-top:6px">press <b>T</b> to close</div>
   </div>
 
@@ -240,8 +247,13 @@
     <kbd>WASD</kbd> move · <kbd>SHIFT</kbd> sprint<br/>
     <kbd>SPACE</kbd> jump / handbrake · <kbd>E</kbd> enter/exit<br/>
     <kbd>F</kbd> attack · <kbd>Q</kbd> weapon · <kbd>R</kbd> reload<br/>
-    <kbd>B</kbd> bribe · <kbd>T</kbd> phone · <kbd>TAB</kbd> map
+    <kbd>B</kbd> bribe · <kbd>J</kbd> taxi · <kbd>T</kbd> phone · <kbd>TAB</kbd> map
   </div>
+</div>
+
+<div id="fullmap-wrap">
+  <canvas id="fullmap" width="760" height="760"></canvas>
+  <div class="map-hint">KRUNG THEP — press TAB to close</div>
 </div>
 
 <script type="module" src="./main.js"></script>
