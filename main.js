@@ -2275,12 +2275,16 @@ function makeMissionSystem() {
             G.audio.blip({ freq: 760, dur: 0.08, gain: 0.12 });
           }
         } else if (this.stage === 5) {
-          // job available again — return to the start line to replay
+          // job available — leave, then return to the marker to start the next job
           const d2 = dist2(G.player.group.position, this.markerPos);
           if (!this.armed && d2 > 18*18) this.armed = true;
           if (this.armed) {
-            G.hud.showPrompt('Return to the <b>marker</b> to run <b>Soi Run</b> again', 0.4);
-            if (d2 < 8*8) { this.armed = false; this.onStart(); }
+            const label = this.nextJob === 'hit' ? 'start <b>The Hit</b>' : 'run <b>Soi Run</b> again';
+            G.hud.showPrompt('Return to the <b>marker</b> to ' + label, 0.4);
+            if (d2 < 8*8) {
+              this.armed = false;
+              if (this.nextJob) sys.start(this.nextJob); else this.onStart();
+            }
           }
         }
       },
@@ -2288,20 +2292,85 @@ function makeMissionSystem() {
         G.cash += this.reward;
         G.hud.setCash(G.cash);
         G.hud.showNotif(`Soi Run complete: +฿${this.reward.toLocaleString()}`);
-        G.hud.showSubtitle("Uncle Seng: \"Fast hands, fast wheels. Nice.\"", "ลุงเซ้ง: \"เร็วดีนี่\"");
-        this.toReoffer();
+        G.hud.showSubtitle("Uncle Seng: \"Fast hands, fast wheels. There's other work...\"", "ลุงเซ้ง: \"เร็วดีนี่ มีงานอีก\"");
+        this.toReoffer('hit');   // winning unlocks The Hit
       },
       fail() {
         G.hud.showNotif('Soi Run failed — out of time');
-        G.hud.showSubtitle("Uncle Seng: \"Too slow. Try again sometime.\"", "ลุงเซ้ง: \"ช้าไป\"");
-        this.toReoffer();
+        G.hud.showSubtitle("Uncle Seng: \"Too slow. Try again.\"", "ลุงเซ้ง: \"ช้าไป ลองใหม่\"");
+        this.toReoffer(null);    // retry Soi Run
       },
-      toReoffer() {
+      toReoffer(next) {
         this.stage = 5;
         this.armed = false;
+        this.nextJob = next || null;
         G.hud.setMissionText('Free Roam · Sukhumvit');
         this.markerPos = this.startLine.clone();
         setBeam(this.markerPos, 0xff2a86);
+      },
+    },
+
+    // Mission 3 — a combat hit: chase down and eliminate a 4-person crew.
+    hit: {
+      name: 'The Hit',
+      markerPos: null,
+      stage: 0,
+      armed: false,
+      nextJob: null,
+      targets: [],
+      base: new THREE.Vector3(80, 0, -80),
+      reward: 2000,
+      onStart() {
+        this.stage = 1;
+        this.targets = [];
+        for (let k = 0; k < 4; k++) {
+          const ped = spawnPed(G.scene, new THREE.Vector3(this.base.x + rand(-7, 7), 0, this.base.z + rand(-7, 7)));
+          ped.isTarget = true;
+          ped.speed = rand(2.2, 3.0);
+          const parts = ped.mesh.userData.parts;
+          if (parts) parts.torso.material = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.7 });
+          // own material per marker so disposing one dead target can't break the others
+          const mk = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8),
+            new THREE.MeshStandardMaterial({ color: 0xff2a86, emissive: 0xff2a86, emissiveIntensity: 0.8, roughness: 0.5 }));
+          mk.position.set(0, 2.5, 0); ped.mesh.add(mk);
+          this.targets.push(ped);
+        }
+        this.markerPos = this.base.clone();
+        setBeam(this.base, 0xff2a86);
+        G.hud.setMissionText('The Hit');
+        G.hud.showSubtitle("Uncle Seng: \"Four of 'em by Soi 80. Take them out.\"", "ลุงเซ้ง: \"จัดการให้ที\"");
+        G.hud.showPrompt('Eliminate the <b>marked crew</b> (0/4)', 3);
+      },
+      update(dt) {
+        if (this.stage === 1) {
+          let dead = 0, near = null, nd = Infinity;
+          for (const t of this.targets) {
+            if (t.dead) { dead++; continue; }
+            const d = dist2(t.mesh.position, G.player.group.position);
+            if (d < nd) { nd = d; near = t; }
+          }
+          G.hud.showPrompt(`The Hit — crew down ${dead}/${this.targets.length}`, 0.4);
+          if (near) { this.markerPos = near.mesh.position; setBeam(near.mesh.position, 0xff2a86); }
+          if (dead >= this.targets.length) this.win();
+        } else if (this.stage === 5) {
+          const d2 = dist2(G.player.group.position, this.markerPos);
+          if (!this.armed && d2 > 18*18) this.armed = true;
+          if (this.armed) {
+            G.hud.showPrompt('Return to the <b>marker</b> for another <b>Hit</b>', 0.4);
+            if (d2 < 8*8) { this.armed = false; this.onStart(); }
+          }
+        }
+      },
+      win() {
+        this.stage = 5;
+        this.armed = false;
+        G.cash += this.reward;
+        G.hud.setCash(G.cash);
+        G.hud.showNotif(`Hit complete: +฿${this.reward.toLocaleString()}`);
+        G.hud.showSubtitle("Uncle Seng: \"Clean enough. Lay low for a bit.\"", "ลุงเซ้ง: \"เก่ง หลบหน่อย\"");
+        G.hud.setMissionText('Free Roam · Sukhumvit');
+        this.markerPos = this.base.clone();
+        setBeam(this.base, 0xff2a86);
       },
     },
   };

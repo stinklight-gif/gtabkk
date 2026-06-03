@@ -55,6 +55,12 @@ the clock runs out; every one buys you extra seconds. ฿1,500 on completion, an
 it's replayable from the start line. Tune the timer/route via `startTime`,
 `cpBonus`, and `route` in the `soiRun` mission object.
 
+**The Hit (mission 3).** Winning Soi Run unlocks it. Return to the marker to
+start, then drive to Soi 80 and eliminate the four **marked crew** (pink
+markers over their heads) — fists, pistol, or the SMG. They scatter when
+attacked and the gunfire draws cops, so it doubles as a wanted-level/escape
+loop (duck into the U-Spray after). ฿2,000 on completion, replayable.
+
 ## Architecture
 
 Everything lives in two files:
