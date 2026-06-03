@@ -110,6 +110,11 @@ function onCopKilled() {
     updateAmmoHud();
     G.hud.showNotif('Picked up a 9mm');
   }
+  // sustained cop-killing brings out the unmarked Crime Suppression units (3★)
+  if (_copsKilled >= 3 && G.wanted.stars < 3) {
+    raiseWanted(3);
+    G.hud.showNotif('Crime Suppression deployed ★★★');
+  }
 }
 
 // Free GPU resources for a mesh/group that's leaving the scene for good.
@@ -1475,6 +1480,26 @@ function makeVehicleMesh(kind) {
     }
     g.userData.dims = { L: 3.8, W: 2.0, H: 2.2 };
     g.userData.spec = { topSpeed: 28, accel: 13, brake: 18, turn: 1.7, mass: 1800, kind: 'cop' };
+  } else if (kind === 'fortuner') {
+    // unmarked Crime Suppression SUV — dark, no light bar, just a dash flasher
+    const paint = 0x15161c;
+    const paintMat = new THREE.MeshStandardMaterial({ color: paint, roughness: 0.5, metalness: 0.5 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.95, 1.15, 3.7), paintMat);
+    body.position.y = 0.95; g.add(body);
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.95, 2.4), paintMat);
+    cab.position.set(0, 1.75, -0.1); g.add(cab);
+    const windshield = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.7), new THREE.MeshBasicMaterial({ color: 0x111820, transparent: true, opacity: 0.7 }));
+    windshield.position.set(0, 1.85, 1.12); g.add(windshield);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111 });
+    for (const z of [-1.35, 1.35]) for (const x of [-0.92, 0.92]) {
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.44, 0.32, 14), wheelMat);
+      w.rotation.z = PI/2; w.position.set(x, 0.44, z); g.add(w);
+    }
+    // small red dash flasher (static) — the only tell that it's police
+    const dash = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.06, 0.12), new THREE.MeshBasicMaterial({ color: 0xff2222 }));
+    dash.position.set(0, 1.55, 1.0); g.add(dash);
+    g.userData.dims = { L: 4.0, W: 2.0, H: 2.3 };
+    g.userData.spec = { topSpeed: 32, accel: 15, brake: 19, turn: 1.7, mass: 2000, kind: 'fortuner' };
   } else if (kind === 'camry' || kind === 'sedan') {
     const color = kind === 'sedan' ? pick([0x222, 0xf5f5f5, 0xc23a3a, 0x335a99, 0x8c8c8c]) : 0xeeeeee;
     const body = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.9, 3.6), new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.4 }));
@@ -1509,7 +1534,7 @@ function makeVehicle(kind, scene) {
     driver: null,      // 'player' | npc obj | null
     npc: null,
     audio: null,
-    isCop: kind === 'cop',
+    isCop: kind === 'cop' || kind === 'fortuner',
     boundsHalf: { x: mesh.userData.dims.W * 0.5, z: mesh.userData.dims.L * 0.5 },
   };
   G.vehicles.push(veh);
@@ -2756,6 +2781,19 @@ function spawnCopCar(scene, pos) {
   return v;
 }
 
+// Unmarked Crime Suppression SUV — the 3★ unit. isCop (set in makeVehicle), so it
+// reuses the cop chase/minimap/damage/death plumbing; just faster and tankier.
+function spawnFortuner(scene, pos) {
+  const v = makeVehicle('fortuner', scene);
+  v.pos.copy(pos);
+  v.mesh.position.copy(v.pos);
+  v.heading = rand(0, TAU);
+  v.driver = 'cop';
+  v.hp = 250;
+  v.vel = 0;
+  return v;
+}
+
 function killCop(cop) {
   if (cop.dead) return;
   cop.dead = true;
@@ -2784,7 +2822,7 @@ function updateWanted(dt) {
   }
 
   // spawn cops based on stars — foot cops live in G.cops, cop cars in G.vehicles
-  const desiredCops = G.wanted.stars >= 2 ? 4 : G.wanted.stars >= 1 ? 2 : 0;
+  const desiredCops = G.wanted.stars >= 3 ? 6 : G.wanted.stars >= 2 ? 4 : G.wanted.stars >= 1 ? 2 : 0;
   let alive = 0;
   for (const c of G.cops) if (!c.dead) alive++;
   for (const v of G.vehicles) if (v.isCop && !v.dead && v.driver) alive++;
@@ -2794,7 +2832,10 @@ function updateWanted(dt) {
     const r = rand(35, 60);
     const sx = clamp(p.x + Math.cos(ang) * r, -HALF + 5, HALF - 5);
     const sz = clamp(p.z + Math.sin(ang) * r, -HALF + 5, HALF - 5);
-    if (G.wanted.stars >= 2 && Math.random() < 0.6) {
+    if (G.wanted.stars >= 3 && Math.random() < 0.6) {
+      const f = spawnFortuner(G.scene, new THREE.Vector3(sx, 0, sz));
+      f.vel = 8;
+    } else if (G.wanted.stars >= 2 && Math.random() < 0.6) {
       const car = spawnCopCar(G.scene, new THREE.Vector3(sx, 0, sz));
       car.vel = 6;
     } else {
@@ -3003,7 +3044,7 @@ function updateInteraction(dt) {
 }
 
 function vehicleName(k) {
-  return { bike: 'motorbike', tuktuk: 'tuk-tuk', hilux: 'pickup', camry: 'car', sedan: 'sedan', cop: 'cop pickup' }[k] || k;
+  return { bike: 'motorbike', tuktuk: 'tuk-tuk', hilux: 'pickup', camry: 'car', sedan: 'sedan', cop: 'cop pickup', fortuner: 'unmarked SUV' }[k] || k;
 }
 
 // =============================================================================
