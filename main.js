@@ -3094,6 +3094,49 @@ function updatePeds(dt) {
   }
 }
 
+// Random "bag-snatcher" street event — a marked ped flees (reusing the panic AI);
+// run them down for a bounty. Delivers on the intro's "beat up muggers".
+function updateMuggings(dt) {
+  const m = G.mugging;
+  if (m) {
+    m.t += dt;
+    if (m.ped.dead) {                                  // player took them down
+      const reward = 250;
+      G.cash += reward; G.hud.setCash(G.cash);
+      G.hud.showNotif(`Stopped the snatcher! +฿${reward}`);
+      G.audio.blip({ freq: 720, dur: 0.12, gain: 0.12 });
+      G.mugging = null; G._mugTimer = 0;
+      return;
+    }
+    if (m.t > 30) {                                    // got away — revert to a normal civilian
+      m.ped.isMugger = false; m.ped.panicT = 0;
+      if (m.marker) { if (m.marker.parent) m.marker.parent.remove(m.marker); disposeObject(m.marker); }
+      G.hud.showNotif('The snatcher got away.');
+      G.mugging = null; G._mugTimer = 0;
+      return;
+    }
+    m.ped.panicT = 2;                                  // keep them fleeing
+    return;
+  }
+  // maybe kick off a new one
+  G._mugTimer = (G._mugTimer || 0) + dt;
+  if (G._mugTimer < 40 || G.peds.length === 0 || Math.random() > 0.01) return;
+  const pp = G.player.group.position;
+  const ang = rand(0, TAU), r = rand(16, 26);
+  const pos = new THREE.Vector3(
+    clamp(pp.x + Math.cos(ang) * r, -HALF + 6, HALF - 6), 0,
+    clamp(pp.z + Math.sin(ang) * r, -HALF + 6, HALF - 6));
+  const ped = spawnPed(G.scene, pos);
+  ped.isMugger = true; ped.panicT = 3;
+  const parts = ped.mesh.userData.parts;
+  if (parts) parts.torso.material = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.8 });
+  const marker = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8),
+    new THREE.MeshStandardMaterial({ color: 0xff7a2a, emissive: 0xff7a2a, emissiveIntensity: 0.8, roughness: 0.5 }));
+  marker.position.set(0, 2.5, 0); ped.mesh.add(marker);
+  G.mugging = { ped, t: 0, marker };
+  G.hud.showNotif('Bag-snatcher! Run them down.');
+}
+
 function updateDogs(dt) {
   const playerPos = G.player.group.position;
   for (const dog of G.dogs) {
@@ -3972,6 +4015,7 @@ function loop() {
     updateTaxi(dt);
     updateVehicles(dt);
     updatePeds(dt);
+    updateMuggings(dt);
     updateDogs(dt);
     updateFootCops(dt);
     updateBullets(dt);
