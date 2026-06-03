@@ -1673,10 +1673,11 @@ function makePlayer(scene) {
     stam: 100, stamMax: 100,
     armor: 0, armorMax: 100,
     sprintLock: false,
-    weapons: { fists: true, pistol: false, smg: false },
+    weapons: { fists: true, pistol: false, smg: false, shotgun: false },
     activeWeapon: 'fists',
     pistolAmmo: 0, pistolMag: 12, pistolReserve: 36,
     smgAmmo: 0, smgMag: 30, smgReserve: 90,
+    shotgunAmmo: 0, shotgunMag: 6, shotgunReserve: 24,
     inVehicle: null,
     // combat anim state
     attackTimer: 0, attackKind: null, attackCooldown: 0,
@@ -2073,9 +2074,10 @@ function saveGame() {
     if (!p) return;
     localStorage.setItem(SAVE_KEY, JSON.stringify({
       cash: G.cash, armor: p.armor, dayT: G.time.dayT, copsKilled: _copsKilled,
-      weapons: { pistol: !!p.weapons.pistol, smg: !!p.weapons.smg },
+      weapons: { pistol: !!p.weapons.pistol, smg: !!p.weapons.smg, shotgun: !!p.weapons.shotgun },
       pistolAmmo: p.pistolAmmo, pistolReserve: p.pistolReserve,
       smgAmmo: p.smgAmmo, smgReserve: p.smgReserve,
+      shotgunAmmo: p.shotgunAmmo, shotgunReserve: p.shotgunReserve,
       amulets: (G.world.collectibles || []).map(a => a.taken),
       collected: G.collected || 0,
       welcomeDone: !!G._welcomeDone,
@@ -2097,10 +2099,13 @@ function loadGame() {
   if (s.weapons) {
     p.weapons.pistol = !!s.weapons.pistol;
     p.weapons.smg = !!s.weapons.smg;
+    p.weapons.shotgun = !!s.weapons.shotgun;
     if (typeof s.pistolAmmo === 'number') p.pistolAmmo = s.pistolAmmo;
     if (typeof s.pistolReserve === 'number') p.pistolReserve = s.pistolReserve;
     if (typeof s.smgAmmo === 'number') p.smgAmmo = s.smgAmmo;
     if (typeof s.smgReserve === 'number') p.smgReserve = s.smgReserve;
+    if (typeof s.shotgunAmmo === 'number') p.shotgunAmmo = s.shotgunAmmo;
+    if (typeof s.shotgunReserve === 'number') p.shotgunReserve = s.shotgunReserve;
   }
   if (Array.isArray(s.amulets) && G.world.collectibles) {
     s.amulets.forEach((taken, i) => {
@@ -2963,13 +2968,14 @@ function updatePlayerInVehicle(dt) {
   if (p.attackCooldown > 0) p.attackCooldown -= dt;
   if (p.gunRecoil > 0) p.gunRecoil = Math.max(0, p.gunRecoil - dt * 6);
   if (G.input.pressed('KeyQ')) cycleWeapon();
-  if (p.activeWeapon !== 'fists' && (p.weapons.pistol || p.weapons.smg)) {
+  if (p.activeWeapon !== 'fists' && p.weapons[p.activeWeapon]) {
     G.hud.setCrosshair(G.input.rightDown);
-    const isSmg = p.activeWeapon === 'smg' && p.weapons.smg;
-    const ammo = isSmg ? 'smgAmmo' : 'pistolAmmo';
+    const w = p.activeWeapon;            // 'pistol' | 'smg' | 'shotgun'
+    const ammo = w + 'Ammo';
+    const cd = w === 'smg' ? 0.07 : w === 'shotgun' ? 0.8 : 0.18;
     if (G.input.mouseDown && p.attackCooldown <= 0 && p[ammo] > 0) {
-      if (isSmg) fireSMG(); else firePistol();
-      p[ammo]--; p.attackCooldown = isSmg ? 0.07 : 0.18; p.gunRecoil = 1;
+      if (w === 'smg') fireSMG(); else if (w === 'shotgun') fireShotgun(); else firePistol();
+      p[ammo]--; p.attackCooldown = cd; p.gunRecoil = 1;
       updateAmmoHud();
     }
   } else {
@@ -3271,9 +3277,10 @@ function cycleWeapon() {
   const owned = ['fists'];
   if (p.weapons.pistol) owned.push('pistol');
   if (p.weapons.smg) owned.push('smg');
+  if (p.weapons.shotgun) owned.push('shotgun');
   const idx = owned.indexOf(p.activeWeapon);
   p.activeWeapon = owned[(idx + 1) % owned.length];
-  p.pistol.visible = (p.activeWeapon === 'pistol' || p.activeWeapon === 'smg');
+  p.pistol.visible = (p.activeWeapon !== 'fists');
   updateAmmoHud();
 }
 
@@ -3305,6 +3312,12 @@ function updateCombat(dt) {
     const need = p.smgMag - p.smgAmmo;
     const take = Math.min(need, p.smgReserve);
     p.smgAmmo += take; p.smgReserve -= take;
+    G.audio.reload(); updateAmmoHud();
+  }
+  if (G.input.pressed('KeyR') && p.activeWeapon === 'shotgun' && p.shotgunAmmo < p.shotgunMag && p.shotgunReserve > 0) {
+    const need = p.shotgunMag - p.shotgunAmmo;
+    const take = Math.min(need, p.shotgunReserve);
+    p.shotgunAmmo += take; p.shotgunReserve -= take;
     G.audio.reload(); updateAmmoHud();
   }
 
@@ -3364,6 +3377,22 @@ function updateCombat(dt) {
       G.audio.blip({freq: 200, dur: 0.04, type: 'square', gain: 0.05});
       p.attackCooldown = 0.25;
     }
+  } else if (p.activeWeapon === 'shotgun' && p.weapons.shotgun) {
+    p.pistol.visible = true;
+    const recoil = p.gunRecoil || 0;
+    p.armR.rotation.x = -0.6 + recoil * 0.6;
+    p.pistol.position.set(0.42, 1.25, 0.5);
+    p.pistol.rotation.set(-0.6 + recoil * 0.6, 0, 0);
+    G.hud.setCrosshair(G.input.rightDown);
+    if (G.input.mouseDown && p.attackCooldown <= 0 && p.shotgunAmmo > 0) {
+      fireShotgun();
+      p.shotgunAmmo--; p.attackCooldown = 0.8;   // slow, punchy
+      p.gunRecoil = 1;
+      updateAmmoHud();
+    } else if (G.input.mouseDown && p.shotgunAmmo === 0 && p.attackCooldown <= 0) {
+      G.audio.blip({freq: 200, dur: 0.04, type: 'square', gain: 0.05});
+      p.attackCooldown = 0.3;
+    }
   }
 }
 
@@ -3371,6 +3400,7 @@ function updateAmmoHud() {
   const p = G.player;
   if (p.activeWeapon === 'fists') G.hud.setAmmo('FISTS', 'MUAY THAI');
   else if (p.activeWeapon === 'smg') G.hud.setAmmo(`${p.smgAmmo} / ${p.smgReserve}`, 'SMG');
+  else if (p.activeWeapon === 'shotgun') G.hud.setAmmo(`${p.shotgunAmmo} / ${p.shotgunReserve}`, 'SHOTGUN');
   else G.hud.setAmmo(`${p.pistolAmmo} / ${p.pistolReserve}`, '9MM PISTOL');
 }
 
@@ -3455,6 +3485,28 @@ function fireSMG() {
   G.camRig.shake = Math.max(G.camRig.shake, 0.05);
   doBulletRaycast(origin, _fireDir, 22);
   scarePeds(origin, 14);
+}
+
+function fireShotgun() {
+  const origin = G.camera.position;
+  if (!_muzzleLight) { _muzzleLight = new THREE.PointLight(0xffd577, 0, 6, 2); G.scene.add(_muzzleLight); }
+  _muzzleLight.position.copy(origin);
+  _muzzleLight.intensity = 3.2; _muzzleT = 0.07;
+  G.audio.shot();
+  G.camRig.shake = Math.max(G.camRig.shake, 0.12);
+  // a spread of pellets — devastating up close, weak at range
+  for (let i = 0; i < 8; i++) {
+    G.camera.getWorldDirection(_fireDir);
+    _fireDir.x += rand(-0.08, 0.08);
+    _fireDir.y += rand(-0.08, 0.08);
+    _fireDir.z += rand(-0.08, 0.08);
+    _fireDir.normalize();
+    const pellet = new THREE.Mesh(G.bulletGeom, G.bulletMat);
+    pellet.position.copy(origin); G.scene.add(pellet);
+    G.bullets.push({ mesh: pellet, vel: _fireDir.clone().multiplyScalar(80), life: 0.5 });
+    doBulletRaycast(origin, _fireDir, 11);
+  }
+  scarePeds(origin, 16);
 }
 
 function doBulletRaycast(origin, dir, dmg = 35) {
@@ -3832,6 +3884,7 @@ function updateGunShop(dt) {
   if (!shop || dist2(p.group.position, shop) > 7 * 7) return;
   let label, cost, action;
   if (!p.weapons.pistol)    { label = 'Buy 9mm Pistol'; cost = 800;  action = 'pistol'; }
+  else if (!p.weapons.shotgun) { label = 'Buy Shotgun'; cost = 2500; action = 'shotgun'; }
   else if (!p.weapons.smg)  { label = 'Buy SMG';        cost = 4000; action = 'smg'; }
   else                      { label = 'Buy ammo';       cost = 300;  action = 'ammo'; }
   G.hud.showPrompt(`Gun shop — <b>E</b>: ${label} (฿${cost})`, 0.4);
@@ -3840,7 +3893,8 @@ function updateGunShop(dt) {
     G.cash -= cost; G.hud.setCash(G.cash);
     if (action === 'pistol')   { p.weapons.pistol = true; p.pistolAmmo = p.pistolMag; p.pistolReserve = p.pistolMag * 3; }
     else if (action === 'smg') { p.weapons.smg = true; p.smgAmmo = p.smgMag; p.smgReserve = p.smgMag * 3; }
-    else { p.pistolReserve += p.pistolMag * 3; if (p.weapons.smg) p.smgReserve += p.smgMag * 3; }
+    else if (action === 'shotgun') { p.weapons.shotgun = true; p.shotgunAmmo = p.shotgunMag; p.shotgunReserve = p.shotgunMag * 3; }
+    else { p.pistolReserve += p.pistolMag * 3; if (p.weapons.smg) p.smgReserve += p.smgMag * 3; if (p.weapons.shotgun) p.shotgunReserve += p.shotgunMag * 3; }
     updateAmmoHud();
     G.hud.showNotif(label + ' ✓');
     G.audio.blip({ freq: 600, dur: 0.1, gain: 0.12 });
