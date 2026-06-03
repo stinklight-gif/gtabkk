@@ -48,6 +48,13 @@ Uncle Seng's gold shop in the south-west corner of the map. ฿800 reward on
 arrival. After that the world is open — try the bike, hit peds (gain stars),
 bribe your way out, watch the rain roll in.
 
+**Soi Run (mission 2).** Once you've delivered the envelope, Uncle Seng has a
+second job. Leave his shop and return to the **pink marker** to start *Soi Run* —
+a timed checkpoint race (you'll want the bike). Reach each cyan checkpoint before
+the clock runs out; every one buys you extra seconds. ฿1,500 on completion, and
+it's replayable from the start line. Tune the timer/route via `startTime`,
+`cpBonus`, and `route` in the `soiRun` mission object.
+
 ## Architecture
 
 Everything lives in two files:
@@ -135,7 +142,7 @@ chugs, raise the pedestrian/traffic despawn radius or drop pixel ratio.
 ## Roadmap (Phase 2+)
 
 See `gta.md` for the full vision. Next likely additions: Yaowarat (no-cars
-zone), Chao Phraya river + longtail boats, second mission ("Soi Run"),
+zone), Chao Phraya river + longtail boats,
 expanded weapon roster, expanded wanted system (3★ Crime Suppression
 unmarked Fortuners).
 
