@@ -102,6 +102,12 @@
   #pause.show { display: flex; }
   #pause h2 { color: var(--neon-cyan); letter-spacing: 6px; font-size: 30px; margin: 0 0 6px; }
   #pause p { color: #9ffbe0; letter-spacing: 2px; font-size: 14px; margin: 0; }
+  #options { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 14px; background: rgba(8,10,14,0.85); z-index: 75; }
+  #options.show { display: flex; }
+  #options h3 { color: var(--neon-cyan); letter-spacing: 4px; margin: 0 0 4px; }
+  #options label { color: #cfe3e0; font-size: 14px; display: flex; flex-direction: column; gap: 6px; align-items: center; }
+  #options input[type=range] { width: 280px; }
+  #options .opt-hint { color: #9ffbe0; font-size: 12px; opacity: .8; margin-top: 8px; }
   #gameover { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; background: rgba(18,3,3,0.8); z-index: 80; cursor: pointer; }
   #gameover.show { display: flex; }
   #gameover .go-title { color: #ff3344; letter-spacing: 10px; font-size: 56px; margin: 0; text-shadow: 0 0 24px #ff3344; }
@@ -279,6 +285,13 @@
 </div>
 
 <div id="pause"><h2>PAUSED</h2><p>click to resume</p></div>
+
+<div id="options">
+  <h3>OPTIONS</h3>
+  <label>Mouse sensitivity <input id="opt-sens" type="range" min="0.3" max="2.5" step="0.1" value="1"></label>
+  <label>Master volume <input id="opt-vol" type="range" min="0" max="1" step="0.05" value="0.55"></label>
+  <div class="opt-hint">press O to close</div>
+</div>
 
 <div id="gameover">
   <h1 class="go-title">WASTED</h1>
