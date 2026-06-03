@@ -3387,6 +3387,15 @@ function doMeleeHit(kind) {
   if (hitSomething) G.audio.hit();
 }
 
+// Scatter nearby pedestrians (gunfire / explosions) — reuses the flee/panic AI.
+function scarePeds(pos, radius) {
+  const r2 = radius * radius;
+  for (const ped of G.peds) {
+    if (ped.dead) continue;
+    if (dist2(ped.mesh.position, pos) < r2) ped.panicT = Math.max(ped.panicT, 4);
+  }
+}
+
 function firePistol() {
   const origin = G.camera.position;          // used synchronously below; copied where stored
   G.camera.getWorldDirection(_fireDir);
@@ -3401,6 +3410,7 @@ function firePistol() {
   G.audio.shot();
   G.camRig.shake = Math.max(G.camRig.shake, 0.06);
   doBulletRaycast(origin, _fireDir);
+  scarePeds(origin, 14);
 }
 
 function fireSMG() {
@@ -3420,6 +3430,7 @@ function fireSMG() {
   G.audio.shot();
   G.camRig.shake = Math.max(G.camRig.shake, 0.05);
   doBulletRaycast(origin, _fireDir, 22);
+  scarePeds(origin, 14);
 }
 
 function doBulletRaycast(origin, dir, dmg = 35) {
@@ -3714,6 +3725,7 @@ function makeExplosion(pos) {
   G.camRig.shake = 0.6;
   G.audio.thunder();
   makeSmokeEmitter(pos.clone(), 2);
+  scarePeds(pos, 22);
 }
 
 function updateParticles(dt) {
