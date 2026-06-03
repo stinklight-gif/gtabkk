@@ -97,7 +97,7 @@ Everything lives in two files:
 | 16 | Particles / FX | Smoke emitter (vehicles below 30% HP), explosion (light flash + smoke + camera shake + thunder SFX). |
 | 17 | Interaction | Vehicle proximity check + E to enter. |
 | 18 | Camera update | Follow rig with smoothed distance, shake decay, in-vehicle chase view auto-aligns to vehicle heading. |
-| 19 | Day/Night + Weather | 4-min day cycle drives sun position, sky/fog colours, neon and street-lamp intensity. Rain phase kicks in after ~90 s. Dawn temple bell at 5–6 AM. |
+| 19 | Day/Night + Weather | 4-min day cycle drives sun position, sky/fog colours, neon and street-lamp intensity. Monsoon weather cycle (clear ⇄ drizzle/downpour that builds and breaks) with lightning flashes during heavy rain. Dawn temple bell at 5–6 AM. |
 | 20 | Main loop | Single `loop()` calls every system in order. |
 
 The mutable global is `window.GAME`. Useful while developing:
