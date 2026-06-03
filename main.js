@@ -4323,6 +4323,28 @@ function updateGarage(dt) {
   }
 }
 
+// Free-fly camera for photo mode: mouse to look, WASD to fly, Space/Ctrl up/down.
+function updatePhotoCam(dt) {
+  const pc = G.photoCam;
+  if (!pc) return;
+  const [dx, dy] = G.input.consumeMouseDelta();
+  pc.yaw -= dx * 0.0025;
+  pc.pitch = clamp(pc.pitch - dy * 0.0025, -1.4, 1.4);
+  const cp = Math.cos(pc.pitch), sp = Math.sin(pc.pitch), cy = Math.cos(pc.yaw), sy = Math.sin(pc.yaw);
+  const fwd = new THREE.Vector3(sy * cp, sp, cy * cp);
+  const right = new THREE.Vector3(cy, 0, -sy);
+  const speed = (G.input.down('ShiftLeft') ? 45 : 16) * dt;
+  if (G.input.down('KeyW')) pc.pos.addScaledVector(fwd, speed);
+  if (G.input.down('KeyS')) pc.pos.addScaledVector(fwd, -speed);
+  if (G.input.down('KeyD')) pc.pos.addScaledVector(right, speed);
+  if (G.input.down('KeyA')) pc.pos.addScaledVector(right, -speed);
+  if (G.input.down('Space')) pc.pos.y += speed;
+  if (G.input.down('ControlLeft')) pc.pos.y -= speed;
+  pc.pos.y = Math.max(0.5, pc.pos.y);
+  G.camera.position.copy(pc.pos);
+  G.camera.lookAt(pc.pos.clone().add(fwd));
+}
+
 function loop() {
   requestAnimationFrame(loop);
   const dt = Math.min(0.05, G.clock.getDelta());
@@ -4342,6 +4364,18 @@ function loop() {
     document.getElementById('fullmap-wrap').classList.toggle('show', G.showMap);
     G.state = G.showMap ? 'map' : 'playing';
     if (G.showMap) document.exitPointerLock(); else G.input.requestLock();
+  }
+
+  // photo mode (P): free-fly camera + hidden HUD, sim paused
+  if (G.input && G.input.pressed && G.input.pressed('KeyP') && (G.state === 'playing' || G.state === 'photo')) {
+    if (G.state === 'photo') {
+      G.state = 'playing';
+      document.getElementById('hud').classList.remove('hidden');
+    } else {
+      G.state = 'photo';
+      document.getElementById('hud').classList.add('hidden');
+      G.photoCam = { pos: G.camera.position.clone(), yaw: G.camRig.yaw, pitch: G.camRig.pitch };
+    }
   }
 
   if (G.state === 'playing') {
@@ -4395,6 +4429,9 @@ function loop() {
   } else if (G.state === 'paused') {
     if (G.input.endFrame) G.input.endFrame();
   } else if (G.state === 'dead') {
+    if (G.input.endFrame) G.input.endFrame();
+  } else if (G.state === 'photo') {
+    updatePhotoCam(dt);
     if (G.input.endFrame) G.input.endFrame();
   }
 
