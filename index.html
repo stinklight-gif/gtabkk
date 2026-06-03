@@ -108,6 +108,12 @@
   #options label { color: #cfe3e0; font-size: 14px; display: flex; flex-direction: column; gap: 6px; align-items: center; }
   #options input[type=range] { width: 280px; }
   #options .opt-hint { color: #9ffbe0; font-size: 12px; opacity: .8; margin-top: 8px; }
+  #store { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 10px; background: rgba(8,12,10,0.86); z-index: 75; }
+  #store.show { display: flex; }
+  #store h3 { color: #ff7a3a; letter-spacing: 4px; margin: 0 0 8px; }
+  #store button { font: inherit; color: #eaf6f2; background: #1b2a2a; border: 1px solid #2f6a5a; padding: 10px 18px; min-width: 280px; border-radius: 6px; cursor: pointer; letter-spacing: 1px; }
+  #store button:hover { background: #244a44; }
+  #store #store-leave { border-color: #555; margin-top: 6px; }
   #gameover { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; background: rgba(18,3,3,0.8); z-index: 80; cursor: pointer; }
   #gameover.show { display: flex; }
   #gameover .go-title { color: #ff3344; letter-spacing: 10px; font-size: 56px; margin: 0; text-shadow: 0 0 24px #ff3344; }
@@ -291,6 +297,14 @@
   <label>Mouse sensitivity <input id="opt-sens" type="range" min="0.3" max="2.5" step="0.1" value="1"></label>
   <label>Master volume <input id="opt-vol" type="range" min="0" max="1" step="0.05" value="0.55"></label>
   <div class="opt-hint">press O to close</div>
+</div>
+
+<div id="store">
+  <h3>7-ELEVEN</h3>
+  <button id="buy-snack">Snack — ฿20 (+40 HP)</button>
+  <button id="buy-drink">Energy drink — ฿30 (full stamina)</button>
+  <button id="buy-vest">Body armor — ฿200 (full)</button>
+  <button id="store-leave">Leave</button>
 </div>
 
 <div id="gameover">
