@@ -1375,9 +1375,10 @@ function makePlayer(scene) {
     stam: 100, stamMax: 100,
     armor: 0, armorMax: 100,
     sprintLock: false,
-    weapons: { fists: true, pistol: false },
+    weapons: { fists: true, pistol: false, smg: false },
     activeWeapon: 'fists',
     pistolAmmo: 0, pistolMag: 12, pistolReserve: 36,
+    smgAmmo: 0, smgMag: 30, smgReserve: 90,
     inVehicle: null,
     // combat anim state
     attackTimer: 0, attackKind: null, attackCooldown: 0,
@@ -2381,6 +2382,11 @@ function updateVehicles(dt) {
       makeExplosion(v.pos);
       v.vel = 0;
       if (v.isCop) { raiseWanted(2); onCopKilled(); }
+      if (v.kind === 'fortuner' && !G.player.weapons.smg) {
+        G.player.weapons.smg = true;
+        G.player.smgAmmo = G.player.smgMag;
+        G.hud.showNotif('Picked up an SMG');
+      }
       if (v.smoke) v.smoke.life = 0;   // stop the damage smoke
       // remove the wreck after a delay, freeing its GPU resources
       setTimeout(() => {
@@ -2572,9 +2578,12 @@ function updateCombat(dt) {
 
   // weapon cycle
   if (G.input.pressed('KeyQ')) {
-    p.activeWeapon = p.activeWeapon === 'fists' ? 'pistol' : 'fists';
-    if (p.activeWeapon === 'pistol' && !p.weapons.pistol) p.activeWeapon = 'fists';
-    p.pistol.visible = (p.activeWeapon === 'pistol');
+    const owned = ['fists'];
+    if (p.weapons.pistol) owned.push('pistol');
+    if (p.weapons.smg) owned.push('smg');
+    const idx = owned.indexOf(p.activeWeapon);
+    p.activeWeapon = owned[(idx + 1) % owned.length];
+    p.pistol.visible = (p.activeWeapon === 'pistol' || p.activeWeapon === 'smg');
     updateAmmoHud();
   }
   // pickup pistol (give it to player after first cop kill or via cheat)
@@ -2585,11 +2594,17 @@ function updateCombat(dt) {
   // block
   p.blocking = G.input.down('ControlLeft');
 
-  // reload
-  if (G.input.pressed('KeyR') && p.weapons.pistol && p.pistolAmmo < p.pistolMag && p.pistolReserve > 0) {
+  // reload (scoped to the active gun)
+  if (G.input.pressed('KeyR') && p.activeWeapon === 'pistol' && p.pistolAmmo < p.pistolMag && p.pistolReserve > 0) {
     const need = p.pistolMag - p.pistolAmmo;
     const take = Math.min(need, p.pistolReserve);
     p.pistolAmmo += take; p.pistolReserve -= take;
+    G.audio.reload(); updateAmmoHud();
+  }
+  if (G.input.pressed('KeyR') && p.activeWeapon === 'smg' && p.smgAmmo < p.smgMag && p.smgReserve > 0) {
+    const need = p.smgMag - p.smgAmmo;
+    const take = Math.min(need, p.smgReserve);
+    p.smgAmmo += take; p.smgReserve -= take;
     G.audio.reload(); updateAmmoHud();
   }
 
@@ -2632,12 +2647,26 @@ function updateCombat(dt) {
       G.audio.blip({freq: 200, dur: 0.04, type:'square', gain: 0.05});
       p.attackCooldown = 0.25;
     }
+  } else if (p.activeWeapon === 'smg' && p.weapons.smg) {
+    p.pistol.visible = true; // reuse the held-weapon model
+    p.pistol.position.set(0.42, 1.15, 0.4);
+    p.pistol.rotation.set(0, 0, 0);
+    G.hud.setCrosshair(G.input.rightDown);
+    if (G.input.mouseDown && p.attackCooldown <= 0 && p.smgAmmo > 0) {
+      fireSMG();
+      p.smgAmmo--; p.attackCooldown = 0.07;   // fast, full-auto
+      updateAmmoHud();
+    } else if (G.input.mouseDown && p.smgAmmo === 0 && p.attackCooldown <= 0) {
+      G.audio.blip({freq: 200, dur: 0.04, type: 'square', gain: 0.05});
+      p.attackCooldown = 0.25;
+    }
   }
 }
 
 function updateAmmoHud() {
   const p = G.player;
   if (p.activeWeapon === 'fists') G.hud.setAmmo('FISTS', 'MUAY THAI');
+  else if (p.activeWeapon === 'smg') G.hud.setAmmo(`${p.smgAmmo} / ${p.smgReserve}`, 'SMG');
   else G.hud.setAmmo(`${p.pistolAmmo} / ${p.pistolReserve}`, '9MM PISTOL');
 }
 
@@ -2694,7 +2723,26 @@ function firePistol() {
   doBulletRaycast(origin, _fireDir);
 }
 
-function doBulletRaycast(origin, dir) {
+function fireSMG() {
+  const origin = G.camera.position;
+  G.camera.getWorldDirection(_fireDir);
+  // less accurate than the pistol — add a little spread
+  _fireDir.x += rand(-0.03, 0.03);
+  _fireDir.y += rand(-0.03, 0.03);
+  _fireDir.z += rand(-0.03, 0.03);
+  _fireDir.normalize();
+  if (!_muzzleLight) { _muzzleLight = new THREE.PointLight(0xffd577, 0, 6, 2); G.scene.add(_muzzleLight); }
+  _muzzleLight.position.copy(origin);
+  _muzzleLight.intensity = 2.0; _muzzleT = 0.05;
+  const bullet = new THREE.Mesh(G.bulletGeom, G.bulletMat);
+  bullet.position.copy(origin); G.scene.add(bullet);
+  G.bullets.push({ mesh: bullet, vel: _fireDir.clone().multiplyScalar(90), life: 0.8 });
+  G.audio.shot();
+  G.camRig.shake = Math.max(G.camRig.shake, 0.05);
+  doBulletRaycast(origin, _fireDir, 22);
+}
+
+function doBulletRaycast(origin, dir, dmg = 35) {
   _ray.set(origin, dir); _ray.near = 0; _ray.far = 120;
   // gather targets: living actors, vehicles, and only NEARBY buildings — the
   // distance cull keeps us from raycasting all ~650 buildings on every shot.
@@ -2715,7 +2763,7 @@ function doBulletRaycast(origin, dir) {
     G.audio.ricochet();
     const t = best.target;
     if (t.actor) {
-      t.obj.hp -= 35;
+      t.obj.hp -= dmg;
       t.obj.panicT = 6;
       if (t.obj.hp <= 0) {
         if (G.cops.includes(t.obj)) killCop(t.obj);
@@ -2724,7 +2772,7 @@ function doBulletRaycast(origin, dir) {
       raiseWanted(2);
     } else if (t.vehicle) {
       // cop cars take real damage and die through updateVehicles' explosion path
-      t.obj.hp -= t.obj.isCop ? 34 : 18;
+      t.obj.hp -= t.obj.isCop ? dmg : Math.round(dmg * 0.5);
       if (t.obj.isCop) raiseWanted(2);
     }
     // pooled impact spark — reused, faded out in updateBullets

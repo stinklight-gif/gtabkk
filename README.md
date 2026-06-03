@@ -31,7 +31,7 @@ on first load. Click **ENTER THE CITY** when the loader finishes.
 | F | Melee attack (jab/cross/kick randomised) |
 | LMB | Fire pistol |
 | RMB | Aim (pistol) — shows crosshair |
-| Q | Cycle weapon (fists ⇄ pistol if owned) |
+| Q | Cycle weapon (fists / pistol / SMG, whichever are owned) |
 | R | Reload |
 | Ctrl | Block |
 | B | Bribe a nearby cop (฿1,000) at 1–2★ |
@@ -77,7 +77,7 @@ Everything lives in two files:
 | 11 | Collisions | AABB pushback for player and vehicle vs buildings. World-bound clamping. |
 | 12 | Player update | Movement, sprint+stamina, jump, in-vehicle controls, exit on E, leg-bob animation, 7-Eleven door chime trigger. |
 | 13 | Peds + Dogs | Wander state machines; peds panic when attacked; dogs scatter when player approaches, settle back when far. |
-| 14 | Combat | Muay Thai jab/cross/kick (animated arm/leg swings), pistol fire (raycast hit + tracer sphere + muzzle flash + camera shake), reload. |
+| 14 | Combat | Muay Thai jab/cross/kick (animated arm/leg swings), pistol + full-auto SMG fire (raycast hit + tracer sphere + muzzle flash + camera shake), reload. Pistol on first cop kill; SMG drops from a destroyed 3★ Fortuner. |
 | 15 | Cops + Wanted | Star-based heat with decay after 35 s out of sight. Spawns foot cops at 1★, cop-pickup chase cars at 2★, unmarked Crime Suppression Fortuners at 3★ (after a few cop kills). Bribe with B near a foot cop (1–2★ only). |
 | 16 | Particles / FX | Smoke emitter (vehicles below 30% HP), explosion (light flash + smoke + camera shake + thunder SFX). |
 | 17 | Interaction | Vehicle proximity check + E to enter. |
