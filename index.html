@@ -101,6 +101,11 @@
   #pause.show { display: flex; }
   #pause h2 { color: var(--neon-cyan); letter-spacing: 6px; font-size: 30px; margin: 0 0 6px; }
   #pause p { color: #9ffbe0; letter-spacing: 2px; font-size: 14px; margin: 0; }
+  #gameover { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; background: rgba(18,3,3,0.8); z-index: 80; cursor: pointer; }
+  #gameover.show { display: flex; }
+  #gameover .go-title { color: #ff3344; letter-spacing: 10px; font-size: 56px; margin: 0; text-shadow: 0 0 24px #ff3344; }
+  #gameover .go-sub { color: #f0c0c0; letter-spacing: 2px; font-size: 15px; margin: 14px 0 0; }
+  #gameover .go-hint { color: #c9a; letter-spacing: 2px; font-size: 12px; margin-top: 20px; opacity: .8; }
   #compass {
     text-align: center; margin-top: 6px; font-size: 10px; letter-spacing: 4px; opacity: .8;
   }
@@ -272,6 +277,12 @@
 </div>
 
 <div id="pause"><h2>PAUSED</h2><p>click to resume</p></div>
+
+<div id="gameover">
+  <h1 class="go-title">WASTED</h1>
+  <div class="go-sub">You black out. Lost ฿500.</div>
+  <div class="go-hint">click to continue</div>
+</div>
 
 <script type="module" src="./main.js"></script>
 <script>

@@ -2248,6 +2248,15 @@ async function init() {
     G.input.requestLock();
   });
 
+  // Game-over overlay: click to respawn and resume
+  const goEl = document.getElementById('gameover');
+  if (goEl) goEl.addEventListener('click', () => {
+    goEl.classList.remove('show');
+    respawnPlayer();
+    G.state = 'playing';
+    G.input.requestLock();
+  });
+
   // Restore saved progress, then autosave on unload
   loadGame();
   window.addEventListener('beforeunload', saveGame);
@@ -3695,21 +3704,36 @@ function updateFootCops(dt) {
 }
 
 function gameOver() {
-  G.hud.showSubtitle("You wake up at the police station. Lost some cash.", "ตื่นมาที่โรงพัก");
-  G.player.hp = G.player.hpMax;
-  G.player.armor = 0;
+  const busted = G.wanted.stars >= 1;
+  G.state = 'dead';                         // set before releasing lock so the pause path doesn't fire
+  const el = document.getElementById('gameover');
+  if (el) {
+    const title = el.querySelector('.go-title');
+    title.textContent = busted ? 'BUSTED' : 'WASTED';
+    title.style.color = busted ? '#3a7bd5' : '#ff3344';
+    title.style.textShadow = `0 0 24px ${busted ? '#3a7bd5' : '#ff3344'}`;
+    el.querySelector('.go-sub').textContent = busted ? 'Hauled in. Lost ฿500.' : 'You black out. Lost ฿500.';
+    el.classList.add('show');
+  }
+  document.exitPointerLock();
+}
+
+function respawnPlayer() {
+  const p = G.player;
+  p.hp = p.hpMax;
+  p.armor = 0;
   G.cash = Math.max(0, G.cash - 500);
   G.hud.setCash(G.cash);
   G.wanted.stars = 0;
-  // respawn at gold shop or start
+  G.hud.setStars(0);
+  // clear any active cops — clean slate on respawn
+  for (let i = G.cops.length - 1; i >= 0; i--) { G.scene.remove(G.cops[i].mesh); disposeObject(G.cops[i].mesh); G.cops.splice(i, 1); }
+  for (let i = G.vehicles.length - 1; i >= 0; i--) { if (G.vehicles[i].isCop) { G.scene.remove(G.vehicles[i].mesh); disposeObject(G.vehicles[i].mesh); G.vehicles.splice(i, 1); } }
   const sp = G.world.spawns.player.clone();
-  G.player.group.position.copy(sp);
-  G.player.velocity.set(0,0,0);
-  if (G.player.inVehicle) {
-    G.player.inVehicle.driver = null;
-    G.player.inVehicle = null;
-    G.player.group.visible = true;
-  }
+  p.group.position.copy(sp);
+  p.velocity.set(0, 0, 0);
+  if (p.inVehicle) { p.inVehicle.driver = null; p.inVehicle = null; p.group.visible = true; }
+  G.hud.showSubtitle('You wake up at the police station.', 'ตื่นมาที่โรงพัก');
 }
 
 // =============================================================================
@@ -4164,6 +4188,8 @@ function loop() {
     drawFullMap();
     if (G.input.endFrame) G.input.endFrame();
   } else if (G.state === 'paused') {
+    if (G.input.endFrame) G.input.endFrame();
+  } else if (G.state === 'dead') {
     if (G.input.endFrame) G.input.endFrame();
   }
 
