@@ -3372,6 +3372,43 @@ function respawnTraffic(v, playerPos) {
 // 13. PEDESTRIANS + DOGS
 // =============================================================================
 
+// Floating reaction-bark sprites over panicking peds.
+function makeBarkSprite(text) {
+  const c = document.createElement('canvas'); c.width = 128; c.height = 64;
+  const g = c.getContext('2d');
+  g.font = 'bold 34px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.lineWidth = 5; g.strokeStyle = '#000'; g.fillStyle = '#fff';
+  g.strokeText(text, 64, 32); g.fillText(text, 64, 32);
+  const tex = new THREE.CanvasTexture(c);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+  sp.scale.set(2.2, 1.1, 1);
+  return sp;
+}
+function spawnBark(ped) {
+  if (!G.barks) G.barks = [];
+  const sp = makeBarkSprite(pick(['!', '!', 'Help!', 'Run!', 'หนี!']));
+  sp.position.set(ped.mesh.position.x, ped.mesh.position.y + 2.6, ped.mesh.position.z);
+  G.scene.add(sp);
+  G.barks.push({ sprite: sp, ped, life: 1.5 });
+}
+function updateBarks(dt) {
+  if (!G.barks) return;
+  for (let i = G.barks.length - 1; i >= 0; i--) {
+    const b = G.barks[i];
+    b.life -= dt;
+    if (b.life <= 0 || b.ped.dead) {
+      G.scene.remove(b.sprite);
+      if (b.sprite.material.map) b.sprite.material.map.dispose();
+      b.sprite.material.dispose();
+      G.barks.splice(i, 1);
+      continue;
+    }
+    const m = b.ped.mesh.position;
+    b.sprite.position.set(m.x, m.y + 2.6 + (1.5 - b.life) * 0.5, m.z);   // rise as it fades
+    b.sprite.material.opacity = Math.min(1, b.life * 1.5);
+  }
+}
+
 function updatePeds(dt) {
   const playerPos = G.player.group.position;
   for (const ped of G.peds) {
@@ -3384,6 +3421,11 @@ function updatePeds(dt) {
       const dx = ped.mesh.position.x - playerPos.x;
       const dz = ped.mesh.position.z - playerPos.z;
       ped.heading = Math.atan2(dx, dz);
+      // occasional reaction bark (capped, so a panicked crowd doesn't spam)
+      ped._barkCD = (ped._barkCD || 0) - dt;
+      if (ped._barkCD <= 0 && (!G.barks || G.barks.length < 8) && Math.random() < 0.04) {
+        spawnBark(ped); ped._barkCD = 4;
+      }
     } else if (ped.state === 'walking') {
       // light wander, mostly on sidewalk side of block
       ped.waitT -= dt;
@@ -4707,6 +4749,7 @@ function loop() {
     updateTaxi(dt);
     updateVehicles(dt);
     updatePeds(dt);
+    updateBarks(dt);
     updateMuggings(dt);
     updateSpikes(dt);
     updateVigilante(dt);
