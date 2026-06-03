@@ -66,7 +66,7 @@ Everything lives in two files:
 |---|---|---|
 | 1 | Audio | Procedural Web Audio. Engine loopers, 7-Eleven chime, temple bell, footsteps, gunshots, sirens, rain bed. |
 | 2 | Input | Keyboard set + pointer-lock mouse deltas + `pressed` (edge) helper. |
-| 3 | World | Procedural 10×10 block grid (BLOCK=50m), road grid, buildings with neon strips and lit-window planes, BTS Skytrain elevated track, street lamps, 7-Elevens, spirit-house shrines, gold-shop POI with pillar of light. Builds an off-screen canvas as the minimap base. |
+| 3 | World | Procedural 10×10 block grid (BLOCK=50m), road grid, buildings with neon strips and lit-window planes, BTS Skytrain elevated track, street lamps, 7-Elevens, spirit-house shrines, gold-shop POI with pillar of light, temple compound, and a Chao Phraya river down the west edge (water + embankment + pier + longtail boats). Repeated props use `InstancedMesh`. Builds an off-screen canvas as the minimap base. |
 | 4 | Player + Camera | Capsule character (torso/legs/head/arms), arcade third-person camera rig (orbit yaw/pitch/distance, shake decay). |
 | 5 | Vehicles | `makeVehicleMesh(kind)` produces bike / tuk-tuk / hilux / cop / camry / sedan with per-kind `spec` (topSpeed, accel, brake, turn, mass). Tuk-tuk has a leaning wiggle, bike leans into turns. |
 | 6 | NPCs | Procedural ped/dog meshes. `spawnPeds`, `spawnDogs`, `spawnTraffic`. |
@@ -142,6 +142,6 @@ chugs, raise the pedestrian/traffic despawn radius or drop pixel ratio.
 ## Roadmap (Phase 2+)
 
 See `gta.md` for the full vision. Next likely additions: Yaowarat (no-cars
-zone), Chao Phraya river + longtail boats, expanded weapon roster.
+zone), more missions, expanded vehicle roster.
 
 **Build the prototype. Ship it. Iterate.**
