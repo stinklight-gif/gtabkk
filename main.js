@@ -283,6 +283,7 @@ function makeAudio() {
     ctx, master, chime, bell, step, punch, kick, hit, shot, ricochet, reload,
     whistle, siren, thunder, rumble, honk, bark,
     engineLoop, tukTukLoop, blip, rainBed: null, ambienceBed: null,
+    setVolume: v => { master.gain.value = v; },
   };
   audio.rainBed = rainBed();
   audio.ambienceBed = ambienceBed();
@@ -2216,6 +2217,18 @@ function saveGame() {
   } catch (e) { /* storage unavailable — ignore */ }
 }
 
+const SETTINGS_KEY = 'gtabkk_settings';
+function applySettings() { if (G.audio && G.audio.setVolume) G.audio.setVolume(G.settings.volume); }
+function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(G.settings)); } catch (e) {} }
+function loadSettings() {
+  G.settings = { sensitivity: 1, volume: 0.55 };
+  try { const s = JSON.parse(localStorage.getItem(SETTINGS_KEY)); if (s) Object.assign(G.settings, s); } catch (e) {}
+  applySettings();
+  const se = document.getElementById('opt-sens'), ve = document.getElementById('opt-vol');
+  if (se) se.value = G.settings.sensitivity;
+  if (ve) ve.value = G.settings.volume;
+}
+
 function loadGame() {
   let s = null;
   try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { s = null; }
@@ -2399,6 +2412,13 @@ async function init() {
     G.state = 'playing';
     G.input.requestLock();
   });
+
+  // Options menu sliders
+  loadSettings();
+  const optSens = document.getElementById('opt-sens');
+  if (optSens) optSens.addEventListener('input', e => { G.settings.sensitivity = parseFloat(e.target.value); saveSettings(); });
+  const optVol = document.getElementById('opt-vol');
+  if (optVol) optVol.addEventListener('input', e => { G.settings.volume = parseFloat(e.target.value); applySettings(); saveSettings(); });
 
   // Restore saved progress, then autosave on unload
   loadGame();
@@ -2945,7 +2965,7 @@ function updatePlayer(dt) {
 
   // mouse look
   const [dx, dy] = G.input.consumeMouseDelta();
-  const sens = 0.0024;
+  const sens = 0.0024 * (G.settings ? G.settings.sensitivity : 1);
   G.camRig.yaw   -= dx * sens;
   G.camRig.pitch -= dy * sens;
   G.camRig.pitch = clamp(G.camRig.pitch, -1.1, 0.6);
@@ -4570,8 +4590,9 @@ function updatePhotoCam(dt) {
   const pc = G.photoCam;
   if (!pc) return;
   const [dx, dy] = G.input.consumeMouseDelta();
-  pc.yaw -= dx * 0.0025;
-  pc.pitch = clamp(pc.pitch - dy * 0.0025, -1.4, 1.4);
+  const s = 0.0025 * (G.settings ? G.settings.sensitivity : 1);
+  pc.yaw -= dx * s;
+  pc.pitch = clamp(pc.pitch - dy * s, -1.4, 1.4);
   const cp = Math.cos(pc.pitch), sp = Math.sin(pc.pitch), cy = Math.cos(pc.yaw), sy = Math.sin(pc.yaw);
   const fwd = new THREE.Vector3(sy * cp, sp, cy * cp);
   const right = new THREE.Vector3(cy, 0, -sy);
@@ -4623,6 +4644,19 @@ function loop() {
       G.state = 'photo';
       document.getElementById('hud').classList.add('hidden');
       G.photoCam = { pos: G.camera.position.clone(), yaw: G.camRig.yaw, pitch: G.camRig.pitch };
+    }
+  }
+
+  // options menu (O)
+  if (G.input && G.input.pressed && G.input.pressed('KeyO') && (G.state === 'playing' || G.state === 'options')) {
+    if (G.state === 'options') {
+      G.state = 'playing';
+      document.getElementById('options').classList.remove('show');
+      G.input.requestLock();
+    } else {
+      G.state = 'options';
+      document.getElementById('options').classList.add('show');
+      document.exitPointerLock();
     }
   }
 
@@ -4685,6 +4719,8 @@ function loop() {
     if (G.input.endFrame) G.input.endFrame();
   } else if (G.state === 'photo') {
     updatePhotoCam(dt);
+    if (G.input.endFrame) G.input.endFrame();
+  } else if (G.state === 'options') {
     if (G.input.endFrame) G.input.endFrame();
   }
 
