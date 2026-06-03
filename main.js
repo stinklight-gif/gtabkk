@@ -683,10 +683,12 @@ function buildWorld(scene) {
 
   // Temple block — replaces normal buildings in one block with a wat compound.
   const TEMPLE_I = 2, TEMPLE_J = -2;
+  const RIVER_I = -GRID/2;  // westmost column (x ≈ -250..-200) is the Chao Phraya
 
   for (let i = -GRID/2; i < GRID/2; i++) {
     for (let j = -GRID/2; j < GRID/2; j++) {
       if (i === TEMPLE_I && j === TEMPLE_J) continue; // temple placed after loop
+      if (i === RIVER_I) continue;                    // river column — no buildings
       const cx = (i + 0.5) * BLOCK;
       const cz = (j + 0.5) * BLOCK;
 
@@ -925,6 +927,7 @@ function buildWorld(scene) {
   const localHandle = new THREE.Matrix4().compose(new THREE.Vector3(0, 1.0, 0.65), new THREE.Quaternion(), new THREE.Vector3(1,1,1));
   for (let i = -GRID/2; i < GRID/2; i++) {
     for (let j = -GRID/2; j < GRID/2; j++) {
+      if (i === RIVER_I) continue;   // no parked bikes in the river
       const cx = (i + 0.5) * BLOCK;
       const cz = (j + 0.5) * BLOCK;
       const numClusters = irand(1, 3);
@@ -977,6 +980,7 @@ function buildWorld(scene) {
   const propCartPoleGeo = new THREE.CylinderGeometry(0.04, 0.04, 2, 6);
   for (let i = -GRID/2; i < GRID/2; i++) {
     for (let j = -GRID/2; j < GRID/2; j++) {
+      if (i === RIVER_I) continue;   // no sidewalk props in the river
       const cx = (i + 0.5) * BLOCK;
       const cz = (j + 0.5) * BLOCK;
       const numProps = irand(2, 4);
@@ -1115,6 +1119,7 @@ function buildWorld(scene) {
   const lampBulbGeo = new THREE.SphereGeometry(0.35, 8, 8);
   const lampPoleM = [], lampBulbM = [];
   for (const inter of world.intersections) {
+    if (inter.x < -HALF + BLOCK) continue;  // skip lamps standing in the river
     for (const offset of [[-3,-3],[3,-3],[-3,3],[3,3]]) {
       const x = inter.x + offset[0]*1.2, z = inter.z + offset[1]*1.2;
       _q.identity(); _s.set(1, 1, 1);
@@ -1275,6 +1280,67 @@ function buildWorld(scene) {
     addInstanced(ringBoxGeo, ringMats[mi], ringBoxM[mi], false, false);
   }
 
+  // ---- Chao Phraya river along the west edge ----
+  // The westmost block column is water: a murky plane raised above the road
+  // decals so it hides them, an embankment wall (collision) with a pier gap, a
+  // riverside pier, and a few longtail boats.
+  {
+    const RIVER_W = -HALF;                 // map's west edge
+    const RIVER_E = -HALF + BLOCK - 8;      // east bank ≈ x=-208
+    const riverCX = (RIVER_E + RIVER_W) / 2;
+    const riverWidth = RIVER_E - RIVER_W;
+    const PIER_Z = -50;                     // pier sits on this EW road line
+
+    const waterMat = new THREE.MeshStandardMaterial({ color: 0x3f5147, roughness: 0.35, metalness: 0.1, transparent: true, opacity: 0.92 });
+    const water = new THREE.Mesh(new THREE.PlaneGeometry(riverWidth, HALF*2 + 40), waterMat);
+    water.rotation.x = -PI/2; water.position.set(riverCX, 0.12, 0); water.receiveShadow = true;
+    scene.add(water);
+
+    // embankment wall along the east bank, split to leave a gap at the pier
+    const bankMat = new THREE.MeshStandardMaterial({ color: 0x6a6a6a, roughness: 0.95 });
+    const bankH = 1.0, bankY = 0.5, gapHalf = 4;
+    const nLen = HALF - (PIER_Z + gapHalf), nC = (PIER_Z + gapHalf + HALF) / 2;
+    const sLen = (PIER_Z - gapHalf) - (-HALF), sC = (-HALF + PIER_Z - gapHalf) / 2;
+    const wallN = new THREE.Mesh(new THREE.BoxGeometry(0.8, bankH, nLen), bankMat);
+    wallN.position.set(RIVER_E, bankY, nC); scene.add(wallN);
+    const wallS = new THREE.Mesh(new THREE.BoxGeometry(0.8, bankH, sLen), bankMat);
+    wallS.position.set(RIVER_E, bankY, sC); scene.add(wallS);
+    world.buildings.push({ pos: new THREE.Vector3(RIVER_E, bankY, nC), size: new THREE.Vector3(0.8, bankH, nLen), mesh: wallN });
+    world.buildings.push({ pos: new THREE.Vector3(RIVER_E, bankY, sC), size: new THREE.Vector3(0.8, bankH, sLen), mesh: wallS });
+
+    // pier jutting west over the water from the gap
+    const pierLen = 30, pierW = 5, pierWX = RIVER_E - pierLen, pierCX = RIVER_E - pierLen / 2;
+    const pierMat = new THREE.MeshStandardMaterial({ color: 0x7a5a3a, roughness: 0.9 });
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(pierLen, 0.3, pierW), pierMat);
+    deck.position.set(pierCX, 0.7, PIER_Z); deck.castShadow = true; deck.receiveShadow = true; scene.add(deck);
+    const railMat = new THREE.MeshStandardMaterial({ color: 0x4a3a2a, roughness: 0.9 });
+    for (const zoff of [-pierW/2, pierW/2]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(pierLen, 0.5, 0.1), railMat);
+      rail.position.set(pierCX, 1.1, PIER_Z + zoff); scene.add(rail);
+    }
+    const pilMat = new THREE.MeshStandardMaterial({ color: 0x5a4a3a, roughness: 0.95 });
+    for (let px = pierWX + 2; px < RIVER_E; px += 7) {
+      for (const zoff of [-pierW/2 + 0.4, pierW/2 - 0.4]) {
+        const pil = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 2.4, 6), pilMat);
+        pil.position.set(px, -0.4, PIER_Z + zoff); scene.add(pil);
+      }
+    }
+
+    // longtail boats — a long thin hull + a raised stern motor pole
+    for (let n = 0; n < 4; n++) {
+      const boat = new THREE.Group();
+      const hull = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.5, 6), new THREE.MeshStandardMaterial({ color: pick([0x9a3a3a, 0x3a5a9a, 0xcfa83a, 0xe0c885]), roughness: 0.7 }));
+      hull.position.y = 0.25; boat.add(hull);
+      const trim = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.12, 6.1), new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 }));
+      trim.position.y = 0.5; boat.add(trim);
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.4, 6), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+      pole.position.set(0, 0.9, -3.1); pole.rotation.x = 0.5; boat.add(pole);
+      boat.position.set(rand(RIVER_W + 6, RIVER_E - 6), 0.18, rand(-HALF + 30, HALF - 30));
+      boat.rotation.y = rand(-0.3, 0.3) + (Math.random() < 0.5 ? 0 : PI);
+      scene.add(boat);
+    }
+  }
+
   // ---- Render minimap base (top-down 2D snapshot of roads/landmarks) ----
   world.minimap = makeMinimapBase(world);
 
@@ -1325,6 +1391,13 @@ function makeMinimapBase(world) {
   g.strokeStyle = '#21f0ff'; g.lineWidth = 2; g.setLineDash([4,3]);
   g.beginPath(); g.moveTo(mapW(-HALF), mapW(0)); g.lineTo(mapW(HALF), mapW(0)); g.stroke();
   g.setLineDash([]);
+
+  // Chao Phraya river along the west edge
+  g.fillStyle = '#3a5550';
+  const rvX = mapW(-HALF);
+  const rvW = mapW(-HALF + BLOCK - 8) - rvX;
+  g.fillRect(rvX, 0, rvW, SIZE);
+
   return c;
 
   function mapW(v) { return (v + HALF) * (SIZE / (HALF*2)); }
