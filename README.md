@@ -61,6 +61,9 @@ markers over their heads) — fists, pistol, or the SMG. They scatter when
 attacked and the gunfire draws cops, so it doubles as a wanted-level/escape
 loop (duck into the U-Spray after). ฿2,000 on completion, replayable.
 
+**Amulets.** 15 glowing gold amulets are hidden across the districts. Each is
+฿100, and finding all of them pays a ฿2,000 bonus — an excuse to explore.
+
 ## Architecture
 
 Everything lives in two files:
