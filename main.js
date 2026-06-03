@@ -4050,6 +4050,17 @@ function loop() {
     updateDayNight(dt);
     G._saveTimer = (G._saveTimer || 0) + dt;
     if (G._saveTimer > 8) { G._saveTimer = 0; saveGame(); }
+    // one-time 100% celebration (cheap: amulet counter + 3 mission flags)
+    if (!G._congrats) {
+      const ms = (G._welcomeDone ? 1 : 0) + (G._soiRunWon ? 1 : 0) + (G._hitDone ? 1 : 0);
+      const total = G.world.collectibles ? G.world.collectibles.length : 15;
+      if ((G.collected || 0) / Math.max(1, total) * 70 + ms / 3 * 30 >= 99.5) {
+        G._congrats = true;
+        G.hud.showSubtitle('100% — KING OF KRUNG THEP', 'เจ้าพ่อกรุงเทพฯ', 5);
+        G.hud.showNotif('100% complete!');
+        if (G.audio.bell) G.audio.bell();
+      }
+    }
     if (G.mission) G.mission.update(dt);
     G.hud.update(dt);
     G.hud.setBars(G.player.hp, G.player.armor, G.player.stam);
