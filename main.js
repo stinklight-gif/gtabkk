@@ -692,6 +692,7 @@ function buildWorld(scene) {
   const RIVER_I = -GRID/2;  // westmost column (x ≈ -250..-200) is the Chao Phraya
   const GARAGE_I = 3, GARAGE_J = -1;  // block reserved for the U-Spray garage
   const YAO_I = -2, YAO_J0 = 2, YAO_J1 = 3;  // two-block Yaowarat market street
+  const GUN_I = 3, GUN_J = 1;  // block reserved for the gun shop
 
   for (let i = -GRID/2; i < GRID/2; i++) {
     for (let j = -GRID/2; j < GRID/2; j++) {
@@ -699,6 +700,7 @@ function buildWorld(scene) {
       if (i === RIVER_I) continue;                    // river column — no buildings
       if (i === GARAGE_I && j === GARAGE_J) continue; // U-Spray garage block
       if (i === YAO_I && (j === YAO_J0 || j === YAO_J1)) continue; // Yaowarat market
+      if (i === GUN_I && j === GUN_J) continue; // gun shop block
       const cx = (i + 0.5) * BLOCK;
       const cz = (j + 0.5) * BLOCK;
 
@@ -1403,6 +1405,31 @@ function buildWorld(scene) {
     world.garages.push({ pos: new THREE.Vector3(gx, 0, gz), r: 7, cooldownUntil: 0 });
   }
 
+  // ---- Gun shop: buy weapons/ammo with cash (on foot) ----
+  {
+    const gx = (GUN_I + 0.5) * BLOCK, gz = (GUN_J + 0.5) * BLOCK; // (175, 75)
+    const depth = 10, wWidth = 12, wH = 4.5, wY = wH / 2;
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x3a3f4a, roughness: 0.85 });
+    const back = new THREE.Mesh(new THREE.BoxGeometry(wWidth, wH, 0.6), wallMat);
+    back.position.set(gx, wY, gz + depth / 2); back.castShadow = true; back.receiveShadow = true; scene.add(back);
+    const sideW = new THREE.Mesh(new THREE.BoxGeometry(0.6, wH, depth), wallMat);
+    sideW.position.set(gx - wWidth / 2, wY, gz); sideW.castShadow = true; scene.add(sideW);
+    const sideE = new THREE.Mesh(new THREE.BoxGeometry(0.6, wH, depth), wallMat);
+    sideE.position.set(gx + wWidth / 2, wY, gz); sideE.castShadow = true; scene.add(sideE);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(wWidth + 0.6, 0.5, depth + 0.6), wallMat);
+    roof.position.set(gx, wH + 0.25, gz); roof.castShadow = true; scene.add(roof);
+    const counter = new THREE.Mesh(new THREE.BoxGeometry(wWidth - 2, 1.0, 0.8), new THREE.MeshStandardMaterial({ color: 0x6a5a45, roughness: 0.8 }));
+    counter.position.set(gx, 0.5, gz - depth / 2 + 2.5); scene.add(counter);
+    const signMat = new THREE.MeshStandardMaterial({ color: 0xff3344, emissive: 0xff3344, emissiveIntensity: 0.4, roughness: 0.5 });
+    G.nightEmissive.push({ mat: signMat, dayIntensity: 0.4, nightIntensity: 1.6 });
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(7, 1.3), signMat);
+    sign.position.set(gx, wH - 0.1, gz - depth / 2 - 0.4); sign.rotation.y = PI; scene.add(sign);
+    world.buildings.push({ pos: new THREE.Vector3(gx, wY, gz + depth / 2), size: new THREE.Vector3(wWidth, wH, 0.6), mesh: back });
+    world.buildings.push({ pos: new THREE.Vector3(gx - wWidth / 2, wY, gz), size: new THREE.Vector3(0.6, wH, depth), mesh: sideW });
+    world.buildings.push({ pos: new THREE.Vector3(gx + wWidth / 2, wY, gz), size: new THREE.Vector3(0.6, wH, depth), mesh: sideE });
+    world.gunShop = new THREE.Vector3(gx, 0, gz - depth / 2 + 1.5); // stand at the open front
+  }
+
   // ---- Yaowarat: a dense Chinatown market street (blocks (-2, 2..3)) ----
   {
     const laneX = (YAO_I + 0.5) * BLOCK;        // -75: centre of the market lane
@@ -1571,6 +1598,12 @@ function makeMinimapBase(world) {
   g.fillStyle = '#21f0ff';
   for (const ga of (world.garages || [])) {
     g.fillRect(mapW(ga.pos.x) - 3, mapW(ga.pos.z) - 3, 6, 6);
+  }
+
+  // Gun shop
+  if (world.gunShop) {
+    g.fillStyle = '#ff3344';
+    g.fillRect(mapW(world.gunShop.x) - 3, mapW(world.gunShop.z) - 3, 6, 6);
   }
 
   // Yaowarat market street
@@ -3729,6 +3762,30 @@ function updateInteraction(dt) {
       near.npc = null;   // take over from the traffic AI if it was a moving car
       G.audio.blip({freq:300, dur:0.05, gain:0.08});
     }
+  } else {
+    updateGunShop(dt);   // E does shop business only when no vehicle is in reach
+  }
+}
+
+// Gun shop: on foot in the shop zone, E buys the next thing you need (then ammo).
+function updateGunShop(dt) {
+  const p = G.player;
+  const shop = G.world.gunShop;
+  if (!shop || dist2(p.group.position, shop) > 7 * 7) return;
+  let label, cost, action;
+  if (!p.weapons.pistol)    { label = 'Buy 9mm Pistol'; cost = 800;  action = 'pistol'; }
+  else if (!p.weapons.smg)  { label = 'Buy SMG';        cost = 4000; action = 'smg'; }
+  else                      { label = 'Buy ammo';       cost = 300;  action = 'ammo'; }
+  G.hud.showPrompt(`Gun shop — <b>E</b>: ${label} (฿${cost})`, 0.4);
+  if (G.input.pressed('KeyE')) {
+    if (G.cash < cost) { G.hud.showNotif('Not enough cash'); return; }
+    G.cash -= cost; G.hud.setCash(G.cash);
+    if (action === 'pistol')   { p.weapons.pistol = true; p.pistolAmmo = p.pistolMag; p.pistolReserve = p.pistolMag * 3; }
+    else if (action === 'smg') { p.weapons.smg = true; p.smgAmmo = p.smgMag; p.smgReserve = p.smgMag * 3; }
+    else { p.pistolReserve += p.pistolMag * 3; if (p.weapons.smg) p.smgReserve += p.smgMag * 3; }
+    updateAmmoHud();
+    G.hud.showNotif(label + ' ✓');
+    G.audio.blip({ freq: 600, dur: 0.1, gain: 0.12 });
   }
 }
 
