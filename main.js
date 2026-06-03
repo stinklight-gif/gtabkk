@@ -360,6 +360,12 @@ function buildWorld(scene) {
     const inst = new THREE.InstancedMesh(geo, mat, matrices.length);
     for (let k = 0; k < matrices.length; k++) inst.setMatrixAt(k, matrices[k]);
     inst.instanceMatrix.needsUpdate = true;
+    // Instances are positioned via per-instance matrices on origin-centered base
+    // geometry, so the default bounding sphere (base geo at the world origin) would
+    // frustum-cull the entire batch whenever the origin is off-screen. These batches
+    // span the whole map and can't be culled as a unit anyway, so disable per-object
+    // frustum culling (same as the rain/smoke Points).
+    inst.frustumCulled = false;
     inst.castShadow = !!cast;
     inst.receiveShadow = !!receive;
     scene.add(inst);
@@ -2868,7 +2874,7 @@ function updateInteraction(dt) {
   // find nearest vehicle within 2.5m that's not driven by a hostile cop
   let near = null, nd = Infinity;
   for (const v of G.vehicles) {
-    if (v.driver) continue; // already occupied
+    if (v.driver || v.dead) continue; // occupied, or a burning wreck about to despawn
     const d2 = dist2(v.pos, p.group.position);
     if (d2 < 8 && d2 < nd) { nd = d2; near = v; }
   }
