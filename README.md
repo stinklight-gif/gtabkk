@@ -36,6 +36,7 @@ on first load. Click **ENTER THE CITY** when the loader finishes.
 | Ctrl | Block |
 | B | Bribe a nearby cop (฿1,000) at 1–2★ |
 | H | Honk (in vehicle) |
+| J | Start a taxi fare (in a songthaew) |
 | T | Phone — pauses pointer lock and shows menu |
 | G | *(dev)* grant 9mm pistol |
 | Esc | Release mouse |
@@ -63,6 +64,11 @@ loop (duck into the U-Spray after). ฿2,000 on completion, replayable.
 
 **Amulets.** 15 glowing gold amulets are hidden across the districts. Each is
 ฿100, and finding all of them pays a ฿2,000 bonus — an excuse to explore.
+
+**Taxi (free-roam job).** Grab a red songthaew, press **J**, drive to the yellow
+marker to pick up a fare, then to the green marker before the timer runs out.
+Pay scales with distance. It's a standalone activity, separate from the story
+missions, so you can run fares any time.
 
 ## Architecture
 

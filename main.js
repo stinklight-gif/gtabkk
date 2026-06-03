@@ -2261,6 +2261,13 @@ function bindHud() {
       mctx.arc(mx - ppx, my - ppy, 5, 0, TAU);
       mctx.fill();
     }
+    // taxi fare marker
+    if (G.taxi && G.taxi.markerPos) {
+      const tx = (G.taxi.markerPos.x + HALF) * (256 / (HALF*2));
+      const ty = (G.taxi.markerPos.z + HALF) * (256 / (HALF*2));
+      mctx.fillStyle = G.taxi.stage === 'toDropoff' ? '#39ff7a' : '#ffcf4a';
+      mctx.beginPath(); mctx.arc(tx - ppx, ty - ppy, 4, 0, TAU); mctx.fill();
+    }
     // cops as red dots
     mctx.fillStyle = '#ff3333';
     for (const v of G.vehicles) if (v.isCop && v.driver) {
@@ -3691,6 +3698,84 @@ function updateDayNight(dt) {
 // 20. MAIN LOOP
 // =============================================================================
 
+// Songthaew taxi job — a free-roam activity (press J in a songthaew). Kept out
+// of the mission chain so it doesn't disturb the story missions.
+function updateTaxi(dt) {
+  const p = G.player;
+  const t = G.taxi || (G.taxi = { stage: 'idle', markerPos: null, dest: null, beam: null, timeLeft: 0, fares: 0, fareValue: 0 });
+  const inSong = p.inVehicle && p.inVehicle.kind === 'songthaew';
+
+  if (t.stage !== 'idle' && !inSong) {           // bailed out of the cab
+    G.hud.showNotif('Fare bailed.');
+    taxiClear(t);
+    return;
+  }
+  if (t.stage === 'idle') {
+    if (inSong) {
+      G.hud.showPrompt('Press <b>J</b> for a taxi fare', 0.4);
+      if (G.input.pressed('KeyJ')) {
+        t.stage = 'toPickup';
+        t.markerPos = taxiRandPoint(p.inVehicle.pos, 90);
+        taxiBeam(t, t.markerPos, 0xffcf4a);
+        G.hud.showNotif('New fare — head to the yellow marker');
+      }
+    }
+    return;
+  }
+  const v = p.inVehicle;
+  if (t.stage === 'toPickup') {
+    if (dist2(v.pos, t.markerPos) < 7 * 7) {
+      t.dest = taxiRandPoint(v.pos, 150);
+      t.markerPos = t.dest;
+      taxiBeam(t, t.dest, 0x39ff7a);
+      const d = Math.sqrt(dist2(v.pos, t.dest));
+      t.timeLeft = 25 + d / 9;
+      t.fareValue = Math.round(80 + d * 4);
+      t.stage = 'toDropoff';
+      G.hud.showNotif('Fare aboard — drop them at the green marker');
+      G.audio.blip({ freq: 600, dur: 0.08, gain: 0.1 });
+    } else {
+      G.hud.showPrompt('Taxi: pick up the fare at the marker', 0.4);
+    }
+  } else if (t.stage === 'toDropoff') {
+    t.timeLeft -= dt;
+    if (t.timeLeft <= 0) { G.hud.showNotif('Fare gave up — too slow.'); taxiClear(t); return; }
+    G.hud.showPrompt(`TAXI &nbsp; ⏱ ${t.timeLeft.toFixed(0)}s &nbsp;→&nbsp; ฿${t.fareValue}`, 0.4);
+    if (dist2(v.pos, t.dest) < 8 * 8) {
+      G.cash += t.fareValue; t.fares++;
+      G.hud.setCash(G.cash);
+      G.hud.showNotif(`Dropped off: +฿${t.fareValue} (fares: ${t.fares})`);
+      G.audio.blip({ freq: 760, dur: 0.1, gain: 0.12 });
+      taxiClear(t);
+    }
+  }
+}
+function taxiRandPoint(from, maxd) {
+  for (let tries = 0; tries < 24; tries++) {
+    const gi = irand(-GRID/2 + 1, GRID/2 - 1), gj = irand(-GRID/2 + 1, GRID/2 - 1);
+    const x = gi * BLOCK + (Math.random() < 0.5 ? -3 : 3), z = gj * BLOCK;
+    const dx = x - from.x, dz = z - from.z, d2 = dx*dx + dz*dz;
+    if (d2 > 45 * 45 && d2 < maxd * maxd) return new THREE.Vector3(x, 0, z);
+  }
+  return new THREE.Vector3(clamp(from.x + rand(-80, 80), -HALF + 12, HALF - 12), 0, clamp(from.z + rand(-80, 80), -HALF + 12, HALF - 12));
+}
+function taxiBeam(t, pos, color) {
+  if (!t.beam) {
+    t.beam = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.2, 1.2, 80, 12, 1, true),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthWrite: false })
+    );
+    G.scene.add(t.beam);
+  }
+  t.beam.material.color.setHex(color);
+  t.beam.position.set(pos.x, 40, pos.z);
+  t.beam.visible = true;
+}
+function taxiClear(t) {
+  t.stage = 'idle'; t.markerPos = null; t.dest = null;
+  if (t.beam) t.beam.visible = false;
+}
+
 function updateGarage(dt) {
   const p = G.player;
   if (!p.inVehicle || !G.world.garages) return;
@@ -3743,6 +3828,7 @@ function loop() {
     updateCollectibles(dt);
     updateInteraction(dt);
     updateGarage(dt);
+    updateTaxi(dt);
     updateVehicles(dt);
     updatePeds(dt);
     updateDogs(dt);
