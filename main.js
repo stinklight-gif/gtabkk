@@ -2420,6 +2420,13 @@ async function init() {
   const optVol = document.getElementById('opt-vol');
   if (optVol) optVol.addEventListener('input', e => { G.settings.volume = parseFloat(e.target.value); applySettings(); saveSettings(); });
 
+  // 7-Eleven store overlay buttons
+  const sbind = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
+  sbind('buy-snack', () => storeBuy('snack'));
+  sbind('buy-drink', () => storeBuy('drink'));
+  sbind('buy-vest', () => storeBuy('vest'));
+  sbind('store-leave', () => { document.getElementById('store').classList.remove('show'); G.state = 'playing'; G.input.requestLock(); });
+
   // Restore saved progress, then autosave on unload
   loadGame();
   window.addEventListener('beforeunload', saveGame);
@@ -4268,7 +4275,33 @@ function updateInteraction(dt) {
     }
   } else {
     updateGunShop(dt);   // E does shop business only when no vehicle is in reach
+    update7Eleven(dt);
   }
+}
+
+// Enter a 7-Eleven (on foot) to open the store overlay.
+function update7Eleven(dt) {
+  const p = G.player;
+  for (const e of G.world.sevenElevens) {
+    if (dist2(p.group.position, e.pos) < 5 * 5) {
+      G.hud.showPrompt('Press <b>E</b> to enter <b>7-Eleven</b>', 0.4);
+      if (G.input.pressed('KeyE')) {
+        G.state = 'store';
+        document.getElementById('store').classList.add('show');
+        document.exitPointerLock();
+      }
+      return;
+    }
+  }
+}
+function storeBuy(item) {
+  const p = G.player;
+  let ok = false;
+  if (item === 'snack' && G.cash >= 20) { G.cash -= 20; p.hp = Math.min(p.hpMax, p.hp + 40); ok = true; }
+  else if (item === 'drink' && G.cash >= 30) { G.cash -= 30; p.stam = p.stamMax; ok = true; }
+  else if (item === 'vest' && G.cash >= 200) { G.cash -= 200; p.armor = p.armorMax; ok = true; }
+  if (ok) { G.hud.setCash(G.cash); G.audio.chime(); }
+  else G.hud.showNotif('Not enough cash');
 }
 
 // Gun shop: on foot in the shop zone, E buys the next thing you need (then ammo).
@@ -4721,6 +4754,8 @@ function loop() {
     updatePhotoCam(dt);
     if (G.input.endFrame) G.input.endFrame();
   } else if (G.state === 'options') {
+    if (G.input.endFrame) G.input.endFrame();
+  } else if (G.state === 'store') {
     if (G.input.endFrame) G.input.endFrame();
   }
 
