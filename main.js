@@ -1481,6 +1481,22 @@ function buildWorld(scene) {
     world.poi.yaowarat = new THREE.Vector3(laneX, 0, (zStart + zEnd) / 2);
   }
 
+  // ---- Hidden amulets: a collectible hunt across the districts ----
+  {
+    world.collectibles = [];
+    const amMat = new THREE.MeshStandardMaterial({ color: 0xffcf4a, emissive: 0xffcf4a, emissiveIntensity: 0.7, roughness: 0.3, metalness: 0.6 });
+    const amGeo = new THREE.OctahedronGeometry(0.4);
+    for (let n = 0; n < 15; n++) {
+      const bi = irand(-GRID/2 + 1, GRID/2 - 1);   // skip the river column
+      const bj = irand(-GRID/2, GRID/2 - 1);
+      const x = (bi + 0.5) * BLOCK + rand(-16, 16);
+      const z = (bj + 0.5) * BLOCK + rand(-16, 16);
+      const m = new THREE.Mesh(amGeo, amMat);       // shared geo/mat — never disposed
+      m.position.set(x, 1.3, z); scene.add(m);
+      world.collectibles.push({ mesh: m, taken: false });
+    }
+  }
+
   // ---- Render minimap base (top-down 2D snapshot of roads/landmarks) ----
   world.minimap = makeMinimapBase(world);
 
@@ -2586,6 +2602,33 @@ function updateBTS(dt) {
   else if (b.mesh.position.x < b.min) b.dir = 1;
 }
 
+// Spin/bob the hidden amulets and collect them on touch.
+function updateCollectibles(dt) {
+  const cs = G.world.collectibles;
+  if (!cs) return;
+  const pp = G.player.group.position;
+  const tnow = performance.now() * 0.003;
+  for (const a of cs) {
+    if (a.taken) continue;
+    a.mesh.rotation.y += dt * 2;
+    a.mesh.position.y = 1.3 + Math.sin(tnow + a.mesh.position.x) * 0.15;
+    if (dist2(a.mesh.position, pp) < 2.6 * 2.6) {
+      a.taken = true;
+      G.scene.remove(a.mesh);
+      G.collected = (G.collected || 0) + 1;
+      G.cash += 100;
+      G.hud.setCash(G.cash);
+      G.audio.blip({ freq: 880, dur: 0.1, gain: 0.12 });
+      if (G.collected >= cs.length) {
+        G.cash += 2000; G.hud.setCash(G.cash);
+        G.hud.showNotif(`All ${cs.length} amulets found! +฿2,000`);
+      } else {
+        G.hud.showNotif(`Amulet ${G.collected}/${cs.length} (+฿100)`);
+      }
+    }
+  }
+}
+
 function updatePlayerInVehicle(dt) {
   const p = G.player;
   const v = p.inVehicle;
@@ -3593,6 +3636,7 @@ function loop() {
   if (G.state === 'playing') {
     updatePlayer(dt);
     updateDistrict();
+    updateCollectibles(dt);
     updateInteraction(dt);
     updateGarage(dt);
     updateVehicles(dt);
