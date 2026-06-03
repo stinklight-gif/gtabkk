@@ -1570,6 +1570,26 @@ function buildWorld(scene) {
     }
   }
 
+  // ---- Body-armor pickups: respawning vests scattered road-adjacent ----
+  {
+    world.armorPickups = [];
+    const armorMat = new THREE.MeshStandardMaterial({ color: 0x3a7bd5, emissive: 0x3a7bd5, emissiveIntensity: 0.6, roughness: 0.4, metalness: 0.5 });
+    const armorGeo = new THREE.BoxGeometry(0.5, 0.7, 0.25);
+    for (let n = 0; n < 6; n++) {
+      let x, z;
+      if (Math.random() < 0.5) {
+        const gi = irand(-GRID/2 + 1, GRID/2 - 1);
+        x = gi * BLOCK + (Math.random() < 0.5 ? -5 : 5); z = rand(-HALF + 14, HALF - 14);
+      } else {
+        const gj = irand(-GRID/2 + 1, GRID/2 - 1);
+        z = gj * BLOCK + (Math.random() < 0.5 ? -5 : 5); x = rand(-190, HALF - 14);
+      }
+      const m = new THREE.Mesh(armorGeo, armorMat);   // shared geo/mat — toggled, never disposed
+      m.position.set(x, 1.1, z); scene.add(m);
+      world.armorPickups.push({ mesh: m, pos: new THREE.Vector3(x, 0, z), readyAt: 0 });
+    }
+  }
+
   // ---- Render minimap base (top-down 2D snapshot of roads/landmarks) ----
   world.minimap = makeMinimapBase(world);
 
@@ -3365,6 +3385,26 @@ function updatePeds(dt) {
 
 // Random "bag-snatcher" street event — a marked ped flees (reusing the panic AI);
 // run them down for a bounty. Delivers on the intro's "beat up muggers".
+// Body-armor pickups — restore armor on foot; respawn after a cooldown.
+function updateArmorPickups(dt) {
+  const aps = G.world.armorPickups;
+  if (!aps || !GAMEPLAY.armor) return;
+  const now = performance.now();
+  const pp = G.player.group.position;
+  for (const a of aps) {
+    if (now < a.readyAt) continue;            // on cooldown (hidden)
+    if (!a.mesh.visible) a.mesh.visible = true;
+    a.mesh.rotation.y += dt * 1.5;
+    if (!G.player.inVehicle && G.player.armor < G.player.armorMax && dist2(a.pos, pp) < 3 * 3) {
+      G.player.armor = Math.min(G.player.armorMax, G.player.armor + 50);
+      a.readyAt = now + 45000;
+      a.mesh.visible = false;
+      G.hud.showNotif('Body armor +50');
+      G.audio.chime();
+    }
+  }
+}
+
 // Street-food stalls — visit on foot to eat (heal once) and tick the set.
 function updateFoodStalls(dt) {
   const fs = G.world.foodStalls;
@@ -4554,6 +4594,7 @@ function loop() {
     updateDistrict();
     updateCollectibles(dt);
     updateFoodStalls(dt);
+    updateArmorPickups(dt);
     updateInteraction(dt);
     updateGarage(dt);
     updateTaxi(dt);
