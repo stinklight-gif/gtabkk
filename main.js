@@ -3750,19 +3750,36 @@ function updateDayNight(dt) {
   const hh = Math.floor(totalMin / 60), mm = Math.floor(totalMin % 60);
   G.hud.setClock(`${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`);
 
-  // weather: trigger light rain randomly after 2 min of demo time
-  if (!G._weatherTimer) G._weatherTimer = 0;
-  G._weatherTimer += dt;
-  if (G._weatherTimer > 90 && G.time.weather === 'clear' && Math.random() < 0.005) {
-    G.time.weather = 'rain';
-    G.hud.setWeather('LIGHT RAIN · 28°C');
-    G.hud.showNotif('It starts to rain.');
-    G.audio.thunder();
+  // weather cycle: clear ⇄ rain, intensity builds then breaks; lightning in downpours
+  if (G._weatherT === undefined) { G._weatherT = 0; G._weatherUntil = 60; G._rainTarget = 0; }
+  G._weatherT += dt;
+  if (G._weatherT > G._weatherUntil) {
+    if (G.time.weather === 'clear') {
+      G.time.weather = 'rain';
+      G._rainTarget = Math.random() < 0.5 ? 0.45 : 0.85;   // drizzle or downpour
+      G.hud.setWeather((G._rainTarget > 0.7 ? 'DOWNPOUR' : 'LIGHT RAIN') + ' · 28°C');
+      G.hud.showNotif(G._rainTarget > 0.7 ? 'The sky opens up.' : 'It starts to rain.');
+      G.audio.thunder();
+      G._weatherUntil = G._weatherT + rand(40, 90);
+    } else {
+      G.time.weather = 'clear';
+      G._rainTarget = 0;
+      G.hud.setWeather('CLEAR · 33°C');
+      G._weatherUntil = G._weatherT + rand(70, 150);
+    }
   }
-  G.time.rainStrength = lerp(G.time.rainStrength, G.time.weather === 'rain' ? 0.7 : 0, 0.01);
+  G.time.rainStrength = lerp(G.time.rainStrength, G._rainTarget, 0.012);
   G.audio.rainBed.setLevel(G.time.rainStrength * 0.18);
-
   G.rain.update(dt, G.player.group.position, G.time.rainStrength);
+
+  // lightning flashes during heavy rain (transient light boost; reset next frame)
+  if (G.time.rainStrength > 0.6 && Math.random() < 0.0045) { G._lightningT = 0.14; G.audio.thunder(); }
+  if (G._lightningT > 0) {
+    G._lightningT -= dt;
+    const f = (G._lightningT > 0.08) ? 1 : 0.35;   // bright flash, then a fainter second pop
+    G.hemi.intensity += 2.6 * f;
+    G.sun.intensity += 1.4 * f;
+  }
 
   // periodic temple bell at dawn
   if (!G._bellSeen) G._bellSeen = new Set();
