@@ -176,6 +176,28 @@ Targets 60 FPS at 1080p on integrated GPUs. Most cost is the ~120 emissive
 window planes and ~80 simultaneous meshes (vehicles + peds + dogs). If it
 chugs, raise the pedestrian/traffic despawn radius or drop pixel ratio.
 
+## Balance knobs (first-pass — tune after a playtest)
+
+These values were set without runtime testing; adjust to taste. Locations are in
+`main.js`:
+
+| Knob | Where | Value |
+|------|-------|-------|
+| Soi Run timer / per-checkpoint bonus | `soiRun.startTime` / `.cpBonus` | 55s / +15s |
+| Soi Run reward | `soiRun.reward` | ฿1,500 |
+| The Hit reward | `hit.reward` | ฿2,000 |
+| Hot Delivery timer / reward | `delivery.startTime` / `.reward` | 75s / ฿3,000 |
+| Taxi fare | `updateTaxi` | ฿80 + ฿4/m, 25s + dist |
+| Vigilante bust / time bonus | `updateVigilante` | ฿200 + ฿100×busts / +15s |
+| Snatcher bounty | `updateMuggings` | ฿250 |
+| Amulet / full set bonus | `updateCollectibles` | ฿100 / +฿2,000 |
+| Street-food heal | `updateFoodStalls` | +25 HP |
+| Garage respray fee | `updateGarage` | ฿300 + ฿350×stars |
+| Cops desired (1/2/3★) | `updateWanted` | 2 / 4 / 6 (+1 at night) |
+| 3★ escalation threshold | `onCopKilled` | 3 cop kills |
+| Spike-strip cadence | `updateSpikes` | every 12s at 3★ |
+| Out-of-combat HP regen | `loop` | 5/s after 5s |
+
 ## Roadmap (Phase 2+)
 
 See `gta.md` for the full vision. Next likely additions: Yaowarat (no-cars

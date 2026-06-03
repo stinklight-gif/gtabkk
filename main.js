@@ -2776,7 +2776,7 @@ function makeMissionSystem() {
       timeLeft: 0,
       drop: new THREE.Vector3(-150, 0, 150),
       home: new THREE.Vector3(100, 0, -50),
-      startTime: 60,
+      startTime: 75,   // generous: you start at 3★ and spike strips can blow your tires
       reward: 3000,
       onStart() {
         this.stage = 1;
