@@ -1825,6 +1825,20 @@ function makeVehicleMesh(kind) {
     }
     g.userData.dims = { L: 3.8, W: 2.0, H: 2.4 };
     g.userData.spec = { topSpeed: 22, accel: 11, brake: 16, turn: 1.6, mass: 1700, kind: 'songthaew' };
+  } else if (kind === 'boat') {
+    // longtail boat — long thin hull, bench seat, raised stern motor pole
+    const hull = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.6, 7), new THREE.MeshStandardMaterial({ color: 0x9a3a3a, roughness: 0.7 }));
+    hull.position.y = 0.35; g.add(hull);
+    const trim = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.16, 7.1), new THREE.MeshStandardMaterial({ color: 0xe0c060, roughness: 0.6 }));
+    trim.position.y = 0.62; g.add(trim);
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.2, 0.8), new THREE.MeshStandardMaterial({ color: 0x5a3a2a }));
+    seat.position.set(0, 0.7, 0.5); g.add(seat);
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 3, 6), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+    pole.position.set(0, 1.0, -3.6); pole.rotation.x = 0.6; g.add(pole);
+    const prop = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.1), new THREE.MeshStandardMaterial({ color: 0x222222 }));
+    prop.position.set(0, 0.2, -4.6); g.add(prop);
+    g.userData.dims = { L: 7.0, W: 1.7, H: 1.2 };
+    g.userData.spec = { topSpeed: 18, accel: 8, brake: 7, turn: 1.2, mass: 800, kind: 'boat' };
   } else if (kind === 'camry' || kind === 'sedan') {
     const color = kind === 'sedan' ? pick([0x222, 0xf5f5f5, 0xc23a3a, 0x335a99, 0x8c8c8c]) : 0xeeeeee;
     const body = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.9, 3.6), new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.4 }));
@@ -2003,6 +2017,14 @@ function spawnParkedCars(scene) {
     v.driver = null; v.vel = 0;                            // parked: enterable, no AI
     placed++;
   }
+}
+
+// One drivable longtail at the river pier gap (z=-50) — step through the embankment to board.
+function spawnBoat(scene) {
+  const v = makeVehicle('boat', scene);
+  v.pos.set(-212, 0.3, -50); v.mesh.position.copy(v.pos);
+  v.heading = 0; v.mesh.rotation.y = 0;
+  v.driver = null; v.vel = 0;
 }
 
 function spawnPeds(scene, n) {
@@ -2189,6 +2211,7 @@ async function init() {
   // Spawn vehicles, peds, dogs
   spawnTraffic(scene);
   spawnParkedCars(scene);
+  spawnBoat(scene);
   spawnPeds(scene, 60);
   spawnDogs(scene, 16);
   setProgress(88);
@@ -3003,10 +3026,15 @@ function updatePlayerInVehicle(dt) {
   // apply motion
   v.pos.x += Math.sin(v.heading) * v.vel * dt;
   v.pos.z += Math.cos(v.heading) * v.vel * dt;
+  if (v.spec.kind === 'boat') {            // keep the boat in the river channel
+    v.pos.x = clamp(v.pos.x, -248, -210);
+    v.pos.z = clamp(v.pos.z, -246, 246);
+    v.pos.y = 0.3;
+  }
   v.mesh.position.copy(v.pos);
   v.mesh.rotation.y = v.heading;
 
-  resolveVehicleVsBuildings(v);
+  if (v.spec.kind !== 'boat') resolveVehicleVsBuildings(v);
 
   // place player at seat (invisible while inside)
   p.group.visible = false;
@@ -4018,7 +4046,7 @@ function updateGunShop(dt) {
 }
 
 function vehicleName(k) {
-  return { bike: 'motorbike', tuktuk: 'tuk-tuk', hilux: 'pickup', camry: 'car', sedan: 'sedan', cop: 'cop pickup', fortuner: 'unmarked SUV', songthaew: 'songthaew' }[k] || k;
+  return { bike: 'motorbike', tuktuk: 'tuk-tuk', hilux: 'pickup', camry: 'car', sedan: 'sedan', cop: 'cop pickup', fortuner: 'unmarked SUV', songthaew: 'songthaew', boat: 'longtail boat' }[k] || k;
 }
 
 // =============================================================================
