@@ -2434,6 +2434,7 @@ function bindHud() {
     mctx.translate(128, 128);
     // rotate by camera yaw so up = forward
     mctx.rotate(-G.camRig.yaw);
+    mctx.scale(G.minimapZoom || 1, G.minimapZoom || 1);   // N cycles zoom levels
     mctx.drawImage(G.world.minimap, -ppx, -ppy);
 
     // mission marker on minimap
@@ -4362,6 +4363,18 @@ function drawFullMap() {
   ctx.clearRect(0, 0, S, S);
   if (G.world && G.world.minimap) ctx.drawImage(G.world.minimap, 0, 0, S, S);
   const to = v => (v + HALF) / (2 * HALF) * S;
+  // POI labels
+  const poi = G.world.poi || {};
+  const labels = [
+    { p: poi.goldShop, t: "Uncle Seng's" },
+    { p: poi.temple, t: 'Temple' },
+    { p: poi.yaowarat, t: 'Yaowarat' },
+    { p: G.world.gunShop, t: 'Guns' },
+  ];
+  for (const ga of (G.world.garages || [])) labels.push({ p: ga.pos, t: 'U-Spray' });
+  ctx.fillStyle = '#cfe3e0'; ctx.font = '13px system-ui, sans-serif'; ctx.textAlign = 'center';
+  for (const L of labels) if (L.p) ctx.fillText(L.t, to(L.p.x), to(L.p.z) - 8);
+  ctx.textAlign = 'left';
   if (G.world.collectibles) {
     ctx.fillStyle = '#ffcf4a';
     for (const a of G.world.collectibles) if (!a.taken) {
@@ -4462,6 +4475,12 @@ function loop() {
     document.getElementById('fullmap-wrap').classList.toggle('show', G.showMap);
     G.state = G.showMap ? 'map' : 'playing';
     if (G.showMap) document.exitPointerLock(); else G.input.requestLock();
+  }
+
+  // minimap zoom (N)
+  if (G.input && G.input.pressed && G.input.pressed('KeyN') && G.state === 'playing') {
+    const levels = [1, 1.7, 2.6];
+    G.minimapZoom = levels[(levels.indexOf(G.minimapZoom || 1) + 1) % levels.length];
   }
 
   // photo mode (P): free-fly camera + hidden HUD, sim paused
