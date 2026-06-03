@@ -1922,6 +1922,23 @@ function bindHud() {
 
 function makeMissionSystem() {
   const sys = { active: null };
+
+  // Shared mission marker beam — a single pillar of light reused by whichever
+  // mission is active. Pass null to hide it.
+  let beam = null;
+  function setBeam(pos, color = 0x21f0ff) {
+    if (!pos) { if (beam) { G.scene.remove(beam); beam = null; } return; }
+    if (!beam) {
+      beam = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.2, 1.2, 80, 16, 1, true),
+        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false })
+      );
+      G.scene.add(beam);
+    }
+    beam.material.color.setHex(color);
+    beam.position.set(pos.x, 40, pos.z);
+  }
+
   const missions = {
     welcome: {
       name: 'Welcome to Krung Thep',
@@ -1949,14 +1966,111 @@ function makeMissionSystem() {
             const beam = G.world.poi.goldShopBeam;
             if (beam) { G.scene.remove(beam); G.world.poi.goldShopBeam = null; }
             G.hud.setMissionText('Free Roam · Sukhumvit');
-            this.markerPos = null;
+            // Offer the next job: leave and return to the shop to start Soi Run.
+            this.stage = 3;
+            this.armed = false;
+            this.markerPos = G.world.poi.goldShop.clone();
+            setBeam(this.markerPos, 0xff2a86);
             setTimeout(() => {
-              G.hud.showSubtitle("Free roam: take a bike, beat up muggers, dodge cops.", "ขับเล่นเลย");
+              G.hud.showSubtitle("Uncle Seng: \"Got another job — a soi run. Come back when you're ready.\"", "ลุงเซ้ง: \"มีงานอีก เดี๋ยวมาเอา\"");
             }, 2500);
+          }
+        } else if (this.stage === 3) {
+          // job available: leave the marker, then return to it to begin Soi Run
+          const d2 = dist2(G.player.group.position, this.markerPos);
+          if (!this.armed && d2 > 18*18) this.armed = true;
+          if (this.armed) {
+            G.hud.showPrompt('Return to the <b>marker</b> to start <b>Soi Run</b>', 0.4);
+            if (d2 < 8*8) sys.start('soiRun');
           }
         }
       },
-    }
+    },
+
+    // Mission 2 — a timed checkpoint race. Built on the same stage/marker system;
+    // tune startTime / cpBonus / route below. Replayable from the start line.
+    soiRun: {
+      name: 'Soi Run',
+      th: 'ซิ่งซอย',
+      markerPos: null,
+      stage: 0,
+      armed: false,
+      cp: 0,
+      timeLeft: 0,
+      startLine: new THREE.Vector3(-150, 0, -150),
+      route: [
+        new THREE.Vector3(   0, 0, -150),
+        new THREE.Vector3( 150, 0,  -50),
+        new THREE.Vector3( 150, 0,  100),
+        new THREE.Vector3( -50, 0,  150),
+        new THREE.Vector3(-200, 0,   50),
+      ],
+      startTime: 55,   // seconds on the clock when you cross the start line
+      cpBonus: 15,     // seconds added per checkpoint reached
+      reward: 1500,
+      onStart() {
+        this.stage = 1;
+        this.cp = 0;
+        this.timeLeft = 0;
+        G.hud.setMissionText('Soi Run');
+        G.hud.showSubtitle("Soi Run: race the checkpoints. Get to the green start line.", "ซิ่งซอย — ไปจุดสตาร์ท");
+        this.markerPos = this.startLine.clone();
+        setBeam(this.markerPos, 0x39ff7a); // green = start
+      },
+      update(dt) {
+        if (this.stage === 1) {
+          if (dist2(G.player.group.position, this.markerPos) < 8*8) {
+            this.stage = 2;
+            this.cp = 0;
+            this.timeLeft = this.startTime;
+            this.markerPos = this.route[0].clone();
+            setBeam(this.markerPos, 0x21f0ff);
+            G.hud.showNotif('GO! Hit the checkpoints!');
+            G.audio.whistle();
+          }
+        } else if (this.stage === 2) {
+          this.timeLeft -= dt;
+          if (this.timeLeft <= 0) { this.fail(); return; }
+          G.hud.showPrompt(`SOI RUN &nbsp; ⏱ ${this.timeLeft.toFixed(1)}s &nbsp;·&nbsp; CP ${this.cp + 1}/${this.route.length}`, 0.4);
+          if (dist2(G.player.group.position, this.markerPos) < 8*8) {
+            this.cp++;
+            if (this.cp >= this.route.length) { this.win(); return; }
+            this.timeLeft += this.cpBonus;
+            this.markerPos = this.route[this.cp].clone();
+            setBeam(this.markerPos, 0x21f0ff);
+            G.hud.showNotif(`Checkpoint ${this.cp}/${this.route.length} · +${this.cpBonus}s`);
+            G.audio.blip({ freq: 760, dur: 0.08, gain: 0.12 });
+          }
+        } else if (this.stage === 5) {
+          // job available again — return to the start line to replay
+          const d2 = dist2(G.player.group.position, this.markerPos);
+          if (!this.armed && d2 > 18*18) this.armed = true;
+          if (this.armed) {
+            G.hud.showPrompt('Return to the <b>marker</b> to run <b>Soi Run</b> again', 0.4);
+            if (d2 < 8*8) { this.armed = false; this.onStart(); }
+          }
+        }
+      },
+      win() {
+        G.cash += this.reward;
+        G.hud.setCash(G.cash);
+        G.hud.showNotif(`Soi Run complete: +฿${this.reward.toLocaleString()}`);
+        G.hud.showSubtitle("Uncle Seng: \"Fast hands, fast wheels. Nice.\"", "ลุงเซ้ง: \"เร็วดีนี่\"");
+        this.toReoffer();
+      },
+      fail() {
+        G.hud.showNotif('Soi Run failed — out of time');
+        G.hud.showSubtitle("Uncle Seng: \"Too slow. Try again sometime.\"", "ลุงเซ้ง: \"ช้าไป\"");
+        this.toReoffer();
+      },
+      toReoffer() {
+        this.stage = 5;
+        this.armed = false;
+        G.hud.setMissionText('Free Roam · Sukhumvit');
+        this.markerPos = this.startLine.clone();
+        setBeam(this.markerPos, 0xff2a86);
+      },
+    },
   };
   sys.start = id => {
     sys.active = missions[id];
