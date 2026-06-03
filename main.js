@@ -1545,6 +1545,31 @@ function buildWorld(scene) {
     }
   }
 
+  // ---- Street-food stalls: a second collectible set; visit on foot to eat + heal ----
+  {
+    world.foodStalls = [];
+    const cartGeo = new THREE.BoxGeometry(1.6, 0.9, 1.0);
+    const cartMat = new THREE.MeshStandardMaterial({ color: 0x8a6a3a, roughness: 0.8 });
+    const parasolGeo = new THREE.ConeGeometry(1.3, 0.6, 8);
+    for (let n = 0; n < 10; n++) {
+      let x, z;
+      if (Math.random() < 0.5) {
+        const gi = irand(-GRID/2 + 1, GRID/2 - 1);
+        x = gi * BLOCK + (Math.random() < 0.5 ? -5 : 5); z = rand(-HALF + 14, HALF - 14);
+      } else {
+        const gj = irand(-GRID/2 + 1, GRID/2 - 1);
+        z = gj * BLOCK + (Math.random() < 0.5 ? -5 : 5); x = rand(-190, HALF - 14);
+      }
+      const stall = new THREE.Group();
+      const cart = new THREE.Mesh(cartGeo, cartMat); cart.position.y = 0.6; stall.add(cart);
+      const glowColor = pick([0xffaa33, 0xff5a5a, 0x39c6c0]);
+      const glowMat = new THREE.MeshStandardMaterial({ color: glowColor, emissive: glowColor, emissiveIntensity: 0.7, roughness: 0.5 });
+      const parasol = new THREE.Mesh(parasolGeo, glowMat); parasol.position.y = 1.9; stall.add(parasol);
+      stall.position.set(x, 0, z); scene.add(stall);
+      world.foodStalls.push({ pos: new THREE.Vector3(x, 0, z), visited: false, glowMat });
+    }
+  }
+
   // ---- Render minimap base (top-down 2D snapshot of roads/landmarks) ----
   world.minimap = makeMinimapBase(world);
 
@@ -2140,6 +2165,7 @@ function saveGame() {
       smgAmmo: p.smgAmmo, smgReserve: p.smgReserve,
       shotgunAmmo: p.shotgunAmmo, shotgunReserve: p.shotgunReserve,
       amulets: (G.world.collectibles || []).map(a => a.taken),
+      food: (G.world.foodStalls || []).map(f => f.visited), foodVisited: G.foodVisited || 0,
       collected: G.collected || 0,
       welcomeDone: !!G._welcomeDone,
       soiRunWon: !!G._soiRunWon, hitDone: !!G._hitDone,
@@ -2174,6 +2200,10 @@ function loadGame() {
       if (taken && a && !a.taken) { a.taken = true; G.scene.remove(a.mesh); }
     });
     G.collected = (typeof s.collected === 'number') ? s.collected : s.amulets.filter(Boolean).length;
+  }
+  if (Array.isArray(s.food) && G.world.foodStalls) {
+    s.food.forEach((v, i) => { const f = G.world.foodStalls[i]; if (v && f && !f.visited) { f.visited = true; f.glowMat.emissiveIntensity = 0; f.glowMat.color.setHex(0x555555); } });
+    G.foodVisited = (typeof s.foodVisited === 'number') ? s.foodVisited : s.food.filter(Boolean).length;
   }
   if (typeof s.px === 'number' && typeof s.pz === 'number') p.group.position.set(s.px, 0, s.pz);
   if (s.soiRunWon) G._soiRunWon = true;
@@ -2406,6 +2436,7 @@ function bindHud() {
     const milestones = (G._welcomeDone ? 1 : 0) + (G._soiRunWon ? 1 : 0) + (G._hitDone ? 1 : 0);
     const pct = Math.round((G.collected || 0) / Math.max(1, total) * 70 + milestones / 3 * 30);
     document.getElementById('ph-complete').textContent = pct + '%';
+    document.getElementById('ph-food').textContent = `${G.foodVisited || 0} / ${(G.world.foodStalls || []).length}`;
   }
   function setVehicle(hp, show) {
     const row = document.getElementById('veh-row');
@@ -3334,6 +3365,24 @@ function updatePeds(dt) {
 
 // Random "bag-snatcher" street event — a marked ped flees (reusing the panic AI);
 // run them down for a bounty. Delivers on the intro's "beat up muggers".
+// Street-food stalls — visit on foot to eat (heal once) and tick the set.
+function updateFoodStalls(dt) {
+  const fs = G.world.foodStalls;
+  if (!fs || G.player.inVehicle) return;
+  const pp = G.player.group.position;
+  for (const f of fs) {
+    if (f.visited) continue;
+    if (dist2(f.pos, pp) < 4 * 4) {
+      f.visited = true;
+      G.foodVisited = (G.foodVisited || 0) + 1;
+      G.player.hp = Math.min(G.player.hpMax, G.player.hp + 25);
+      f.glowMat.emissiveIntensity = 0; f.glowMat.color.setHex(0x555555);   // dim = visited
+      G.hud.showNotif(`Street food! +HP (${G.foodVisited}/${fs.length})`);
+      G.audio.chime();
+    }
+  }
+}
+
 function updateMuggings(dt) {
   const m = G.mugging;
   if (m) {
@@ -4504,6 +4553,7 @@ function loop() {
     updatePlayer(dt);
     updateDistrict();
     updateCollectibles(dt);
+    updateFoodStalls(dt);
     updateInteraction(dt);
     updateGarage(dt);
     updateTaxi(dt);
