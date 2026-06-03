@@ -54,6 +54,73 @@ const G = {
 
 window.GAME = G; // for poking around in the console
 
+// -----------------------------------------------------------------------------
+// Shared gameplay helpers + pooled temporaries (reused across the update loop to
+// avoid per-frame allocations). GAMEPLAY flags gate the optional systems so any
+// of them can be turned off with a one-line change.
+// -----------------------------------------------------------------------------
+const ROAD_WIDTH = 12;          // matches buildWorld's local ROAD_W
+const PED_TARGET = 60;          // pedestrians are topped back up to this count
+
+const GAMEPLAY = {
+  armor: true,            // armor soaks damage before HP
+  vulnerableOnFoot: true, // cops can hurt the player while on foot
+  pistolOnCopKill: true,  // first cop kill grants the 9mm (per README)
+  wantedLOS: true,        // stars only decay once no cop is within sight
+};
+
+// pooled scratch objects (never returned/stored — copy out before reuse)
+const _camTarget = new THREE.Vector3();
+const _camOffset = new THREE.Vector3();
+const _fireDir   = new THREE.Vector3();
+const _ray       = new THREE.Raycaster();
+const _blackColor = new THREE.Color(0x111111);
+
+// pooled fire FX lights (created lazily, reused every shot, decayed in the loop)
+let _muzzleLight = null, _sparkLight = null, _muzzleT = 0, _sparkT = 0;
+let _copsKilled = 0;
+
+// Bump wanted level and refresh the "last seen" tracker. Replaces the same
+// three-line pattern that was copy-pasted across combat/cop code.
+function raiseWanted(n) {
+  G.wanted.stars = Math.max(G.wanted.stars, n);
+  G.wanted.lastSeenAt = performance.now();
+  G.wanted.lastSeenPos.copy(G.player.group.position);
+}
+
+// Apply damage to the player, soaking into armor first when enabled.
+function damagePlayer(amount) {
+  const p = G.player;
+  if (GAMEPLAY.armor && p.armor > 0) {
+    const absorbed = Math.min(p.armor, amount * 0.6);
+    p.armor -= absorbed;
+    amount  -= absorbed;
+  }
+  p.hp -= amount;
+  p.hitFlashT = 0.3;
+  if (p.hp <= 0) gameOver();
+}
+
+// Award credit for a downed cop; first kill hands over the pistol (README).
+function onCopKilled() {
+  _copsKilled++;
+  if (GAMEPLAY.pistolOnCopKill && _copsKilled === 1 && !G.player.weapons.pistol) {
+    G.player.weapons.pistol = true;
+    G.player.pistolAmmo = G.player.pistolMag;
+    updateAmmoHud();
+    G.hud.showNotif('Picked up a 9mm');
+  }
+}
+
+// Free GPU resources for a mesh/group that's leaving the scene for good.
+function disposeObject(obj) {
+  obj.traverse(o => {
+    if (o.geometry) o.geometry.dispose();
+    const m = o.material;
+    if (m) { if (Array.isArray(m)) m.forEach(x => x.dispose()); else m.dispose(); }
+  });
+}
+
 // =============================================================================
 // 1. AUDIO
 // =============================================================================
@@ -266,16 +333,44 @@ function buildWorld(scene) {
   const world = {
     bounds: { min: new THREE.Vector3(-HALF, 0, -HALF), max: new THREE.Vector3(HALF, 0, HALF) },
     buildings: [],       // {pos, size, mesh}
-    roads: [],           // {a,b,width}  — segment list, for AI
     intersections: [],   // grid vertex positions (for traffic & cops)
-    nodes: [],           // network nodes for path-following
-    edges: [],           // node connectivity
     spawns: { player: new THREE.Vector3(0, 0.0, 100) },
     poi: {},             // points of interest (mission markers)
     sevenElevens: [],
-    shrines: [],
     minimap: null,       // canvas-rendered base layer
   };
+
+  // Day/night caches — populated below, consumed by updateDayNight() so it never
+  // has to traverse the whole scene graph each frame.
+  G.nightLights = [];    // [{light, base}] accent PointLights that scale with night
+  G.nightEmissive = [];  // [{mat, dayIntensity, nightIntensity}] materials that ramp at night
+
+  // Scratch transform objects, reused while composing InstancedMesh matrices.
+  const _m = new THREE.Matrix4();
+  const _m2 = new THREE.Matrix4();
+  const _q = new THREE.Quaternion();
+  const _e = new THREE.Euler();
+  const _p = new THREE.Vector3();
+  const _s = new THREE.Vector3();
+
+  // Build one InstancedMesh from an array of Matrix4 and add it to the scene.
+  // Returns null (and adds nothing) for empty arrays so callers can stay terse.
+  function addInstanced(geo, mat, matrices, cast, receive) {
+    if (!matrices.length) return null;
+    const inst = new THREE.InstancedMesh(geo, mat, matrices.length);
+    for (let k = 0; k < matrices.length; k++) inst.setMatrixAt(k, matrices[k]);
+    inst.instanceMatrix.needsUpdate = true;
+    // Instances are positioned via per-instance matrices on origin-centered base
+    // geometry, so the default bounding sphere (base geo at the world origin) would
+    // frustum-cull the entire batch whenever the origin is off-screen. These batches
+    // span the whole map and can't be culled as a unit anyway, so disable per-object
+    // frustum culling (same as the rain/smoke Points).
+    inst.frustumCulled = false;
+    inst.castShadow = !!cast;
+    inst.receiveShadow = !!receive;
+    scene.add(inst);
+    return inst;
+  }
 
   // ---- ground / asphalt ----
   const groundMat = new THREE.MeshStandardMaterial({ color: COLORS.asphalt, roughness: 0.9 });
@@ -289,17 +384,6 @@ function buildWorld(scene) {
   const sidewalkMat = new THREE.MeshStandardMaterial({ color: COLORS.sidewalk, roughness: 1.0 });
 
   const ROAD_W = 12, SIDEWALK_W = 3;
-
-  // Build geometry pools (batched per material)
-  const buildingGeoms = [];
-  const neonGeoms = {};   // by hex color
-  COLORS.neon.forEach(c => neonGeoms[c] = []);
-
-  // helper to push neon
-  function pushNeon(box, color) {
-    neonGeoms[color] = neonGeoms[color] || [];
-    neonGeoms[color].push(box);
-  }
 
   // Build major roads on grid lines (avenues)
   for (let i = -GRID/2; i <= GRID/2; i++) {
@@ -319,23 +403,10 @@ function buildWorld(scene) {
     }
   }
 
-  // intersections (grid vertices) and traffic nodes
+  // intersections (grid vertices) — used to place lamps, traffic & cops
   for (let i = -GRID/2; i <= GRID/2; i++) {
     for (let j = -GRID/2; j <= GRID/2; j++) {
-      const v = new THREE.Vector3(i*BLOCK, 0, j*BLOCK);
-      world.intersections.push(v);
-      world.nodes.push({ pos: v.clone(), neighbors: [] });
-    }
-  }
-  // node connectivity (4-neighbor)
-  function nodeIdx(i, j) { return (i + GRID/2) * (GRID+1) + (j + GRID/2); }
-  for (let i = -GRID/2; i <= GRID/2; i++) {
-    for (let j = -GRID/2; j <= GRID/2; j++) {
-      const me = world.nodes[nodeIdx(i,j)];
-      if (i < GRID/2)  me.neighbors.push(world.nodes[nodeIdx(i+1, j)]);
-      if (i > -GRID/2) me.neighbors.push(world.nodes[nodeIdx(i-1, j)]);
-      if (j < GRID/2)  me.neighbors.push(world.nodes[nodeIdx(i, j+1)]);
-      if (j > -GRID/2) me.neighbors.push(world.nodes[nodeIdx(i, j-1)]);
+      world.intersections.push(new THREE.Vector3(i*BLOCK, 0, j*BLOCK));
     }
   }
 
@@ -372,15 +443,34 @@ function buildWorld(scene) {
   const shopMatPool = SHOP_COLORS.map(c => new THREE.MeshStandardMaterial({
     color: c, roughness: 0.95,
   }));
-  // windows: emissive grid texture procedurally drawn
+  // windows: emissive grid texture procedurally drawn. One shared material for all
+  // window planes (so it instances cheaply and ramps via a single nightEmissive entry).
   const winTex = makeWindowTexture();
-  const winMatNight = new THREE.MeshStandardMaterial({
+  const winMat = new THREE.MeshStandardMaterial({
     map: winTex, emissiveMap: winTex, emissive: 0xffe6a8, emissiveIntensity: 0.0, roughness: 0.6,
   });
-  const winMat = winMatNight;
+  G.nightEmissive.push({ mat: winMat, dayIntensity: 0.0, nightIntensity: 1.0 });
 
   const SIDEWALK_EDGE = BLOCK/2 - ROAD_W/2 - SIDEWALK_W*2; // 13: distance from block center to inner sidewalk edge
   const SHOP_LEVEL_H = 4; // height of ground-floor shop band
+
+  // ---- Rooftop-decor instancing pools ----
+  // placeBuilding scatters water tanks, AC condensers, antennas and dishes across
+  // many rooftops. Rather than one Mesh each (thousands of draw calls), we collect
+  // a per-instance Matrix4 here and build one InstancedMesh per prop type afterwards.
+  // Unit geometries (radius 1 / height 1) are scaled per instance via the matrix.
+  const tankGeo = new THREE.CylinderGeometry(1, 1, 1, 10);   // scaled by (R, H, R)
+  const tankMatDark = new THREE.MeshStandardMaterial({ color: 0x202020, roughness: 0.7 });
+  const tankMatBlue = new THREE.MeshStandardMaterial({ color: 0x355088, roughness: 0.7 });
+  const tankLegGeo = new THREE.BoxGeometry(0.08, 0.3, 0.08);
+  const tankLegMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 });
+  const acGeo = new THREE.BoxGeometry(0.55, 0.35, 0.4);
+  const acMat = new THREE.MeshStandardMaterial({ color: 0xb8b8b8, roughness: 0.6, metalness: 0.4 });
+  const antGeo = new THREE.CylinderGeometry(0.035, 0.035, 1, 6); // scaled by (1, H, 1)
+  const antMat = new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.6 });
+  const dishGeo = new THREE.SphereGeometry(0.32, 8, 6, 0, TAU, 0, PI/3);
+  const dishMat = new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.4, metalness: 0.3 });
+  const tankDarkM = [], tankBlueM = [], tankLegM = [], acM = [], antM = [], dishM = [];
 
   // placeBuilding: shop band on bottom 4m + upper floors above, plus optional
   // window strips and neon sign on the faces that look toward a road.
@@ -413,13 +503,13 @@ function buildWorld(scene) {
         if (face.ax === 'z') {
           const winW = dimX - 1.5;
           if (winW <= 0.5) continue;
-          win = new THREE.Mesh(new THREE.PlaneGeometry(winW, winH), winMat.clone());
+          win = new THREE.Mesh(new THREE.PlaneGeometry(winW, winH), winMat);
           win.position.set(bx, SHOP_LEVEL_H + upperH/2, bz + face.sign * (dimZ/2 + 0.02));
           if (face.sign < 0) win.rotation.y = PI;
         } else {
           const winW = dimZ - 1.5;
           if (winW <= 0.5) continue;
-          win = new THREE.Mesh(new THREE.PlaneGeometry(winW, winH), winMat.clone());
+          win = new THREE.Mesh(new THREE.PlaneGeometry(winW, winH), winMat);
           win.position.set(bx + face.sign * (dimX/2 + 0.02), SHOP_LEVEL_H + upperH/2, bz);
           win.rotation.y = face.sign > 0 ? PI/2 : -PI/2;
         }
@@ -427,17 +517,20 @@ function buildWorld(scene) {
       }
     }
 
-    // neon sign on shop level for short/mid buildings — on the first road-facing face
+    // neon sign on shop level for short/mid buildings — on the first road-facing face.
+    // Self-illuminated via an emissive material (no real PointLight) so hundreds of
+    // signs cost nothing at runtime; the emissive ramps up at night via nightEmissive.
     if (h < 32 && Math.random() < 0.8 && frontFaces.length > 0) {
       const face = frontFaces[0];
       const neonColor = pick(COLORS.neon);
       const faceWidth = face.ax === 'z' ? dimX : dimZ;
       const sw = rand(2, Math.min(faceWidth, 6));
       const sh = rand(1.0, 2.0);
-      const sign = new THREE.Mesh(
-        new THREE.PlaneGeometry(sw, sh),
-        new THREE.MeshBasicMaterial({ color: neonColor })
-      );
+      const signMat = new THREE.MeshStandardMaterial({
+        color: neonColor, emissive: neonColor, emissiveIntensity: 0.15, roughness: 0.5,
+      });
+      G.nightEmissive.push({ mat: signMat, dayIntensity: 0.15, nightIntensity: 1.4 });
+      const sign = new THREE.Mesh(new THREE.PlaneGeometry(sw, sh), signMat);
       if (face.ax === 'z') {
         sign.position.set(bx, rand(2.5, 3.7), bz + face.sign * (dimZ/2 + 0.05));
         if (face.sign < 0) sign.rotation.y = PI;
@@ -445,14 +538,7 @@ function buildWorld(scene) {
         sign.position.set(bx + face.sign * (dimX/2 + 0.05), rand(2.5, 3.7), bz);
         sign.rotation.y = face.sign > 0 ? PI/2 : -PI/2;
       }
-      sign.userData.neon = true; sign.userData.neonColor = neonColor;
       scene.add(sign);
-      if (Math.random() < 0.35) {
-        const pl = new THREE.PointLight(neonColor, 0.0, 16, 2);
-        pl.position.copy(sign.position);
-        pl.userData.neon = true; pl.userData.baseIntensity = 1.0;
-        scene.add(pl);
-      }
     }
 
     // awning: tarp slab projecting out from the shop level over the sidewalk
@@ -499,7 +585,7 @@ function buildWorld(scene) {
           const face = frontFaces[0];
           const win = new THREE.Mesh(
             new THREE.PlaneGeometry(face.ax === 'z' ? setX - 1 : setZ - 1, setH - 1.5),
-            winMat.clone()
+            winMat
           );
           if (face.ax === 'z') {
             win.position.set(bx, roofY + setH/2, bz + face.sign * (setZ/2 + 0.02));
@@ -512,57 +598,53 @@ function buildWorld(scene) {
         }
       }
 
-      // Water tank (cylinder on stubby legs) — iconic Bangkok rooftop
+      // Water tank (cylinder on stubby legs) — iconic Bangkok rooftop. Instanced:
+      // unit cylinder scaled to (R, H, R); legs are a shared box instanced too.
       if (Math.random() < 0.6) {
         const tankR = rand(0.45, 0.85);
         const tankH = rand(1.2, 2.0);
-        const tankColor = Math.random() < 0.72 ? 0x202020 : 0x355088;
-        const tankMat = new THREE.MeshStandardMaterial({ color: tankColor, roughness: 0.7 });
-        const tank = new THREE.Mesh(new THREE.CylinderGeometry(tankR, tankR, tankH, 10), tankMat);
+        const tankDark = Math.random() < 0.72;
         const tankX = bx + rand(-dimX/2 + tankR + 0.3, dimX/2 - tankR - 0.3);
         const tankZ = bz + rand(-dimZ/2 + tankR + 0.3, dimZ/2 - tankR - 0.3);
-        tank.position.set(tankX, roofY + tankH/2 + 0.3, tankZ);
-        tank.castShadow = true;
-        scene.add(tank);
-        const legMat = new THREE.MeshStandardMaterial({ color: 0x222, roughness: 0.9 });
+        _p.set(tankX, roofY + tankH/2 + 0.3, tankZ);
+        _q.identity();
+        _s.set(tankR, tankH, tankR);
+        (tankDark ? tankDarkM : tankBlueM).push(_m.compose(_p, _q, _s).clone());
         for (const [lx, lz] of [[-tankR*0.7, -tankR*0.7], [tankR*0.7, -tankR*0.7], [-tankR*0.7, tankR*0.7], [tankR*0.7, tankR*0.7]]) {
-          const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.3, 0.08), legMat);
-          leg.position.set(tankX + lx, roofY + 0.15, tankZ + lz);
-          scene.add(leg);
+          _p.set(tankX + lx, roofY + 0.15, tankZ + lz);
+          _q.identity();
+          _s.set(1, 1, 1);
+          tankLegM.push(_m.compose(_p, _q, _s).clone());
         }
       }
 
-      // AC condensers — small clustered boxes
+      // AC condensers — small clustered boxes (instanced, shared geo/material)
       const numAC = irand(0, 3);
-      const acMat = new THREE.MeshStandardMaterial({ color: 0xb8b8b8, roughness: 0.6, metalness: 0.4 });
       for (let k = 0; k < numAC; k++) {
-        const ac = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.35, 0.4), acMat);
-        ac.position.set(
+        _p.set(
           bx + rand(-dimX/2 + 0.4, dimX/2 - 0.4),
           roofY + 0.175,
           bz + rand(-dimZ/2 + 0.4, dimZ/2 - 0.4)
         );
-        ac.rotation.y = rand(0, TAU);
-        scene.add(ac);
+        _q.setFromEuler(_e.set(0, rand(0, TAU), 0));
+        _s.set(1, 1, 1);
+        acM.push(_m.compose(_p, _q, _s).clone());
       }
 
-      // Antenna / satellite dish
+      // Antenna / satellite dish (instanced; antenna is a unit cylinder scaled in Y)
       if (Math.random() < 0.5) {
         const antH = rand(1.5, 3);
-        const antMat = new THREE.MeshStandardMaterial({ color: 0x555, roughness: 0.6 });
-        const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.04, antH, 6), antMat);
         const antX = bx + rand(-dimX/2 + 0.3, dimX/2 - 0.3);
         const antZ = bz + rand(-dimZ/2 + 0.3, dimZ/2 - 0.3);
-        ant.position.set(antX, roofY + antH/2, antZ);
-        scene.add(ant);
+        _p.set(antX, roofY + antH/2, antZ);
+        _q.identity();
+        _s.set(1, antH, 1);
+        antM.push(_m.compose(_p, _q, _s).clone());
         if (Math.random() < 0.45) {
-          const dish = new THREE.Mesh(
-            new THREE.SphereGeometry(0.32, 8, 6, 0, TAU, 0, PI/3),
-            new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.4, metalness: 0.3 })
-          );
-          dish.position.set(antX + 0.25, roofY + antH * 0.7, antZ);
-          dish.rotation.z = -PI/2;
-          scene.add(dish);
+          _p.set(antX + 0.25, roofY + antH * 0.7, antZ);
+          _q.setFromEuler(_e.set(0, 0, -PI/2));
+          _s.set(1, 1, 1);
+          dishM.push(_m.compose(_p, _q, _s).clone());
         }
       }
     }
@@ -658,6 +740,14 @@ function buildWorld(scene) {
     }
   }
 
+  // ---- Build rooftop-decor InstancedMeshes from the matrices gathered above ----
+  addInstanced(tankGeo, tankMatDark, tankDarkM, true, false); // tanks cast shadow
+  addInstanced(tankGeo, tankMatBlue, tankBlueM, true, false);
+  addInstanced(tankLegGeo, tankLegMat, tankLegM, false, false);
+  addInstanced(acGeo, acMat, acM, false, false);
+  addInstanced(antGeo, antMat, antM, false, false);
+  addInstanced(dishGeo, dishMat, dishM, false, false);
+
   // ---- Temple compound (wat) — a landmark block with viharn + chedi ----
   {
     const cx = (TEMPLE_I + 0.5) * BLOCK;
@@ -709,11 +799,11 @@ function buildWorld(scene) {
     const cSpire = new THREE.Mesh(new THREE.ConeGeometry(0.5, 5.5, 8), chediGoldMat);
     cSpire.position.set(chediX, 9.3, chediZ); scene.add(cSpire);
 
-    // soft warm glow over the temple
+    // soft warm glow over the temple — a real accent light, cached for day/night
     const templeLight = new THREE.PointLight(0xffd577, 0.6, 30, 2);
     templeLight.position.set(cx, 7, cz);
-    templeLight.userData.streetLamp = true; templeLight.userData.baseIntensity = 0.8;
     scene.add(templeLight);
+    G.nightLights.push({ light: templeLight, base: 0.8 });
 
     // collision: viharn + chedi base
     world.buildings.push({
@@ -740,19 +830,19 @@ function buildWorld(scene) {
   const armGeoEW = new THREE.BoxGeometry(1.6, 0.10, 0.10);
   const armGeoNS = new THREE.BoxGeometry(0.10, 0.10, 1.6);
   const junctionGeo = new THREE.BoxGeometry(0.32, 0.5, 0.28);
+  const wireGeo = new THREE.CylinderGeometry(0.035, 0.035, 1, 4); // unit; scaled in Y
+  // Instancing accumulators — one Matrix4 per instance, built into InstancedMeshes below.
+  const poleM = [], armEWM = [], armNSM = [], junctionM = [], wireM = [];
 
   function makePole(x, z, isEW) {
-    const pole = new THREE.Mesh(poleGeo, poleMat);
-    pole.position.set(x, POLE_H/2, z);
-    pole.castShadow = true; pole.receiveShadow = true;
-    scene.add(pole);
-    const arm = new THREE.Mesh(isEW ? armGeoEW : armGeoNS, poleMat);
-    arm.position.set(x, POLE_H - 0.55, z);
-    scene.add(arm);
+    _q.identity(); _s.set(1, 1, 1);
+    _p.set(x, POLE_H/2, z);
+    poleM.push(_m.compose(_p, _q, _s).clone());
+    _p.set(x, POLE_H - 0.55, z);
+    (isEW ? armEWM : armNSM).push(_m.compose(_p, _q, _s).clone());
     if (Math.random() < 0.4) {
-      const box = new THREE.Mesh(junctionGeo, junctionMat);
-      box.position.set(x, 4.0 + rand(-0.3, 0.4), z);
-      scene.add(box);
+      _p.set(x, 4.0 + rand(-0.3, 0.4), z);
+      junctionM.push(_m.compose(_p, _q, _s).clone());
     }
   }
 
@@ -763,12 +853,11 @@ function buildWorld(scene) {
     let cx, cz;
     if (isEW) { cx = (x1+x2)/2; cz = (z1+z2)/2 + lateral; }
     else      { cx = (x1+x2)/2 + lateral; cz = (z1+z2)/2; }
-    const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, len, 4), wireMat);
-    wire.position.set(cx, y, cz);
-    // cylinder default long-axis is Y; rotate to run along road direction
-    if (isEW) wire.rotation.z = PI/2;
-    else      wire.rotation.x = PI/2;
-    scene.add(wire);
+    _p.set(cx, y, cz);
+    // unit cylinder long-axis is Y; scale Y by length, then rotate to run along road
+    _q.setFromEuler(_e.set(isEW ? 0 : PI/2, 0, isEW ? PI/2 : 0));
+    _s.set(1, len, 1);
+    wireM.push(_m.compose(_p, _q, _s).clone());
   }
 
   // Poles along EW roads — on both sidewalks (north & south of each road)
@@ -805,14 +894,30 @@ function buildWorld(scene) {
       }
     }
   }
+  // Build power-line InstancedMeshes (poles cast+receive shadow like the originals)
+  addInstanced(poleGeo, poleMat, poleM, true, true);
+  addInstanced(armGeoEW, poleMat, armEWM, false, false);
+  addInstanced(armGeoNS, poleMat, armNSM, false, false);
+  addInstanced(junctionGeo, junctionMat, junctionM, false, false);
+  addInstanced(wireGeo, wireMat, wireM, false, false);
 
   // ---- Parked motorbikes — clusters along curbs (Bangkok parking is everywhere) ----
-  const bikeColors = [0xd6363c, 0x2a3a55, 0x222222, 0xc8c8c8, 0x3a8a5a, 0xcfa83a];
-  const bikeWheelMat = new THREE.MeshStandardMaterial({ color: 0x111, roughness: 0.85 });
-  const bikeHandleMat = new THREE.MeshStandardMaterial({ color: 0x111 });
+  // One InstancedMesh per part type (frame / wheel / handle). The original gave each
+  // cluster a random frame color; instancing forces a single shared frame material,
+  // so we pick one representative Bangkok-red — the silhouette is what reads at range.
+  const bikeFrameMat = new THREE.MeshStandardMaterial({ color: 0xd6363c, roughness: 0.55, metalness: 0.3 });
+  const bikeWheelMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.85 });
+  const bikeHandleMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
   const bikeWheelGeo = new THREE.TorusGeometry(0.3, 0.075, 6, 12);
   const bikeFrameGeo = new THREE.BoxGeometry(0.5, 0.4, 1.5);
   const bikeHandleGeo = new THREE.BoxGeometry(0.7, 0.05, 0.06);
+  const bikeFrameM = [], bikeWheelM = [], bikeHandleM = [];
+  // Local (within-bike) part transforms, baked once and reused for every bike.
+  const _wheelQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, PI/2, 0));
+  const localFrame  = new THREE.Matrix4().compose(new THREE.Vector3(0, 0.5, 0), new THREE.Quaternion(), new THREE.Vector3(1,1,1));
+  const localWheelF = new THREE.Matrix4().compose(new THREE.Vector3(0, 0.3, 0.75), _wheelQ, new THREE.Vector3(1,1,1));
+  const localWheelR = new THREE.Matrix4().compose(new THREE.Vector3(0, 0.3, -0.75), _wheelQ, new THREE.Vector3(1,1,1));
+  const localHandle = new THREE.Matrix4().compose(new THREE.Vector3(0, 1.0, 0.65), new THREE.Quaternion(), new THREE.Vector3(1,1,1));
   for (let i = -GRID/2; i < GRID/2; i++) {
     for (let j = -GRID/2; j < GRID/2; j++) {
       const cx = (i + 0.5) * BLOCK;
@@ -825,35 +930,33 @@ function buildWorld(scene) {
         ]);
         const clusterSize = irand(2, 5);
         const t0 = rand(-12, 12 - clusterSize * 0.9);
-        const frameMat = new THREE.MeshStandardMaterial({
-          color: pick(bikeColors), roughness: 0.55, metalness: 0.3,
-        });
         for (let k = 0; k < clusterSize; k++) {
-          const bike = new THREE.Group();
-          const frame = new THREE.Mesh(bikeFrameGeo, frameMat);
-          frame.position.y = 0.5; bike.add(frame);
-          const wF = new THREE.Mesh(bikeWheelGeo, bikeWheelMat);
-          wF.rotation.y = PI/2; wF.position.set(0, 0.3, 0.75); bike.add(wF);
-          const wR = new THREE.Mesh(bikeWheelGeo, bikeWheelMat);
-          wR.rotation.y = PI/2; wR.position.set(0, 0.3, -0.75); bike.add(wR);
-          const handle = new THREE.Mesh(bikeHandleGeo, bikeHandleMat);
-          handle.position.set(0, 1.0, 0.65); bike.add(handle);
-          let bx, bz;
+          let bx, bz, ry;
           if (side.ax === 'z') {
             bx = cx + t0 + k * 0.9;
             bz = cz + side.sign * 15.5;
-            bike.rotation.y = (side.sign > 0 ? 0 : PI) + rand(-0.12, 0.12);
+            ry = (side.sign > 0 ? 0 : PI) + rand(-0.12, 0.12);
           } else {
             bz = cz + t0 + k * 0.9;
             bx = cx + side.sign * 15.5;
-            bike.rotation.y = (side.sign > 0 ? -PI/2 : PI/2) + rand(-0.12, 0.12);
+            ry = (side.sign > 0 ? -PI/2 : PI/2) + rand(-0.12, 0.12);
           }
-          bike.position.set(bx, 0.05, bz);
-          scene.add(bike);
+          // group (bike) transform, then world = group * localPart
+          _p.set(bx, 0.05, bz);
+          _q.setFromEuler(_e.set(0, ry, 0));
+          _s.set(1, 1, 1);
+          _m2.compose(_p, _q, _s);
+          bikeFrameM.push(new THREE.Matrix4().multiplyMatrices(_m2, localFrame));
+          bikeWheelM.push(new THREE.Matrix4().multiplyMatrices(_m2, localWheelF));
+          bikeWheelM.push(new THREE.Matrix4().multiplyMatrices(_m2, localWheelR));
+          bikeHandleM.push(new THREE.Matrix4().multiplyMatrices(_m2, localHandle));
         }
       }
     }
   }
+  addInstanced(bikeFrameGeo, bikeFrameMat, bikeFrameM, false, false);
+  addInstanced(bikeWheelGeo, bikeWheelMat, bikeWheelM, false, false);
+  addInstanced(bikeHandleGeo, bikeHandleMat, bikeHandleM, false, false);
 
   // ---- Sidewalk props: food carts, plant pots, trash piles ----
   const tarpColors2 = [0xa83a3a, 0x3a5a8a, 0x3a8a5a, 0xcfa83a, 0xc26b3a];
@@ -942,11 +1045,13 @@ function buildWorld(scene) {
   // ---- BTS Skytrain elevated track running east-west at z=0 ----
   const pillarMat = new THREE.MeshStandardMaterial({ color: 0x9b9b9b, roughness: 0.85 });
   const beamMat   = new THREE.MeshStandardMaterial({ color: 0x7d7d7d, roughness: 0.85 });
+  const pillarGeo = new THREE.CylinderGeometry(1.0, 1.3, 14, 8);
+  const pillarM = [];
   for (let x = -HALF + 10; x <= HALF - 10; x += 18) {
-    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.3, 14, 8), pillarMat);
-    pillar.position.set(x, 7, 0); pillar.castShadow = true; pillar.receiveShadow = true;
-    scene.add(pillar);
+    _p.set(x, 7, 0); _q.identity(); _s.set(1, 1, 1);
+    pillarM.push(_m.compose(_p, _q, _s).clone());
   }
+  addInstanced(pillarGeo, pillarMat, pillarM, true, true); // pillars cast+receive shadow
   const beam = new THREE.Mesh(new THREE.BoxGeometry(HALF*2, 1.2, 6), beamMat);
   beam.position.set(0, 14.5, 0); beam.castShadow = true; scene.add(beam);
 
@@ -992,22 +1097,28 @@ function buildWorld(scene) {
     scene.add(stationSign);
   }
 
-  // ---- Street lamps + traffic lights at intersections ----
-  const lampMat = new THREE.MeshStandardMaterial({ color: 0x333, roughness: 0.7 });
-  const bulbMat = new THREE.MeshBasicMaterial({ color: 0xffd577 });
+  // ---- Street lamps at intersections ----
+  // ~480 lamps. Previously each had its own PointLight (pathological for forward
+  // rendering); now the poles and bulb heads are instanced, and the bulbs glow via
+  // a shared emissive material that ramps at night instead of being real lights.
+  const lampMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.7 });
+  const bulbMat = new THREE.MeshStandardMaterial({
+    color: 0xffd577, emissive: 0xffd577, emissiveIntensity: 0.2, roughness: 0.4,
+  });
+  G.nightEmissive.push({ mat: bulbMat, dayIntensity: 0.2, nightIntensity: 1.4 });
+  const lampPoleGeo = new THREE.CylinderGeometry(0.12, 0.15, 6, 6);
+  const lampBulbGeo = new THREE.SphereGeometry(0.35, 8, 8);
+  const lampPoleM = [], lampBulbM = [];
   for (const inter of world.intersections) {
-    // skip lamp at center (BTS pillar there)
     for (const offset of [[-3,-3],[3,-3],[-3,3],[3,3]]) {
       const x = inter.x + offset[0]*1.2, z = inter.z + offset[1]*1.2;
-      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 6, 6), lampMat);
-      pole.position.set(x, 3, z); scene.add(pole);
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 8), bulbMat);
-      head.position.set(x, 6, z); head.userData.bulb = true; scene.add(head);
-      const pl = new THREE.PointLight(0xffd09b, 0.0, 16, 2);
-      pl.position.set(x, 5.5, z); pl.userData.streetLamp = true; pl.userData.baseIntensity = 0.6;
-      scene.add(pl);
+      _q.identity(); _s.set(1, 1, 1);
+      _p.set(x, 3, z); lampPoleM.push(_m.compose(_p, _q, _s).clone());
+      _p.set(x, 6, z); lampBulbM.push(_m.compose(_p, _q, _s).clone());
     }
   }
+  addInstanced(lampPoleGeo, lampMat, lampPoleM, false, false);
+  addInstanced(lampBulbGeo, bulbMat, lampBulbM, false, false);
 
   // ---- 7-Elevens (the door chime is non-negotiable) ----
   // Place a couple of obvious 7-Eleven storefronts.
@@ -1057,7 +1168,6 @@ function buildWorld(scene) {
     pl.position.y = 2; shrine.add(pl);
     shrine.position.copy(sp);
     scene.add(shrine);
-    world.shrines.push({ pos: sp.clone() });
   }
 
   // ---- Mission marker: Uncle Seng's gold shop (yellow pillar of light) ----
@@ -1108,6 +1218,10 @@ function buildWorld(scene) {
   const RING_INNER = HALF + 30;   // start just past the play area
   const RING_OUTER = HALF + 280;  // ~280m of fake skyline depth
   const RING_COUNT = 380;
+  // Boxes + caps + landmark tower bodies are all unit cubes scaled per instance.
+  // Accumulate one matrix array per ring material so each color is one InstancedMesh.
+  const ringBoxGeo = new THREE.BoxGeometry(1, 1, 1);
+  const ringBoxM = ringMats.map(() => []);
   for (let n = 0; n < RING_COUNT; n++) {
     const ang = rand(0, TAU);
     const r = rand(RING_INNER, RING_OUTER);
@@ -1118,22 +1232,21 @@ function buildWorld(scene) {
     const h = lerp(rand(35, 110), rand(15, 50), tDist);
     const w = rand(10, 22);
     const d = rand(10, 22);
-    const mat = ringMats[irand(0, ringMats.length - 1)];
-    const box = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
-    box.position.set(x, h/2, z);
-    // no shadows on distant ring (perf)
-    scene.add(box);
+    const mi = irand(0, ringMats.length - 1);
+    _q.identity();
+    _p.set(x, h/2, z); _s.set(w, h, d);
+    ringBoxM[mi].push(_m.compose(_p, _q, _s).clone());
     // occasional darker rooftop cap for silhouette variation
     if (Math.random() < 0.35) {
       const capH = rand(2, 6);
       const capW = w * rand(0.5, 0.85);
       const capD = d * rand(0.5, 0.85);
-      const cap = new THREE.Mesh(new THREE.BoxGeometry(capW, capH, capD), mat);
-      cap.position.set(x, h + capH/2, z);
-      scene.add(cap);
+      _p.set(x, h + capH/2, z); _s.set(capW, capH, capD);
+      ringBoxM[mi].push(_m.compose(_p, _q, _s).clone());
     }
   }
-  // A couple of landmark towers — taller than everything else
+  // A couple of landmark towers — taller than everything else (bodies fold into the
+  // material[0] box instances; the pointed cone tips stay as a few plain meshes).
   for (let n = 0; n < 4; n++) {
     const ang = rand(0, TAU);
     const r = rand(HALF + 80, HALF + 200);
@@ -1142,15 +1255,19 @@ function buildWorld(scene) {
     const h = rand(180, 260);
     const w = rand(14, 22);
     const d = rand(14, 22);
-    const tower = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), ringMats[0]);
-    tower.position.set(x, h/2, z);
-    scene.add(tower);
+    _q.identity();
+    _p.set(x, h/2, z); _s.set(w, h, d);
+    ringBoxM[0].push(_m.compose(_p, _q, _s).clone());
     // pointed cap
     const tipH = rand(6, 14);
     const tip = new THREE.Mesh(new THREE.ConeGeometry(w*0.4, tipH, 4), ringMats[0]);
     tip.position.set(x, h + tipH/2, z);
     tip.rotation.y = PI/4;
     scene.add(tip);
+  }
+  // Build the distant-ring InstancedMeshes (no shadows on distant ring — perf)
+  for (let mi = 0; mi < ringMats.length; mi++) {
+    addInstanced(ringBoxGeo, ringMats[mi], ringBoxM[mi], false, false);
   }
 
   // ---- Render minimap base (top-down 2D snapshot of roads/landmarks) ----
@@ -1386,17 +1503,13 @@ function makeVehicle(kind, scene) {
     pos: mesh.position,
     vel: 0,            // forward speed (m/s)
     heading: 0,        // yaw radians
-    steerAngle: 0,
     hp: 100,
     smoke: null, fire: null,
+    dead: false,
     driver: null,      // 'player' | npc obj | null
     npc: null,
     audio: null,
     isCop: kind === 'cop',
-    aiTargetNode: null,
-    aiState: 'cruising',
-    siren: false,
-    targetVel: 0,
     boundsHalf: { x: mesh.userData.dims.W * 0.5, z: mesh.userData.dims.L * 0.5 },
   };
   G.vehicles.push(veh);
@@ -1451,11 +1564,6 @@ function spawnPed(scene, pos) {
     waitT: 0,
     panicT: 0,
     hp: 30,
-    laneOffset: rand(-1.2, 1.2),
-    targetEdgeT: rand(0,1),
-    cellI: irand(-GRID/2, GRID/2-1),
-    cellJ: irand(-GRID/2, GRID/2-1),
-    side: irand(0,3),
     dead: false,
   };
   G.peds.push(ped);
@@ -1509,13 +1617,11 @@ function spawnPeds(scene, n) {
   for (let i = 0; i < n; i++) {
     const blockI = irand(-GRID/2, GRID/2-1);
     const blockJ = irand(-GRID/2, GRID/2-1);
-    const cx = (blockI + 0.5) * BLOCK + rand(-BLOCK/2 + ROAD_W()/2, BLOCK/2 - ROAD_W()/2);
-    const cz = (blockJ + 0.5) * BLOCK + rand(-BLOCK/2 + ROAD_W()/2, BLOCK/2 - ROAD_W()/2);
+    const cx = (blockI + 0.5) * BLOCK + rand(-BLOCK/2 + ROAD_WIDTH/2, BLOCK/2 - ROAD_WIDTH/2);
+    const cz = (blockJ + 0.5) * BLOCK + rand(-BLOCK/2 + ROAD_WIDTH/2, BLOCK/2 - ROAD_WIDTH/2);
     spawnPed(scene, new THREE.Vector3(cx, 0, cz));
   }
 }
-
-function ROAD_W() { return 12; }
 
 function spawnDogs(scene, n) {
   for (let i = 0; i < n; i++) {
@@ -1837,7 +1943,8 @@ function makeMissionSystem() {
             G.hud.showSubtitle("Uncle Seng: \"Good, kid. The envelope.\"", "ลุงเซ้ง: \"ดีแล้ว ส่งมา\"");
             G.cash += 800;
             G.hud.setCash(G.cash);
-            G.hud.showNotif('Mission complete: +฿800');
+            if (GAMEPLAY.armor) G.player.armor = Math.min(G.player.armorMax, G.player.armor + 50);
+            G.hud.showNotif('Mission complete: +฿800, +Armor');
             // remove pillar
             const beam = G.world.poi.goldShopBeam;
             if (beam) { G.scene.remove(beam); G.world.poi.goldShopBeam = null; }
@@ -1876,8 +1983,8 @@ function resolvePlayerVsBuildings(player) {
       // push out on shortest axis
       const px = hx - Math.abs(dx);
       const pz = hz - Math.abs(dz);
-      if (px < pz) p.x = bx + Math.sign(dx) * hx;
-      else         p.z = bz + Math.sign(dz) * hz;
+      if (px < pz) p.x = bx + (Math.sign(dx) || 1) * hx;
+      else         p.z = bz + (Math.sign(dz) || 1) * hz;
     }
   }
   // world bounds
@@ -1897,8 +2004,8 @@ function resolveVehicleVsBuildings(v) {
     if (Math.abs(dx) < hx && Math.abs(dz) < hz) {
       const px = hx - Math.abs(dx);
       const pz = hz - Math.abs(dz);
-      if (px < pz) p.x = bx + Math.sign(dx) * hx;
-      else         p.z = bz + Math.sign(dz) * hz;
+      if (px < pz) p.x = bx + (Math.sign(dx) || 1) * hx;
+      else         p.z = bz + (Math.sign(dz) || 1) * hz;
       hit = true;
     }
   }
@@ -1989,10 +2096,16 @@ function updatePlayer(dt) {
   // Combat
   updateCombat(dt);
 
-  // 7-Eleven proximity chime
+  // 7-Eleven proximity chime + armor top-up
   for (const e of G.world.sevenElevens) {
     if (dist2(p.group.position, e.pos) < 7*7) {
-      if (Date.now() - e.chimed > 4000) { G.audio.chime(); e.chimed = Date.now(); }
+      if (Date.now() - e.chimed > 4000) {
+        G.audio.chime(); e.chimed = Date.now();
+        if (GAMEPLAY.armor && p.armor < 50) {
+          p.armor = 50;
+          G.hud.showNotif('Bought a vest — Armor restored');
+        }
+      }
     }
   }
 }
@@ -2000,6 +2113,20 @@ function updatePlayer(dt) {
 function updatePlayerInVehicle(dt) {
   const p = G.player;
   const v = p.inVehicle;
+  // vehicle destroyed under the player — blow it and kick them out
+  if (v.hp <= 0 && !v.fire) {
+    v.fire = true; v.dead = true; v.driver = null;
+    p.inVehicle = null; p.group.visible = true;
+    p.group.position.set(v.pos.x + Math.cos(v.heading) * 1.8, 0, v.pos.z - Math.sin(v.heading) * 1.8);
+    v.mesh.children.forEach(c => { if (c.material && c.material.color) c.material.color.lerp(_blackColor, 0.6); });
+    makeExplosion(v.pos);
+    damagePlayer(20);
+    setTimeout(() => {
+      const i = G.vehicles.indexOf(v); if (i >= 0) G.vehicles.splice(i, 1);
+      G.scene.remove(v.mesh); disposeObject(v.mesh);
+    }, 6000);
+    return;
+  }
   // exit
   if (G.input.pressed('KeyE')) {
     p.inVehicle = null;
@@ -2070,9 +2197,7 @@ function updatePlayerInVehicle(dt) {
     if (ped.dead) continue;
     if (dist2(ped.mesh.position, v.pos) < 1.6*1.6 && Math.abs(v.vel) > 4) {
       killPed(ped);
-      G.wanted.stars = Math.max(G.wanted.stars, 2);
-      G.wanted.lastSeenAt = performance.now();
-      G.wanted.lastSeenPos.copy(p.group.position);
+      raiseWanted(2);
       G.hud.showNotif('Hit & Run! +Wanted Star');
     }
   }
@@ -2094,12 +2219,14 @@ function killPed(ped) {
   G.audio.hit();
   setTimeout(() => {
     G.scene.remove(ped.mesh);
+    disposeObject(ped.mesh);
     const i = G.peds.indexOf(ped); if (i >= 0) G.peds.splice(i, 1);
   }, 8000);
 }
 
 function updateVehicles(dt) {
   for (const v of G.vehicles) {
+    if (v.dead) continue;
     if (v.driver === 'player') continue;
     if (v.isCop && v.driver) updateCop(v, dt);
     else if (v.npc) updateTrafficCar(v, dt);
@@ -2109,9 +2236,20 @@ function updateVehicles(dt) {
     }
     if (v.hp <= 0 && !v.fire) {
       v.fire = true;
-      v.mesh.children.forEach(c => { if (c.material && c.material.color) c.material.color.lerp(new THREE.Color(0x111), 0.6); });
+      v.dead = true;
+      v.driver = null;
+      v.mesh.children.forEach(c => { if (c.material && c.material.color) c.material.color.lerp(_blackColor, 0.6); });
       makeExplosion(v.pos);
       v.vel = 0;
+      if (v.isCop) { raiseWanted(2); onCopKilled(); }
+      if (v.smoke) v.smoke.life = 0;   // stop the damage smoke
+      // remove the wreck after a delay, freeing its GPU resources
+      setTimeout(() => {
+        const i = G.vehicles.indexOf(v);
+        if (i >= 0) G.vehicles.splice(i, 1);
+        G.scene.remove(v.mesh);
+        disposeObject(v.mesh);
+      }, 6000);
     }
   }
 }
@@ -2119,7 +2257,6 @@ function updateVehicles(dt) {
 function updateTrafficCar(v, dt) {
   const npc = v.npc;
   // simple grid following: pick a heading aligned with the road, choose new heading at intersections
-  const onEW = Math.abs(((v.pos.z + 100000) % BLOCK) - BLOCK/2) > BLOCK/2 - 2 || Math.abs(v.pos.z % BLOCK) < 2;
   // collision check ahead with player vehicle / other cars / peds
   const headingX = Math.sin(v.heading), headingZ = Math.cos(v.heading);
   let block = false;
@@ -2238,6 +2375,13 @@ function updatePeds(dt) {
         playerPos.z + rand(-90, 90)
       );
     }
+  }
+  // keep the streets populated — killed peds are spliced out, so top back up
+  while (G.peds.length < PED_TARGET) {
+    const ang = rand(0, TAU), r = rand(60, 100);
+    spawnPed(G.scene, new THREE.Vector3(
+      clamp(playerPos.x + Math.cos(ang) * r, -HALF + 5, HALF - 5), 0,
+      clamp(playerPos.z + Math.sin(ang) * r, -HALF + 5, HALF - 5)));
   }
 }
 
@@ -2365,7 +2509,7 @@ function doMeleeHit(kind) {
   let hitSomething = false;
   for (const list of [G.peds, G.cops]) {
     for (const target of list) {
-      if (target.dead || target.isVehicle) continue;
+      if (target.dead) continue;
       const tx = target.mesh.position.x - p.group.position.x;
       const tz = target.mesh.position.z - p.group.position.z;
       const fwd = tx*fx + tz*fz;
@@ -2383,9 +2527,7 @@ function doMeleeHit(kind) {
         if (!target._notedAggression) {
           target._notedAggression = true;
           if (G.wanted.stars < 1) {
-            G.wanted.stars = 1;
-            G.wanted.lastSeenAt = performance.now();
-            G.wanted.lastSeenPos.copy(p.group.position);
+            raiseWanted(1);
             G.hud.showNotif('Assault witnessed — ★');
             G.audio.whistle();
           }
@@ -2398,38 +2540,33 @@ function doMeleeHit(kind) {
 }
 
 function firePistol() {
-  const p = G.player;
-  // raycast from camera forward
-  const dir = new THREE.Vector3();
-  G.camera.getWorldDirection(dir);
-  const origin = G.camera.position.clone();
-  // muzzle flash
-  const flash = new THREE.PointLight(0xffd577, 2.5, 6, 2);
-  flash.position.copy(origin); G.scene.add(flash);
-  setTimeout(() => G.scene.remove(flash), 60);
-  // spawn tracer bullet
+  const origin = G.camera.position;          // used synchronously below; copied where stored
+  G.camera.getWorldDirection(_fireDir);
+  // pooled muzzle flash — reused every shot, faded out in updateBullets
+  if (!_muzzleLight) { _muzzleLight = new THREE.PointLight(0xffd577, 0, 6, 2); G.scene.add(_muzzleLight); }
+  _muzzleLight.position.copy(origin);
+  _muzzleLight.intensity = 2.5; _muzzleT = 0.06;
+  // spawn tracer bullet (visual only; the hit is the raycast below)
   const bullet = new THREE.Mesh(G.bulletGeom, G.bulletMat);
   bullet.position.copy(origin); G.scene.add(bullet);
-  G.bullets.push({ mesh: bullet, vel: dir.clone().multiplyScalar(80), life: 1.0, dir });
+  G.bullets.push({ mesh: bullet, vel: _fireDir.clone().multiplyScalar(80), life: 1.0 });
   G.audio.shot();
   G.camRig.shake = Math.max(G.camRig.shake, 0.06);
-  // raycast for instant hit (bullet visual is cosmetic)
-  doBulletRaycast(origin, dir);
+  doBulletRaycast(origin, _fireDir);
 }
 
 function doBulletRaycast(origin, dir) {
-  const ray = new THREE.Raycaster(origin, dir, 0, 120);
-  // gather targets: peds, cops, vehicles, buildings
+  _ray.set(origin, dir); _ray.near = 0; _ray.far = 120;
+  // gather targets: living actors, vehicles, and only NEARBY buildings — the
+  // distance cull keeps us from raycasting all ~650 buildings on every shot.
   const candidates = [];
-  for (const ped of G.peds) if (!ped.dead) candidates.push({ obj: ped, mesh: ped.mesh });
-  for (const cop of G.cops) if (!cop.dead) candidates.push({ obj: cop, mesh: cop.mesh });
-  for (const veh of G.vehicles) candidates.push({ obj: veh, mesh: veh.mesh });
-  // also test buildings (cheap)
-  for (const b of G.world.buildings) candidates.push({ obj: b, mesh: b.mesh, isBuilding: true });
-  // sort by distance test
+  for (const ped of G.peds) if (!ped.dead) candidates.push({ obj: ped, mesh: ped.mesh, actor: true });
+  for (const cop of G.cops) if (!cop.dead) candidates.push({ obj: cop, mesh: cop.mesh, actor: true });
+  for (const veh of G.vehicles) if (!veh.dead) candidates.push({ obj: veh, mesh: veh.mesh, vehicle: true });
+  for (const b of G.world.buildings) if (dist2(b.pos, origin) < 130 * 130) candidates.push({ obj: b, mesh: b.mesh });
   let best = null;
   for (const c of candidates) {
-    const intersects = ray.intersectObject(c.mesh, true);
+    const intersects = _ray.intersectObject(c.mesh, true);
     if (intersects.length) {
       const hit = intersects[0];
       if (!best || hit.distance < best.dist) best = { dist: hit.distance, point: hit.point, target: c };
@@ -2438,28 +2575,30 @@ function doBulletRaycast(origin, dir) {
   if (best) {
     G.audio.ricochet();
     const t = best.target;
-    if (t.obj.hp != null && !t.isBuilding) {
+    if (t.actor) {
       t.obj.hp -= 35;
+      t.obj.panicT = 6;
       if (t.obj.hp <= 0) {
-        if (G.peds.includes(t.obj)) killPed(t.obj);
-        else if (G.cops.includes(t.obj)) killCop(t.obj);
+        if (G.cops.includes(t.obj)) killCop(t.obj);
+        else killPed(t.obj);
       }
-      // bullets escalate wanted level
-      G.wanted.stars = Math.max(G.wanted.stars, 2);
-      G.wanted.lastSeenAt = performance.now();
-      G.wanted.lastSeenPos.copy(G.player.group.position);
-    } else if (G.vehicles.includes(t.obj)) {
-      t.obj.hp -= 15;
+      raiseWanted(2);
+    } else if (t.vehicle) {
+      // cop cars take real damage and die through updateVehicles' explosion path
+      t.obj.hp -= t.obj.isCop ? 34 : 18;
+      if (t.obj.isCop) raiseWanted(2);
     }
-    // tiny spark
-    const spark = new THREE.PointLight(0xffeebb, 1.5, 4, 2);
-    spark.position.copy(best.point);
-    G.scene.add(spark);
-    setTimeout(() => G.scene.remove(spark), 80);
+    // pooled impact spark — reused, faded out in updateBullets
+    if (!_sparkLight) { _sparkLight = new THREE.PointLight(0xffeebb, 0, 4, 2); G.scene.add(_sparkLight); }
+    _sparkLight.position.copy(best.point);
+    _sparkLight.intensity = 1.5; _sparkT = 0.08;
   }
 }
 
 function updateBullets(dt) {
+  // fade the pooled muzzle/spark lights
+  if (_muzzleT > 0) { _muzzleT -= dt; if (_muzzleLight) _muzzleLight.intensity = Math.max(0, _muzzleT / 0.06 * 2.5); }
+  if (_sparkT  > 0) { _sparkT  -= dt; if (_sparkLight)  _sparkLight.intensity  = Math.max(0, _sparkT  / 0.08 * 1.5); }
   for (let i = G.bullets.length - 1; i >= 0; i--) {
     const b = G.bullets[i];
     b.mesh.position.addScaledVector(b.vel, dt);
@@ -2486,7 +2625,7 @@ function spawnCop(scene, pos) {
   const cop = {
     mesh: m, heading: rand(0, TAU), speed: 3.5, hp: 60, dead: false,
     state: 'seeking',  // seeking | engaging | bribed
-    shootCooldown: 0, idleT: 0,
+    shootCooldown: 0, idleT: 0, panicT: 0,
   };
   G.cops.push(cop);
   return cop;
@@ -2498,9 +2637,8 @@ function spawnCopCar(scene, pos) {
   v.mesh.position.copy(v.pos);
   v.heading = rand(0, TAU);
   v.driver = 'cop';
-  v.siren = true;
+  v.hp = 200;          // cop cars are tankier; they live in G.vehicles like any car
   v.vel = 0;
-  G.cops.push({ mesh: v.mesh, vehicle: v, isVehicle: true, hp: 200, dead: false });
   return v;
 }
 
@@ -2509,43 +2647,59 @@ function killCop(cop) {
   cop.dead = true;
   cop.mesh.rotation.x = PI/2;
   cop.mesh.position.y = 0.05;
-  G.wanted.stars = Math.max(G.wanted.stars, 2);
-  G.wanted.lastSeenAt = performance.now();
-  G.wanted.lastSeenPos.copy(G.player.group.position);
-  setTimeout(() => { G.scene.remove(cop.mesh); const i = G.cops.indexOf(cop); if (i>=0) G.cops.splice(i,1); }, 8000);
+  raiseWanted(2);
+  onCopKilled();
+  setTimeout(() => {
+    G.scene.remove(cop.mesh);
+    disposeObject(cop.mesh);
+    const i = G.cops.indexOf(cop); if (i >= 0) G.cops.splice(i, 1);
+  }, 8000);
 }
 
 function updateWanted(dt) {
   const p = G.player.group.position;
-  // visual: blink cop car lamps
+  // visual: blink active cop-car light bars
   const t = performance.now() * 0.012;
   for (const v of G.vehicles) {
-    if (v.isCop && v.mesh.userData.copLamps) {
+    if (v.isCop && !v.dead && v.driver && v.mesh.userData.copLamps) {
       const flash = Math.sin(t) > 0;
       v.mesh.userData.copLamps[0].material.color.setHex(flash ? 0xff2222 : 0x441111);
       v.mesh.userData.copLamps[1].material.color.setHex(flash ? 0x2266ff : 0x111144);
-      if (Math.random() < 0.005 && v.driver) G.audio.siren();
+      if (Math.random() < 0.005) G.audio.siren();
     }
   }
 
-  // spawn cops based on stars and player visibility
+  // spawn cops based on stars — foot cops live in G.cops, cop cars in G.vehicles
   const desiredCops = G.wanted.stars >= 2 ? 4 : G.wanted.stars >= 1 ? 2 : 0;
-  const alive = G.cops.filter(c => !c.dead).length;
+  let alive = 0;
+  for (const c of G.cops) if (!c.dead) alive++;
+  for (const v of G.vehicles) if (v.isCop && !v.dead && v.driver) alive++;
   if (alive < desiredCops && Math.random() < 0.01 + G.wanted.stars * 0.01) {
     // spawn just outside view
     const ang = rand(0, TAU);
     const r = rand(35, 60);
-    const sx = p.x + Math.cos(ang) * r;
-    const sz = p.z + Math.sin(ang) * r;
+    const sx = clamp(p.x + Math.cos(ang) * r, -HALF + 5, HALF - 5);
+    const sz = clamp(p.z + Math.sin(ang) * r, -HALF + 5, HALF - 5);
     if (G.wanted.stars >= 2 && Math.random() < 0.6) {
-      const car = spawnCopCar(G.scene, new THREE.Vector3(clamp(sx,-HALF+5,HALF-5), 0, clamp(sz,-HALF+5,HALF-5)));
+      const car = spawnCopCar(G.scene, new THREE.Vector3(sx, 0, sz));
       car.vel = 6;
     } else {
-      spawnCop(G.scene, new THREE.Vector3(clamp(sx,-HALF+5,HALF-5), 0, clamp(sz,-HALF+5,HALF-5)));
+      spawnCop(G.scene, new THREE.Vector3(sx, 0, sz));
     }
   }
 
-  // wanted decay if not seen
+  // line of sight: a cop close enough to see you keeps refreshing "last seen",
+  // so heat only starts cooling once you've actually broken contact. The sight
+  // radius is smaller than the spawn radius so fresh spawns don't auto-refresh.
+  if (GAMEPLAY.wantedLOS && G.wanted.stars > 0) {
+    const seeR = 30 * 30;
+    let seen = false;
+    for (const c of G.cops) if (!c.dead && dist2(c.mesh.position, p) < seeR) { seen = true; break; }
+    if (!seen) for (const v of G.vehicles) if (v.isCop && !v.dead && v.driver && dist2(v.pos, p) < seeR) { seen = true; break; }
+    if (seen) G.wanted.lastSeenAt = performance.now();
+  }
+
+  // wanted decay once out of sight long enough
   const sinceSeen = (performance.now() - G.wanted.lastSeenAt) / 1000;
   if (G.wanted.stars > 0 && sinceSeen > 35) {
     G.wanted.stars = Math.max(0, G.wanted.stars - 1);
@@ -2553,13 +2707,11 @@ function updateWanted(dt) {
     G.hud.showNotif(G.wanted.stars === 0 ? 'You lost the cops.' : 'Heat reduced ★');
   }
 
-  // bribe: B near any non-engaged cop
-  const player = G.player;
+  // bribe: B near any foot cop
   let bribeable = null;
   for (const c of G.cops) {
-    if (c.dead || c.isVehicle) continue;
-    const d2 = dist2(c.mesh.position, p);
-    if (d2 < 4*4) { bribeable = c; break; }
+    if (c.dead) continue;
+    if (dist2(c.mesh.position, p) < 4 * 4) { bribeable = c; break; }
   }
   if (bribeable && G.wanted.stars > 0 && G.wanted.stars <= 2) {
     G.hud.showPrompt('Press <b>B</b> to bribe (฿1,000)', 0.5);
@@ -2570,7 +2722,6 @@ function updateWanted(dt) {
       G.hud.showNotif('Bribed: -฿1,000');
       G.audio.blip({freq:600, dur:0.1, gain:0.1});
       bribeable.state = 'bribed';
-      setTimeout(() => { if (bribeable && !bribeable.dead) { /* leave alone */ } }, 4000);
     }
   }
 
@@ -2592,16 +2743,18 @@ function updateCop(v, dt) {
   v.pos.z += Math.cos(v.heading) * v.vel * dt;
   v.mesh.position.copy(v.pos);
   v.mesh.rotation.y = v.heading;
-  // ram player vehicle
+  // ram player vehicle, or run the player down on foot
   if (p.inVehicle && dist2(v.pos, p.inVehicle.pos) < 4*4) {
     p.inVehicle.hp -= 8 * dt;
+  } else if (GAMEPLAY.vulnerableOnFoot && !p.inVehicle && Math.abs(v.vel) > 5 && dist2(v.pos, p.group.position) < 3*3) {
+    damagePlayer(14 * dt);
   }
 }
 
 function updateFootCops(dt) {
   const p = G.player;
   for (const c of G.cops) {
-    if (c.dead || c.isVehicle) continue;
+    if (c.dead) continue;
     if (c.state === 'bribed') { c.idleT += dt; continue; }
     const dx = p.group.position.x - c.mesh.position.x;
     const dz = p.group.position.z - c.mesh.position.z;
@@ -2610,16 +2763,22 @@ function updateFootCops(dt) {
     if (d > 2.5) {
       c.mesh.position.x += Math.sin(c.heading) * c.speed * dt;
       c.mesh.position.z += Math.cos(c.heading) * c.speed * dt;
+      // at 2★ cops draw and fire from range
+      if (GAMEPLAY.vulnerableOnFoot && G.wanted.stars >= 2 && d < 22) {
+        c.shootCooldown -= dt;
+        if (c.shootCooldown <= 0) {
+          c.shootCooldown = rand(1.4, 2.6);
+          G.audio.shot();
+          if (Math.random() < 0.5) { damagePlayer(8); G.camRig.shake = Math.max(G.camRig.shake, 0.08); }
+        }
+      }
     } else {
       // melee attack
       c.shootCooldown -= dt;
       if (c.shootCooldown <= 0) {
         c.shootCooldown = 0.8;
-        // attack player
-        p.hp -= 6;
-        p.hitFlashT = 0.3;
         G.audio.punch();
-        if (p.hp <= 0) gameOver();
+        damagePlayer(6);
       }
     }
     c.mesh.rotation.y = c.heading;
@@ -2631,6 +2790,7 @@ function updateFootCops(dt) {
 function gameOver() {
   G.hud.showSubtitle("You wake up at the police station. Lost some cash.", "ตื่นมาที่โรงพัก");
   G.player.hp = G.player.hpMax;
+  G.player.armor = 0;
   G.cash = Math.max(0, G.cash - 500);
   G.hud.setCash(G.cash);
   G.wanted.stars = 0;
@@ -2659,8 +2819,9 @@ function makeSmokeEmitter(target, intensity=1) {
   const pts = new THREE.Points(geom, mat);
   G.scene.add(pts);
   const seeds = Array.from({length:N}, () => ({ t: Math.random()*1.5, x: rand(-0.3,0.3), z: rand(-0.3,0.3) }));
-  G.particles.push({ pts, mat, seeds, target, life: 60, intensity });
-  return pts;
+  const entry = { pts, mat, seeds, target, life: 60, intensity };
+  G.particles.push(entry);
+  return entry;
 }
 
 function makeExplosion(pos) {
@@ -2695,6 +2856,8 @@ function updateParticles(dt) {
     e.mat.opacity = clamp(e.life / 60, 0, 0.65);
     if (e.life <= 0) {
       G.scene.remove(e.pts);
+      e.pts.geometry.dispose();
+      e.mat.dispose();
       G.particles.splice(i, 1);
     }
   }
@@ -2711,7 +2874,7 @@ function updateInteraction(dt) {
   // find nearest vehicle within 2.5m that's not driven by a hostile cop
   let near = null, nd = Infinity;
   for (const v of G.vehicles) {
-    if (v.driver) continue; // already occupied
+    if (v.driver || v.dead) continue; // occupied, or a burning wreck about to despawn
     const d2 = dist2(v.pos, p.group.position);
     if (d2 < 8 && d2 < nd) { nd = d2; near = v; }
   }
@@ -2741,26 +2904,23 @@ function updateCamera(dt) {
   const shakeX = (Math.random()*2-1) * rig.shake;
   const shakeY = (Math.random()*2-1) * rig.shake;
 
-  let target;
   if (p.inVehicle) {
-    target = p.inVehicle.pos.clone();
-    target.y += 1.2;
+    _camTarget.copy(p.inVehicle.pos); _camTarget.y += 1.2;
     // chase camera: ride behind the vehicle heading, but slow yaw follow lets player look around
     const followYaw = p.inVehicle.heading + PI; // behind
     rig.yaw = lerpAngle(rig.yaw, followYaw, dt * 1.4);
     rig.targetDistance = p.inVehicle.spec.kind === 'bike' ? 4.8 : 6.5;
   } else {
-    target = p.group.position.clone();
-    target.y += 1.5;
+    _camTarget.copy(p.group.position); _camTarget.y += 1.5;
     rig.targetDistance = 4.5;
   }
   rig.distance = lerp(rig.distance, rig.targetDistance, 0.08);
   const cy = Math.cos(rig.yaw), sy = Math.sin(rig.yaw);
   const cp = Math.cos(rig.pitch), sp = Math.sin(rig.pitch);
-  const offset = new THREE.Vector3(sy * cp, -sp, cy * cp).multiplyScalar(rig.distance);
-  rig.cam.position.copy(target).add(offset);
+  _camOffset.set(sy * cp, -sp, cy * cp).multiplyScalar(rig.distance);
+  rig.cam.position.copy(_camTarget).add(_camOffset);
   rig.cam.position.x += shakeX; rig.cam.position.y += shakeY + 0.6;
-  rig.cam.lookAt(target);
+  rig.cam.lookAt(_camTarget);
 }
 
 // =============================================================================
@@ -2795,16 +2955,17 @@ function updateDayNight(dt) {
   G.scene.fog.color.copy(sky);
   G.scene.fog.density = lerp(0.0012, 0.0035, 1 - dayK) + G.time.rainStrength * 0.004;
 
-  // neon/lamp emissive: brighter at night
-  G.scene.traverse(o => {
-    if (o.isPointLight) {
-      if (o.userData.neon) o.intensity = (1 - dayK) * (o.userData.baseIntensity || 1) * 1.0;
-      if (o.userData.streetLamp) o.intensity = (1 - dayK) * (o.userData.baseIntensity || 0.6);
-    }
-    if (o.isMesh && o.material && o.material.emissiveIntensity != null && o.material.emissiveMap) {
-      o.material.emissiveIntensity = (1 - dayK) * 1.0;
-    }
-  });
+  // neon/lamp/window emissive + accent lights: brighter at night.
+  // Iterate only the cached arrays built in buildWorld — no full scene.traverse.
+  const nightK = 1 - dayK;
+  for (let n = 0; n < G.nightLights.length; n++) {
+    const nl = G.nightLights[n];
+    nl.light.intensity = nightK * nl.base;
+  }
+  for (let n = 0; n < G.nightEmissive.length; n++) {
+    const ne = G.nightEmissive[n];
+    ne.mat.emissiveIntensity = ne.dayIntensity + (ne.nightIntensity - ne.dayIntensity) * nightK;
+  }
 
   // clock display
   const totalMin = t * 24 * 60;
