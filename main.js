@@ -2250,6 +2250,8 @@ async function init() {
   spawnTraffic(scene);
   spawnParkedCars(scene);
   spawnBoat(scene);
+  // a parked, enterable cop car — the Vigilante ride
+  { const v = spawnCopCar(scene, new THREE.Vector3(50, 0, 90)); v.driver = null; v.vel = 0; v.heading = 0; v.mesh.rotation.y = 0; }
   spawnPeds(scene, 60);
   spawnDogs(scene, 16);
   setProgress(88);
@@ -3412,6 +3414,64 @@ function updateSpikes(dt) {
   }
 }
 
+// Vigilante side job — drive a cop unit, press V, bust fleeing crooks for escalating cash.
+function vigilanteSpawnTarget(vg) {
+  const pp = G.player.group.position;
+  const ang = rand(0, TAU), r = rand(20, 35);
+  const pos = new THREE.Vector3(
+    clamp(pp.x + Math.cos(ang) * r, -HALF + 6, HALF - 6), 0,
+    clamp(pp.z + Math.sin(ang) * r, -HALF + 6, HALF - 6));
+  const ped = spawnPed(G.scene, pos);
+  ped.isTarget = true; ped.panicT = 3;   // reuse isTarget so night-thinning skips it
+  const parts = ped.mesh.userData.parts;
+  if (parts) parts.torso.material = new THREE.MeshStandardMaterial({ color: 0x6a1a1a, roughness: 0.8 });
+  const mk = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8),
+    new THREE.MeshStandardMaterial({ color: 0xff2a2a, emissive: 0xff2a2a, emissiveIntensity: 0.8, roughness: 0.5 }));
+  mk.position.set(0, 2.5, 0); ped.mesh.add(mk);
+  vg.target = ped; vg.marker = mk;
+}
+function vigilanteEnd(msg) {
+  const vg = G.vigilante;
+  if (!vg) return;
+  if (vg.target && !vg.target.dead) {     // release the current crook
+    vg.target.isTarget = false; vg.target.panicT = 0;
+    if (vg.marker && vg.marker.parent) { vg.marker.parent.remove(vg.marker); disposeObject(vg.marker); }
+  }
+  G.hud.showNotif('Vigilante over — ' + msg);
+  G.vigilante = null;
+}
+function updateVigilante(dt) {
+  const p = G.player;
+  const inCop = p.inVehicle && p.inVehicle.isCop;
+  const vg = G.vigilante;
+  if (vg && vg.active) {
+    if (!inCop) { vigilanteEnd('left the unit'); return; }
+    vg.timeLeft -= dt;
+    if (vg.timeLeft <= 0) { vigilanteEnd(`time up · ${vg.busts} busts`); return; }
+    G.hud.showPrompt(`VIGILANTE &nbsp; ⏱ ${vg.timeLeft.toFixed(0)}s &nbsp;·&nbsp; busts ${vg.busts}`, 0.4);
+    if (vg.target.dead) {
+      vg.busts++;
+      const r = 200 + vg.busts * 100;
+      G.cash += r; G.hud.setCash(G.cash);
+      G.hud.showNotif(`Busted! +฿${r}`);
+      G.audio.blip({ freq: 760, dur: 0.1, gain: 0.12 });
+      vg.timeLeft = Math.min(60, vg.timeLeft + 15);
+      vigilanteSpawnTarget(vg);
+    } else {
+      vg.target.panicT = 2;   // keep them fleeing
+    }
+    return;
+  }
+  if (inCop) {
+    G.hud.showPrompt('Press <b>V</b> for Vigilante', 0.4);
+    if (G.input.pressed('KeyV')) {
+      G.vigilante = { active: true, busts: 0, timeLeft: 45, target: null, marker: null };
+      vigilanteSpawnTarget(G.vigilante);
+      G.hud.showNotif('Vigilante: run down the fleeing crooks!');
+    }
+  }
+}
+
 function updateDogs(dt) {
   const playerPos = G.player.group.position;
   for (const dog of G.dogs) {
@@ -4427,6 +4487,7 @@ function loop() {
     updatePeds(dt);
     updateMuggings(dt);
     updateSpikes(dt);
+    updateVigilante(dt);
     updateDogs(dt);
     updateFootCops(dt);
     updateBullets(dt);
