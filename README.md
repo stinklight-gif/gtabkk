@@ -58,10 +58,16 @@ it's replayable from the start line. Tune the timer/route via `startTime`,
 `cpBonus`, and `route` in the `soiRun` mission object.
 
 **The Hit (mission 3).** Winning Soi Run unlocks it. Return to the marker to
-start, then drive to Soi 80 and eliminate the four **marked crew** (pink
-markers over their heads) — fists, pistol, or the SMG. They scatter when
-attacked and the gunfire draws cops, so it doubles as a wanted-level/escape
-loop (duck into the U-Spray after). ฿2,000 on completion, replayable.
+start, then drive to the marked spot (varies each run) and eliminate the four
+**marked crew** (pink markers over their heads) — fists, pistol, SMG, or
+shotgun. They scatter when attacked and the gunfire draws cops, so it doubles
+as a wanted-level/escape loop (duck into the U-Spray after). ฿2,000, and it
+unlocks Hot Delivery.
+
+**Hot Delivery (mission 4).** The capstone. You take the job already at 3★ —
+cops swarm immediately — and must drive the goods across town to the green drop
+before a 60s timer runs out. Reward ฿3,000, replayable. Pure use-everything
+chaos: fast wheels, the wanted system, and the garage/escape loop.
 
 **Amulets.** 15 glowing gold amulets are hidden across the districts. Each is
 ฿100, and finding all of them pays a ฿2,000 bonus — an excuse to explore.

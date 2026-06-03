@@ -2650,8 +2650,9 @@ function makeMissionSystem() {
           const d2 = dist2(G.player.group.position, this.markerPos);
           if (!this.armed && d2 > 18*18) this.armed = true;
           if (this.armed) {
-            G.hud.showPrompt('Return to the <b>marker</b> for another <b>Hit</b>', 0.4);
-            if (d2 < 8*8) { this.armed = false; this.onStart(); }
+            const label = this.nextJob ? 'start <b>Hot Delivery</b>' : 'run <b>The Hit</b> again';
+            G.hud.showPrompt('Return to the <b>marker</b> to ' + label, 0.4);
+            if (d2 < 8*8) { this.armed = false; if (this.nextJob) sys.start(this.nextJob); else this.onStart(); }
           }
         }
       },
@@ -2661,11 +2662,66 @@ function makeMissionSystem() {
         G.cash += this.reward;
         G.hud.setCash(G.cash);
         G._hitDone = true;
+        this.nextJob = 'delivery';   // winning the Hit unlocks Hot Delivery
         G.hud.showNotif(`Hit complete: +฿${this.reward.toLocaleString()}`);
-        G.hud.showSubtitle("Uncle Seng: \"Clean enough. Lay low for a bit.\"", "ลุงเซ้ง: \"เก่ง หลบหน่อย\"");
+        G.hud.showSubtitle("Uncle Seng: \"Clean enough. There's a hot run if you want it.\"", "ลุงเซ้ง: \"มีงานด่วน\"");
         G.hud.setMissionText('Free Roam · Sukhumvit');
         this.markerPos = this.base.clone();
         setBeam(this.base, 0xff2a86);
+      },
+    },
+
+    // Mission 4 — Hot Delivery: move the goods across town while the heat is maxed.
+    delivery: {
+      name: 'Hot Delivery',
+      markerPos: null,
+      stage: 0,
+      armed: false,
+      timeLeft: 0,
+      drop: new THREE.Vector3(-150, 0, 150),
+      home: new THREE.Vector3(100, 0, -50),
+      startTime: 60,
+      reward: 3000,
+      onStart() {
+        this.stage = 1;
+        this.timeLeft = this.startTime;
+        this.markerPos = this.drop.clone();
+        setBeam(this.drop, 0x39ff7a);
+        G.hud.setMissionText('Hot Delivery');
+        G.hud.showSubtitle("Uncle Seng: \"Hot goods — get them to the drop. Cops are on you.\"", "ลุงเซ้ง: \"ของร้อน รีบไป\"");
+        raiseWanted(3);   // you're hot the moment you take the job
+      },
+      update(dt) {
+        if (this.stage === 1) {
+          this.timeLeft -= dt;
+          if (this.timeLeft <= 0) { this.fail(); return; }
+          G.hud.showPrompt(`HOT DELIVERY &nbsp; ⏱ ${this.timeLeft.toFixed(0)}s`, 0.4);
+          if (dist2(G.player.group.position, this.drop) < 9*9) { this.win(); return; }
+        } else if (this.stage === 5) {
+          const d2 = dist2(G.player.group.position, this.markerPos);
+          if (!this.armed && d2 > 18*18) this.armed = true;
+          if (this.armed) {
+            G.hud.showPrompt('Return to the <b>marker</b> for another <b>Delivery</b>', 0.4);
+            if (d2 < 8*8) { this.armed = false; this.onStart(); }
+          }
+        }
+      },
+      win() {
+        this.stage = 5; this.armed = false;
+        G.cash += this.reward; G.hud.setCash(G.cash);
+        G.hud.showNotif(`Delivery complete: +฿${this.reward.toLocaleString()}`);
+        G.hud.showSubtitle("Uncle Seng: \"Made it. You're solid, kid.\"", "ลุงเซ้ง: \"เก่งมาก\"");
+        G.hud.setMissionText('Free Roam · Sukhumvit');
+        this.markerPos = this.home.clone();
+        setBeam(this.home, 0xff2a86);
+      },
+      fail() {
+        this.stage = 5; this.armed = false;
+        G.hud.showNotif('Delivery failed — goods lost.');
+        G.hud.showSubtitle("Uncle Seng: \"You lost the goods. Damn.\"", "ลุงเซ้ง: \"ของหายหมด\"");
+        G.hud.setMissionText('Free Roam · Sukhumvit');
+        this.markerPos = this.home.clone();
+        setBeam(this.home, 0xff2a86);
       },
     },
   };
