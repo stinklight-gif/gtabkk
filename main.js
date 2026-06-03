@@ -684,11 +684,13 @@ function buildWorld(scene) {
   // Temple block — replaces normal buildings in one block with a wat compound.
   const TEMPLE_I = 2, TEMPLE_J = -2;
   const RIVER_I = -GRID/2;  // westmost column (x ≈ -250..-200) is the Chao Phraya
+  const GARAGE_I = 3, GARAGE_J = -1;  // block reserved for the U-Spray garage
 
   for (let i = -GRID/2; i < GRID/2; i++) {
     for (let j = -GRID/2; j < GRID/2; j++) {
       if (i === TEMPLE_I && j === TEMPLE_J) continue; // temple placed after loop
       if (i === RIVER_I) continue;                    // river column — no buildings
+      if (i === GARAGE_I && j === GARAGE_J) continue; // U-Spray garage block
       const cx = (i + 0.5) * BLOCK;
       const cz = (j + 0.5) * BLOCK;
 
@@ -1341,6 +1343,35 @@ function buildWorld(scene) {
     }
   }
 
+  // ---- U-Spray garage: drive in to repair the car + lose the cops for a fee ----
+  {
+    const gx = (GARAGE_I + 0.5) * BLOCK, gz = (GARAGE_J + 0.5) * BLOCK; // (175, -25)
+    const depth = 11, wWidth = 14, wH = 5, wY = wH / 2;
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x4a6a7a, roughness: 0.8 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x2a3540, roughness: 0.8 });
+    // 3-sided shed, open to the south road
+    const back = new THREE.Mesh(new THREE.BoxGeometry(wWidth, wH, 0.6), wallMat);
+    back.position.set(gx, wY, gz + depth / 2); back.castShadow = true; back.receiveShadow = true; scene.add(back);
+    const sideW = new THREE.Mesh(new THREE.BoxGeometry(0.6, wH, depth), wallMat);
+    sideW.position.set(gx - wWidth / 2, wY, gz); sideW.castShadow = true; scene.add(sideW);
+    const sideE = new THREE.Mesh(new THREE.BoxGeometry(0.6, wH, depth), wallMat);
+    sideE.position.set(gx + wWidth / 2, wY, gz); sideE.castShadow = true; scene.add(sideE);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(wWidth + 0.6, 0.5, depth + 0.6), roofMat);
+    roof.position.set(gx, wH + 0.25, gz); roof.castShadow = true; scene.add(roof);
+    // neon sign over the opening
+    const signMat = new THREE.MeshStandardMaterial({ color: 0x21f0ff, emissive: 0x21f0ff, emissiveIntensity: 0.4, roughness: 0.5 });
+    G.nightEmissive.push({ mat: signMat, dayIntensity: 0.4, nightIntensity: 1.6 });
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(8, 1.4), signMat);
+    sign.position.set(gx, wH - 0.2, gz - depth / 2 - 0.4); sign.rotation.y = PI; scene.add(sign);
+    // collision: back + two sides (front left open to drive in)
+    world.buildings.push({ pos: new THREE.Vector3(gx, wY, gz + depth / 2), size: new THREE.Vector3(wWidth, wH, 0.6), mesh: back });
+    world.buildings.push({ pos: new THREE.Vector3(gx - wWidth / 2, wY, gz), size: new THREE.Vector3(0.6, wH, depth), mesh: sideW });
+    world.buildings.push({ pos: new THREE.Vector3(gx + wWidth / 2, wY, gz), size: new THREE.Vector3(0.6, wH, depth), mesh: sideE });
+    // service trigger zone
+    world.garages = world.garages || [];
+    world.garages.push({ pos: new THREE.Vector3(gx, 0, gz), r: 7, cooldownUntil: 0 });
+  }
+
   // ---- Render minimap base (top-down 2D snapshot of roads/landmarks) ----
   world.minimap = makeMinimapBase(world);
 
@@ -1397,6 +1428,12 @@ function makeMinimapBase(world) {
   const rvX = mapW(-HALF);
   const rvW = mapW(-HALF + BLOCK - 8) - rvX;
   g.fillRect(rvX, 0, rvW, SIZE);
+
+  // U-Spray garages
+  g.fillStyle = '#21f0ff';
+  for (const ga of (world.garages || [])) {
+    g.fillRect(mapW(ga.pos.x) - 3, mapW(ga.pos.z) - 3, 6, 6);
+  }
 
   return c;
 
@@ -3286,6 +3323,39 @@ function updateDayNight(dt) {
 // 20. MAIN LOOP
 // =============================================================================
 
+function updateGarage(dt) {
+  const p = G.player;
+  if (!p.inVehicle || !G.world.garages) return;
+  const v = p.inVehicle;
+  for (const g of G.world.garages) {
+    if (dist2(v.pos, g.pos) >= g.r * g.r) continue;
+    const now = performance.now();
+    if (now < g.cooldownUntil) return;
+    const needsService = G.wanted.stars > 0 || v.hp < 100;
+    if (!needsService) { G.hud.showPrompt('U-Spray — nothing to fix', 0.4); return; }
+    if (G.cash < 500) { G.hud.showPrompt('U-Spray needs <b>฿500</b>', 0.4); return; }
+    // pay, repair, and shed the heat
+    G.cash -= 500;
+    v.hp = 100;
+    if (v.smoke) { v.smoke.life = 0; v.smoke = null; }
+    G.wanted.stars = 0;
+    G.wanted.lastSeenAt = now;
+    // clear every active cop (foot + vehicles)
+    for (let i = G.cops.length - 1; i >= 0; i--) {
+      G.scene.remove(G.cops[i].mesh); disposeObject(G.cops[i].mesh); G.cops.splice(i, 1);
+    }
+    for (let i = G.vehicles.length - 1; i >= 0; i--) {
+      if (G.vehicles[i].isCop) { G.scene.remove(G.vehicles[i].mesh); disposeObject(G.vehicles[i].mesh); G.vehicles.splice(i, 1); }
+    }
+    G.hud.setCash(G.cash);
+    G.hud.setStars(0);
+    G.hud.showNotif('Resprayed — repaired & lost the cops (-฿500)');
+    G.audio.blip({ freq: 520, dur: 0.12, gain: 0.12 });
+    g.cooldownUntil = now + 8000;
+    return;
+  }
+}
+
 function loop() {
   requestAnimationFrame(loop);
   const dt = Math.min(0.05, G.clock.getDelta());
@@ -3302,6 +3372,7 @@ function loop() {
   if (G.state === 'playing') {
     updatePlayer(dt);
     updateInteraction(dt);
+    updateGarage(dt);
     updateVehicles(dt);
     updatePeds(dt);
     updateDogs(dt);
