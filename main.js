@@ -305,6 +305,12 @@ function makeInput() {
   window.addEventListener('contextmenu', e => e.preventDefault());
   document.addEventListener('pointerlockchange', () => {
     pointerLocked = document.pointerLockElement != null;
+    // losing the lock while playing (Esc / alt-tab) pauses the game
+    if (!pointerLocked && G.state === 'playing') {
+      G.state = 'paused';
+      const pe = document.getElementById('pause');
+      if (pe) pe.classList.add('show');
+    }
   });
 
   return {
@@ -2192,6 +2198,14 @@ async function init() {
     G.audio.bell();   // dawn bell to set tone
   });
 
+  // Pause overlay: click to resume (re-locks the pointer)
+  const pauseEl = document.getElementById('pause');
+  if (pauseEl) pauseEl.addEventListener('click', () => {
+    pauseEl.classList.remove('show');
+    G.state = 'playing';
+    G.input.requestLock();
+  });
+
   // Restore saved progress, then autosave on unload
   loadGame();
   window.addEventListener('beforeunload', saveGame);
@@ -3887,9 +3901,10 @@ function updateGarage(dt) {
     if (now < g.cooldownUntil) return;
     const needsService = G.wanted.stars > 0 || v.hp < 100;
     if (!needsService) { G.hud.showPrompt('U-Spray — nothing to fix', 0.4); return; }
-    if (G.cash < 500) { G.hud.showPrompt('U-Spray needs <b>฿500</b>', 0.4); return; }
+    const fee = 300 + G.wanted.stars * 350;   // pricier the hotter you are
+    if (G.cash < fee) { G.hud.showPrompt(`U-Spray needs <b>฿${fee}</b>`, 0.4); return; }
     // pay, repair, and shed the heat
-    G.cash -= 500;
+    G.cash -= fee;
     v.hp = 100;
     if (v.smoke) { v.smoke.life = 0; v.smoke = null; }
     G.wanted.stars = 0;
@@ -3903,7 +3918,7 @@ function updateGarage(dt) {
     }
     G.hud.setCash(G.cash);
     G.hud.setStars(0);
-    G.hud.showNotif('Resprayed — repaired & lost the cops (-฿500)');
+    G.hud.showNotif(`Resprayed — repaired & lost the cops (-฿${fee})`);
     G.audio.blip({ freq: 520, dur: 0.12, gain: 0.12 });
     g.cooldownUntil = now + 8000;
     return;
@@ -3962,6 +3977,8 @@ function loop() {
     if (G.input.endFrame) G.input.endFrame();
   } else if (G.state === 'map') {
     drawFullMap();
+    if (G.input.endFrame) G.input.endFrame();
+  } else if (G.state === 'paused') {
     if (G.input.endFrame) G.input.endFrame();
   }
 
