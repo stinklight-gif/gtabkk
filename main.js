@@ -1068,6 +1068,29 @@ function buildWorld(scene) {
   const beam = new THREE.Mesh(new THREE.BoxGeometry(HALF*2, 1.2, 6), beamMat);
   beam.position.set(0, 14.5, 0); beam.castShadow = true; scene.add(beam);
 
+  // A Skytrain that slides along the track (visual only)
+  {
+    const train = new THREE.Group();
+    const carMat = new THREE.MeshStandardMaterial({ color: 0xdedede, roughness: 0.5, metalness: 0.3 });
+    const stripeMat = new THREE.MeshStandardMaterial({ color: 0x2a7d8e, roughness: 0.5 });
+    const trainWinMat = new THREE.MeshStandardMaterial({ color: 0x223340, emissive: 0x66ccff, emissiveIntensity: 0.0, roughness: 0.4 });
+    G.nightEmissive.push({ mat: trainWinMat, dayIntensity: 0.0, nightIntensity: 1.2 });
+    for (let c = 0; c < 3; c++) {
+      const x0 = (c - 1) * 9.4;
+      const car = new THREE.Mesh(new THREE.BoxGeometry(9, 2.6, 2.8), carMat);
+      car.position.set(x0, 0, 0); car.castShadow = true; train.add(car);
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(9.05, 0.45, 2.85), stripeMat);
+      stripe.position.set(x0, -0.75, 0); train.add(stripe);
+      for (const zs of [-1, 1]) {
+        const win = new THREE.Mesh(new THREE.PlaneGeometry(8, 1.0), trainWinMat);
+        win.position.set(x0, 0.25, zs * 1.41); win.rotation.y = zs > 0 ? 0 : PI; train.add(win);
+      }
+    }
+    train.position.set(0, 16.5, 0);
+    scene.add(train);
+    G.bts = { mesh: train, dir: 1, speed: 24, min: -HALF + 18, max: HALF - 18 };
+  }
+
   // BTS Skytrain station — elevated platform + canopy + stair tower
   {
     const sx = -50; // station centered above this pillar
@@ -2554,6 +2577,15 @@ function updateDistrict() {
   }
 }
 
+// Slide the Skytrain back and forth along the elevated track.
+function updateBTS(dt) {
+  const b = G.bts;
+  if (!b) return;
+  b.mesh.position.x += b.dir * b.speed * dt;
+  if (b.mesh.position.x > b.max) b.dir = -1;
+  else if (b.mesh.position.x < b.min) b.dir = 1;
+}
+
 function updatePlayerInVehicle(dt) {
   const p = G.player;
   const v = p.inVehicle;
@@ -3571,6 +3603,7 @@ function loop() {
     updateParticles(dt);
     updateWanted(dt);
     updateCamera(dt);
+    updateBTS(dt);
     updateDayNight(dt);
     if (G.mission) G.mission.update(dt);
     G.hud.update(dt);
