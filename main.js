@@ -2818,6 +2818,23 @@ function updatePlayerInVehicle(dt) {
   // honk
   if (G.input.pressed('KeyH')) G.audio.honk();
 
+  // drive-by: fire the active gun from the vehicle (combat update doesn't run here)
+  if (p.attackCooldown > 0) p.attackCooldown -= dt;
+  if (p.gunRecoil > 0) p.gunRecoil = Math.max(0, p.gunRecoil - dt * 6);
+  if (G.input.pressed('KeyQ')) cycleWeapon();
+  if (p.activeWeapon !== 'fists' && (p.weapons.pistol || p.weapons.smg)) {
+    G.hud.setCrosshair(G.input.rightDown);
+    const isSmg = p.activeWeapon === 'smg' && p.weapons.smg;
+    const ammo = isSmg ? 'smgAmmo' : 'pistolAmmo';
+    if (G.input.mouseDown && p.attackCooldown <= 0 && p[ammo] > 0) {
+      if (isSmg) fireSMG(); else firePistol();
+      p[ammo]--; p.attackCooldown = isSmg ? 0.07 : 0.18; p.gunRecoil = 1;
+      updateAmmoHud();
+    }
+  } else {
+    G.hud.setCrosshair(false);
+  }
+
   // crashing into things — handled by vehicle vs vehicle below
 
   // ramming peds
@@ -3059,6 +3076,18 @@ function updateDogs(dt) {
 // 14. COMBAT — melee + pistol
 // =============================================================================
 
+// Cycle fists -> pistol -> SMG through whatever's owned. Used on foot and in cars.
+function cycleWeapon() {
+  const p = G.player;
+  const owned = ['fists'];
+  if (p.weapons.pistol) owned.push('pistol');
+  if (p.weapons.smg) owned.push('smg');
+  const idx = owned.indexOf(p.activeWeapon);
+  p.activeWeapon = owned[(idx + 1) % owned.length];
+  p.pistol.visible = (p.activeWeapon === 'pistol' || p.activeWeapon === 'smg');
+  updateAmmoHud();
+}
+
 function updateCombat(dt) {
   const p = G.player;
   if (p.attackTimer > 0) p.attackTimer -= dt;
@@ -3067,15 +3096,7 @@ function updateCombat(dt) {
   if (p.gunRecoil > 0) p.gunRecoil = Math.max(0, p.gunRecoil - dt * 6);
 
   // weapon cycle
-  if (G.input.pressed('KeyQ')) {
-    const owned = ['fists'];
-    if (p.weapons.pistol) owned.push('pistol');
-    if (p.weapons.smg) owned.push('smg');
-    const idx = owned.indexOf(p.activeWeapon);
-    p.activeWeapon = owned[(idx + 1) % owned.length];
-    p.pistol.visible = (p.activeWeapon === 'pistol' || p.activeWeapon === 'smg');
-    updateAmmoHud();
-  }
+  if (G.input.pressed('KeyQ')) cycleWeapon();
   // pickup pistol (give it to player after first cop kill or via cheat)
   if (G.input.pressed('KeyG')) { // dev: grant pistol
     p.weapons.pistol = true; p.pistolAmmo = p.pistolMag; updateAmmoHud(); G.hud.showNotif('+9mm Pistol');
@@ -3243,7 +3264,7 @@ function doBulletRaycast(origin, dir, dmg = 35) {
   const candidates = [];
   for (const ped of G.peds) if (!ped.dead) candidates.push({ obj: ped, mesh: ped.mesh, actor: true });
   for (const cop of G.cops) if (!cop.dead) candidates.push({ obj: cop, mesh: cop.mesh, actor: true });
-  for (const veh of G.vehicles) if (!veh.dead) candidates.push({ obj: veh, mesh: veh.mesh, vehicle: true });
+  for (const veh of G.vehicles) if (!veh.dead && veh !== G.player.inVehicle) candidates.push({ obj: veh, mesh: veh.mesh, vehicle: true });
   for (const b of G.world.buildings) if (dist2(b.pos, origin) < 130 * 130) candidates.push({ obj: b, mesh: b.mesh });
   let best = null;
   for (const c of candidates) {

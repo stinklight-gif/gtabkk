@@ -29,7 +29,7 @@ on first load. Click **ENTER THE CITY** when the loader finishes.
 | Space | Jump (foot) / handbrake (vehicle) |
 | E | Enter/exit vehicle |
 | F | Melee attack (jab/cross/kick randomised) |
-| LMB | Fire pistol |
+| LMB | Fire pistol / SMG (also drive-by while driving) |
 | RMB | Aim (pistol) — shows crosshair |
 | Q | Cycle weapon (fists / pistol / SMG, whichever are owned) |
 | R | Reload |
