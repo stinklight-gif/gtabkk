@@ -2577,10 +2577,17 @@ function makeMissionSystem() {
       nextJob: null,
       targets: [],
       base: new THREE.Vector3(80, 0, -80),
+      spots: [
+        new THREE.Vector3(  80, 0,  -80),
+        new THREE.Vector3(-110, 0,   30),
+        new THREE.Vector3( 120, 0,  120),
+        new THREE.Vector3( -40, 0, -150),
+      ],
       reward: 2000,
       onStart() {
         this.stage = 1;
         this.targets = [];
+        this.base = pick(this.spots).clone();   // vary the location each run
         for (let k = 0; k < 4; k++) {
           const ped = spawnPed(G.scene, new THREE.Vector3(this.base.x + rand(-7, 7), 0, this.base.z + rand(-7, 7)));
           ped.isTarget = true;
@@ -2596,7 +2603,7 @@ function makeMissionSystem() {
         this.markerPos = this.base.clone();
         setBeam(this.base, 0xff2a86);
         G.hud.setMissionText('The Hit');
-        G.hud.showSubtitle("Uncle Seng: \"Four of 'em by Soi 80. Take them out.\"", "ลุงเซ้ง: \"จัดการให้ที\"");
+        G.hud.showSubtitle("Uncle Seng: \"Four of 'em at the marker. Take them out.\"", "ลุงเซ้ง: \"จัดการให้ที\"");
         G.hud.showPrompt('Eliminate the <b>marked crew</b> (0/4)', 3);
       },
       update(dt) {
