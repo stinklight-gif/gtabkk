@@ -1747,6 +1747,29 @@ function makeVehicleMesh(kind) {
     dash.position.set(0, 1.55, 1.0); g.add(dash);
     g.userData.dims = { L: 4.0, W: 2.0, H: 2.3 };
     g.userData.spec = { topSpeed: 32, accel: 15, brake: 19, turn: 1.7, mass: 2000, kind: 'fortuner' };
+  } else if (kind === 'songthaew') {
+    // red shared-taxi pickup with a covered passenger bench in the back
+    const red = 0xb83434;
+    const paint = new THREE.MeshStandardMaterial({ color: red, roughness: 0.6 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.0, 3.6), paint);
+    body.position.y = 0.9; g.add(body);
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.8, 1.3), paint);
+    cab.position.set(0, 1.65, 0.9); g.add(cab);
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.12, 2.0), new THREE.MeshStandardMaterial({ color: 0xd9d9d9, roughness: 0.7 }));
+    canopy.position.set(0, 2.15, -0.7); g.add(canopy);
+    for (const xx of [-0.85, 0.85]) for (const zz of [0.2, -1.6]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.1, 0.08), new THREE.MeshStandardMaterial({ color: 0x888888 }));
+      post.position.set(xx, 1.6, zz); g.add(post);
+    }
+    const windshield = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.6), new THREE.MeshBasicMaterial({ color: 0x223344, transparent: true, opacity: 0.65 }));
+    windshield.position.set(0, 1.85, 1.56); g.add(windshield);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+    for (const z of [-1.3, 1.3]) for (const x of [-0.9, 0.9]) {
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.3, 14), wheelMat);
+      w.rotation.z = PI/2; w.position.set(x, 0.4, z); g.add(w);
+    }
+    g.userData.dims = { L: 3.8, W: 2.0, H: 2.4 };
+    g.userData.spec = { topSpeed: 22, accel: 11, brake: 16, turn: 1.6, mass: 1700, kind: 'songthaew' };
   } else if (kind === 'camry' || kind === 'sedan') {
     const color = kind === 'sedan' ? pick([0x222, 0xf5f5f5, 0xc23a3a, 0x335a99, 0x8c8c8c]) : 0xeeeeee;
     const body = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.9, 3.6), new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.4 }));
@@ -1770,6 +1793,19 @@ function makeVehicle(kind, scene) {
   const mesh = makeVehicleMesh(kind);
   scene.add(mesh);
   const spec = mesh.userData.spec;
+  // head/tail lights — per-vehicle materials that glow at night (driven from
+  // G.nightK in updateVehicles; per-vehicle so disposeObject stays safe).
+  const dims = mesh.userData.dims;
+  const headMat = new THREE.MeshStandardMaterial({ color: 0x999999, emissive: 0xfff2cc, emissiveIntensity: 0 });
+  const tailMat = new THREE.MeshStandardMaterial({ color: 0x331111, emissive: 0xff2222, emissiveIntensity: 0 });
+  const lightGeo = new THREE.PlaneGeometry(0.3, 0.18);
+  const lz = dims.L * 0.46, lx = dims.W * 0.3, ly = dims.H * 0.32 + 0.2;
+  for (const sx of [-1, 1]) {
+    const hl = new THREE.Mesh(lightGeo, headMat);
+    hl.position.set(sx * lx, ly, lz); mesh.add(hl);
+    const tl = new THREE.Mesh(lightGeo, tailMat);
+    tl.position.set(sx * lx, ly, -lz); tl.rotation.y = PI; mesh.add(tl);
+  }
   const veh = {
     kind, mesh, spec,
     pos: mesh.position,
@@ -1782,6 +1818,7 @@ function makeVehicle(kind, scene) {
     npc: null,
     audio: null,
     isCop: kind === 'cop' || kind === 'fortuner',
+    lights: [headMat, tailMat],
     boundsHalf: { x: mesh.userData.dims.W * 0.5, z: mesh.userData.dims.L * 0.5 },
   };
   G.vehicles.push(veh);
@@ -1869,7 +1906,7 @@ function spawnDog(scene, pos) {
 
 function spawnTraffic(scene) {
   // Each road segment can hold some cars. We sample edges and place vehicles.
-  const kinds = ['camry','camry','camry','sedan','sedan','tuktuk','hilux','bike','bike'];
+  const kinds = ['camry','camry','camry','sedan','sedan','tuktuk','hilux','songthaew','songthaew','bike','bike'];
   for (let n = 0; n < 28; n++) {
     const kind = pick(kinds);
     const v = makeVehicle(kind, scene);
@@ -2746,6 +2783,7 @@ function killPed(ped) {
 function updateVehicles(dt) {
   for (const v of G.vehicles) {
     if (v.dead) continue;
+    if (v.lights) for (const m of v.lights) m.emissiveIntensity = G.nightK || 0;
     if (v.driver === 'player') continue;
     if (v.isCop && v.driver) updateCop(v, dt);
     else if (v.npc) updateTrafficCar(v, dt);
@@ -3476,7 +3514,7 @@ function updateInteraction(dt) {
 }
 
 function vehicleName(k) {
-  return { bike: 'motorbike', tuktuk: 'tuk-tuk', hilux: 'pickup', camry: 'car', sedan: 'sedan', cop: 'cop pickup', fortuner: 'unmarked SUV' }[k] || k;
+  return { bike: 'motorbike', tuktuk: 'tuk-tuk', hilux: 'pickup', camry: 'car', sedan: 'sedan', cop: 'cop pickup', fortuner: 'unmarked SUV', songthaew: 'songthaew' }[k] || k;
 }
 
 // =============================================================================
@@ -3545,6 +3583,7 @@ function updateDayNight(dt) {
   // neon/lamp/window emissive + accent lights: brighter at night.
   // Iterate only the cached arrays built in buildWorld — no full scene.traverse.
   const nightK = 1 - dayK;
+  G.nightK = nightK;   // exposed so vehicle headlights can follow day/night
   for (let n = 0; n < G.nightLights.length; n++) {
     const nl = G.nightLights[n];
     nl.light.intensity = nightK * nl.base;
