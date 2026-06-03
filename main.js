@@ -3235,12 +3235,23 @@ function updatePeds(dt) {
       );
     }
   }
-  // keep the streets populated — killed peds are spliced out, so top back up
-  while (G.peds.length < PED_TARGET) {
+  // keep the streets populated — busier by day, sparser at night
+  const dayK = 1 - (G.nightK || 0);
+  const target = Math.round(PED_TARGET * (0.45 + 0.55 * dayK));
+  while (G.peds.length < target) {
     const ang = rand(0, TAU), r = rand(60, 100);
     spawnPed(G.scene, new THREE.Vector3(
       clamp(playerPos.x + Math.cos(ang) * r, -HALF + 5, HALF - 5), 0,
       clamp(playerPos.z + Math.sin(ang) * r, -HALF + 5, HALF - 5)));
+  }
+  // thin the night crowd: occasionally drop a far-off ped when over target
+  if (G.peds.length > target && Math.random() < 0.03) {
+    let fi = -1, fd = 80 * 80;
+    for (let i = 0; i < G.peds.length; i++) {
+      const d = dist2(G.peds[i].mesh.position, playerPos);
+      if (d > fd) { fd = d; fi = i; }
+    }
+    if (fi >= 0) { G.scene.remove(G.peds[fi].mesh); disposeObject(G.peds[fi].mesh); G.peds.splice(fi, 1); }
   }
 }
 
@@ -3693,7 +3704,8 @@ function updateWanted(dt) {
   }
 
   // spawn cops based on stars — foot cops live in G.cops, cop cars in G.vehicles
-  const desiredCops = G.wanted.stars >= 3 ? 6 : G.wanted.stars >= 2 ? 4 : G.wanted.stars >= 1 ? 2 : 0;
+  const nightBonus = (G.nightK > 0.5 && G.wanted.stars > 0) ? 1 : 0;  // hotter at night
+  const desiredCops = (G.wanted.stars >= 3 ? 6 : G.wanted.stars >= 2 ? 4 : G.wanted.stars >= 1 ? 2 : 0) + nightBonus;
   let alive = 0;
   for (const c of G.cops) if (!c.dead) alive++;
   for (const v of G.vehicles) if (v.isCop && !v.dead && v.driver) alive++;
