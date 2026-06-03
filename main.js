@@ -122,6 +122,10 @@ function onCopKilled() {
     raiseWanted(3);
     G.hud.showNotif('Crime Suppression deployed ★★★');
   }
+  if (_copsKilled >= 6 && G.wanted.stars < 4) {
+    raiseWanted(4);
+    G.hud.showNotif('SWAT deployed ★★★★');
+  }
 }
 
 // Free GPU resources for a mesh/group that's leaving the scene for good.
@@ -1848,6 +1852,24 @@ function makeVehicleMesh(kind) {
     dash.position.set(0, 1.55, 1.0); g.add(dash);
     g.userData.dims = { L: 4.0, W: 2.0, H: 2.3 };
     g.userData.spec = { topSpeed: 32, accel: 15, brake: 19, turn: 1.7, mass: 2000, kind: 'fortuner' };
+  } else if (kind === 'swat') {
+    // armored SWAT van — the 4★ response
+    const paint = new THREE.MeshStandardMaterial({ color: 0x1a2028, roughness: 0.6, metalness: 0.4 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.0, 4.8), paint);
+    body.position.y = 1.3; g.add(body);
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(2.1, 1.0, 1.4), paint);
+    cab.position.set(0, 2.0, 1.4); g.add(cab);
+    const windshield = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 0.7), new THREE.MeshBasicMaterial({ color: 0x111820, transparent: true, opacity: 0.8 }));
+    windshield.position.set(0, 2.0, 2.11); g.add(windshield);
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.18, 0.3), new THREE.MeshBasicMaterial({ color: 0x2244ff }));
+    bar.position.set(0, 2.6, 0.4); g.add(bar);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+    for (const z of [-1.6, 1.6]) for (const x of [-1.05, 1.05]) {
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.4, 14), wheelMat);
+      w.rotation.z = PI/2; w.position.set(x, 0.5, z); g.add(w);
+    }
+    g.userData.dims = { L: 4.9, W: 2.3, H: 2.8 };
+    g.userData.spec = { topSpeed: 26, accel: 13, brake: 18, turn: 1.4, mass: 3500, kind: 'swat' };
   } else if (kind === 'songthaew') {
     // red shared-taxi pickup with a covered passenger bench in the back
     const red = 0xb83434;
@@ -1969,7 +1991,7 @@ function makeVehicle(kind, scene) {
     driver: null,      // 'player' | npc obj | null
     npc: null,
     audio: null,
-    isCop: kind === 'cop' || kind === 'fortuner',
+    isCop: kind === 'cop' || kind === 'fortuner' || kind === 'swat',
     lights: [headMat, tailMat],
     boundsHalf: { x: mesh.userData.dims.W * 0.5, z: mesh.userData.dims.L * 0.5 },
   };
@@ -3945,6 +3967,18 @@ function spawnFortuner(scene, pos) {
   return v;
 }
 
+// Armored SWAT van — the 4★ unit. isCop, reuses the cop chase/damage paths.
+function spawnSwat(scene, pos) {
+  const v = makeVehicle('swat', scene);
+  v.pos.copy(pos);
+  v.mesh.position.copy(v.pos);
+  v.heading = rand(0, TAU);
+  v.driver = 'cop';
+  v.hp = 350;
+  v.vel = 0;
+  return v;
+}
+
 function killCop(cop) {
   if (cop.dead) return;
   cop.dead = true;
@@ -3974,7 +4008,7 @@ function updateWanted(dt) {
 
   // spawn cops based on stars — foot cops live in G.cops, cop cars in G.vehicles
   const nightBonus = (G.nightK > 0.5 && G.wanted.stars > 0) ? 1 : 0;  // hotter at night
-  const desiredCops = (G.wanted.stars >= 3 ? 6 : G.wanted.stars >= 2 ? 4 : G.wanted.stars >= 1 ? 2 : 0) + nightBonus;
+  const desiredCops = (G.wanted.stars >= 4 ? 8 : G.wanted.stars >= 3 ? 6 : G.wanted.stars >= 2 ? 4 : G.wanted.stars >= 1 ? 2 : 0) + nightBonus;
   let alive = 0;
   for (const c of G.cops) if (!c.dead) alive++;
   for (const v of G.vehicles) if (v.isCop && !v.dead && v.driver) alive++;
@@ -3984,7 +4018,10 @@ function updateWanted(dt) {
     const r = rand(35, 60);
     const sx = clamp(p.x + Math.cos(ang) * r, -HALF + 5, HALF - 5);
     const sz = clamp(p.z + Math.sin(ang) * r, -HALF + 5, HALF - 5);
-    if (G.wanted.stars >= 3 && Math.random() < 0.6) {
+    if (G.wanted.stars >= 4 && Math.random() < 0.5) {
+      const s = spawnSwat(G.scene, new THREE.Vector3(sx, 0, sz));
+      s.vel = 6;
+    } else if (G.wanted.stars >= 3 && Math.random() < 0.6) {
       const f = spawnFortuner(G.scene, new THREE.Vector3(sx, 0, sz));
       f.vel = 8;
     } else if (G.wanted.stars >= 2 && Math.random() < 0.6) {
@@ -4239,7 +4276,7 @@ function updateGunShop(dt) {
 }
 
 function vehicleName(k) {
-  return { bike: 'motorbike', tuktuk: 'tuk-tuk', hilux: 'pickup', camry: 'car', sedan: 'sedan', cop: 'cop pickup', fortuner: 'unmarked SUV', songthaew: 'songthaew', boat: 'longtail boat', bus: 'bus', luxsedan: 'luxury sedan', supercar: 'supercar' }[k] || k;
+  return { bike: 'motorbike', tuktuk: 'tuk-tuk', hilux: 'pickup', camry: 'car', sedan: 'sedan', cop: 'cop pickup', fortuner: 'unmarked SUV', swat: 'SWAT van', songthaew: 'songthaew', boat: 'longtail boat', bus: 'bus', luxsedan: 'luxury sedan', supercar: 'supercar' }[k] || k;
 }
 
 // =============================================================================

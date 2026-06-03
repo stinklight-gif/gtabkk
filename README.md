@@ -104,7 +104,7 @@ Everything lives in two files:
 | 12 | Player update | Movement, sprint+stamina, jump, in-vehicle controls, exit on E, leg-bob animation, 7-Eleven door chime trigger. |
 | 13 | Peds + Dogs | Wander state machines; peds panic when attacked; dogs scatter when player approaches, settle back when far. |
 | 14 | Combat | Muay Thai jab/cross/kick (animated arm/leg swings), pistol + full-auto SMG + pellet-spread shotgun fire (raycast hit + tracer sphere + muzzle flash + camera shake), reload. Pistol on first cop kill; SMG drops from a destroyed 3★ Fortuner; shotgun/SMG also buyable at the gun shop. |
-| 15 | Cops + Wanted | Star-based heat with decay after 35 s out of sight. Spawns foot cops at 1★, cop-pickup chase cars at 2★, unmarked Crime Suppression Fortuners + spike strips at 3★ (after a few cop kills); a star increase flashes the HUD and whoops a siren; nights run one extra unit. Bribe with B near a foot cop (1–2★ only). |
+| 15 | Cops + Wanted | Star-based heat with decay after 35 s out of sight. Spawns foot cops at 1★, cop-pickup chase cars at 2★, unmarked Crime Suppression Fortuners + spike strips at 3★ (after ~3 cop kills), armored SWAT vans at 4★ (after ~6 kills); a star increase flashes the HUD and whoops a siren; nights run one extra unit. Bribe with B near a foot cop (1–2★ only). |
 | 16 | Particles / FX | Smoke emitter (vehicles below 30% HP), explosion (light flash + smoke + camera shake + thunder SFX). |
 | 17 | Interaction | Vehicle proximity check + E to enter. |
 | 18 | Camera update | Follow rig with smoothed distance, shake decay, in-vehicle chase view auto-aligns to vehicle heading. |
