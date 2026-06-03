@@ -2038,6 +2038,7 @@ function saveGame() {
       amulets: (G.world.collectibles || []).map(a => a.taken),
       collected: G.collected || 0,
       welcomeDone: !!G._welcomeDone,
+      soiRunWon: !!G._soiRunWon, hitDone: !!G._hitDone,
       px: p.group.position.x, pz: p.group.position.z,
     }));
   } catch (e) { /* storage unavailable — ignore */ }
@@ -2068,6 +2069,8 @@ function loadGame() {
     G.collected = (typeof s.collected === 'number') ? s.collected : s.amulets.filter(Boolean).length;
   }
   if (typeof s.px === 'number' && typeof s.pz === 'number') p.group.position.set(s.px, 0, s.pz);
+  if (s.soiRunWon) G._soiRunWon = true;
+  if (s.hitDone) G._hitDone = true;
   if (s.welcomeDone) { G._welcomeDone = true; if (G.mission.resume) G.mission.resume(true); }
   G.hud.setCash(G.cash);
   updateAmmoHud();
@@ -2274,6 +2277,9 @@ function bindHud() {
     document.getElementById('ph-amulets').textContent = `${G.collected || 0} / ${total}`;
     document.getElementById('ph-fares').textContent = (G.taxi && G.taxi.fares) || 0;
     document.getElementById('ph-cops').textContent = _copsKilled || 0;
+    const milestones = (G._welcomeDone ? 1 : 0) + (G._soiRunWon ? 1 : 0) + (G._hitDone ? 1 : 0);
+    const pct = Math.round((G.collected || 0) / Math.max(1, total) * 70 + milestones / 3 * 30);
+    document.getElementById('ph-complete').textContent = pct + '%';
   }
   function setVehicle(hp, show) {
     const row = document.getElementById('veh-row');
@@ -2320,6 +2326,22 @@ function bindHud() {
       const ty = (G.taxi.markerPos.z + HALF) * (256 / (HALF*2));
       mctx.fillStyle = G.taxi.stage === 'toDropoff' ? '#39ff7a' : '#ffcf4a';
       mctx.beginPath(); mctx.arc(tx - ppx, ty - ppy, 4, 0, TAU); mctx.fill();
+    }
+    // uncollected amulets (small gold dots)
+    if (G.world.collectibles) {
+      mctx.fillStyle = '#ffd24a';
+      for (const a of G.world.collectibles) if (!a.taken) {
+        const x = (a.mesh.position.x + HALF) * (256 / (HALF*2));
+        const y = (a.mesh.position.z + HALF) * (256 / (HALF*2));
+        mctx.beginPath(); mctx.arc(x - ppx, y - ppy, 1.8, 0, TAU); mctx.fill();
+      }
+    }
+    // active bag-snatcher (orange)
+    if (G.mugging && G.mugging.ped && !G.mugging.ped.dead) {
+      const sp = G.mugging.ped.mesh.position;
+      const x = (sp.x + HALF) * (256 / (HALF*2)), y = (sp.z + HALF) * (256 / (HALF*2));
+      mctx.fillStyle = '#ff7a2a';
+      mctx.beginPath(); mctx.arc(x - ppx, y - ppy, 3, 0, TAU); mctx.fill();
     }
     // cops as red dots
     mctx.fillStyle = '#ff3333';
@@ -2493,6 +2515,7 @@ function makeMissionSystem() {
       win() {
         G.cash += this.reward;
         G.hud.setCash(G.cash);
+        G._soiRunWon = true;
         G.hud.showNotif(`Soi Run complete: +฿${this.reward.toLocaleString()}`);
         G.hud.showSubtitle("Uncle Seng: \"Fast hands, fast wheels. There's other work...\"", "ลุงเซ้ง: \"เร็วดีนี่ มีงานอีก\"");
         this.toReoffer('hit');   // winning unlocks The Hit
@@ -2568,6 +2591,7 @@ function makeMissionSystem() {
         this.armed = false;
         G.cash += this.reward;
         G.hud.setCash(G.cash);
+        G._hitDone = true;
         G.hud.showNotif(`Hit complete: +฿${this.reward.toLocaleString()}`);
         G.hud.showSubtitle("Uncle Seng: \"Clean enough. Lay low for a bit.\"", "ลุงเซ้ง: \"เก่ง หลบหน่อย\"");
         G.hud.setMissionText('Free Roam · Sukhumvit');
