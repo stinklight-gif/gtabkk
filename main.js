@@ -2986,7 +2986,8 @@ function updatePlayerInVehicle(dt) {
     v.vel *= Math.pow(0.985, dt * 60);
   }
   if (handbrake) v.vel *= Math.pow(0.94, dt*60);
-  v.vel = clamp(v.vel, -spec.topSpeed * 0.4, spec.topSpeed * (boost ? 1.15 : 1));
+  const speedMul = v.tiresBlown ? 0.5 : 1;   // spike strips halve your top speed
+  v.vel = clamp(v.vel, -spec.topSpeed * 0.4 * speedMul, spec.topSpeed * (boost ? 1.15 : 1) * speedMul);
   // steering — speed dependent
   const steerRate = spec.turn * (1 - Math.min(1, Math.abs(v.vel)/spec.topSpeed) * 0.4);
   v.heading += steer * steerRate * dt * (v.vel >= 0 ? 1 : -1) * (Math.abs(v.vel)>0.3 ? 1 : 0);
@@ -3296,6 +3297,51 @@ function updateMuggings(dt) {
   marker.position.set(0, 2.5, 0); ped.mesh.add(marker);
   G.mugging = { ped, t: 0, marker };
   G.hud.showNotif('Bag-snatcher! Run them down.');
+}
+
+// Spike strips at 3★ — deployed ahead of a fleeing driver; running one over blows
+// your tires (halved top speed until a respray).
+function spawnSpikeStrip(pos, dirAngle) {
+  const strip = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.BoxGeometry(8, 0.1, 0.6), new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 }));
+  base.position.y = 0.06; strip.add(base);
+  const spikeMat = new THREE.MeshStandardMaterial({ color: 0x999999, metalness: 0.6, roughness: 0.4 });
+  for (let i = -3; i <= 3; i++) {
+    const sp = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.3, 4), spikeMat);
+    sp.position.set(i * 1.1, 0.2, 0); strip.add(sp);
+  }
+  strip.position.set(pos.x, 0, pos.z);
+  strip.rotation.y = dirAngle;   // lie across the road
+  G.scene.add(strip);
+  (G.spikes || (G.spikes = [])).push({ group: strip, pos: new THREE.Vector3(pos.x, 0, pos.z), life: 22 });
+}
+
+function updateSpikes(dt) {
+  const p = G.player;
+  if (!G.spikes) G.spikes = [];
+  // deploy ahead of the player's vehicle at 3★, on a cadence
+  G._spikeTimer = (G._spikeTimer || 0) + dt;
+  if (G.wanted.stars >= 3 && p.inVehicle && G._spikeTimer > 12) {
+    G._spikeTimer = 0;
+    const v = p.inVehicle, ahead = 45;
+    const sx = clamp(v.pos.x + Math.sin(v.heading) * ahead, -HALF + 8, HALF - 8);
+    const sz = clamp(v.pos.z + Math.cos(v.heading) * ahead, -HALF + 8, HALF - 8);
+    spawnSpikeStrip(new THREE.Vector3(sx, 0, sz), v.heading);
+    G.hud.showNotif('Spike strip ahead!');
+  }
+  for (let i = G.spikes.length - 1; i >= 0; i--) {
+    const s = G.spikes[i];
+    s.life -= dt;
+    let remove = s.life <= 0;
+    if (!remove && p.inVehicle && !p.inVehicle.tiresBlown &&
+        dist2(p.inVehicle.pos, s.pos) < 3.5 * 3.5 && Math.abs(p.inVehicle.vel) > 5) {
+      p.inVehicle.tiresBlown = true;
+      G.hud.showNotif('Tires blown!');
+      G.audio.blip({ freq: 140, dur: 0.18, type: 'sawtooth', gain: 0.12 });
+      remove = true;
+    }
+    if (remove) { G.scene.remove(s.group); disposeObject(s.group); G.spikes.splice(i, 1); }
+  }
 }
 
 function updateDogs(dt) {
@@ -4227,6 +4273,7 @@ function updateGarage(dt) {
     // pay, repair, and shed the heat
     G.cash -= fee;
     v.hp = 100;
+    v.tiresBlown = false;   // respray patches the tires too
     if (v.smoke) { v.smoke.life = 0; v.smoke = null; }
     G.wanted.stars = 0;
     G.wanted.lastSeenAt = now;
@@ -4277,6 +4324,7 @@ function loop() {
     updateVehicles(dt);
     updatePeds(dt);
     updateMuggings(dt);
+    updateSpikes(dt);
     updateDogs(dt);
     updateFootCops(dt);
     updateBullets(dt);
