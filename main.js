@@ -104,6 +104,7 @@ function damagePlayer(amount) {
   }
   p.hp -= amount;
   p.hitFlashT = 0.3;
+  p.regenLockT = 5;   // no passive regen for a few seconds after taking a hit
   if (p.hp <= 0) gameOver();
 }
 
@@ -1684,6 +1685,7 @@ function makePlayer(scene) {
     hitFlashT: 0,
     deadT: 0,
     gunRecoil: 0,
+    regenLockT: 0,
     // bribe
     canBribeUntil: 0,
   };
@@ -4174,6 +4176,9 @@ function loop() {
         if (G.audio.bell) G.audio.bell();
       }
     }
+    // passive HP regen when out of combat for a few seconds
+    if (G.player.regenLockT > 0) G.player.regenLockT -= dt;
+    else if (G.player.hp < G.player.hpMax) G.player.hp = Math.min(G.player.hpMax, G.player.hp + 5 * dt);
     if (G.mission) G.mission.update(dt);
     G.hud.update(dt);
     G.hud.setBars(G.player.hp, G.player.armor, G.player.stam);
