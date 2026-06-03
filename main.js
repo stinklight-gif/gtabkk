@@ -1487,11 +1487,18 @@ function buildWorld(scene) {
     const amMat = new THREE.MeshStandardMaterial({ color: 0xffcf4a, emissive: 0xffcf4a, emissiveIntensity: 0.7, roughness: 0.3, metalness: 0.6 });
     const amGeo = new THREE.OctahedronGeometry(0.4);
     for (let n = 0; n < 15; n++) {
-      const bi = irand(-GRID/2 + 1, GRID/2 - 1);   // skip the river column
-      const bj = irand(-GRID/2, GRID/2 - 1);
-      const x = (bi + 0.5) * BLOCK + rand(-16, 16);
-      const z = (bj + 0.5) * BLOCK + rand(-16, 16);
-      const m = new THREE.Mesh(amGeo, amMat);       // shared geo/mat — never disposed
+      // place on a road (grid line) so each is always reachable, never inside a building
+      let x, z;
+      if (Math.random() < 0.5) {
+        const gi = irand(-GRID/2 + 1, GRID/2 - 1);   // x in -200..200, east of the river
+        x = gi * BLOCK + rand(-1.5, 1.5);
+        z = rand(-HALF + 14, HALF - 14);
+      } else {
+        const gj = irand(-GRID/2 + 1, GRID/2 - 1);
+        z = gj * BLOCK + rand(-1.5, 1.5);
+        x = rand(-195, HALF - 14);                    // keep east of the riverside road
+      }
+      const m = new THREE.Mesh(amGeo, amMat);          // shared geo/mat — never disposed
       m.position.set(x, 1.3, z); scene.add(m);
       world.collectibles.push({ mesh: m, taken: false });
     }
@@ -1931,6 +1938,25 @@ function spawnTraffic(scene) {
   }
 }
 
+// A handful of parked, enterable cars at the curb so there's always a ride (and a
+// songthaew for the taxi job) without chasing moving traffic on foot.
+function spawnParkedCars(scene) {
+  const kinds = ['camry', 'sedan', 'hilux', 'songthaew', 'songthaew', 'tuktuk'];
+  let placed = 0, guard = 0;
+  while (placed < 10 && guard++ < 200) {
+    const lane = irand(-GRID/2 + 1, GRID/2 - 1);          // NS road, x in -200..200
+    const x = lane * BLOCK + (Math.random() < 0.5 ? -4.5 : 4.5);  // against a curb
+    const z = rand(-HALF + 20, HALF - 20);
+    if (x < -195) continue;                                // keep out of the river
+    const v = makeVehicle(pick(kinds), scene);
+    v.pos.set(x, 0, z); v.mesh.position.copy(v.pos);
+    v.heading = Math.random() < 0.5 ? 0 : PI;
+    v.mesh.rotation.y = v.heading;
+    v.driver = null; v.vel = 0;                            // parked: enterable, no AI
+    placed++;
+  }
+}
+
 function spawnPeds(scene, n) {
   for (let i = 0; i < n; i++) {
     const blockI = irand(-GRID/2, GRID/2-1);
@@ -2107,6 +2133,7 @@ async function init() {
 
   // Spawn vehicles, peds, dogs
   spawnTraffic(scene);
+  spawnParkedCars(scene);
   spawnPeds(scene, 60);
   spawnDogs(scene, 16);
   setProgress(88);
@@ -3606,10 +3633,10 @@ function updateInteraction(dt) {
   const p = G.player;
   if (p.inVehicle) return;
 
-  // find nearest vehicle within 2.5m that's not driven by a hostile cop
+  // find nearest vehicle within reach that isn't a cop unit or a burning wreck
   let near = null, nd = Infinity;
   for (const v of G.vehicles) {
-    if (v.driver || v.dead) continue; // occupied, or a burning wreck about to despawn
+    if (v.driver || v.dead) continue; // occupied/cop/player, or a wreck about to despawn
     const d2 = dist2(v.pos, p.group.position);
     if (d2 < 8 && d2 < nd) { nd = d2; near = v; }
   }
@@ -3618,6 +3645,7 @@ function updateInteraction(dt) {
     if (G.input.pressed('KeyE')) {
       p.inVehicle = near;
       near.driver = 'player';
+      near.npc = null;   // take over from the traffic AI if it was a moving car
       G.audio.blip({freq:300, dur:0.05, gain:0.08});
     }
   }
