@@ -37,6 +37,12 @@ const SHOTS = [
   { name: 'smoke_noon.png',  dayT: 0.5  },  // 12:00 — must read as daytime
   { name: 'smoke_night.png', dayT: 0.87 },  // ~20:50 — full neon
 ];
+// Extra one-off shots for tuning, e.g. SMOKE_SHOTS="dawn=0.30,dusk=0.78"
+// (these don't run in CI — only the two standard shots above are asserted).
+for (const pair of (process.env.SMOKE_SHOTS || '').split(',').filter(Boolean)) {
+  const [label, t] = pair.split('=');
+  SHOTS.push({ name: `smoke_${label}.png`, dayT: Number(t) });
+}
 
 function serve() {
   return new Promise((resolve, reject) => {

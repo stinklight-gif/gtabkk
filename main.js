@@ -19,10 +19,12 @@ const dist2 = (a, b) => { const dx = a.x - b.x, dz = a.z - b.z; return dx*dx + d
 
 // Deterministic-ish color palettes per district
 const COLORS = {
-  asphalt:  0x1a1c20,
+  // Bangkok surfaces are sun-bleached, not charcoal — albedos must survive
+  // daylight without rendering black (see goal2.md phase 1.3).
+  asphalt:  0x34373c,
   sidewalk: 0x6f6f6f,
   curb:     0x3a3a3a,
-  building: [0x4a4a55, 0x5a5560, 0x6a5a45, 0x504848, 0x3f4045],
+  building: [0x7a7a88, 0x8d8794, 0x9a8a70, 0x837a7a, 0x6e7077],
   neon:     [0xff2a86, 0x21f0ff, 0xff7a1a, 0xb24bff, 0xffcf4a, 0x39ff7a],
   khlong:   0x3a4f3a,
 };
@@ -403,7 +405,7 @@ function buildWorld(scene) {
   scene.add(ground);
 
   // ---- road grid ----
-  const roadMat = new THREE.MeshStandardMaterial({ color: 0x111418, roughness: 0.85 });
+  const roadMat = new THREE.MeshStandardMaterial({ color: 0x3a3d42, roughness: 0.85 });
   const stripeMat = new THREE.MeshBasicMaterial({ color: 0xffe699 });
   const sidewalkMat = new THREE.MeshStandardMaterial({ color: COLORS.sidewalk, roughness: 1.0 });
 
@@ -467,11 +469,13 @@ function buildWorld(scene) {
   const shopMatPool = SHOP_COLORS.map(c => new THREE.MeshStandardMaterial({
     color: c, roughness: 0.95,
   }));
-  // windows: emissive grid texture procedurally drawn. One shared material for all
-  // window planes (so it instances cheaply and ramps via a single nightEmissive entry).
+  // windows: procedurally drawn grid, split into two textures sharing one cell
+  // layout — a muted daytime albedo (glass tower in sunlight, not "lit at night")
+  // and a bright-cells-on-black emissive that carries the night look. One shared
+  // material for all window planes (instances cheaply, one nightEmissive entry).
   const winTex = makeWindowTexture();
   const winMat = new THREE.MeshStandardMaterial({
-    map: winTex, emissiveMap: winTex, emissive: 0xffe6a8, emissiveIntensity: 0.0, roughness: 0.6,
+    map: winTex.map, emissiveMap: winTex.emissiveMap, emissive: 0xffe6a8, emissiveIntensity: 0.0, roughness: 0.6,
   });
   G.nightEmissive.push({ mat: winMat, dayIntensity: 0.0, nightIntensity: 1.0 });
 
@@ -1271,7 +1275,7 @@ function buildWorld(scene) {
 
   // ---- Distant city ring: low-detail silhouettes outside the playable bounds ----
   // Fakes a bigger world. Just unlit boxes in a 250..500m band from origin.
-  const ringColors = [0x4a4a55, 0x5a5560, 0x6a5a45, 0x504848, 0x3f4045, 0x55505a, 0x6a6055];
+  const ringColors = [0x7a7a88, 0x8d8794, 0x9a8a70, 0x837a7a, 0x6e7077, 0x878291, 0x9b9082];
   const ringMats = ringColors.map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.95 }));
   const RING_INNER = HALF + 30;   // start just past the play area
   const RING_OUTER = HALF + 280;  // ~280m of fake skyline depth
@@ -1605,19 +1609,33 @@ function buildWorld(scene) {
 }
 
 function makeWindowTexture() {
-  const c = document.createElement('canvas'); c.width = 64; c.height = 128;
-  const g = c.getContext('2d');
-  g.fillStyle = '#1a1d22'; g.fillRect(0,0,64,128);
+  // Two canvases, one cell layout. Albedo: blue-grey mullions + glass cells that
+  // read as a daytime curtain wall. Emissive: black except the "lit" cells, so
+  // only those glow when the night ramp raises emissiveIntensity.
+  const ca = document.createElement('canvas'); ca.width = 64; ca.height = 128;
+  const ce = document.createElement('canvas'); ce.width = 64; ce.height = 128;
+  const ga = ca.getContext('2d');
+  const ge = ce.getContext('2d');
+  // emissive base/unlit values match the pre-split texture exactly, so the
+  // night look (bright cells + faint plane sheen) is byte-identical to before.
+  ga.fillStyle = '#454b55'; ga.fillRect(0,0,64,128);
+  ge.fillStyle = '#1a1d22'; ge.fillRect(0,0,64,128);
   for (let y = 6; y < 128; y += 10) {
     for (let x = 4; x < 64; x += 10) {
       const lit = Math.random() < 0.55;
-      g.fillStyle = lit ? `rgb(${200+Math.random()*55|0},${180+Math.random()*60|0},${120+Math.random()*80|0})` : '#0e1014';
-      g.fillRect(x, y, 6, 6);
+      // day glass: sky-tinted panes with slight variance, regardless of lit state
+      const v = 90 + Math.random() * 50 | 0;
+      ga.fillStyle = `rgb(${v-20},${v},${v+25|0})`;
+      ga.fillRect(x, y, 6, 6);
+      ge.fillStyle = lit ? `rgb(${200+Math.random()*55|0},${180+Math.random()*60|0},${120+Math.random()*80|0})` : '#0e1014';
+      ge.fillRect(x, y, 6, 6);
     }
   }
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  return tex;
+  const map = new THREE.CanvasTexture(ca);
+  map.wrapS = map.wrapT = THREE.RepeatWrapping;
+  const emissiveMap = new THREE.CanvasTexture(ce);
+  emissiveMap.wrapS = emissiveMap.wrapT = THREE.RepeatWrapping;
+  return { map, emissiveMap };
 }
 
 function makeMinimapBase(world) {
@@ -2299,15 +2317,16 @@ async function init() {
   sun.shadow.camera.near = 1; sun.shadow.camera.far = 300;
   sun.shadow.bias = -0.0008;
   scene.add(sun);
+  scene.add(sun.target);   // target must be in the scene graph so per-frame re-anchoring takes effect
   G.sun = sun;
 
-  // Hemisphere fill
-  const hemi = new THREE.HemisphereLight(0xa8c7ff, 0x33271a, 0.55);
+  // Hemisphere fill — ground color is warm concrete bounce, not dark soil
+  const hemi = new THREE.HemisphereLight(0xa8c7ff, 0x8a7f72, 0.55);
   scene.add(hemi);
   G.hemi = hemi;
 
   // Ambient at night
-  const amb = new THREE.AmbientLight(0x223040, 0.15);
+  const amb = new THREE.AmbientLight(0x404856, 0.15);
   scene.add(amb);
   G.amb = amb;
 
@@ -4417,17 +4436,26 @@ const DAY_LENGTH = 240; // seconds for a full 24h cycle
 function updateDayNight(dt) {
   G.time.dayT = (G.time.dayT + dt / DAY_LENGTH) % 1;
   const t = G.time.dayT;          // 0..1, where 0 = midnight, 0.25 = 6am, 0.5 = noon, 0.75 = 6pm
-  // sun direction
+  // sun direction — lateral z-offset keeps noon elevation at ~39° (atan 90/110)
+  // so vertical facades still catch direct light at midday; the cos/sin arc
+  // keeps mornings/evenings raking along the east-west streets.
   const sunAngle = (t - 0.25) * TAU; // 0 at sunrise (east)
   const sx = Math.cos(sunAngle) * 100;
   const sy = Math.sin(sunAngle) * 90;
-  const sz = 30;
-  G.sun.position.set(sx, sy, sz);
+  const sz = 110;
+  // Re-anchor the sun + shadow camera on the player every frame: the shadow
+  // frustum is a ±80 m box, the map is ±250 m — anchored at the origin, most
+  // of the playable area would sample outside the frustum.
+  const pp = G.player.group.position;
+  G.sun.position.set(pp.x + sx, sy, pp.z + sz);
+  G.sun.target.position.set(pp.x, 0, pp.z);
+  G.sun.target.updateMatrixWorld();
   // sun intensity
   const dayK = clamp((Math.sin(sunAngle) + 0.2), 0, 1);
-  G.sun.intensity = dayK * 1.4;
-  G.hemi.intensity = 0.25 + dayK * 0.5;
-  G.amb.intensity = 0.10 + dayK * 0.10;
+  G.sun.intensity = dayK * 1.6;
+  G.hemi.intensity = 0.3 + dayK * 1.0;
+  G.amb.intensity = 0.10 + dayK * 0.18;
+  G.renderer.toneMappingExposure = 1.0 + dayK * 0.18;
   // background color
   const skyDay = new THREE.Color(0x8eb6e8);
   const skyDusk = new THREE.Color(0xff8866);
