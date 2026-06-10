@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <title>Bangkok 3D — Krung Thep Prototype</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="icon" href="data:," />
 <style>
   :root {
     --cream: #f5e9c8;
@@ -200,8 +201,8 @@
 <script type="importmap">
 {
   "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    "three": "./vendor/three.module.js",
+    "three/addons/": "./vendor/jsm/"
   }
 }
 </script>
@@ -314,19 +315,5 @@
 </div>
 
 <script type="module" src="./main.js"></script>
-<script>
-  // Network watchdog: three.js is fetched from a CDN at runtime, so the whole
-  // module fails silently if there's no internet on first load. Surface a
-  // helpful message instead of a forever-spinning "Loading the city…".
-  setTimeout(function () {
-    if (!window.GAME) {
-      var hint = document.querySelector('#loading .hint');
-      if (hint) {
-        hint.style.color = '#ff2a86';
-        hint.textContent = 'Could not load three.js — needs internet on first load. Check your connection and reload.';
-      }
-    }
-  }, 12000);
-</script>
 </body>
 </html>

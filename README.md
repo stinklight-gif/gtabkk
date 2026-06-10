@@ -16,8 +16,23 @@ python3 -m http.server 8765
 # then open http://127.0.0.1:8765/
 ```
 
-Three.js is fetched at runtime via importmap from jsdelivr; you need internet
-on first load. Click **ENTER THE CITY** when the loader finishes.
+Three.js is vendored in `vendor/` (resolved via importmap), so it works fully
+offline. Click **ENTER THE CITY** when the loader finishes.
+
+## Smoke test
+
+A headless Playwright harness boots the real game, fails on any page error, and
+captures noon/night screenshots (`smoke_noon.png` / `smoke_night.png`) plus the
+renderer draw-call count:
+
+```bash
+npm install --no-save playwright && npx playwright install chromium   # once
+node tools/smoke.mjs
+```
+
+CI (`.github/workflows/smoke.yml`) runs it on every PR and push to main, and
+uploads both screenshots as artifacts. In sandboxes where Playwright's browser
+CDN is blocked, point `CHROME_PATH` at any Chrome/Chromium binary.
 
 ## Controls
 
