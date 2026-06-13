@@ -124,7 +124,7 @@ Everything lives in two files:
 | 16 | Particles / FX | Smoke emitter (vehicles below 30% HP), explosion (light flash + smoke + camera shake + thunder SFX). |
 | 17 | Interaction | Vehicle proximity check + E to enter. |
 | 18 | Camera update | Follow rig with smoothed distance, shake decay, in-vehicle chase view auto-aligns to vehicle heading. |
-| 19 | Day/Night + Weather | 4-min day cycle drives sun position, sky/fog colours, neon and street-lamp intensity. Monsoon weather cycle (clear ⇄ drizzle/downpour that builds and breaks) with lightning flashes during heavy rain. Dawn temple bell at 5–6 AM. |
+| 19 | Day/Night + Weather | 8-min day cycle drives sun position (tilted so noon actually sunlights the facades), sky/fog colours, neon and street-lamp intensity; the sun + shadow camera track the player. Monsoon weather cycle (clear ⇄ drizzle/downpour that builds and breaks) with lightning flashes during heavy rain. Dawn temple bell at 5–6 AM. |
 | 20 | Main loop | Single `loop()` calls every system in order. |
 
 The mutable global is `window.GAME`. Useful while developing:
@@ -181,8 +181,9 @@ traffic AI.
   velocity but doesn't bounce realistically.
 - Traffic AI is grid-aware but doesn't yield at intersections — a few honks per
   block at rush hour, which is admittedly authentic.
-- No pathfinding for cops; they steer directly at the player. At 2★ they ram
-  with their pickups.
+- Cops use lightweight road-aware steering, not true pathfinding: beyond ~25 m
+  they route along the 50 m road grid (so they stop grinding the canyon walls);
+  inside 25 m they pursue and ram directly. AABB pushback is still the backstop.
 - Audio is fully synthesised. No radio stations yet (Phase 2 — would need
   hand-built procedural music or licensed-free tracks).
 

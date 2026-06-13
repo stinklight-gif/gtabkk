@@ -4166,10 +4166,40 @@ function updateWanted(dt) {
 function updateCop(v, dt) {
   // chase player
   const p = G.player;
-  const tx = p.group.position.x - v.pos.x;
-  const tz = p.group.position.z - v.pos.z;
-  const d = Math.hypot(tx, tz);
-  const targetHeading = Math.atan2(tx, tz);
+  const px = p.group.position.x, pz = p.group.position.z;
+  const tx0 = px - v.pos.x;
+  const tz0 = pz - v.pos.z;
+  const d = Math.hypot(tx0, tz0);
+
+  // Road-aware steering: at range, route along the 50 m road grid (roads sit on
+  // x=k*BLOCK and z=k*BLOCK, ROAD_W wide) so chase cars don't grind the canyon
+  // walls. Inside 25 m, drop the routing and pursue/ram directly.
+  let targetHeading;
+  if (d < 25) {
+    targetHeading = Math.atan2(tx0, tz0);
+  } else {
+    const roadX = Math.round(v.pos.x / BLOCK) * BLOCK;  // nearest NS road centerline
+    const roadZ = Math.round(v.pos.z / BLOCK) * BLOCK;  // nearest EW road centerline
+    const offX = v.pos.x - roadX;
+    const offZ = v.pos.z - roadZ;
+    const onNS = Math.abs(offX) < 7;   // within a lane of a north-south road
+    const onEW = Math.abs(offZ) < 7;   // within a lane of an east-west road
+    let tx, tz;
+    if (!onNS && !onEW) {
+      // stranded in a block interior — steer back to the nearer centerline first
+      if (Math.abs(offX) < Math.abs(offZ)) { tx = roadX; tz = v.pos.z; }
+      else { tx = v.pos.x; tz = roadZ; }
+    } else if (onNS && onEW) {
+      // at an intersection — commit to the axis with farther left to travel
+      if (Math.abs(tx0) > Math.abs(tz0)) { tx = px; tz = roadZ; }
+      else { tx = roadX; tz = pz; }
+    } else if (onNS) {
+      tx = roadX; tz = pz;   // run this NS road toward the player's row, turn at the cross street
+    } else {
+      tz = roadZ; tx = px;   // run this EW road toward the player's column
+    }
+    targetHeading = Math.atan2(tx - v.pos.x, tz - v.pos.z);
+  }
   v.heading = lerpAngle(v.heading, targetHeading, 0.06);
   const target = d > 8 ? v.spec.topSpeed * 0.7 : (d < 4 ? 0 : 4);
   if (v.vel < target) v.vel += v.spec.accel * dt;
@@ -4431,7 +4461,9 @@ function updateCamera(dt) {
 // 19. DAY/NIGHT + WEATHER
 // =============================================================================
 
-const DAY_LENGTH = 240; // seconds for a full 24h cycle
+const DAY_LENGTH = 480; // seconds for a full 24h cycle (slow enough that a mission
+                        // doesn't blow through dusk-to-dark mid-chase). Everything
+                        // time-of-day keys off the normalized dayT/nightK, not this.
 
 function updateDayNight(dt) {
   G.time.dayT = (G.time.dayT + dt / DAY_LENGTH) % 1;
