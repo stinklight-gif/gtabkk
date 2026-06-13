@@ -189,9 +189,20 @@ traffic AI.
 
 ## Performance
 
-Targets 60 FPS at 1080p on integrated GPUs. Most cost is the ~120 emissive
-window planes and ~80 simultaneous meshes (vehicles + peds + dogs). If it
-chugs, raise the pedestrian/traffic despawn radius or drop pixel ratio.
+Targets 60 FPS at 1080p on integrated GPUs. The static city is geometry-merged:
+road stripes, sidewalks, building boxes, window/neon planes, awnings, signs and
+sidewalk props are each baked to world space and merged into one mesh per
+material at world-build time. That takes a street-level view from ~7,700 meshes
+/ ~2,800 draw calls down to ~1,200 meshes / **~370 draw calls** (measured via
+`tools/smoke.mjs`, which prints `renderer.info.render.calls`). What's left is
+mostly dynamic — vehicles, peds, dogs, the rooftop/lamp/wire `InstancedMesh`
+batches — plus a few one-off landmarks. If it still chugs, raise the
+pedestrian/traffic despawn radius or drop pixel ratio.
+
+Repeated props (rooftop tanks/AC/antennas, lamps, poles, wires, Yaowarat
+lanterns, parked bikes) use `InstancedMesh`; pooled materials with night-emissive
+ramps are shared, so the per-frame day/night loop touches ~a dozen materials,
+not hundreds.
 
 ## Balance knobs (first-pass — tune after a playtest)
 

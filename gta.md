@@ -227,7 +227,7 @@ Before scoping the full world, deliver a **playable vertical slice** containing:
 2. Three vehicles: Honda Wave motorbike, tuk-tuk, Toyota Hilux.
 3. On-foot movement + basic Muay Thai melee (jab, cross, kick, block).
 4. One firearm (9mm pistol).
-5. Day/night cycle (compressed to 4 minutes for demo).
+5. Day/night cycle (compressed to 8 minutes for demo).
 6. Light rain weather state.
 7. 20–40 traffic vehicles, 30–60 pedestrians.
 8. Functional minimap.
