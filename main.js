@@ -3,10 +3,45 @@
 // Sections: Engine · World · Player · Vehicles · AI · Combat · Wanted · Mission · HUD · Loop
 
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 // =============================================================================
 // 0. UTILITIES
 // =============================================================================
+
+// Static-geometry baker: the city is ~7,700 individual static meshes (road
+// stripes, sidewalks, building boxes, window/neon planes…). Rendered one-per
+// draw call that's thousands of calls. The baker accumulates each static piece
+// as a world-space-baked geometry clone, grouped by material, and flushes one
+// merged Mesh per material — collapsing thousands of draw calls into a handful
+// while preserving the exact look (geometry, position and per-material night
+// ramps are all unchanged). Only ever fed provably-static geometry.
+function makeStaticBaker() {
+  const buckets = new Map();  // material -> { geos, cast, receive }
+  return {
+    // geo: a (shared, unmodified) BufferGeometry; matrix: its world transform.
+    add(geo, matrix, material, cast = false, receive = false) {
+      let bk = buckets.get(material);
+      if (!bk) { bk = { geos: [], cast, receive }; buckets.set(material, bk); }
+      bk.geos.push(geo.clone().applyMatrix4(matrix));
+    },
+    flush(scene) {
+      let meshes = 0;
+      for (const [material, bk] of buckets) {
+        if (!bk.geos.length) continue;
+        const merged = mergeGeometries(bk.geos, false);
+        bk.geos.forEach(g => g.dispose());
+        const mesh = new THREE.Mesh(merged, material);
+        mesh.castShadow = bk.cast; mesh.receiveShadow = bk.receive;
+        mesh.frustumCulled = false;   // a merged mesh spans the map; its box can't cull usefully
+        scene.add(mesh);
+        meshes++;
+      }
+      buckets.clear();
+      return meshes;
+    },
+  };
+}
 
 const PI = Math.PI, TAU = PI * 2;
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -76,6 +111,8 @@ const _camTarget = new THREE.Vector3();
 const _camOffset = new THREE.Vector3();
 const _fireDir   = new THREE.Vector3();
 const _ray       = new THREE.Raycaster();
+const _bbox      = new THREE.Box3();   // scratch AABB for ray-vs-building tests
+const _vBox      = new THREE.Vector3();
 const _blackColor = new THREE.Color(0x111111);
 
 // pooled fire FX lights (created lazily, reused every shot, decayed in the loop)
@@ -398,6 +435,31 @@ function buildWorld(scene) {
     return inst;
   }
 
+  // Static-geometry bakers (flushed at the end of buildWorld). `baker` handles the
+  // shadow-casting solids (buildings, sidewalks); `flatBaker` the ground-hugging
+  // overlays (road stripes) that neither cast nor receive. Helper bakes an
+  // axis-rotated/positioned piece via the shared scratch matrix.
+  const baker = makeStaticBaker();
+  const flatBaker = makeStaticBaker();
+  const ONE = new THREE.Vector3(1, 1, 1);
+  const _bm = new THREE.Matrix4(), _bq = new THREE.Quaternion(), _be = new THREE.Euler(), _bp = new THREE.Vector3();
+  function bake(target, geo, material, x, y, z, rotY, rotX, rotZ, cast, receive) {
+    _be.set(rotX || 0, rotY || 0, rotZ || 0);
+    _bq.setFromEuler(_be);
+    _bp.set(x, y, z);
+    _bm.compose(_bp, _bq, ONE);
+    target.add(geo, _bm, material, cast, receive);
+  }
+  // Bake a built (but not scene-added) Group of static meshes: resolve each
+  // child's world matrix and feed it to the baker, grouped by its own material.
+  // Lets the prop-building code stay as-is — just bakeGroup() instead of scene.add.
+  function bakeGroup(group, cast, receive) {
+    group.updateMatrixWorld(true);
+    group.traverse(o => {
+      if (o.isMesh) baker.add(o.geometry, o.matrixWorld, o.material, cast, receive);
+    });
+  }
+
   // ---- ground / asphalt ----
   const groundMat = new THREE.MeshStandardMaterial({ color: COLORS.asphalt, roughness: 0.9 });
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(HALF*2 + 200, HALF*2 + 200, 1, 1), groundMat);
@@ -411,6 +473,11 @@ function buildWorld(scene) {
 
   const ROAD_W = 12, SIDEWALK_W = 3;
 
+  // Stripe base geometries — reused (cloned + baked) by the flat baker, not added
+  // to the scene directly. ~1,800 individual stripe planes collapse to one mesh.
+  const stripeGeoEW = new THREE.PlaneGeometry(3, 0.4);
+  const stripeGeoNS = new THREE.PlaneGeometry(0.4, 3);
+
   // Build major roads on grid lines (avenues)
   for (let i = -GRID/2; i <= GRID/2; i++) {
     const p = i * BLOCK;
@@ -420,12 +487,10 @@ function buildWorld(scene) {
     // north-south road
     const rdNS = new THREE.Mesh(new THREE.PlaneGeometry(ROAD_W, HALF*2), roadMat);
     rdNS.rotation.x = -PI/2; rdNS.position.set(p, 0.02, 0); rdNS.receiveShadow = true; scene.add(rdNS);
-    // center stripes
+    // center stripes (baked → merged)
     for (let s = -HALF+10; s <= HALF-10; s += 6) {
-      const sEW = new THREE.Mesh(new THREE.PlaneGeometry(3, 0.4), stripeMat);
-      sEW.rotation.x = -PI/2; sEW.position.set(s, 0.025, p); scene.add(sEW);
-      const sNS = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 3), stripeMat);
-      sNS.rotation.x = -PI/2; sNS.position.set(p, 0.025, s); scene.add(sNS);
+      bake(flatBaker, stripeGeoEW, stripeMat, s, 0.025, p, 0, -PI/2, 0, false, false);
+      bake(flatBaker, stripeGeoNS, stripeMat, p, 0.025, s, 0, -PI/2, 0, false, false);
     }
   }
 
@@ -436,24 +501,21 @@ function buildWorld(scene) {
     }
   }
 
-  // sidewalks bordering blocks
+  // sidewalks bordering blocks (baked → one merged mesh)
+  const blockHalf = BLOCK/2 - ROAD_W/2;
+  const swLong = new THREE.PlaneGeometry(BLOCK - ROAD_W, SIDEWALK_W*2);
+  const swShort = new THREE.PlaneGeometry(SIDEWALK_W*2, BLOCK - ROAD_W - SIDEWALK_W*4);
   for (let i = -GRID/2; i < GRID/2; i++) {
     for (let j = -GRID/2; j < GRID/2; j++) {
       const cx = (i + 0.5) * BLOCK;
       const cz = (j + 0.5) * BLOCK;
-      // block interior: 50m square minus road clearance
-      const blockHalf = BLOCK/2 - ROAD_W/2;
-      // sidewalks: thin strips inside the block bounds
-      const sw1 = new THREE.Mesh(new THREE.PlaneGeometry(BLOCK - ROAD_W, SIDEWALK_W*2), sidewalkMat);
-      sw1.rotation.x = -PI/2; sw1.position.set(cx, 0.04, cz - blockHalf + SIDEWALK_W); sw1.receiveShadow = true; scene.add(sw1);
-      const sw2 = new THREE.Mesh(new THREE.PlaneGeometry(BLOCK - ROAD_W, SIDEWALK_W*2), sidewalkMat);
-      sw2.rotation.x = -PI/2; sw2.position.set(cx, 0.04, cz + blockHalf - SIDEWALK_W); sw2.receiveShadow = true; scene.add(sw2);
-      const sw3 = new THREE.Mesh(new THREE.PlaneGeometry(SIDEWALK_W*2, BLOCK - ROAD_W - SIDEWALK_W*4), sidewalkMat);
-      sw3.rotation.x = -PI/2; sw3.position.set(cx - blockHalf + SIDEWALK_W, 0.04, cz); sw3.receiveShadow = true; scene.add(sw3);
-      const sw4 = new THREE.Mesh(new THREE.PlaneGeometry(SIDEWALK_W*2, BLOCK - ROAD_W - SIDEWALK_W*4), sidewalkMat);
-      sw4.rotation.x = -PI/2; sw4.position.set(cx + blockHalf - SIDEWALK_W, 0.04, cz); sw4.receiveShadow = true; scene.add(sw4);
+      bake(baker, swLong,  sidewalkMat, cx, 0.04, cz - blockHalf + SIDEWALK_W, 0, -PI/2, 0, false, true);
+      bake(baker, swLong,  sidewalkMat, cx, 0.04, cz + blockHalf - SIDEWALK_W, 0, -PI/2, 0, false, true);
+      bake(baker, swShort, sidewalkMat, cx - blockHalf + SIDEWALK_W, 0.04, cz, 0, -PI/2, 0, false, true);
+      bake(baker, swShort, sidewalkMat, cx + blockHalf - SIDEWALK_W, 0.04, cz, 0, -PI/2, 0, false, true);
     }
   }
+  swLong.dispose(); swShort.dispose();
 
   // ---- buildings ----
   // Buildings flank the road on all 4 sides of each block, forming a street canyon.
@@ -499,49 +561,66 @@ function buildWorld(scene) {
   const dishGeo = new THREE.SphereGeometry(0.32, 8, 6, 0, TAU, 0, PI/3);
   const dishMat = new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.4, metalness: 0.3 });
   const tankDarkM = [], tankBlueM = [], tankLegM = [], acM = [], antM = [], dishM = [];
+  // Neon sign materials pooled by color: every sign of a given color shares one
+  // emissive material (and so one nightEmissive ramp entry) and merges into one
+  // mesh — turning hundreds of per-sign materials + draw calls into six of each.
+  const neonMatPool = new Map();
+  // Awning tarp + hanging-sign materials pooled by color for the same reason.
+  const awningMatPool = new Map();
+  const getAwningMat = c => {
+    let m = awningMatPool.get(c);
+    if (!m) { m = new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, side: THREE.DoubleSide }); awningMatPool.set(c, m); }
+    return m;
+  };
+  const hangSignMatPool = new Map();
+  const getHangSignMat = c => {
+    let m = hangSignMatPool.get(c);
+    if (!m) { m = new THREE.MeshBasicMaterial({ color: c }); hangSignMatPool.set(c, m); }
+    return m;
+  };
+  const hangArmMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
 
   // placeBuilding: shop band on bottom 4m + upper floors above, plus optional
-  // window strips and neon sign on the faces that look toward a road.
+  // window strips and neon sign on the faces that look toward a road. All of the
+  // static boxes/planes are routed through the baker (merged per material at the
+  // end of buildWorld) rather than added as individual meshes.
   // frontFaces: array of {ax: 'x'|'z', sign: +1|-1} for each road-facing face.
   function placeBuilding(bx, bz, dimX, dimZ, h, frontFaces) {
     const upperH = Math.max(0.1, h - SHOP_LEVEL_H);
     const upperMat = buildingMatPool[irand(0, buildingMatPool.length - 1)];
-    const upper = new THREE.Mesh(new THREE.BoxGeometry(dimX, upperH, dimZ), upperMat);
-    upper.position.set(bx, SHOP_LEVEL_H + upperH/2, bz);
-    upper.castShadow = true; upper.receiveShadow = true;
-    scene.add(upper);
+    const upperGeo = new THREE.BoxGeometry(dimX, upperH, dimZ);
+    bake(baker, upperGeo, upperMat, bx, SHOP_LEVEL_H + upperH/2, bz, 0, 0, 0, true, true);
+    upperGeo.dispose();
 
     const shopMat = shopMatPool[irand(0, shopMatPool.length - 1)];
-    const shop = new THREE.Mesh(new THREE.BoxGeometry(dimX, SHOP_LEVEL_H, dimZ), shopMat);
-    shop.position.set(bx, SHOP_LEVEL_H/2, bz);
-    shop.castShadow = true; shop.receiveShadow = true;
-    scene.add(shop);
+    const shopGeo = new THREE.BoxGeometry(dimX, SHOP_LEVEL_H, dimZ);
+    bake(baker, shopGeo, shopMat, bx, SHOP_LEVEL_H/2, bz, 0, 0, 0, true, true);
+    shopGeo.dispose();
 
+    // Collision AABB only — no mesh ref needed; bullet raycasts test pos/size
+    // directly (doBulletRaycast), and the resolvers always used pos/size anyway.
     world.buildings.push({
       pos: new THREE.Vector3(bx, h/2, bz),
       size: new THREE.Vector3(dimX, h, dimZ),
-      mesh: upper,
     });
 
     // window strip on tall buildings — emissive panels on each road-facing face
     if (h > 22) {
       const winH = upperH - 2;
       for (const face of frontFaces) {
-        let win;
         if (face.ax === 'z') {
           const winW = dimX - 1.5;
           if (winW <= 0.5) continue;
-          win = new THREE.Mesh(new THREE.PlaneGeometry(winW, winH), winMat);
-          win.position.set(bx, SHOP_LEVEL_H + upperH/2, bz + face.sign * (dimZ/2 + 0.02));
-          if (face.sign < 0) win.rotation.y = PI;
+          const g = new THREE.PlaneGeometry(winW, winH);
+          bake(baker, g, winMat, bx, SHOP_LEVEL_H + upperH/2, bz + face.sign * (dimZ/2 + 0.02), face.sign < 0 ? PI : 0, 0, 0, false, false);
+          g.dispose();
         } else {
           const winW = dimZ - 1.5;
           if (winW <= 0.5) continue;
-          win = new THREE.Mesh(new THREE.PlaneGeometry(winW, winH), winMat);
-          win.position.set(bx + face.sign * (dimX/2 + 0.02), SHOP_LEVEL_H + upperH/2, bz);
-          win.rotation.y = face.sign > 0 ? PI/2 : -PI/2;
+          const g = new THREE.PlaneGeometry(winW, winH);
+          bake(baker, g, winMat, bx + face.sign * (dimX/2 + 0.02), SHOP_LEVEL_H + upperH/2, bz, face.sign > 0 ? PI/2 : -PI/2, 0, 0, false, false);
+          g.dispose();
         }
-        scene.add(win);
       }
     }
 
@@ -554,41 +633,40 @@ function buildWorld(scene) {
       const faceWidth = face.ax === 'z' ? dimX : dimZ;
       const sw = rand(2, Math.min(faceWidth, 6));
       const sh = rand(1.0, 2.0);
-      const signMat = new THREE.MeshStandardMaterial({
-        color: neonColor, emissive: neonColor, emissiveIntensity: 0.15, roughness: 0.5,
-      });
-      G.nightEmissive.push({ mat: signMat, dayIntensity: 0.15, nightIntensity: 1.4 });
-      const sign = new THREE.Mesh(new THREE.PlaneGeometry(sw, sh), signMat);
-      if (face.ax === 'z') {
-        sign.position.set(bx, rand(2.5, 3.7), bz + face.sign * (dimZ/2 + 0.05));
-        if (face.sign < 0) sign.rotation.y = PI;
-      } else {
-        sign.position.set(bx + face.sign * (dimX/2 + 0.05), rand(2.5, 3.7), bz);
-        sign.rotation.y = face.sign > 0 ? PI/2 : -PI/2;
+      let signMat = neonMatPool.get(neonColor);
+      if (!signMat) {
+        signMat = new THREE.MeshStandardMaterial({
+          color: neonColor, emissive: neonColor, emissiveIntensity: 0.15, roughness: 0.5,
+        });
+        neonMatPool.set(neonColor, signMat);
+        G.nightEmissive.push({ mat: signMat, dayIntensity: 0.15, nightIntensity: 1.4 });
       }
-      scene.add(sign);
+      const g = new THREE.PlaneGeometry(sw, sh);
+      if (face.ax === 'z') {
+        bake(baker, g, signMat, bx, rand(2.5, 3.7), bz + face.sign * (dimZ/2 + 0.05), face.sign < 0 ? PI : 0, 0, 0, false, false);
+      } else {
+        bake(baker, g, signMat, bx + face.sign * (dimX/2 + 0.05), rand(2.5, 3.7), bz, face.sign > 0 ? PI/2 : -PI/2, 0, 0, false, false);
+      }
+      g.dispose();
     }
 
     // awning: tarp slab projecting out from the shop level over the sidewalk
     if (h < 34 && Math.random() < 0.55 && frontFaces.length > 0) {
       const tarpColors = [0x3a5a8a, 0xa83a3a, 0x3a8a5a, 0xcfa83a, 0x4a4a4a, 0xc26b3a];
-      const tarpColor = pick(tarpColors);
-      const tarpMat = new THREE.MeshStandardMaterial({ color: tarpColor, roughness: 0.85, side: THREE.DoubleSide });
+      const tarpMat = getAwningMat(pick(tarpColors));
       for (const face of frontFaces) {
         const projDepth = rand(1.6, 2.4);
         const projY = SHOP_LEVEL_H - 0.35;
         if (face.ax === 'z') {
           const aw = Math.max(0.5, dimX - 0.6);
-          const awning = new THREE.Mesh(new THREE.BoxGeometry(aw, 0.06, projDepth), tarpMat);
-          awning.position.set(bx, projY, bz + face.sign * (dimZ/2 + projDepth/2));
-          awning.rotation.x = -0.05 * face.sign; // slight outward droop
-          scene.add(awning);
+          const g = new THREE.BoxGeometry(aw, 0.06, projDepth);
+          bake(baker, g, tarpMat, bx, projY, bz + face.sign * (dimZ/2 + projDepth/2), 0, -0.05 * face.sign, 0, false, false);
+          g.dispose();
         } else {
           const aw = Math.max(0.5, dimZ - 0.6);
-          const awning = new THREE.Mesh(new THREE.BoxGeometry(projDepth, 0.06, aw), tarpMat);
-          awning.position.set(bx + face.sign * (dimX/2 + projDepth/2), projY, bz);
-          awning.rotation.z = 0.05 * face.sign;
-          scene.add(awning);
+          const g = new THREE.BoxGeometry(projDepth, 0.06, aw);
+          bake(baker, g, tarpMat, bx + face.sign * (dimX/2 + projDepth/2), projY, bz, 0, 0, 0.05 * face.sign, false, false);
+          g.dispose();
         }
       }
     }
@@ -604,25 +682,19 @@ function buildWorld(scene) {
         const setX = Math.max(2, dimX * rand(0.55, 0.78));
         const setZ = Math.max(2, dimZ * rand(0.55, 0.78));
         const setMat = buildingMatPool[irand(0, buildingMatPool.length - 1)];
-        const setbox = new THREE.Mesh(new THREE.BoxGeometry(setX, setH, setZ), setMat);
-        setbox.position.set(bx, roofY + setH/2, bz);
-        setbox.castShadow = true; setbox.receiveShadow = true;
-        scene.add(setbox);
+        const setGeo = new THREE.BoxGeometry(setX, setH, setZ);
+        bake(baker, setGeo, setMat, bx, roofY + setH/2, bz, 0, 0, 0, true, true);
+        setGeo.dispose();
         // window strip on the setback's main face
         if (frontFaces.length > 0 && setH > 5) {
           const face = frontFaces[0];
-          const win = new THREE.Mesh(
-            new THREE.PlaneGeometry(face.ax === 'z' ? setX - 1 : setZ - 1, setH - 1.5),
-            winMat
-          );
+          const g = new THREE.PlaneGeometry(face.ax === 'z' ? setX - 1 : setZ - 1, setH - 1.5);
           if (face.ax === 'z') {
-            win.position.set(bx, roofY + setH/2, bz + face.sign * (setZ/2 + 0.02));
-            if (face.sign < 0) win.rotation.y = PI;
+            bake(baker, g, winMat, bx, roofY + setH/2, bz + face.sign * (setZ/2 + 0.02), face.sign < 0 ? PI : 0, 0, 0, false, false);
           } else {
-            win.position.set(bx + face.sign * (setX/2 + 0.02), roofY + setH/2, bz);
-            win.rotation.y = face.sign > 0 ? PI/2 : -PI/2;
+            bake(baker, g, winMat, bx + face.sign * (setX/2 + 0.02), roofY + setH/2, bz, face.sign > 0 ? PI/2 : -PI/2, 0, 0, false, false);
           }
-          scene.add(win);
+          g.dispose();
         }
       }
 
@@ -682,24 +754,22 @@ function buildWorld(scene) {
       const face = frontFaces[0];
       const armLen = 1.2;
       const signW = rand(1.0, 1.6), signH = rand(0.5, 0.9);
-      const signColor = pick([0xa84a3a, 0xcfa83a, 0xe0c885, 0x3a8a5a, 0x1a1a1a, 0xb24bff]);
-      const signMat = new THREE.MeshBasicMaterial({ color: signColor });
-      const armMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
+      const signMat = getHangSignMat(pick([0xa84a3a, 0xcfa83a, 0xe0c885, 0x3a8a5a, 0x1a1a1a, 0xb24bff]));
       const heightY = Math.min(h - 1, rand(4.5, 7));
       if (face.ax === 'z') {
-        const arm = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, armLen), armMat);
-        arm.position.set(bx, heightY, bz + face.sign * (dimZ/2 + armLen/2));
-        scene.add(arm);
-        const signMesh = new THREE.Mesh(new THREE.BoxGeometry(signW, signH, 0.05), signMat);
-        signMesh.position.set(bx, heightY - signH/2 - 0.05, bz + face.sign * (dimZ/2 + armLen));
-        scene.add(signMesh);
+        const ga = new THREE.BoxGeometry(0.05, 0.05, armLen);
+        bake(baker, ga, hangArmMat, bx, heightY, bz + face.sign * (dimZ/2 + armLen/2), 0, 0, 0, false, false);
+        ga.dispose();
+        const gs = new THREE.BoxGeometry(signW, signH, 0.05);
+        bake(baker, gs, signMat, bx, heightY - signH/2 - 0.05, bz + face.sign * (dimZ/2 + armLen), 0, 0, 0, false, false);
+        gs.dispose();
       } else {
-        const arm = new THREE.Mesh(new THREE.BoxGeometry(armLen, 0.05, 0.05), armMat);
-        arm.position.set(bx + face.sign * (dimX/2 + armLen/2), heightY, bz);
-        scene.add(arm);
-        const signMesh = new THREE.Mesh(new THREE.BoxGeometry(0.05, signH, signW), signMat);
-        signMesh.position.set(bx + face.sign * (dimX/2 + armLen), heightY - signH/2 - 0.05, bz);
-        scene.add(signMesh);
+        const ga = new THREE.BoxGeometry(armLen, 0.05, 0.05);
+        bake(baker, ga, hangArmMat, bx + face.sign * (dimX/2 + armLen/2), heightY, bz, 0, 0, 0, false, false);
+        ga.dispose();
+        const gs = new THREE.BoxGeometry(0.05, signH, signW);
+        bake(baker, gs, signMat, bx + face.sign * (dimX/2 + armLen), heightY - signH/2 - 0.05, bz, 0, 0, 0, false, false);
+        gs.dispose();
       }
     }
   }
@@ -996,7 +1066,16 @@ function buildWorld(scene) {
   addInstanced(bikeHandleGeo, bikeHandleMat, bikeHandleM, false, false);
 
   // ---- Sidewalk props: food carts, plant pots, trash piles ----
+  // All static, so each prop group is baked (merged per material) instead of
+  // added as its own group of meshes. Umbrella tarps are pooled by color so the
+  // ~5 colors stay 5 materials (and merge cleanly) instead of one-per-cart.
   const tarpColors2 = [0xa83a3a, 0x3a5a8a, 0x3a8a5a, 0xcfa83a, 0xc26b3a];
+  const umbrellaMatPool = new Map();
+  const getUmbrellaMat = c => {
+    let m = umbrellaMatPool.get(c);
+    if (!m) { m = new THREE.MeshStandardMaterial({ color: c, roughness: 0.8, side: THREE.DoubleSide }); umbrellaMatPool.set(c, m); }
+    return m;
+  };
   const propPotMat = new THREE.MeshStandardMaterial({ color: 0x6b4a3a, roughness: 0.95 });
   const propLeafMat = new THREE.MeshStandardMaterial({ color: 0x3a6a3a, roughness: 0.8, side: THREE.DoubleSide });
   const propTrashMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 1.0 });
@@ -1035,8 +1114,7 @@ function buildWorld(scene) {
           body.position.y = 0.55; cart.add(body);
           const pole = new THREE.Mesh(propCartPoleGeo, propCartPoleMat);
           pole.position.y = 1.0; cart.add(pole);
-          const umbrellaMat = new THREE.MeshStandardMaterial({ color: pick(tarpColors2), roughness: 0.8, side: THREE.DoubleSide });
-          const umbrella = new THREE.Mesh(new THREE.ConeGeometry(1.3, 0.5, 8), umbrellaMat);
+          const umbrella = new THREE.Mesh(new THREE.ConeGeometry(1.3, 0.5, 8), getUmbrellaMat(pick(tarpColors2)));
           umbrella.position.y = 2.0; cart.add(umbrella);
           for (const xx of [-0.5, 0.5]) {
             const w = new THREE.Mesh(propCartWheelGeo, bikeWheelMat);
@@ -1045,7 +1123,7 @@ function buildWorld(scene) {
           }
           cart.position.set(px, 0, pz);
           cart.rotation.y = rand(0, TAU);
-          scene.add(cart);
+          bakeGroup(cart, false, false);
         } else if (propType === 1 || propType === 3) {
           // plant pot with leaves
           const pot = new THREE.Group();
@@ -1060,7 +1138,7 @@ function buildWorld(scene) {
             pot.add(leaf);
           }
           pot.position.set(px, 0, pz);
-          scene.add(pot);
+          bakeGroup(pot, false, false);
         } else {
           // trash pile — a few small dark boxes
           const tg = new THREE.Group();
@@ -1074,7 +1152,7 @@ function buildWorld(scene) {
             tg.add(b);
           }
           tg.position.set(px, 0, pz);
-          scene.add(tg);
+          bakeGroup(tg, false, false);
         }
       }
     }
@@ -1601,6 +1679,14 @@ function buildWorld(scene) {
       world.armorPickups.push({ mesh: m, pos: new THREE.Vector3(x, 0, z), readyAt: 0 });
     }
   }
+
+  // ---- Flush static-geometry bakers → a handful of merged meshes ----
+  // Everything routed through `baker`/`flatBaker` above (road stripes, sidewalks,
+  // building/shop/setback boxes, window + neon planes) collapses here into one
+  // merged mesh per material, cutting thousands of draw calls.
+  const mergedSolid = baker.flush(scene);
+  const mergedFlat = flatBaker.flush(scene);
+  G._mergedMeshCount = mergedSolid + mergedFlat;
 
   // ---- Render minimap base (top-down 2D snapshot of roads/landmarks) ----
   world.minimap = makeMinimapBase(world);
@@ -3966,13 +4052,25 @@ function doBulletRaycast(origin, dir, dmg = 35) {
   for (const ped of G.peds) if (!ped.dead) candidates.push({ obj: ped, mesh: ped.mesh, actor: true });
   for (const cop of G.cops) if (!cop.dead) candidates.push({ obj: cop, mesh: cop.mesh, actor: true });
   for (const veh of G.vehicles) if (!veh.dead && veh !== G.player.inVehicle) candidates.push({ obj: veh, mesh: veh.mesh, vehicle: true });
-  for (const b of G.world.buildings) if (dist2(b.pos, origin) < 130 * 130) candidates.push({ obj: b, mesh: b.mesh });
   let best = null;
   for (const c of candidates) {
     const intersects = _ray.intersectObject(c.mesh, true);
     if (intersects.length) {
       const hit = intersects[0];
       if (!best || hit.distance < best.dist) best = { dist: hit.distance, point: hit.point, target: c };
+    }
+  }
+  // Buildings are merged into shared meshes now, so test their stored AABBs
+  // directly (they're axis-aligned boxes — this is exact, and cheaper than the
+  // old per-mesh recursive raycast). Distance-culled to nearby buildings.
+  for (const b of G.world.buildings) {
+    if (dist2(b.pos, origin) >= 130 * 130) continue;
+    _bbox.min.set(b.pos.x - b.size.x/2, b.pos.y - b.size.y/2, b.pos.z - b.size.z/2);
+    _bbox.max.set(b.pos.x + b.size.x/2, b.pos.y + b.size.y/2, b.pos.z + b.size.z/2);
+    const hit = _ray.ray.intersectBox(_bbox, _vBox);
+    if (hit) {
+      const dist = origin.distanceTo(hit);
+      if (dist <= _ray.far && (!best || dist < best.dist)) best = { dist, point: hit.clone(), target: { obj: b } };
     }
   }
   if (best) {
