@@ -16,8 +16,23 @@ python3 -m http.server 8765
 # then open http://127.0.0.1:8765/
 ```
 
-Three.js is fetched at runtime via importmap from jsdelivr; you need internet
-on first load. Click **ENTER THE CITY** when the loader finishes.
+Three.js is vendored in `vendor/` (resolved via importmap), so it works fully
+offline. Click **ENTER THE CITY** when the loader finishes.
+
+## Smoke test
+
+A headless Playwright harness boots the real game, fails on any page error, and
+captures noon/night screenshots (`smoke_noon.png` / `smoke_night.png`) plus the
+renderer draw-call count:
+
+```bash
+npm install --no-save playwright && npx playwright install chromium   # once
+node tools/smoke.mjs
+```
+
+CI (`.github/workflows/smoke.yml`) runs it on every PR and push to main, and
+uploads both screenshots as artifacts. In sandboxes where Playwright's browser
+CDN is blocked, point `CHROME_PATH` at any Chrome/Chromium binary.
 
 ## Controls
 
@@ -109,7 +124,7 @@ Everything lives in two files:
 | 16 | Particles / FX | Smoke emitter (vehicles below 30% HP), explosion (light flash + smoke + camera shake + thunder SFX). |
 | 17 | Interaction | Vehicle proximity check + E to enter. |
 | 18 | Camera update | Follow rig with smoothed distance, shake decay, in-vehicle chase view auto-aligns to vehicle heading. |
-| 19 | Day/Night + Weather | 4-min day cycle drives sun position, sky/fog colours, neon and street-lamp intensity. Monsoon weather cycle (clear ⇄ drizzle/downpour that builds and breaks) with lightning flashes during heavy rain. Dawn temple bell at 5–6 AM. |
+| 19 | Day/Night + Weather | 8-min day cycle drives sun position (tilted so noon actually sunlights the facades), sky/fog colours, neon and street-lamp intensity; the sun + shadow camera track the player. Monsoon weather cycle (clear ⇄ drizzle/downpour that builds and breaks) with lightning flashes during heavy rain. Dawn temple bell at 5–6 AM. |
 | 20 | Main loop | Single `loop()` calls every system in order. |
 
 The mutable global is `window.GAME`. Useful while developing:
@@ -166,16 +181,28 @@ traffic AI.
   velocity but doesn't bounce realistically.
 - Traffic AI is grid-aware but doesn't yield at intersections — a few honks per
   block at rush hour, which is admittedly authentic.
-- No pathfinding for cops; they steer directly at the player. At 2★ they ram
-  with their pickups.
+- Cops use lightweight road-aware steering, not true pathfinding: beyond ~25 m
+  they route along the 50 m road grid (so they stop grinding the canyon walls);
+  inside 25 m they pursue and ram directly. AABB pushback is still the backstop.
 - Audio is fully synthesised. No radio stations yet (Phase 2 — would need
   hand-built procedural music or licensed-free tracks).
 
 ## Performance
 
-Targets 60 FPS at 1080p on integrated GPUs. Most cost is the ~120 emissive
-window planes and ~80 simultaneous meshes (vehicles + peds + dogs). If it
-chugs, raise the pedestrian/traffic despawn radius or drop pixel ratio.
+Targets 60 FPS at 1080p on integrated GPUs. The static city is geometry-merged:
+road stripes, sidewalks, building boxes, window/neon planes, awnings, signs and
+sidewalk props are each baked to world space and merged into one mesh per
+material at world-build time. That takes a street-level view from ~7,700 meshes
+/ ~2,800 draw calls down to ~1,200 meshes / **~370 draw calls** (measured via
+`tools/smoke.mjs`, which prints `renderer.info.render.calls`). What's left is
+mostly dynamic — vehicles, peds, dogs, the rooftop/lamp/wire `InstancedMesh`
+batches — plus a few one-off landmarks. If it still chugs, raise the
+pedestrian/traffic despawn radius or drop pixel ratio.
+
+Repeated props (rooftop tanks/AC/antennas, lamps, poles, wires, Yaowarat
+lanterns, parked bikes) use `InstancedMesh`; pooled materials with night-emissive
+ramps are shared, so the per-frame day/night loop touches ~a dozen materials,
+not hundreds.
 
 ## Balance knobs (first-pass — tune after a playtest)
 
