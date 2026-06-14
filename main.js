@@ -97,7 +97,7 @@ window.GAME = G; // for poking around in the console
 // of them can be turned off with a one-line change.
 // -----------------------------------------------------------------------------
 const ROAD_WIDTH = 12;          // matches buildWorld's local ROAD_W
-const PED_TARGET = 60;          // pedestrians are topped back up to this count
+const PED_TARGET = 82;          // peak crowd cap; scaled by crowdFactor(dayT) per time of day
 
 const GAMEPLAY = {
   armor: true,            // armor soaks damage before HP
@@ -2240,6 +2240,20 @@ function makeDogMesh() {
   return g;
 }
 
+// A point on a sidewalk near (cx,cz): sample within `radius`, then snap onto the
+// band just outside the nearer road centerline so peds populate the pavements
+// (and read as a crowd down whatever street the camera faces) rather than a
+// uniform disc that scatters most of them into blocks and side streets.
+function sidewalkPos(cx, cz, radius) {
+  const ang = rand(0, TAU), r = rand(6, radius);
+  let x = cx + Math.cos(ang) * r, z = cz + Math.sin(ang) * r;
+  const roadX = Math.round(x / BLOCK) * BLOCK, roadZ = Math.round(z / BLOCK) * BLOCK;
+  const sw = ROAD_WIDTH / 2 + rand(1.0, 2.4);    // sidewalk band hugging the curb
+  if (Math.abs(x - roadX) < Math.abs(z - roadZ)) x = roadX + (Math.random() < 0.5 ? -sw : sw);
+  else z = roadZ + (Math.random() < 0.5 ? -sw : sw);
+  return new THREE.Vector3(clamp(x, -HALF + 5, HALF - 5), 0, clamp(z, -HALF + 5, HALF - 5));
+}
+
 function spawnPed(scene, pos) {
   const m = makePedMesh();
   m.position.copy(pos);
@@ -2332,11 +2346,7 @@ function spawnBoat(scene) {
 
 function spawnPeds(scene, n) {
   for (let i = 0; i < n; i++) {
-    const blockI = irand(-GRID/2, GRID/2-1);
-    const blockJ = irand(-GRID/2, GRID/2-1);
-    const cx = (blockI + 0.5) * BLOCK + rand(-BLOCK/2 + ROAD_WIDTH/2, BLOCK/2 - ROAD_WIDTH/2);
-    const cz = (blockJ + 0.5) * BLOCK + rand(-BLOCK/2 + ROAD_WIDTH/2, BLOCK/2 - ROAD_WIDTH/2);
-    spawnPed(scene, new THREE.Vector3(cx, 0, cz));
+    spawnPed(scene, sidewalkPos(rand(-HALF + 12, HALF - 12), rand(-HALF + 12, HALF - 12), 8));
   }
 }
 
@@ -3603,6 +3613,52 @@ function updateBarks(dt) {
   }
 }
 
+// Crowd density by time of day — Bangkok rhythm: dead 2-5am, morning rush,
+// hot midday lull, evening-rush/nightlife peak, late-night taper. Returns 0..1.
+const CROWD_CURVE = [
+  [0, 0.22], [2, 0.10], [5, 0.10], [7, 0.55], [8.5, 1.0], [11, 0.72],
+  [14, 0.72], [16, 0.82], [18.5, 1.0], [21, 0.85], [23, 0.40], [24, 0.22],
+];
+function crowdFactor(dayT) {
+  const h = ((dayT % 1) + 1) % 1 * 24;
+  for (let i = 0; i < CROWD_CURVE.length - 1; i++) {
+    const a = CROWD_CURVE[i], b = CROWD_CURVE[i + 1];
+    if (h >= a[0] && h <= b[0]) return lerp(a[1], b[1], (h - a[0]) / (b[0] - a[0]));
+  }
+  return CROWD_CURVE[0][1];
+}
+function crowdTarget() { return Math.round(PED_TARGET * crowdFactor(G.time.dayT)); }
+
+// Snap the live crowd to the current time-of-day target immediately (spawn the
+// shortfall near the player, cull the farthest excess). Used by the headless
+// harness so a screenshot reflects the hour without waiting for the slow ramp;
+// gameplay reaches the same target gradually via updatePeds.
+function resyncCrowd() {
+  const pp = G.player.group.position;
+  const target = crowdTarget();
+  // pull stray wanderers onto nearby sidewalks so the count near the camera
+  // reflects the hour immediately (harness-only; gameplay distributes gradually)
+  for (const ped of G.peds) {
+    if (ped.isMugger || ped.isTarget || ped.anchor) continue;
+    if (dist2(ped.mesh.position, pp) > 95 * 95) ped.mesh.position.copy(sidewalkPos(pp.x, pp.z, 88));
+  }
+  for (let guard = 0; G.peds.length > target && guard < 500; guard++) {
+    let fi = -1, fd = -1;
+    for (let i = 0; i < G.peds.length; i++) {
+      const ped = G.peds[i];
+      if (ped.isMugger || ped.isTarget || ped.anchor) continue;
+      const d = dist2(ped.mesh.position, pp);
+      if (d > fd) { fd = d; fi = i; }
+    }
+    if (fi < 0) break;
+    G.scene.remove(G.peds[fi].mesh); disposeObject(G.peds[fi].mesh); G.peds.splice(fi, 1);
+  }
+  while (G.peds.length < target) {
+    spawnPed(G.scene, sidewalkPos(pp.x, pp.z, 88));
+  }
+}
+G.resyncCrowd = resyncCrowd;   // exposed on window.GAME for the smoke harness
+
 function updatePeds(dt) {
   const playerPos = G.player.group.position;
   for (const ped of G.peds) {
@@ -3637,30 +3693,23 @@ function updatePeds(dt) {
     ped.mesh.position.x = clamp(ped.mesh.position.x, -HALF + 2, HALF - 2);
     ped.mesh.position.z = clamp(ped.mesh.position.z, -HALF + 2, HALF - 2);
 
-    // despawn far / respawn
-    if (dist2(ped.mesh.position, playerPos) > 180*180) {
-      ped.mesh.position.set(
-        playerPos.x + rand(-90, 90),
-        0,
-        playerPos.z + rand(-90, 90)
-      );
+    // recycle a wanderer that strayed too far back onto a sidewalk in view
+    // (anchored cluster peds stay put — they belong to a stall/store)
+    if (!ped.anchor && dist2(ped.mesh.position, playerPos) > 170*170) {
+      ped.mesh.position.copy(sidewalkPos(playerPos.x, playerPos.z, 75));
     }
   }
-  // keep the streets populated — busier by day, sparser at night
-  const dayK = 1 - (G.nightK || 0);
-  const target = Math.round(PED_TARGET * (0.45 + 0.55 * dayK));
-  while (G.peds.length < target) {
-    const ang = rand(0, TAU), r = rand(60, 100);
-    spawnPed(G.scene, new THREE.Vector3(
-      clamp(playerPos.x + Math.cos(ang) * r, -HALF + 5, HALF - 5), 0,
-      clamp(playerPos.z + Math.sin(ang) * r, -HALF + 5, HALF - 5)));
-  }
-  // thin the night crowd: occasionally drop a far-off ped when over target
-  if (G.peds.length > target && Math.random() < 0.03) {
-    let fi = -1, fd = 80 * 80;
+  // keep the streets populated to the time-of-day target — busy at rush hour,
+  // near-empty in the small hours (see crowdFactor)
+  const target = crowdTarget();
+  if (G.peds.length < target) {
+    spawnPed(G.scene, sidewalkPos(playerPos.x, playerPos.z, 90));   // ramps in smoothly
+  } else if (G.peds.length > target) {
+    // thin toward the target by dropping the farthest non-special ped each frame
+    let fi = -1, fd = 60 * 60;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget) continue;   // never thin mission-relevant peds
+      if (ped.isMugger || ped.isTarget || ped.anchor) continue;
       const d = dist2(ped.mesh.position, playerPos);
       if (d > fd) { fd = d; fi = i; }
     }
