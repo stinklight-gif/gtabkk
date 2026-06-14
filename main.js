@@ -81,7 +81,9 @@ const G = {
   bullets: [],
   particles: [],
   effects: [],
-  time: { dayT: 0.27, weather: 'clear', rainStrength: 0 }, // 0..1 of a 4-min day
+  time: { dayT: 0.27, weather: 'clear', rainStrength: 0, day: 0 }, // dayT 0..1; day = whole days elapsed
+  // Loy Krathong festival — floats + sky lanterns drift on the river on schedule nights
+  festival: { active: false, floats: [], lanterns: [], announcedDay: -1 },
   wanted: { stars: 0, lastSeenAt: 0, lastSeenPos: new THREE.Vector3() },
   cash: 100,
   notifQueue: [],
@@ -5058,7 +5060,9 @@ const DAY_LENGTH = 480; // seconds for a full 24h cycle (slow enough that a miss
                         // time-of-day keys off the normalized dayT/nightK, not this.
 
 function updateDayNight(dt) {
+  const prevT = G.time.dayT;
   G.time.dayT = (G.time.dayT + dt / DAY_LENGTH) % 1;
+  if (G.time.dayT < prevT) G.time.day++;     // crossed midnight → a whole day elapsed
   const t = G.time.dayT;          // 0..1, where 0 = midnight, 0.25 = 6am, 0.5 = noon, 0.75 = 6pm
   // sun direction — lateral z-offset keeps noon elevation at ~39° (atan 90/110)
   // so vertical facades still catch direct light at midday; the cos/sin arc
@@ -5149,6 +5153,92 @@ function updateDayNight(dt) {
     G.audio.bell();
   }
   if (hourSlot < 5) G._bellSeen.clear();
+}
+
+// =============================================================================
+// 19b. LOY KRATHONG FESTIVAL — floats + sky lanterns on the river, on schedule
+// =============================================================================
+const FESTIVAL_PERIOD = 3;   // every 3rd night the river fills with krathong
+const KRATHONG_COUNT = 42;
+const RIVER_CX = -229;       // river centerline x (from buildWorld)
+
+// A lotus krathong: leaf base + petals + a glowing candle that reads at night.
+function makeKrathong() {
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.46, 0.16, 10),
+    new THREE.MeshStandardMaterial({ color: 0x2f7d4f, roughness: 0.8 }));
+  base.position.y = 0.08; g.add(base);
+  const petalMat = new THREE.MeshStandardMaterial({ color: pick([0xff9ec4, 0xffd1e0, 0xfff0d0, 0xffb86b]), roughness: 0.7 });
+  for (let k = 0; k < 8; k++) {
+    const p = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.22, 5), petalMat);
+    const a = k / 8 * TAU;
+    p.position.set(Math.cos(a) * 0.34, 0.18, Math.sin(a) * 0.34);
+    p.rotation.z = Math.cos(a) * 0.5; p.rotation.x = Math.sin(a) * 0.5;
+    g.add(p);
+  }
+  const candle = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.16, 6),
+    new THREE.MeshStandardMaterial({ color: 0xf0e0b0, roughness: 0.6 }));
+  candle.position.y = 0.26; g.add(candle);
+  const flame = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6),
+    new THREE.MeshStandardMaterial({ color: 0xffb030, emissive: 0xffae28, emissiveIntensity: 1.7, roughness: 0.4 }));
+  flame.position.y = 0.4; flame.scale.y = 1.7; g.add(flame);
+  return g;
+}
+// A khom loi sky lantern: a glowing ovoid that rises and fades.
+function makeSkyLantern() {
+  const mat = new THREE.MeshStandardMaterial({ color: 0xff8a2a, emissive: 0xff7a18, emissiveIntensity: 1.4, roughness: 0.6, transparent: true, opacity: 0.92 });
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.34, 0.95, 10), mat);
+  m.userData.mat = mat; m.frustumCulled = false;
+  return m;
+}
+function festivalScheduled() {
+  // every 3rd night is Loy Krathong (offset so a fresh game's first night isn't one)
+  return (G.time.day % FESTIVAL_PERIOD === 2) && (G.nightK || 0) > 0.45;
+}
+function startFestival() {
+  const f = G.festival; f.active = true; f.announcedDay = G.time.day;
+  for (let i = 0; i < KRATHONG_COUNT; i++) {
+    const m = makeKrathong();
+    m.position.set(RIVER_CX + rand(-13, 13), 0.16, rand(-HALF, HALF));
+    m.rotation.y = rand(0, TAU); m.frustumCulled = false; G.scene.add(m);
+    f.floats.push({ mesh: m, speed: rand(1.4, 3.2), spin: rand(-0.3, 0.3), phase: rand(0, TAU) });
+  }
+  G.hud.showSubtitle('Loy Krathong — the river glows with floats.', 'ลอยกระทง');
+  if (G.audio && G.audio.bell) G.audio.bell();
+}
+function stopFestival() {
+  const f = G.festival; f.active = false;
+  for (const k of f.floats) { G.scene.remove(k.mesh); disposeObject(k.mesh); }
+  for (const l of f.lanterns) { G.scene.remove(l.mesh); l.mesh.geometry.dispose(); l.mesh.userData.mat.dispose(); }
+  f.floats = []; f.lanterns = [];
+}
+function spawnSkyLantern() {
+  const m = makeSkyLantern();
+  m.position.set(rand(-HALF, -110), rand(5, 14), rand(-HALF, HALF));   // rise over the riverside/west
+  G.scene.add(m);
+  G.festival.lanterns.push({ mesh: m, rise: rand(2, 4), drift: rand(0.4, 1.5), life: rand(8, 14), maxLife: 14 });
+}
+function updateFestival(dt) {
+  const f = G.festival;
+  const want = festivalScheduled();
+  if (want && !f.active) startFestival();
+  else if (!want && f.active) stopFestival();
+  if (!f.active) return;
+  const now = performance.now();
+  for (const k of f.floats) {
+    k.mesh.position.z += dt * k.speed;                                 // drift downstream
+    k.mesh.position.y = 0.16 + Math.sin(now * 0.002 + k.phase) * 0.03; // gentle bob
+    k.mesh.rotation.y += dt * k.spin;
+    if (k.mesh.position.z > HALF + 5) k.mesh.position.z = -HALF - 5;    // recycle
+  }
+  for (let i = f.lanterns.length - 1; i >= 0; i--) {
+    const l = f.lanterns[i];
+    l.mesh.position.y += dt * l.rise; l.mesh.position.x += dt * l.drift; l.life -= dt;
+    l.mesh.userData.mat.opacity = clamp(l.life / l.maxLife, 0, 1) * 0.92;
+    if (l.life <= 0) { G.scene.remove(l.mesh); l.mesh.geometry.dispose(); l.mesh.userData.mat.dispose(); f.lanterns.splice(i, 1); }
+  }
+  f.lanternT = (f.lanternT || 0) - dt;
+  if (f.lanternT <= 0 && f.lanterns.length < 14) { spawnSkyLantern(); f.lanternT = rand(0.6, 1.7); }
 }
 
 // =============================================================================
@@ -5552,6 +5642,7 @@ function loop() {
     updateCamera(dt);
     updateBTS(dt);
     updateDayNight(dt);
+    updateFestival(dt);
     // distant daytime traffic honks (ambient flavor)
     if (Math.random() < 0.004 * (1 - (G.nightK || 0))) G.audio.blip({ freq: 360, dur: 0.2, type: 'square', gain: 0.03, freqEnd: 330 });
     G._saveTimer = (G._saveTimer || 0) + dt;

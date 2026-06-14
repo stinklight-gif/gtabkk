@@ -22,9 +22,10 @@ offline. Click **ENTER THE CITY** when the loader finishes.
 ## Smoke test
 
 A headless Playwright harness boots the real game, fails on any page error, and
-captures noon/night/3am screenshots (`smoke_noon.png` / `smoke_night.png` /
-`smoke_3am.png` — the last two from the same spot prove the crowd thins from a
-busy midday to dead small-hours) plus the renderer draw-call count:
+captures four screenshots (`smoke_noon.png` / `smoke_night.png` / `smoke_3am.png`
+— the night/3am pair from the same spot prove the crowd thins from a busy midday
+to dead small-hours — plus `smoke_festival.png`, a Loy Krathong night on the
+river) along with the renderer draw-call count:
 
 ```bash
 npm install --no-save playwright && npx playwright install chromium   # once
@@ -147,7 +148,7 @@ Everything lives in two files:
 | 16 | Particles / FX | Smoke emitter (vehicles below 30% HP), explosion (light flash + smoke + camera shake + thunder SFX), tire-skid decals (`spawnSkid`, laid while drifting and faded over 5 s), impact dust puffs (`spawnDust`), and a global **hit-stop** (`triggerHitStop` slows the loop ~0.05 s on a solid melee/gun connect). |
 | 17 | Interaction | Vehicle proximity check + E to enter. |
 | 18 | Camera update | Follow rig with smoothed distance, shake decay, in-vehicle chase view auto-aligns to vehicle heading, **occlusion** (ray-casts target→camera against building AABBs and pulls in so it never clips into a wall), and a speed-based FOV kick while driving. |
-| 19 | Day/Night + Weather | 8-min day cycle drives sun position (tilted so noon actually sunlights the facades), sky/fog colours, neon and street-lamp intensity; the sun + shadow camera track the player. Monsoon weather cycle (clear ⇄ drizzle/downpour that builds and breaks) with lightning flashes during heavy rain. Dawn temple bell at 5–6 AM. |
+| 19 | Day/Night + Weather + Festival | 8-min day cycle drives sun position (tilted so noon actually sunlights the facades), sky/fog colours, neon and street-lamp intensity; the sun + shadow camera track the player. A whole-day counter (`G.time.day`) ticks at midnight and drives **Loy Krathong** (`updateFestival`): every 3rd night the Chao Phraya fills with drifting candle-lit krathong floats and rising sky lanterns. Monsoon weather cycle (clear ⇄ drizzle/downpour) with lightning in heavy rain. Dawn temple bell at 5–6 AM. |
 | 20 | Main loop | Single `loop()` calls every system in order. |
 
 The mutable global is `window.GAME`. Useful while developing:
