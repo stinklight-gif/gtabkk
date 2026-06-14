@@ -87,7 +87,17 @@ const G = {
   notifQueue: [],
   paused: false,
   groundHelpers: null,
+  // Player property / ownership economy (persisted in the save).
+  econ: {
+    safehouse: { owned: false, pos: null },           // buyable respawn point
+    garage: { rented: false, stored: [], capacity: 4, retrieveIdx: 0 }, // stored: [{kind,color,plate,hp}]
+  },
 };
+
+// Economy prices (one place to balance the money sinks).
+const PRICE = { safehouse: 12000, garageRent: 4000, repaint: 250 };
+// Paint colors offered at the garage.
+const PAINT_COLORS = [0xd44b3b, 0xf3f3f3, 0x2a3a55, 0x1e9a5e, 0xe0b020, 0x101015, 0x8c3a8c, 0x35506e, 0xd96a2a];
 
 window.GAME = G; // for poking around in the console
 
@@ -780,12 +790,14 @@ function buildWorld(scene) {
   const GARAGE_I = 3, GARAGE_J = -1;  // block reserved for the U-Spray garage
   const YAO_I = -2, YAO_J0 = 2, YAO_J1 = 3;  // two-block Yaowarat market street
   const GUN_I = 3, GUN_J = 1;  // block reserved for the gun shop
+  const SAFE_I = -1, SAFE_J = 1;  // block reserved for the buyable safehouse (≈ -25, 75)
 
   for (let i = -GRID/2; i < GRID/2; i++) {
     for (let j = -GRID/2; j < GRID/2; j++) {
       if (i === TEMPLE_I && j === TEMPLE_J) continue; // temple placed after loop
       if (i === RIVER_I) continue;                    // river column — no buildings
       if (i === GARAGE_I && j === GARAGE_J) continue; // U-Spray garage block
+      if (i === SAFE_I && j === SAFE_J) continue;      // safehouse block
       if (i === YAO_I && (j === YAO_J0 || j === YAO_J1)) continue; // Yaowarat market
       if (i === GUN_I && j === GUN_J) continue; // gun shop block
       const cx = (i + 0.5) * BLOCK;
@@ -1498,6 +1510,38 @@ function buildWorld(scene) {
     // service trigger zone
     world.garages = world.garages || [];
     world.garages.push({ pos: new THREE.Vector3(gx, 0, gz), r: 7, cooldownUntil: 0 });
+    // garage door — where retrieved/stored vehicles sit (front, on the open south side)
+    world.garageDoor = new THREE.Vector3(gx, 0, gz - depth / 2 - 4);
+  }
+
+  // ---- Safehouse: a buyable townhouse that becomes your respawn point ----
+  {
+    const hx = (SAFE_I + 0.5) * BLOCK, hz = (SAFE_J + 0.5) * BLOCK;  // ≈ (-25, 75)
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0xb8a78a, roughness: 0.85 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x6a3a2a, roughness: 0.8 });
+    const doorMat = new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.7 });
+    // two-storey shophouse front, set back from the south road
+    const W = 9, D = 8, H = 8;
+    const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), wallMat);
+    body.position.set(hx, H / 2, hz); body.castShadow = true; body.receiveShadow = true; scene.add(body);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(W + 0.8, 0.6, D + 0.8), roofMat);
+    roof.position.set(hx, H + 0.3, hz); roof.castShadow = true; scene.add(roof);
+    const doorZ = hz - D / 2 - 0.05;
+    const door = new THREE.Mesh(new THREE.BoxGeometry(1.6, 3.2, 0.2), doorMat);
+    door.position.set(hx, 1.6, doorZ); scene.add(door);
+    // a little balcony slab for silhouette
+    const balcony = new THREE.Mesh(new THREE.BoxGeometry(W * 0.8, 0.2, 1.4), wallMat);
+    balcony.position.set(hx, 4.4, hz - D / 2 - 0.7); balcony.castShadow = true; scene.add(balcony);
+    // sign over the door — red FOR SALE until bought, green HOME after (toggled at runtime)
+    const signMat = new THREE.MeshStandardMaterial({ color: 0xff3344, emissive: 0xff3344, emissiveIntensity: 0.5, roughness: 0.5 });
+    G.nightEmissive.push({ mat: signMat, dayIntensity: 0.5, nightIntensity: 1.4 });
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(4, 1), signMat);
+    sign.position.set(hx, H - 1, hz - D / 2 - 0.12); sign.rotation.y = PI; scene.add(sign);
+    // collision: the house body is a solid building
+    world.buildings.push({ pos: new THREE.Vector3(hx, H / 2, hz), size: new THREE.Vector3(W, H, D) });
+    world.poi.safehouse = new THREE.Vector3(hx, 0, doorZ - 2.5);   // stand-here door spot
+    world.safehouseSign = signMat;
+    G.econ.safehouse.pos = new THREE.Vector3(hx, 0, doorZ - 4);    // respawn just outside the door
   }
 
   // ---- Gun shop: buy weapons/ammo with cash (on foot) ----
@@ -2419,6 +2463,10 @@ function saveGame() {
       welcomeDone: !!G._welcomeDone,
       soiRunWon: !!G._soiRunWon, hitDone: !!G._hitDone,
       px: p.group.position.x, pz: p.group.position.z,
+      // property / ownership economy
+      safehouseOwned: !!G.econ.safehouse.owned,
+      garageRented: !!G.econ.garage.rented,
+      garageStored: G.econ.garage.stored,
     }));
   } catch (e) { /* storage unavailable — ignore */ }
 }
@@ -2470,6 +2518,15 @@ function loadGame() {
   if (s.soiRunWon) G._soiRunWon = true;
   if (s.hitDone) G._hitDone = true;
   if (s.welcomeDone) { G._welcomeDone = true; if (G.mission.resume) G.mission.resume(true); }
+  // property / ownership economy
+  if (s.safehouseOwned) { G.econ.safehouse.owned = true; markSafehouseOwned(); }
+  if (s.garageRented) G.econ.garage.rented = true;
+  if (Array.isArray(s.garageStored)) {
+    G.econ.garage.stored = s.garageStored
+      .filter(v => v && typeof v.kind === 'string')
+      .map(v => ({ kind: v.kind, color: v.color | 0, plate: String(v.plate || ''), hp: typeof v.hp === 'number' ? v.hp : 100 }))
+      .slice(0, G.econ.garage.capacity);
+  }
   G.hud.setCash(G.cash);
   updateAmmoHud();
 }
@@ -2850,7 +2907,7 @@ function makeMissionSystem() {
             this.stage = 2;
             G.hud.showSubtitle("Uncle Seng: \"Good, kid. The envelope.\"", "ลุงเซ้ง: \"ดีแล้ว ส่งมา\"");
             G._welcomeDone = true;
-            G.cash += 800;
+            G.cash += 1200;
             G.hud.setCash(G.cash);
             if (GAMEPLAY.armor) G.player.armor = Math.min(G.player.armorMax, G.player.armor + 50);
             G.hud.showNotif('Mission complete: +฿800, +Armor');
@@ -2899,7 +2956,7 @@ function makeMissionSystem() {
       ],
       startTime: 55,   // seconds on the clock when you cross the start line
       cpBonus: 15,     // seconds added per checkpoint reached
-      reward: 1500,
+      reward: 2500,
       onStart() {
         this.stage = 1;
         this.cp = 0;
@@ -2985,7 +3042,7 @@ function makeMissionSystem() {
         new THREE.Vector3( 120, 0,  120),
         new THREE.Vector3( -40, 0, -150),
       ],
-      reward: 2000,
+      reward: 4000,
       onStart() {
         this.stage = 1;
         this.targets = [];
@@ -3054,7 +3111,7 @@ function makeMissionSystem() {
       drop: new THREE.Vector3(-150, 0, 150),
       home: new THREE.Vector3(100, 0, -50),
       startTime: 75,   // generous: you start at 3★ and spike strips can blow your tires
-      reward: 3000,
+      reward: 6000,
       onStart() {
         this.stage = 1;
         this.timeLeft = this.startTime;
@@ -3308,7 +3365,7 @@ function updateCollectibles(dt) {
       G.hud.setCash(G.cash);
       G.audio.blip({ freq: 880, dur: 0.1, gain: 0.12 });
       if (G.collected >= cs.length) {
-        G.cash += 2000; G.hud.setCash(G.cash);
+        G.cash += 3000; G.hud.setCash(G.cash);
         G.hud.showNotif(`All ${cs.length} amulets found! +฿2,000`);
       } else {
         G.hud.showNotif(`Amulet ${G.collected}/${cs.length} (+฿100)`);
@@ -3838,7 +3895,7 @@ function updateMuggings(dt) {
   if (m) {
     m.t += dt;
     if (m.ped.dead) {                                  // player took them down
-      const reward = 250;
+      const reward = 400;
       G.cash += reward; G.hud.setCash(G.cash);
       G.hud.showNotif(`Stopped the snatcher! +฿${reward}`);
       G.audio.blip({ freq: 720, dur: 0.12, gain: 0.12 });
@@ -4590,11 +4647,13 @@ function respawnPlayer() {
   // clear any active cops — clean slate on respawn
   for (let i = G.cops.length - 1; i >= 0; i--) { G.scene.remove(G.cops[i].mesh); disposeObject(G.cops[i].mesh); G.cops.splice(i, 1); }
   for (let i = G.vehicles.length - 1; i >= 0; i--) { if (G.vehicles[i].isCop) { G.scene.remove(G.vehicles[i].mesh); disposeObject(G.vehicles[i].mesh); G.vehicles.splice(i, 1); } }
-  const sp = G.world.spawns.player.clone();
+  const home = G.econ.safehouse.owned && G.econ.safehouse.pos;
+  const sp = (home ? G.econ.safehouse.pos : G.world.spawns.player).clone();
   p.group.position.copy(sp);
   p.velocity.set(0, 0, 0);
   if (p.inVehicle) { p.inVehicle.driver = null; p.inVehicle = null; p.group.visible = true; }
-  G.hud.showSubtitle('You wake up at the police station.', 'ตื่นมาที่โรงพัก');
+  if (home) G.hud.showSubtitle('You wake up at home.', 'ตื่นที่บ้าน');
+  else G.hud.showSubtitle('You wake up at the police station.', 'ตื่นมาที่โรงพัก');
 }
 
 // =============================================================================
@@ -4664,6 +4723,12 @@ function updateInteraction(dt) {
   const p = G.player;
   if (p.inVehicle) return;
 
+  // Inside the garage shed, let updateGarageOwnership own the E key (rent/retrieve)
+  // so the enter-vehicle prompt doesn't fight it. The garage door sits just
+  // outside this radius, so a car parked/retrieved there is still enterable.
+  const gg = G.world.garages && G.world.garages[0];
+  if (gg && dist2(p.group.position, gg.pos) < gg.r * gg.r) return;
+
   // find nearest vehicle within reach that isn't a cop unit or a burning wreck
   let near = null, nd = Infinity;
   for (const v of G.vehicles) {
@@ -4682,6 +4747,7 @@ function updateInteraction(dt) {
   } else {
     updateGunShop(dt);   // E does shop business only when no vehicle is in reach
     update7Eleven(dt);
+    updateSafehouse(dt);
   }
 }
 
@@ -4700,6 +4766,39 @@ function update7Eleven(dt) {
     }
   }
 }
+// Safehouse (on foot at the door): buy it once, then rest to heal + save. Owning
+// it makes it your respawn point instead of the police station.
+function updateSafehouse(dt) {
+  const p = G.player;
+  const door = G.world.poi && G.world.poi.safehouse;
+  if (!door || dist2(p.group.position, door) > 6 * 6) return;
+  const sh = G.econ.safehouse;
+  if (!sh.owned) {
+    G.hud.showPrompt(`Safehouse for sale — <b>E</b>: buy (฿${PRICE.safehouse.toLocaleString()})`, 0.4);
+    if (G.input.pressed('KeyE')) {
+      if (G.cash < PRICE.safehouse) { G.hud.showNotif('Not enough cash for the safehouse'); return; }
+      G.cash -= PRICE.safehouse; G.hud.setCash(G.cash);
+      sh.owned = true;
+      markSafehouseOwned();
+      G.hud.showNotif('Safehouse bought — you respawn here now');
+      G.audio.chime();
+      saveGame();
+    }
+  } else {
+    G.hud.showPrompt('Home — <b>E</b>: rest (heal + save)', 0.4);
+    if (G.input.pressed('KeyE')) {
+      p.hp = p.hpMax; if (typeof p.stam === 'number') p.stam = p.stamMax;
+      G.hud.showNotif('Rested at home — healed & saved');
+      G.audio.chime();
+      saveGame();
+    }
+  }
+}
+function markSafehouseOwned() {
+  const m = G.world.safehouseSign;
+  if (m) { m.color.setHex(0x39ff7a); m.emissive.setHex(0x39ff7a); }   // FOR SALE → HOME
+}
+
 function storeBuy(item) {
   const p = G.player;
   let ok = false;
@@ -4907,7 +5006,7 @@ function updateTaxi(dt) {
       taxiBeam(t, t.dest, 0x39ff7a);
       const d = Math.sqrt(dist2(v.pos, t.dest));
       t.timeLeft = 25 + d / 9;
-      t.fareValue = Math.round(80 + d * 4);
+      t.fareValue = Math.round(120 + d * 5);
       t.stage = 'toDropoff';
       G.hud.showNotif('Fare aboard — drop them at the green marker');
       G.audio.blip({ freq: 600, dur: 0.08, gain: 0.1 });
@@ -4971,8 +5070,9 @@ function drawFullMap() {
     { p: poi.temple, t: 'Temple' },
     { p: poi.yaowarat, t: 'Yaowarat' },
     { p: G.world.gunShop, t: 'Guns' },
+    { p: poi.safehouse, t: G.econ.safehouse.owned ? 'Home' : 'Safehouse' },
   ];
-  for (const ga of (G.world.garages || [])) labels.push({ p: ga.pos, t: 'U-Spray' });
+  for (const ga of (G.world.garages || [])) labels.push({ p: ga.pos, t: G.econ.garage.rented ? 'Garage' : 'U-Spray' });
   ctx.fillStyle = '#cfe3e0'; ctx.font = '13px system-ui, sans-serif'; ctx.textAlign = 'center';
   for (const L of labels) if (L.p) ctx.fillText(L.t, to(L.p.x), to(L.p.z) - 8);
   ctx.textAlign = 'left';
@@ -5032,6 +5132,122 @@ function updateGarage(dt) {
     G.audio.blip({ freq: 520, dur: 0.12, gain: 0.12 });
     g.cooldownUntil = now + 8000;
     return;
+  }
+}
+
+// ---- Garage ownership: rent the U-Spray, store/retrieve + repaint vehicles ----
+const STORABLE = new Set(['bike', 'tuktuk', 'hilux', 'camry', 'sedan', 'songthaew', 'bus', 'luxsedan', 'supercar']);
+
+// The repaintable body materials of a vehicle: its biggest non-wheel/non-glass
+// MeshStandard parts (body + cab), found once and cached on the vehicle.
+function collectPaintMats(mesh) {
+  const items = [];
+  mesh.traverse(o => {
+    if (!o.isMesh || !o.material || !o.material.isMeshStandardMaterial) return;
+    if (o.geometry.type === 'CylinderGeometry') return;     // wheels
+    if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+    const b = o.geometry.boundingBox;
+    items.push({ mat: o.material, v: (b.max.x - b.min.x) * (b.max.y - b.min.y) * (b.max.z - b.min.z) });
+  });
+  items.sort((a, b) => b.v - a.v);
+  const mats = [], seen = new Set();
+  for (const it of items) { if (seen.has(it.mat)) continue; seen.add(it.mat); mats.push(it.mat); if (mats.length >= 2) break; }
+  return mats;
+}
+function setVehicleColor(v, hex) {
+  if (!v.paintMats) v.paintMats = collectPaintMats(v.mesh);
+  for (const m of v.paintMats) m.color.setHex(hex);
+  v.color = hex;
+}
+function currentBodyColor(v) {
+  if (typeof v.color === 'number') return v.color;
+  const m = v.paintMats || collectPaintMats(v.mesh);
+  return m.length ? m[0].color.getHex() : 0xcccccc;
+}
+function randomPlate() {
+  const t = ['กก', 'ขข', 'งง', 'รด', 'สห', 'ทพ', 'มล', 'ญบ', 'ผด', 'นค'];
+  return `${irand(1, 9)}${pick(t)} ${irand(1000, 9999)}`;
+}
+function storedLabel(e) { return `${vehicleName(e.kind)}${e.plate ? ' ' + e.plate : ''}`; }
+
+function storeVehicle(v) {
+  const garage = G.econ.garage, p = G.player, g = G.world.garages[0];
+  const entry = { kind: v.kind, color: currentBodyColor(v), plate: v.plate || randomPlate(), hp: Math.max(40, Math.round(v.hp)) };
+  garage.stored.push(entry);
+  // step the player out at the garage, then despawn the stored car
+  p.inVehicle = null; v.driver = null; p.group.visible = true;
+  p.group.position.set(g.pos.x, 0, g.pos.z - 5);
+  G.scene.remove(v.mesh); disposeObject(v.mesh);
+  const vi = G.vehicles.indexOf(v); if (vi >= 0) G.vehicles.splice(vi, 1);
+  G.hud.showNotif(`Stored ${storedLabel(entry)} (${garage.stored.length}/${garage.capacity})`);
+  G.audio.chime();
+  saveGame();
+}
+function retrieveVehicle(idx) {
+  const garage = G.econ.garage;
+  const e = garage.stored[idx];
+  if (!e) return;
+  const v = makeVehicle(e.kind, G.scene);
+  const door = G.world.garageDoor || G.world.garages[0].pos;
+  v.pos.set(door.x, 0, door.z); v.mesh.position.copy(v.pos);
+  v.heading = PI; v.mesh.rotation.y = PI;
+  v.hp = e.hp; v.plate = e.plate;
+  setVehicleColor(v, e.color);
+  garage.stored.splice(idx, 1);
+  garage.retrieveIdx = 0;
+  G.hud.showNotif(`Brought out ${storedLabel(e)} — at the garage door`);
+  G.audio.blip({ freq: 320, dur: 0.06, gain: 0.08 });
+  saveGame();
+}
+function repaintVehicle(v) {
+  if (G.cash < PRICE.repaint) { G.hud.showNotif('Not enough cash to repaint'); return; }
+  G.cash -= PRICE.repaint; G.hud.setCash(G.cash);
+  const cur = currentBodyColor(v);
+  let i = PAINT_COLORS.indexOf(cur); i = (i + 1) % PAINT_COLORS.length;
+  setVehicleColor(v, PAINT_COLORS[i]);
+  if (!v.plate) v.plate = randomPlate();
+  G.hud.showNotif(`Repainted — new plate ${v.plate} (-฿${PRICE.repaint})`);
+  G.audio.chime();
+  saveGame();
+}
+
+function updateGarageOwnership(dt) {
+  const p = G.player;
+  if (!G.world.garages || !G.world.garages.length) return;
+  const g = G.world.garages[0], garage = G.econ.garage;
+  if (p.inVehicle) {
+    const v = p.inVehicle;
+    if (dist2(v.pos, g.pos) >= (g.r + 1) * (g.r + 1)) return;
+    if (!garage.rented) { G.hud.showPrompt('Garage — step out and rent it to store cars here', 0.4); return; }
+    if (!STORABLE.has(v.kind)) return;                      // cop cars / boats aren't storable
+    // only claim the prompt line when U-Spray isn't already offering a repair
+    const servicing = v.hp < 100 || G.wanted.stars > 0;
+    const full = garage.stored.length >= garage.capacity;
+    if (!servicing) {
+      G.hud.showPrompt(full
+        ? `Garage full — <b>C</b>: repaint (฿${PRICE.repaint})`
+        : `Garage — <b>K</b>: store this ${vehicleName(v.kind)} · <b>C</b>: repaint (฿${PRICE.repaint})`, 0.4);
+    }
+    if (G.input.pressed('KeyK') && !full) storeVehicle(v);
+    else if (G.input.pressed('KeyC')) repaintVehicle(v);
+  } else {
+    if (dist2(p.group.position, g.pos) >= g.r * g.r) return;
+    if (!garage.rented) {
+      G.hud.showPrompt(`Garage — <b>E</b>: rent (฿${PRICE.garageRent.toLocaleString()})`, 0.4);
+      if (G.input.pressed('KeyE')) {
+        if (G.cash < PRICE.garageRent) { G.hud.showNotif('Not enough cash to rent the garage'); return; }
+        G.cash -= PRICE.garageRent; G.hud.setCash(G.cash); garage.rented = true;
+        G.hud.showNotif('Garage rented — drive vehicles in to store & repaint them');
+        G.audio.chime(); saveGame();
+      }
+      return;
+    }
+    if (garage.stored.length === 0) { G.hud.showPrompt('Garage — drive a vehicle in to store it', 0.4); return; }
+    const idx = garage.retrieveIdx % garage.stored.length;
+    const e = garage.stored[idx];
+    G.hud.showPrompt(`Garage — <b>E</b>: take ${storedLabel(e)} (${idx + 1}/${garage.stored.length}) · <b>L</b>: next`, 0.4);
+    if (G.input.pressed('KeyL')) garage.retrieveIdx = (idx + 1) % garage.stored.length;
+    else if (G.input.pressed('KeyE')) retrieveVehicle(idx);
   }
 }
 
@@ -5118,6 +5334,7 @@ function loop() {
     updateArmorPickups(dt);
     updateInteraction(dt);
     updateGarage(dt);
+    updateGarageOwnership(dt);
     updateTaxi(dt);
     updateVehicles(dt);
     updatePeds(dt);

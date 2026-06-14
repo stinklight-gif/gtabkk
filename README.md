@@ -58,6 +58,10 @@ CDN is blocked, point `CHROME_PATH` at any Chrome/Chromium binary.
 | V | Start Vigilante (while in a cop vehicle) |
 | N | Cycle minimap zoom |
 | O | Options — mouse sensitivity + master volume |
+| E | Buy/rest at the safehouse · rent/retrieve at the garage (on foot) |
+| K | Store the current vehicle (in a car, inside the rented garage) |
+| C | Repaint the current vehicle (฿250, at the garage) |
+| L | Cycle which stored vehicle to retrieve |
 | G | *(dev)* grant 9mm pistol |
 | Esc | Release mouse / pause (click to resume) |
 
@@ -97,6 +101,23 @@ marker to pick up a fare, then to the green marker before the timer runs out.
 Pay scales with distance. It's a standalone activity, separate from the story
 missions, so you can run fares any time.
 
+## Property (spend the money)
+
+Two things to sink cash into, both persisted in your save:
+
+- **Safehouse** (฿12,000) — a townhouse just north of the spawn (look for the red
+  **FOR SALE** sign; it turns green to **HOME** once bought). Walk to the door
+  and press **E** to buy. Owning it makes it your respawn point instead of the
+  police station, and pressing **E** at home again heals you and saves.
+- **Garage** — rent the U-Spray (฿4,000, **E** on foot inside the shed) and it
+  becomes your lock-up: drive a car in and press **K** to **store** it (up to 4),
+  **C** to **repaint** it (฿250, cycles colours and stamps a new Thai plate). On
+  foot, **E** brings a stored car back out at the door, **L** cycles which one.
+  Stored cars keep their colour, plate, and condition across reloads.
+
+Mission rewards were bumped to feed this economy (Soi Run ฿2,500, The Hit
+฿4,000, Hot Delivery ฿6,000), so the safehouse is a few jobs away.
+
 ## Architecture
 
 Everything lives in two files:
@@ -108,7 +129,7 @@ Everything lives in two files:
 |---|---|---|
 | 1 | Audio | Procedural Web Audio. Engine loopers, 7-Eleven chime, temple bell, footsteps, gunshots, sirens, rain bed. |
 | 2 | Input | Keyboard set + pointer-lock mouse deltas + `pressed` (edge) helper. |
-| 3 | World | Procedural 10×10 block grid (BLOCK=50m), road grid, buildings with neon strips and lit-window planes, BTS Skytrain elevated track, street lamps, 7-Elevens, spirit-house shrines, gold-shop POI with pillar of light, temple compound, a U-Spray garage (drive a vehicle in to repair it and clear your wanted level for a heat-scaled fee), a gun shop (buy pistol/shotgun/SMG/ammo with cash on foot), a Yaowarat Chinatown market street (paifang gate, dense shophouses, hanging lanterns, market stalls), and a Chao Phraya river down the west edge (water + embankment + pier + longtail boats, including one **drivable** longtail at the pier gap). Repeated props use `InstancedMesh`. Builds an off-screen canvas as the minimap base. |
+| 3 | World | Procedural 10×10 block grid (BLOCK=50m), road grid, buildings with neon strips and lit-window planes, BTS Skytrain elevated track, street lamps, 7-Elevens, spirit-house shrines, gold-shop POI with pillar of light, temple compound, a U-Spray garage (drive a vehicle in to repair it and clear your wanted level for a heat-scaled fee, or rent it as a vehicle lock-up — store/retrieve/repaint), a buyable safehouse (respawn point) just north of spawn, a gun shop (buy pistol/shotgun/SMG/ammo with cash on foot), a Yaowarat Chinatown market street (paifang gate, dense shophouses, hanging lanterns, market stalls), and a Chao Phraya river down the west edge (water + embankment + pier + longtail boats, including one **drivable** longtail at the pier gap). Repeated props use `InstancedMesh`. Builds an off-screen canvas as the minimap base. |
 | 4 | Player + Camera | Capsule character (torso/legs/head/arms), arcade third-person camera rig (orbit yaw/pitch/distance, shake decay). |
 | 5b | More vehicles | City bus, luxury sedan, and a rare-spawn supercar join the traffic mix; a drivable longtail boat sits at the river pier. |
 | 5 | Vehicles | `makeVehicleMesh(kind)` produces bike / tuk-tuk / hilux / cop / camry / sedan with per-kind `spec` (topSpeed, accel, brake, turn, mass). Tuk-tuk has a leaning wiggle, bike leans into turns. |
@@ -141,10 +162,13 @@ GAME.player.weapons.pistol = true; GAME.player.pistolAmmo = 12;
 
 ## Saving
 
-Progress (cash, weapons + ammo, armor, amulets found, time of day, and position)
-autosaves to `localStorage` every ~8 s and on exit, and restores on reload. If
-the intro delivery was done, you respawn straight into free roam with Soi Run
-available. Wipe the save to start fresh:
+Progress (cash, weapons + ammo, armor, amulets found, time of day, position, and
+now property — the safehouse, the rented garage, and every stored car with its
+colour/plate/condition) autosaves to `localStorage` every ~8 s and on exit, and
+restores on reload. New property fields are additive, so old `gtabkk_save_v1`
+saves still load (they just start without property). If the intro delivery was
+done, you respawn straight into free roam with Soi Run available. Wipe the save
+to start fresh:
 
 ```js
 localStorage.removeItem('gtabkk_save_v1');
@@ -216,13 +240,15 @@ These values were set without runtime testing; adjust to taste. Locations are in
 | Knob | Where | Value |
 |------|-------|-------|
 | Soi Run timer / per-checkpoint bonus | `soiRun.startTime` / `.cpBonus` | 55s / +15s |
-| Soi Run reward | `soiRun.reward` | ฿1,500 |
-| The Hit reward | `hit.reward` | ฿2,000 |
-| Hot Delivery timer / reward | `delivery.startTime` / `.reward` | 75s / ฿3,000 |
-| Taxi fare | `updateTaxi` | ฿80 + ฿4/m, 25s + dist |
+| Soi Run reward | `soiRun.reward` | ฿2,500 |
+| The Hit reward | `hit.reward` | ฿4,000 |
+| Hot Delivery timer / reward | `delivery.startTime` / `.reward` | 75s / ฿6,000 |
+| Safehouse / garage rent / repaint | `PRICE` | ฿12,000 / ฿4,000 / ฿250 |
+| Garage capacity | `econ.garage.capacity` | 4 cars |
+| Taxi fare | `updateTaxi` | ฿120 + ฿5/m, 25s + dist |
 | Vigilante bust / time bonus | `updateVigilante` | ฿200 + ฿100×busts / +15s |
-| Snatcher bounty | `updateMuggings` | ฿250 |
-| Amulet / full set bonus | `updateCollectibles` | ฿100 / +฿2,000 |
+| Snatcher bounty | `updateMuggings` | ฿400 |
+| Amulet / full set bonus | `updateCollectibles` | ฿100 / +฿3,000 |
 | Street-food heal | `updateFoodStalls` | +25 HP |
 | Garage respray fee | `updateGarage` | ฿300 + ฿350×stars |
 | Cops desired (1/2/3★) | `updateWanted` | 2 / 4 / 6 (+1 at night) |
