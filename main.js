@@ -2111,29 +2111,118 @@ function makeVehicle(kind, scene) {
 // 6. NPCs — pedestrians, soi dogs, cops
 // =============================================================================
 
+// Pedestrian archetypes — silhouette + palette variety so the crowd reads as a
+// city, not a row of identical capsules. Returns a Group with an animatable limb
+// rig in userData.parts {torso, head, legL, legR, armL, armR}. `torso` stays one
+// mesh so the mugger/target/kill recolor sites keep working; forearms are bare
+// skin (Bangkok heat) so recoloring the torso never leaves mismatched sleeves.
 function makePedMesh() {
   const g = new THREE.Group();
   const roll = Math.random();
-  const monk = roll < 0.08;                 // saffron-robed monk
-  const tourist = !monk && roll < 0.26;     // bright shirt + backpack
-  const shirtColor = monk ? 0xe0892e
-    : tourist ? pick([0xff6a3a, 0x39c6c0, 0xffd23a, 0x6a3aff])
-    : pick([0xffffff, 0xeeeeee, 0xdeb887, 0x223344, 0x556677, 0xb04040, 0xddcc88]);
-  const pantsColor = monk ? 0xc8761f : pick([0x222, 0x111, 0x445566, 0x804020]);
-  const skin = pick([0xc69472, 0xb88060, 0xd6a785, 0xa57755]);
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.3, 0.55, 4, 6), new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.8 }));
-  torso.position.y = 0.95; g.add(torso);
-  const legs = new THREE.Mesh(new THREE.CapsuleGeometry(0.24, 0.5, 4, 6), new THREE.MeshStandardMaterial({ color: pantsColor }));
-  legs.position.y = 0.4; g.add(legs);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), new THREE.MeshStandardMaterial({ color: skin }));
-  head.position.y = 1.5; g.add(head);
-  if (tourist) {
-    const pack = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.42, 0.2), new THREE.MeshStandardMaterial({ color: pick([0x2a3a55, 0x803030, 0x2a5a3a]), roughness: 0.85 }));
-    pack.position.set(0, 1.0, -0.28); g.add(pack);
+  let kind;
+  if (roll < 0.07) kind = 'monk';
+  else if (roll < 0.20) kind = 'tourist';
+  else if (roll < 0.34) kind = 'office';
+  else if (roll < 0.44) kind = 'vendor';
+  else if (roll < 0.55) kind = 'laborer';
+  else kind = 'local';
+
+  const skin = pick([0xc69472, 0xb88060, 0xd6a785, 0xa57755, 0x8d5a3a]);
+  const skinMat = new THREE.MeshStandardMaterial({ color: skin, roughness: 0.7 });
+
+  let shirtColor, pantsColor, bareArms = true, skirt = false;
+  switch (kind) {
+    case 'monk':    shirtColor = 0xe0892e; pantsColor = 0xd0801f; break;
+    case 'tourist': shirtColor = pick([0xff6a3a, 0x39c6c0, 0xffd23a, 0x6a3aff, 0xff4f8b]);
+                    pantsColor = pick([0xd9d2c7, 0x8090a0, 0x6a5a45]); break;          // shorts
+    case 'office':  shirtColor = pick([0xffffff, 0xeaf0f6, 0xc7d6e6, 0xf0e6d2]);
+                    pantsColor = pick([0x222831, 0x33384a, 0x4a3a2a]); bareArms = false; break;
+    case 'vendor':  shirtColor = pick([0xd9d2c7, 0xc94f3a, 0x3a7d5a, 0xe0c060]);
+                    pantsColor = pick([0x33384a, 0x222222, 0x5a4030]); break;
+    case 'laborer': shirtColor = pick([0x6a8fb0, 0x9a8a60, 0xb0b0b0, 0x7a6a5a]);
+                    pantsColor = pick([0x3a4658, 0x4a3a2a, 0x222222]); break;
+    default:        shirtColor = pick([0xffffff, 0xeeeeee, 0xdeb887, 0x223344, 0x556677, 0xb04040, 0xddcc88, 0x3a6a8a]);
+                    pantsColor = pick([0x222222, 0x111111, 0x445566, 0x804020, 0x33384a]);
   }
-  g.userData.parts = { torso, legs, head };
-  g.castShadow = true;
+  if ((kind === 'local' || kind === 'office') && Math.random() < 0.28) skirt = true;
+
+  const shirtMat = new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.82 });
+  const pantsMat = new THREE.MeshStandardMaterial({ color: pantsColor, roughness: 0.85 });
+  const armMat = bareArms ? skinMat : shirtMat;
+
+  // torso — single mesh (recolor sites swap this material); flattened for shoulders
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.4, 3, 8), shirtMat);
+  torso.position.y = 1.18; torso.scale.set(1.18, 1, 0.72); torso.castShadow = true; g.add(torso);
+
+  // head + hair/hat
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.135, 10, 8), skinMat);
+  head.position.y = 1.5; head.castShadow = true; g.add(head);
+  if (kind === 'vendor' || kind === 'laborer') {
+    const hat = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.2, 10), new THREE.MeshStandardMaterial({ color: 0xcba76a, roughness: 0.9 }));
+    hat.position.y = 1.6; g.add(hat);                                   // conical straw hat
+  } else if (kind === 'tourist' && Math.random() < 0.6) {
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6, 0, TAU, 0, PI/2), new THREE.MeshStandardMaterial({ color: pick([0xb03030, 0x305080, 0xf0f0f0]) }));
+    cap.position.y = 1.55; g.add(cap);
+  } else if (kind !== 'monk') {
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.145, 8, 6, 0, TAU, 0, PI/1.7), new THREE.MeshStandardMaterial({ color: pick([0x1a1410, 0x2a2018, 0x0a0a0a]) }));
+    hair.position.y = 1.5; g.add(hair);
+  }
+
+  // limbs — geometry offset so the mesh origin sits at the joint (rotation.x pivots there)
+  function limb(len, r, mat, cast) {
+    const geo = new THREE.CapsuleGeometry(r, len, 3, 6);
+    geo.translate(0, -(len / 2 + r), 0);
+    const m = new THREE.Mesh(geo, mat); m.castShadow = !!cast; return m;
+  }
+  const hipY = 0.92, shoulderY = 1.42;
+  let legL, legR;
+  if (skirt) {
+    const sk = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.5, 10), pantsMat);
+    sk.position.y = 0.7; sk.castShadow = true; g.add(sk);
+    legL = limb(0.3, 0.07, skinMat, false); legL.position.set(-0.08, 0.42, 0);
+    legR = limb(0.3, 0.07, skinMat, false); legR.position.set( 0.08, 0.42, 0);
+  } else {
+    legL = limb(0.62, 0.085, pantsMat, true); legL.position.set(-0.09, hipY, 0);
+    legR = limb(0.62, 0.085, pantsMat, true); legR.position.set( 0.09, hipY, 0);
+  }
+  g.add(legL); g.add(legR);
+  const armL = limb(0.5, 0.06, armMat, false); armL.position.set(-0.25, shoulderY, 0); g.add(armL);
+  const armR = limb(0.5, 0.06, armMat, false); armR.position.set( 0.25, shoulderY, 0); g.add(armR);
+
+  // archetype props
+  if (kind === 'tourist') {
+    const pack = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.38, 0.18), new THREE.MeshStandardMaterial({ color: pick([0x2a3a55, 0x803030, 0x2a5a3a]), roughness: 0.85 }));
+    pack.position.set(0, 1.15, -0.22); g.add(pack);
+  } else if (kind === 'office') {
+    const bag = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.22, 0.3), new THREE.MeshStandardMaterial({ color: 0x2a1a10, roughness: 0.6 }));
+    bag.position.set(0, -0.56, 0.02); armR.add(bag);                    // hangs from the hand, swings with the arm
+  } else if (kind === 'monk') {
+    const bowl = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6, 0, TAU, 0, PI/2), new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.7 }));
+    bowl.rotation.x = PI; bowl.position.set(0, 1.0, 0.2); g.add(bowl);
+  }
+
+  const build = rand(0.92, 1.08);
+  g.scale.set(build, rand(0.94, 1.06), build);
+  g.userData.parts = { torso, head, legL, legR, armL, armR };
+  g.userData.kind = kind;
+  g.userData.phase = rand(0, TAU);
   return g;
+}
+
+// Shared limb animator for peds + foot cops: advances a per-mesh walk phase and
+// swings legs/arms (arms opposite the same-side leg). `moving` false → near-still
+// idle with a faint breathing bob.
+function animateWalk(mesh, speed, dt, moving) {
+  const p = mesh.userData.parts; if (!p) return;
+  const ud = mesh.userData;
+  ud.phase = (ud.phase || 0) + (moving ? (1.6 + speed) * dt * 2.0 : dt * 1.2);
+  const amp = moving ? Math.min(0.7, 0.3 + speed * 0.16) : 0.05;
+  const s = Math.sin(ud.phase), c = Math.sin(ud.phase + PI);
+  if (p.legL) p.legL.rotation.x = s * amp;
+  if (p.legR) p.legR.rotation.x = c * amp;
+  if (p.armL) p.armL.rotation.x = c * amp * 0.9;
+  if (p.armR) p.armR.rotation.x = s * amp * 0.9;
+  if (p.torso) p.torso.position.y = 1.18 + (moving ? 0 : Math.sin(ud.phase * 0.7) * 0.012);
 }
 
 function makeDogMesh() {
@@ -3542,10 +3631,7 @@ function updatePeds(dt) {
     ped.mesh.position.x += Math.sin(ped.heading) * ped.speed * dt;
     ped.mesh.position.z += Math.cos(ped.heading) * ped.speed * dt;
     ped.mesh.rotation.y = ped.heading;
-    // arm/leg sway
-    const t = performance.now() * 0.006;
-    const parts = ped.mesh.userData.parts;
-    if (parts) parts.legs.rotation.x = Math.sin(t * ped.speed) * 0.4;
+    animateWalk(ped.mesh, ped.speed, dt, ped.state !== 'idle');
 
     // bounds
     ped.mesh.position.x = clamp(ped.mesh.position.x, -HALF + 2, HALF - 2);
@@ -4118,9 +4204,13 @@ function updateBullets(dt) {
 function spawnCop(scene, pos) {
   // foot cop
   const m = makePedMesh();
-  // override clothing to brown/khaki
-  m.userData.parts.torso.material = new THREE.MeshStandardMaterial({ color: 0x8a7f4a, roughness: 0.7 });
-  m.userData.parts.legs.material  = new THREE.MeshStandardMaterial({ color: 0x4a4030, roughness: 0.8 });
+  // override clothing to brown/khaki cop uniform
+  const copShirt = new THREE.MeshStandardMaterial({ color: 0x8a7f4a, roughness: 0.7 });
+  const copPants = new THREE.MeshStandardMaterial({ color: 0x4a4030, roughness: 0.8 });
+  const pp = m.userData.parts;
+  pp.torso.material = copShirt;
+  pp.armL.material = pp.armR.material = copShirt;
+  pp.legL.material = pp.legR.material = copPants;
   m.position.copy(pos);
   scene.add(m);
   const cop = {
@@ -4345,8 +4435,7 @@ function updateFootCops(dt) {
       }
     }
     c.mesh.rotation.y = c.heading;
-    const parts = c.mesh.userData.parts;
-    if (parts) parts.legs.rotation.x = Math.sin(performance.now()*0.012) * 0.5;
+    animateWalk(c.mesh, c.speed || 2.0, dt, true);
   }
 }
 
