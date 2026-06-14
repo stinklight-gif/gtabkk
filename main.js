@@ -86,6 +86,9 @@ const G = {
   cash: 100,
   notifQueue: [],
   paused: false,
+  hitStop: 0,            // seconds of slow-mo remaining after a solid hit
+  skids: [],             // tire-skid decals (faded over time)
+  dust: [],              // impact dust puffs
   groundHelpers: null,
   // Player property / ownership economy (persisted in the save).
   econ: {
@@ -3317,12 +3320,66 @@ function resolveVehicleVsBuildings(v) {
       v.hp -= Math.abs(v.vel) * 0.6;
       G.camRig.shake = Math.min(0.4, Math.abs(v.vel) * 0.02);
       G.audio.hit();
+      spawnDust(p.x, p.z, 16);                 // impact puff
     }
     v.vel *= 0.4;
   }
   // bounds
   p.x = clamp(p.x, -HALF + 1, HALF - 1);
   p.z = clamp(p.z, -HALF + 1, HALF - 1);
+}
+
+// ---- Juice FX: tire-skid decals + impact dust puffs ----
+const _skidGeo = new THREE.PlaneGeometry(0.34, 1.2); _skidGeo.rotateX(-PI / 2);  // lies flat, length along +Z
+const _skidMat = new THREE.MeshBasicMaterial({ color: 0x0b0b0b, transparent: true, opacity: 0.5, depthWrite: false });
+function spawnSkid(v) {
+  const now = performance.now();
+  if (now - (v._skidAt || 0) < 45) return;     // throttle
+  v._skidAt = now;
+  const fx = Math.sin(v.heading), fz = Math.cos(v.heading);
+  const rx = Math.cos(v.heading), rz = -Math.sin(v.heading);
+  for (const lat of [-0.7, 0.7]) {
+    const m = new THREE.Mesh(_skidGeo, _skidMat.clone());
+    m.position.set(v.pos.x + rx * lat - fx * 1.1, 0.045, v.pos.z + rz * lat - fz * 1.1);
+    m.rotation.y = v.heading;
+    m.frustumCulled = false;
+    G.scene.add(m);
+    G.skids.push({ mesh: m, life: 5 });
+  }
+  while (G.skids.length > 90) { const s = G.skids.shift(); G.scene.remove(s.mesh); s.mesh.material.dispose(); }
+}
+function updateSkids(dt) {
+  for (let i = G.skids.length - 1; i >= 0; i--) {
+    const s = G.skids[i]; s.life -= dt;
+    s.mesh.material.opacity = Math.max(0, s.life / 5 * 0.5);
+    if (s.life <= 0) { G.scene.remove(s.mesh); s.mesh.material.dispose(); G.skids.splice(i, 1); }
+  }
+}
+function spawnDust(x, z, n = 14) {
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(n * 3), vel = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    pos[i * 3] = x; pos[i * 3 + 1] = 0.3; pos[i * 3 + 2] = z;
+    const a = Math.random() * TAU, sp = rand(1, 4.5);
+    vel[i * 3] = Math.cos(a) * sp; vel[i * 3 + 1] = rand(1, 3.2); vel[i * 3 + 2] = Math.sin(a) * sp;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.PointsMaterial({ color: 0xbcae98, size: 0.55, transparent: true, opacity: 0.7, depthWrite: false });
+  const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; G.scene.add(pts);
+  G.dust.push({ pts, vel, life: 0.6 });
+}
+function updateDust(dt) {
+  for (let i = G.dust.length - 1; i >= 0; i--) {
+    const d = G.dust[i]; d.life -= dt;
+    const a = d.pts.geometry.attributes.position.array;
+    for (let k = 0; k < d.vel.length / 3; k++) {
+      a[k * 3] += d.vel[k * 3] * dt; a[k * 3 + 1] = Math.max(0.05, a[k * 3 + 1] + d.vel[k * 3 + 1] * dt); a[k * 3 + 2] += d.vel[k * 3 + 2] * dt;
+      d.vel[k * 3 + 1] -= 6 * dt;
+    }
+    d.pts.geometry.attributes.position.needsUpdate = true;
+    d.pts.material.opacity = Math.max(0, d.life / 0.6 * 0.7);
+    if (d.life <= 0) { G.scene.remove(d.pts); d.pts.geometry.dispose(); d.pts.material.dispose(); G.dust.splice(i, 1); }
+  }
 }
 
 // =============================================================================
@@ -3523,6 +3580,11 @@ function updatePlayerInVehicle(dt) {
   // steering — speed dependent
   const steerRate = spec.turn * (1 - Math.min(1, Math.abs(v.vel)/spec.topSpeed) * 0.4);
   v.heading += steer * steerRate * dt * (v.vel >= 0 ? 1 : -1) * (Math.abs(v.vel)>0.3 ? 1 : 0);
+  // arcade handbrake drift: extra oversteer + lay rubber while sliding
+  if (handbrake && Math.abs(v.vel) > 6 && Math.abs(steer) > 0.15 && spec.kind !== 'boat' && spec.kind !== 'bike') {
+    v.heading += steer * 1.5 * dt * (v.vel >= 0 ? 1 : -1);
+    spawnSkid(v);
+  }
 
   // motorbike lean
   if (v.spec.kind === 'bike') {
@@ -4305,6 +4367,8 @@ function updateAmmoHud() {
   else G.hud.setAmmo(`${p.pistolAmmo} / ${p.pistolReserve}`, '9MM PISTOL');
 }
 
+function triggerHitStop(s) { G.hitStop = Math.max(G.hitStop || 0, s); }
+
 function doMeleeHit(kind) {
   const p = G.player;
   const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw);
@@ -4322,6 +4386,8 @@ function doMeleeHit(kind) {
         target.hp -= (kind === 'kick' ? 22 : kind === 'cross' ? 18 : 12);
         target.panicT = 6;
         hitSomething = true;
+        triggerHitStop(kind === 'kick' ? 0.07 : 0.05);     // freeze-frame the impact
+        G.camRig.shake = Math.max(G.camRig.shake, kind === 'kick' ? 0.16 : 0.1);
         if (target.hp <= 0) {
           if (G.cops.includes(target)) killCop(target);
           else killPed(target);
@@ -4445,6 +4511,7 @@ function doBulletRaycast(origin, dir, dmg = 35) {
     if (t.actor) {
       t.obj.hp -= dmg;
       t.obj.panicT = 6;
+      triggerHitStop(0.035);                 // tiny freeze so a connecting shot reads
       if (t.obj.hp <= 0) {
         if (G.cops.includes(t.obj)) killCop(t.obj);
         else killPed(t.obj);
@@ -4960,10 +5027,26 @@ function updateCamera(dt) {
   rig.distance = lerp(rig.distance, rig.targetDistance, 0.08);
   const cy = Math.cos(rig.yaw), sy = Math.sin(rig.yaw);
   const cp = Math.cos(rig.pitch), sp = Math.sin(rig.pitch);
-  _camOffset.set(sy * cp, -sp, cy * cp).multiplyScalar(rig.distance);
-  rig.cam.position.copy(_camTarget).add(_camOffset);
+  _camOffset.set(sy * cp, -sp, cy * cp);                 // unit direction target → camera
+  // Occlusion: never let the camera sit inside a building. Cast target → camera
+  // against nearby building AABBs and pull the camera in to just shy of the wall.
+  let camDist = rig.distance;
+  _ray.ray.origin.copy(_camTarget);
+  _ray.ray.direction.copy(_camOffset);
+  for (const b of G.world.buildings) {
+    if (dist2(b.pos, _camTarget) > 50 * 50) continue;
+    _bbox.min.set(b.pos.x - b.size.x / 2, b.pos.y - b.size.y / 2, b.pos.z - b.size.z / 2);
+    _bbox.max.set(b.pos.x + b.size.x / 2, b.pos.y + b.size.y / 2, b.pos.z + b.size.z / 2);
+    const hit = _ray.ray.intersectBox(_bbox, _vBox);
+    if (hit) { const d = _camTarget.distanceTo(hit) - 0.4; if (d < camDist) camDist = Math.max(1.1, d); }
+  }
+  rig.cam.position.copy(_camTarget).addScaledVector(_camOffset, camDist);
   rig.cam.position.x += shakeX; rig.cam.position.y += shakeY + 0.6;
   rig.cam.lookAt(_camTarget);
+  // speed-based FOV kick while driving — a little sense of velocity
+  const sp01 = p.inVehicle ? Math.min(1, Math.abs(p.inVehicle.vel) / p.inVehicle.spec.topSpeed) : 0;
+  const targetFov = 72 + sp01 * 14;
+  if (Math.abs(rig.cam.fov - targetFov) > 0.05) { rig.cam.fov = lerp(rig.cam.fov, targetFov, 0.06); rig.cam.updateProjectionMatrix(); }
 }
 
 // =============================================================================
@@ -5388,7 +5471,10 @@ function updatePhotoCam(dt) {
 
 function loop() {
   requestAnimationFrame(loop);
-  const dt = Math.min(0.05, G.clock.getDelta());
+  const realDt = Math.min(0.05, G.clock.getDelta());
+  // hit-stop: a brief global slow-mo on a solid melee/gun connect so impacts land
+  let dt = realDt;
+  if (G.hitStop > 0) { G.hitStop -= realDt; dt = realDt * 0.12; }
 
   // phone toggle
   if (G.input && G.input.pressed && G.input.pressed('KeyT') && (G.state === 'playing' || G.state === 'phone')) {
@@ -5460,6 +5546,8 @@ function loop() {
     updateFootCops(dt);
     updateBullets(dt);
     updateParticles(dt);
+    updateSkids(dt);
+    updateDust(dt);
     updateWanted(dt);
     updateCamera(dt);
     updateBTS(dt);

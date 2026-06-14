@@ -144,9 +144,9 @@ Everything lives in two files:
 | 13 | Peds + Dogs | Wander state machines; peds panic when attacked; dogs scatter when player approaches, settle back when far. |
 | 14 | Combat | Muay Thai jab/cross/kick (animated arm/leg swings), pistol + full-auto SMG + pellet-spread shotgun fire (raycast hit + tracer sphere + muzzle flash + camera shake), reload. Pistol on first cop kill; SMG drops from a destroyed 3★ Fortuner; shotgun/SMG also buyable at the gun shop. |
 | 15 | Cops + Wanted | Star-based heat with decay after 35 s out of sight. Spawns foot cops at 1★, cop-pickup chase cars at 2★, unmarked Crime Suppression Fortuners + spike strips at 3★ (after ~3 cop kills), armored SWAT vans at 4★ (after ~6 kills); a star increase flashes the HUD and whoops a siren; nights run one extra unit. Bribe with B near a foot cop (1–2★ only). |
-| 16 | Particles / FX | Smoke emitter (vehicles below 30% HP), explosion (light flash + smoke + camera shake + thunder SFX). |
+| 16 | Particles / FX | Smoke emitter (vehicles below 30% HP), explosion (light flash + smoke + camera shake + thunder SFX), tire-skid decals (`spawnSkid`, laid while drifting and faded over 5 s), impact dust puffs (`spawnDust`), and a global **hit-stop** (`triggerHitStop` slows the loop ~0.05 s on a solid melee/gun connect). |
 | 17 | Interaction | Vehicle proximity check + E to enter. |
-| 18 | Camera update | Follow rig with smoothed distance, shake decay, in-vehicle chase view auto-aligns to vehicle heading. |
+| 18 | Camera update | Follow rig with smoothed distance, shake decay, in-vehicle chase view auto-aligns to vehicle heading, **occlusion** (ray-casts target→camera against building AABBs and pulls in so it never clips into a wall), and a speed-based FOV kick while driving. |
 | 19 | Day/Night + Weather | 8-min day cycle drives sun position (tilted so noon actually sunlights the facades), sky/fog colours, neon and street-lamp intensity; the sun + shadow camera track the player. Monsoon weather cycle (clear ⇄ drizzle/downpour that builds and breaks) with lightning flashes during heavy rain. Dawn temple bell at 5–6 AM. |
 | 20 | Main loop | Single `loop()` calls every system in order. |
 
