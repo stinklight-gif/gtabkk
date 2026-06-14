@@ -52,6 +52,7 @@ CDN is blocked, point `CHROME_PATH` at any Chrome/Chromium binary.
 | Ctrl | Block |
 | B | Bribe a nearby cop (฿1,000) at 1–2★ |
 | H | Honk (in vehicle) |
+| M | Car radio — cycle stations (Luk Thung / Bangkok Bars / Talk Radio / off) |
 | J | Start a taxi fare (in a songthaew) |
 | T | Phone — pauses pointer lock and shows menu |
 | P | Photo mode — free-fly camera + hidden HUD (WASD/Space/Ctrl to fly, Shift faster) |
@@ -127,7 +128,7 @@ Everything lives in two files:
 
 | § | Section | Notes |
 |---|---|---|
-| 1 | Audio | Procedural Web Audio. Engine loopers, 7-Eleven chime, temple bell, footsteps, gunshots, sirens, rain bed. |
+| 1 | Audio | Procedural Web Audio. Engine loopers (on a duckable `engineBus`), 7-Eleven chime, temple bell, footsteps, gunshots, sirens, rain bed, and a **car radio** — a lookahead step-sequencer (`makeRadio`) with three procedural stations (Luk Thung synth-pop, Bangkok Bars boom-bap, AM talk/ads) that play in-vehicle and duck the engine. |
 | 2 | Input | Keyboard set + pointer-lock mouse deltas + `pressed` (edge) helper. |
 | 3 | World | Procedural 10×10 block grid (BLOCK=50m), road grid, buildings with neon strips and lit-window planes, BTS Skytrain elevated track, street lamps, 7-Elevens, spirit-house shrines, gold-shop POI with pillar of light, temple compound, a U-Spray garage (drive a vehicle in to repair it and clear your wanted level for a heat-scaled fee, or rent it as a vehicle lock-up — store/retrieve/repaint), a buyable safehouse (respawn point) just north of spawn, a gun shop (buy pistol/shotgun/SMG/ammo with cash on foot), a Yaowarat Chinatown market street (paifang gate, dense shophouses, hanging lanterns, market stalls), and a Chao Phraya river down the west edge (water + embankment + pier + longtail boats, including one **drivable** longtail at the pier gap). Repeated props use `InstancedMesh`. Builds an off-screen canvas as the minimap base. |
 | 4 | Player + Camera | Capsule character (torso/legs/head/arms), arcade third-person camera rig (orbit yaw/pitch/distance, shake decay). |
@@ -209,8 +210,9 @@ traffic AI.
 - Cops use lightweight road-aware steering, not true pathfinding: beyond ~25 m
   they route along the 50 m road grid (so they stop grinding the canyon walls);
   inside 25 m they pursue and ram directly. AABB pushback is still the backstop.
-- Audio is fully synthesised. No radio stations yet (Phase 2 — would need
-  hand-built procedural music or licensed-free tracks).
+- Audio is fully synthesised, including the car radio's three procedural music
+  stations — catchy enough to read as luk-thung / hip-hop / talk, but not actual
+  songs. Licensed or hand-composed tracks would be a future upgrade.
 
 ## Performance
 

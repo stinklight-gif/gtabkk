@@ -193,6 +193,9 @@ function disposeObject(obj) {
 function makeAudio() {
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
   const master = ctx.createGain(); master.gain.value = 0.55; master.connect(ctx.destination);
+  // Engine bus: all vehicle engine loops route here so the radio can duck them
+  // as a group when music is playing in-car.
+  const engineBus = ctx.createGain(); engineBus.gain.value = 1.0; engineBus.connect(master);
 
   // simple beep helper
   function blip({freq=440, dur=0.15, type='sine', gain=0.2, attack=0.005, release=0.05, freqEnd=null}) {
@@ -240,7 +243,7 @@ function makeAudio() {
     const o2 = ctx.createOscillator(); o2.type = 'square';   o2.frequency.value = rpmBase * 0.5;
     const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = harsh ? 1800 : 900;
     const g  = ctx.createGain(); g.gain.value = 0;
-    o1.connect(lp); o2.connect(lp); lp.connect(g).connect(master);
+    o1.connect(lp); o2.connect(lp); lp.connect(g).connect(engineBus);
     o1.start(); o2.start();
     return {
       set(speed01, on) {
@@ -262,7 +265,7 @@ function makeAudio() {
     lfo.connect(lfog).connect(o.frequency);
     const lp = ctx.createBiquadFilter(); lp.type = 'bandpass'; lp.frequency.value = 600; lp.Q.value = 1.2;
     const g  = ctx.createGain(); g.gain.value = 0;
-    o.connect(lp).connect(g).connect(master);
+    o.connect(lp).connect(g).connect(engineBus);
     o.start(); lfo.start();
     return {
       set(speed01, on) {
@@ -320,6 +323,98 @@ function makeAudio() {
     return {};
   }
 
+  // ---- Car radio: procedural stations scheduled ahead of ctx time ----
+  // A lookahead step-sequencer. Each station has a tempo + a pattern(step,time)
+  // that schedules notes onto the shared radio bus. tick() runs it while active.
+  function makeRadio() {
+    const bus = ctx.createGain(); bus.gain.value = 0; bus.connect(master);
+    const N = 261.63; // C4
+    const nt = s => N * Math.pow(2, s / 12);
+    function tone(time, freq, dur, type, gain, freqEnd) {
+      const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(freq, time);
+      if (freqEnd) o.frequency.exponentialRampToValueAtTime(Math.max(20, freqEnd), time + dur);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, time);
+      g.gain.linearRampToValueAtTime(gain, time + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0006, time + dur);
+      o.connect(g).connect(bus); o.start(time); o.stop(time + dur + 0.03);
+    }
+    function nz(time, dur, gain, lp, bp) {
+      const len = Math.max(1, Math.floor(ctx.sampleRate * dur));
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const d = buf.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      const src = ctx.createBufferSource(); src.buffer = buf;
+      const f = ctx.createBiquadFilter();
+      if (bp) { f.type = 'bandpass'; f.frequency.value = bp; f.Q.value = 1.0; }
+      else { f.type = 'lowpass'; f.frequency.value = lp || 5000; }
+      const g = ctx.createGain(); g.gain.setValueAtTime(gain, time); g.gain.exponentialRampToValueAtTime(0.0006, time + dur);
+      src.connect(f).connect(g).connect(bus); src.start(time); src.stop(time + dur + 0.02);
+    }
+    const kick = (t, g = 0.55) => tone(t, 132, 0.18, 'sine', g, 46);
+    const snare = (t, g = 0.32) => { nz(t, 0.16, g, 3200); tone(t, 190, 0.07, 'triangle', g * 0.4, 90); };
+    const hat = (t, g = 0.10) => nz(t, 0.028, g, 9000);
+
+    // Station patterns. Pentatonic-ish so random steps stay consonant.
+    const lukLead = [0, 4, 7, 9, 12, 9, 7, 4];          // C major pentatonic run
+    const lukBass = [0, 0, 7, 7, 9, 9, 5, 5];           // C G Am F roots (per 4 steps)
+    function lukThung(step, t) {                          // bright synth-pop
+      const b = step % 16, bar = Math.floor(step / 16) % 2;
+      if (b % 8 === 0) kick(t, 0.5);
+      if (b === 4 || b === 12) snare(t, 0.28);
+      if (b % 2 === 0) hat(t, 0.08);
+      if (b % 4 === 0) tone(t, nt(lukBass[(bar * 4 + b / 4) % lukBass.length] - 12), 0.22, 'triangle', 0.34);
+      if (b % 2 === 1) tone(t, nt(lukLead[(step) % lukLead.length] + 12), 0.16, 'square', 0.12);
+    }
+    const hipBass = [-3, -3, -3, 0, 2, 2, -5, -5];       // A minor-ish roots
+    function bangkokBars(step, t) {                       // boom-bap hip-hop
+      const b = step % 16;
+      if (b === 0 || b === 7 || b === 10) kick(t, 0.6);
+      if (b === 4 || b === 12) snare(t, 0.34);
+      if (b % 2 === 0) hat(t, b % 4 === 2 ? 0.09 : 0.05); // light swing
+      if (b % 4 === 0) tone(t, nt(hipBass[(step / 4) % hipBass.length] - 12), 0.4, 'sawtooth', 0.3, null);
+      if (b === 6) tone(t, nt(7), 0.5, 'triangle', 0.07);  // sparse stab
+    }
+    const jingle = [12, 16, 19, 24];
+    function talkRadio(step, t) {                          // AM talk + bumpers/ads
+      const b = step % 32;
+      // muffled "speech" — short bandpassed noise blips, gated to feel like talking
+      if (b % 2 === 0 && Math.random() < 0.7) nz(t, 0.07 + Math.random() * 0.06, 0.16, 0, 700 + Math.random() * 900);
+      // station bumper jingle every 2 bars
+      if (b === 0) jingle.forEach((s, i) => tone(t + i * 0.12, nt(s), 0.18, 'square', 0.16));
+      // ad "ding" mid-loop
+      if (b === 20) { tone(t, nt(19), 0.2, 'sine', 0.18); tone(t + 0.18, nt(14), 0.28, 'sine', 0.16); }
+    }
+    const STATIONS = [
+      { name: 'RADIO OFF', bpm: 0, pattern: null },
+      { name: 'LUK THUNG FM', bpm: 104, pattern: lukThung },
+      { name: 'BANGKOK BARS 97.5', bpm: 88, pattern: bangkokBars },
+      { name: 'TALK RADIO AM', bpm: 100, pattern: talkRadio },
+    ];
+    let station = 1, step = 0, nextTime = 0;
+    function reset() { step = 0; nextTime = 0; }
+    return {
+      names: STATIONS.map(s => s.name),
+      get station() { return station; },
+      next() { station = (station + 1) % STATIONS.length; reset(); return STATIONS[station].name; },
+      // active = in a vehicle; schedules + fades the bus, returns nothing
+      tick(active) {
+        const s = STATIONS[station];
+        const playing = active && !!s.pattern;
+        bus.gain.setTargetAtTime(playing ? 0.5 : 0.0, ctx.currentTime, 0.18);
+        if (!playing) { reset(); return; }
+        const now = ctx.currentTime;
+        if (nextTime === 0) nextTime = now + 0.06;
+        const stepDur = (60 / s.bpm) / 4;                 // 16th notes
+        let guard = 0;
+        while (nextTime < now + 0.18 && guard++ < 64) {
+          try { s.pattern(step, nextTime); } catch (e) { /* keep the loop alive */ }
+          step = (step + 1) % 64;
+          nextTime += stepDur;
+        }
+      },
+    };
+  }
+
   function honk() {
     blip({freq:380, dur:0.25, type:'square', gain:0.12, freqEnd:340});
   }
@@ -332,10 +427,13 @@ function makeAudio() {
     ctx, master, chime, bell, step, punch, kick, hit, shot, ricochet, reload,
     whistle, siren, thunder, rumble, honk, bark,
     engineLoop, tukTukLoop, blip, rainBed: null, ambienceBed: null,
+    radio: null,
+    duckEngine: on => engineBus.gain.setTargetAtTime(on ? 0.4 : 1.0, ctx.currentTime, 0.2),
     setVolume: v => { master.gain.value = v; },
   };
   audio.rainBed = rainBed();
   audio.ambienceBed = ambienceBed();
+  audio.radio = makeRadio();
   return audio;
 }
 
@@ -5251,6 +5349,20 @@ function updateGarageOwnership(dt) {
   }
 }
 
+// Car radio: M cycles stations; music plays (and ducks the engine) only while
+// you're in a vehicle, and flashes the station name on the HUD.
+function updateRadio(dt) {
+  const a = G.audio; if (!a || !a.radio) return;
+  const inV = !!G.player.inVehicle;
+  if (G.input && G.input.pressed && G.input.pressed('KeyM') && G.state === 'playing') {
+    G.hud.showNotif('📻 ' + a.radio.next());
+  }
+  if (inV && !G._wasInVehicle) G.hud.showNotif('📻 ' + a.radio.names[a.radio.station]);
+  G._wasInVehicle = inV;
+  a.radio.tick(inV);
+  a.duckEngine(inV && a.radio.station !== 0);
+}
+
 // Free-fly camera for photo mode: mouse to look, WASD to fly, Space/Ctrl up/down.
 function updatePhotoCam(dt) {
   const pc = G.photoCam;
@@ -5335,6 +5447,7 @@ function loop() {
     updateInteraction(dt);
     updateGarage(dt);
     updateGarageOwnership(dt);
+    updateRadio(dt);
     updateTaxi(dt);
     updateVehicles(dt);
     updatePeds(dt);
