@@ -34,8 +34,9 @@ const MIME = {
 };
 
 const SHOTS = [
-  { name: 'smoke_noon.png',  dayT: 0.5  },  // 12:00 — must read as daytime
+  { name: 'smoke_noon.png',  dayT: 0.5  },  // 12:00 — daytime + busy sidewalks
   { name: 'smoke_night.png', dayT: 0.87 },  // ~20:50 — full neon
+  { name: 'smoke_3am.png',   dayT: 0.13 },  // ~03:00 — dead streets (same spot as noon)
 ];
 // Extra one-off shots for tuning, e.g. SMOKE_SHOTS="dawn=0.30,dusk=0.78"
 // (these don't run in CI — only the two standard shots above are asserted).
@@ -107,6 +108,7 @@ async function main() {
         GAME.player.group.position.set(0, 0, -130);              // street level, mid-map
         GAME.camRig.yaw = Math.PI; GAME.camRig.pitch = -0.02;    // aim down the street
         GAME.camRig.shake = 0;
+        if (GAME.resyncCrowd) GAME.resyncCrowd();                // snap crowd to this hour (busy noon vs dead 3am)
       }, shot);
       await waitFrames(page, 14);  // let day/night + camera smoothing settle
       await page.screenshot({ path: path.join(ROOT, shot.name), timeout: 120_000 });

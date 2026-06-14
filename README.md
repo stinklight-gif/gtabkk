@@ -22,8 +22,9 @@ offline. Click **ENTER THE CITY** when the loader finishes.
 ## Smoke test
 
 A headless Playwright harness boots the real game, fails on any page error, and
-captures noon/night screenshots (`smoke_noon.png` / `smoke_night.png`) plus the
-renderer draw-call count:
+captures noon/night/3am screenshots (`smoke_noon.png` / `smoke_night.png` /
+`smoke_3am.png` — the last two from the same spot prove the crowd thins from a
+busy midday to dead small-hours) plus the renderer draw-call count:
 
 ```bash
 npm install --no-save playwright && npx playwright install chromium   # once
@@ -31,7 +32,7 @@ node tools/smoke.mjs
 ```
 
 CI (`.github/workflows/smoke.yml`) runs it on every PR and push to main, and
-uploads both screenshots as artifacts. In sandboxes where Playwright's browser
+uploads the screenshots as artifacts. In sandboxes where Playwright's browser
 CDN is blocked, point `CHROME_PATH` at any Chrome/Chromium binary.
 
 ## Controls
@@ -111,7 +112,7 @@ Everything lives in two files:
 | 4 | Player + Camera | Capsule character (torso/legs/head/arms), arcade third-person camera rig (orbit yaw/pitch/distance, shake decay). |
 | 5b | More vehicles | City bus, luxury sedan, and a rare-spawn supercar join the traffic mix; a drivable longtail boat sits at the river pier. |
 | 5 | Vehicles | `makeVehicleMesh(kind)` produces bike / tuk-tuk / hilux / cop / camry / sedan with per-kind `spec` (topSpeed, accel, brake, turn, mass). Tuk-tuk has a leaning wiggle, bike leans into turns. |
-| 6 | NPCs | Procedural ped/dog meshes with variety (locals, saffron-robed monks, backpacked tourists). `spawnPeds`, `spawnDogs`, `spawnTraffic`. District banners (`updateDistrict`) announce Yaowarat / The Wat / Riverside / Sukhumvit on entry. |
+| 6 | NPCs | Articulated humanoid peds (torso/head/two legs/two arms) with a shared `animateWalk` cycle and six archetype silhouettes (local, office worker w/ briefcase, tourist w/ cap+backpack, bald monk w/ alms bowl, conical-hatted vendor & laborer, plus a skirt variant). Crowd density follows the time of day (`crowdFactor` — dead 3am, rush-hour/midday busy) and peds spawn onto the sidewalk band (`sidewalkPos`). Behavioral clusters (`buildClusterAnchors`/`updateClusters`) queue customers at food stalls and loiterers at 7-Elevens. `spawnPeds`, `spawnDogs`, `spawnTraffic`. District banners announce Yaowarat / The Wat / Riverside / Sukhumvit on entry. |
 | 7 | Rain | Particle points re-centered on the player each frame, opacity fades with weather. |
 | 8 | Engine init | Renderer, lights (sun + hemi + ambient), camera, audio, world build, player, vehicles, peds, dogs. Loading bar + start gate. |
 | 9 | HUD | Star/cash/HP/stamina/ammo/clock/weather binds, subtitle + prompt + notif queues, phone (T) with live stats (amulets/fares/cops + completion %), full north-up map overlay (TAB), minimap renderer (camera-yaw rotated, mission + taxi markers, amulet + snatcher + cop dots). |
@@ -196,8 +197,11 @@ material at world-build time. That takes a street-level view from ~7,700 meshes
 / ~2,800 draw calls down to ~1,200 meshes / **~370 draw calls** (measured via
 `tools/smoke.mjs`, which prints `renderer.info.render.calls`). What's left is
 mostly dynamic — vehicles, peds, dogs, the rooftop/lamp/wire `InstancedMesh`
-batches — plus a few one-off landmarks. If it still chugs, raise the
-pedestrian/traffic despawn radius or drop pixel ratio.
+batches — plus a few one-off landmarks. A busy midday crowd (the articulated
+peds are ~7 meshes each, frustum-culled) adds a few hundred calls when the
+sidewalks are full, landing the noon view around ~800; the small hours drop back
+toward the ~370 floor. If it still chugs, lower `PED_TARGET`, raise the
+pedestrian/traffic despawn radius, or drop pixel ratio.
 
 Repeated props (rooftop tanks/AC/antennas, lamps, poles, wires, Yaowarat
 lanterns, parked bikes) use `InstancedMesh`; pooled materials with night-emissive
