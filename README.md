@@ -122,10 +122,18 @@ Mission rewards were bumped to feed this economy (Soi Run ฿2,500, The Hit
 
 ## Architecture
 
-Everything lives in two files:
+The engine is being pulled out of one file into native ES modules (no bundler —
+the importmap resolves them, same "serve the folder and it runs" deal):
 
-- `index.html` — DOM shell, HUD overlays, importmap. No game logic.
-- `main.js` — the entire engine. Organised into numbered sections:
+- `index.html` — DOM shell, HUD overlays, importmap.
+- `audio.js` — procedural Web Audio (engine loopers, SFX, car radio). Standalone.
+- `input.js` — keyboard set + pointer-lock mouse deltas + edge-detected `pressed`.
+- `main.js` — the rest of the engine (world, vehicles, NPCs, combat, missions,
+  HUD, loop, …), still organised into the numbered sections below. Extracting
+  the remaining sections (notably the ~1.4k-line `buildWorld`) into their own
+  modules is in progress.
+
+`main.js` sections:
 
 | § | Section | Notes |
 |---|---|---|
