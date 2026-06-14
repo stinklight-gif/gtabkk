@@ -2547,6 +2547,7 @@ async function init() {
   { const v = spawnCopCar(scene, new THREE.Vector3(50, 0, 90)); v.driver = null; v.vel = 0; v.heading = 0; v.mesh.rotation.y = 0; }
   spawnPeds(scene, 60);
   spawnDogs(scene, 16);
+  buildClusterAnchors();
   setProgress(88);
 
   // A parked motorbike right next to the player so they can grab it immediately
@@ -3656,6 +3657,7 @@ function resyncCrowd() {
   while (G.peds.length < target) {
     spawnPed(G.scene, sidewalkPos(pp.x, pp.z, 88));
   }
+  G._clusterT = 0; updateClusters(0);   // populate nearby stalls/stores for the shot too
 }
 G.resyncCrowd = resyncCrowd;   // exposed on window.GAME for the smoke harness
 
@@ -3676,6 +3678,14 @@ function updatePeds(dt) {
       if (ped._barkCD <= 0 && (!G.barks || G.barks.length < 8) && Math.random() < 0.04) {
         spawnBark(ped); ped._barkCD = 4;
       }
+    } else if (ped.anchor) {
+      // cluster member: hold a slot at a food stall / 7-Eleven, drifting back
+      // to it if knocked off (e.g. after a panic), then stand and face inward
+      const slot = ped.anchor.slot;
+      const dx = slot.x - ped.mesh.position.x, dz = slot.z - ped.mesh.position.z;
+      const d = Math.hypot(dx, dz);
+      if (d > 0.5) { ped.heading = Math.atan2(dx, dz); ped.speed = 1.1; ped.state = 'returning'; }
+      else { ped.speed = 0; ped.state = 'idle'; ped.heading = ped.anchor.facing; }
     } else if (ped.state === 'walking') {
       // light wander, mostly on sidewalk side of block
       ped.waitT -= dt;
@@ -3687,7 +3697,7 @@ function updatePeds(dt) {
     ped.mesh.position.x += Math.sin(ped.heading) * ped.speed * dt;
     ped.mesh.position.z += Math.cos(ped.heading) * ped.speed * dt;
     ped.mesh.rotation.y = ped.heading;
-    animateWalk(ped.mesh, ped.speed, dt, ped.state !== 'idle');
+    animateWalk(ped.mesh, ped.speed, dt, ped.speed > 0.05);
 
     // bounds
     ped.mesh.position.x = clamp(ped.mesh.position.x, -HALF + 2, HALF - 2);
@@ -3714,6 +3724,72 @@ function updatePeds(dt) {
       if (d > fd) { fd = d; fi = i; }
     }
     if (fi >= 0) { G.scene.remove(G.peds[fi].mesh); disposeObject(G.peds[fi].mesh); G.peds.splice(fi, 1); }
+  }
+}
+
+// ---- Behavioral clusters: queues at food stalls, loiterers at 7-Elevens ----
+// Each anchor owns a few slot positions; updateClusters keeps the right number
+// of standing peds parked there for the current hour (busy midday/evening,
+// empty in the small hours), only populating anchors near the player.
+function buildClusterAnchors() {
+  G.clusterAnchors = [];
+  for (const f of (G.world.foodStalls || [])) {
+    const theta = rand(0, TAU);
+    const fwd = new THREE.Vector3(Math.sin(theta), 0, Math.cos(theta));
+    const right = new THREE.Vector3(Math.cos(theta), 0, -Math.sin(theta));
+    const slots = [];
+    for (const [d, s] of [[1.25, -0.5], [1.25, 0.55], [2.15, -0.45], [2.15, 0.5]]) {
+      const p = f.pos.clone().addScaledVector(fwd, d).addScaledVector(right, s);
+      slots.push({ pos: p, facing: theta + PI });          // face back toward the cart
+    }
+    G.clusterAnchors.push({ pos: f.pos.clone(), kind: 'food', capacity: 4, slots, peds: [] });
+  }
+  for (const e of (G.world.sevenElevens || [])) {
+    const theta = rand(0, TAU);
+    const slots = [];
+    for (let k = 0; k < 3; k++) {
+      const a = theta + (k - 1) * 0.7;
+      const p = e.pos.clone().add(new THREE.Vector3(Math.sin(a) * 2.7, 0, Math.cos(a) * 2.7));
+      slots.push({ pos: p, facing: a + PI + rand(-0.6, 0.6) });   // loiter facing the storefront / each other
+    }
+    G.clusterAnchors.push({ pos: e.pos.clone(), kind: 'store', capacity: 3, slots, peds: [] });
+  }
+}
+
+function spawnAnchoredPed(anchor, slot, slotIdx) {
+  const ped = spawnPed(G.scene, slot.pos.clone());
+  ped.anchor = { pos: anchor.pos, slot: slot.pos.clone(), facing: slot.facing };
+  ped._slotIdx = slotIdx;
+  ped.state = 'idle'; ped.speed = 0;
+  ped.mesh.rotation.y = slot.facing;
+  anchor.peds.push(ped);
+  return ped;
+}
+
+function updateClusters(dt) {
+  if (!G.clusterAnchors) return;
+  G._clusterT = (G._clusterT || 0) - dt;
+  if (G._clusterT > 0) return;
+  G._clusterT = 1.5;                                   // re-evaluate occupancy a couple times a second of sim
+  const pp = G.player.group.position;
+  const cf = crowdFactor(G.time.dayT);
+  for (const a of G.clusterAnchors) {
+    a.peds = a.peds.filter(p => !p.dead && p.anchor);  // drop any that died / got repurposed
+    const near = dist2(a.pos, pp) < 135 * 135;
+    const occ = a.kind === 'store' ? clamp(cf * 1.15, 0, 1) : cf;
+    const want = near ? Math.round(a.capacity * occ) : 0;
+    while (a.peds.length < want && a.peds.length < a.slots.length) {
+      const used = new Set(a.peds.map(p => p._slotIdx));
+      let si = -1;
+      for (let k = 0; k < a.slots.length; k++) if (!used.has(k)) { si = k; break; }
+      if (si < 0) break;
+      spawnAnchoredPed(a, a.slots[si], si);
+    }
+    while (a.peds.length > want) {
+      const ped = a.peds.pop();
+      G.scene.remove(ped.mesh); disposeObject(ped.mesh);
+      const idx = G.peds.indexOf(ped); if (idx >= 0) G.peds.splice(idx, 1);
+    }
   }
 }
 
@@ -5045,6 +5121,7 @@ function loop() {
     updateTaxi(dt);
     updateVehicles(dt);
     updatePeds(dt);
+    updateClusters(dt);
     updateBarks(dt);
     updateMuggings(dt);
     updateSpikes(dt);
