@@ -40,7 +40,7 @@ import {
 } from './combat.js';
 export * from './hud.js';
 import {
-  bindHud
+  bindHud, drawHouseGlyph, drawGarageGlyph, HOME_COLOR, GARAGE_COLOR
 } from './hud.js';
 export * from './missions.js';
 import {
@@ -556,19 +556,28 @@ export function drawFullMap() {
   ctx.clearRect(0, 0, S, S);
   if (G.world && G.world.minimap) ctx.drawImage(G.world.minimap, 0, 0, S, S);
   const to = v => (v + HALF) / (2 * HALF) * S;
-  // POI labels
+  // Plain POI text labels (Home + Garage get a glyph below, drawn separately).
   const poi = G.world.poi || {};
   const labels = [
     { p: poi.goldShop, t: "Uncle Seng's" },
     { p: poi.temple, t: 'Temple' },
     { p: poi.yaowarat, t: 'Yaowarat' },
     { p: G.world.gunShop, t: 'Guns' },
-    { p: poi.safehouse, t: G.econ.safehouse.owned ? 'Home' : 'Safehouse' },
   ];
-  for (const ga of (G.world.garages || [])) labels.push({ p: ga.pos, t: G.econ.garage.rented ? 'Garage' : 'U-Spray' });
   ctx.fillStyle = '#cfe3e0'; ctx.font = '13px system-ui, sans-serif'; ctx.textAlign = 'center';
   for (const L of labels) if (L.p) ctx.fillText(L.t, to(L.p.x), to(L.p.z) - 8);
-  ctx.textAlign = 'left';
+  // Home + Garage glyphs (state-coded), label pushed up so it clears the glyph.
+  if (poi.safehouse) {
+    const hx = to(poi.safehouse.x), hy = to(poi.safehouse.z);
+    drawHouseGlyph(ctx, hx, hy, 8, HOME_COLOR, G.econ.safehouse.owned);
+    ctx.fillStyle = HOME_COLOR; ctx.fillText(G.econ.safehouse.owned ? 'Home' : 'Safehouse', hx, hy - 15);
+  }
+  for (const ga of (G.world.garages || [])) if (ga.pos) {
+    const gx = to(ga.pos.x), gy = to(ga.pos.z);
+    drawGarageGlyph(ctx, gx, gy, 7, GARAGE_COLOR, G.econ.garage.rented);
+    ctx.fillStyle = GARAGE_COLOR; ctx.fillText(G.econ.garage.rented ? 'Garage' : 'U-Spray', gx, gy - 15);
+  }
+  ctx.fillStyle = '#cfe3e0'; ctx.textAlign = 'left';
   if (G.world.collectibles) {
     ctx.fillStyle = '#ffcf4a';
     for (const a of G.world.collectibles) if (!a.taken) {
@@ -576,12 +585,18 @@ export function drawFullMap() {
     }
   }
   if (G.mission && G.mission.active && G.mission.active.markerPos) {
+    const mx = to(G.mission.active.markerPos.x), my = to(G.mission.active.markerPos.z);
     ctx.fillStyle = '#ff2a86';
-    ctx.beginPath(); ctx.arc(to(G.mission.active.markerPos.x), to(G.mission.active.markerPos.z), 7, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(mx, my, 7, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#ff2a86'; ctx.lineWidth = 3;          // thick ring → primary target
+    ctx.beginPath(); ctx.arc(mx, my, 13, 0, TAU); ctx.stroke();
   }
   if (G.taxi && G.taxi.markerPos) {
+    const tx = to(G.taxi.markerPos.x), tz = to(G.taxi.markerPos.z);
     ctx.fillStyle = G.taxi.stage === 'toDropoff' ? '#39ff7a' : '#ffcf4a';
-    ctx.beginPath(); ctx.arc(to(G.taxi.markerPos.x), to(G.taxi.markerPos.z), 7, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(tx, tz, 7, 0, TAU); ctx.fill();
+    ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(tx, tz, 12, 0, TAU); ctx.stroke();
   }
   ctx.fillStyle = '#ff3333';
   for (const v of G.vehicles) if (v.isCop && v.driver) { ctx.beginPath(); ctx.arc(to(v.pos.x), to(v.pos.z), 3.5, 0, TAU); ctx.fill(); }
@@ -591,6 +606,40 @@ export function drawFullMap() {
   ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + fx * 14, py + fz * 14); ctx.stroke();
   ctx.fillStyle = '#21f0ff';
   ctx.beginPath(); ctx.arc(px, py, 5, 0, TAU); ctx.fill();
+
+  // Legend — a small color key (panel-backed) so the map reads to a first-timer.
+  const items = [
+    ['home',   HOME_COLOR,   'Home'],
+    ['garage', GARAGE_COLOR, 'Garage'],
+    ['dot',    '#ff2a86',    'Objective'],
+    ['dot',    '#ff3333',    'Cops'],
+    ['dot',    '#ffcf4a',    'Amulet'],
+  ];
+  const lx = 14, ly0 = 24, rowH = 21, panelW = 130, panelH = items.length * rowH + 12;
+  ctx.fillStyle = 'rgba(8,10,14,0.62)'; ctx.fillRect(lx - 6, ly0 - 14, panelW, panelH);
+  ctx.strokeStyle = 'rgba(33,240,255,0.35)'; ctx.lineWidth = 1; ctx.strokeRect(lx - 6, ly0 - 14, panelW, panelH);
+  ctx.textAlign = 'left'; ctx.font = '12px system-ui, sans-serif';
+  for (let i = 0; i < items.length; i++) {
+    const [kind, color, text] = items[i], yy = ly0 + i * rowH;
+    if (kind === 'home') drawHouseGlyph(ctx, lx + 8, yy, 6, color, true);
+    else if (kind === 'garage') drawGarageGlyph(ctx, lx + 8, yy, 5, color, true);
+    else { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(lx + 8, yy, 5, 0, TAU); ctx.fill(); }
+    ctx.fillStyle = '#dfeee9'; ctx.fillText(text, lx + 24, yy + 4);
+  }
+
+  // Objective line (bottom center): the active target name + live distance.
+  let objText = 'No active objective — free roam', op = null, on = null;
+  if (G.mission && G.mission.active && G.mission.active.markerPos) { op = G.mission.active.markerPos; on = G.mission.active.name || 'Objective'; }
+  else if (G.taxi && G.taxi.stage && G.taxi.stage !== 'idle' && G.taxi.markerPos) { op = G.taxi.markerPos; on = G.taxi.stage === 'toDropoff' ? 'Taxi drop-off' : 'Taxi pick-up'; }
+  if (op) {
+    const pp = (G.player.inVehicle && G.player.inVehicle.pos) || G.player.group.position;
+    objText = `Objective: ${on} — ${Math.round(Math.hypot(op.x - pp.x, op.z - pp.z))} m`;
+  }
+  ctx.font = 'bold 15px system-ui, sans-serif'; ctx.textAlign = 'center';
+  const tw = ctx.measureText(objText).width;
+  ctx.fillStyle = 'rgba(8,10,14,0.62)'; ctx.fillRect(S / 2 - tw / 2 - 12, S - 40, tw + 24, 26);
+  ctx.fillStyle = '#ffe08a'; ctx.fillText(objText, S / 2, S - 22);
+  ctx.textAlign = 'left';
 }
 export function updateRadio(dt) {
   const a = G.audio; if (!a || !a.radio) return;
@@ -605,6 +654,8 @@ export function updateRadio(dt) {
   G._wasInVehicle = inV;
   a.radio.tick(inV);
   a.duckEngine(inV && a.radio.station !== 0);
+  // Persistent HUD chip: live station name while driving, hidden on foot / RADIO OFF.
+  G.hud.setRadioChip(inV && a.radio.station !== 0 ? '📻 ' + a.radio.names[a.radio.station] : null);
 }
 
 // Free-fly camera for photo mode: mouse to look, WASD to fly, Space/Ctrl up/down.
@@ -759,6 +810,9 @@ export function loop() {
   }
 
   G.renderer.render(G.scene, G.camera);
+  // On-screen objective waypoint — after render so the camera matrices are
+  // current. Self-gates on G.state === 'playing' (hidden in map/photo/pause).
+  if (G.hud && G.hud.drawWaypoint) G.hud.drawWaypoint();
 }
 
 // =============================================================================
