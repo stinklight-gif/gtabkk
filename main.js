@@ -4,6 +4,8 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { makeAudio } from './audio.js';
+import { makeInput } from './input.js';
 
 // =============================================================================
 // 0. UTILITIES
@@ -65,7 +67,7 @@ const COLORS = {
 };
 
 // Global container, populated by init()
-const G = {
+export const G = {
   THREE, scene: null, camera: null, renderer: null, clock: null,
   audio: null,           // AudioContext + helpers
   state: 'loading',      // 'playing' | 'paused' | 'phone' | 'map'
@@ -81,13 +83,28 @@ const G = {
   bullets: [],
   particles: [],
   effects: [],
-  time: { dayT: 0.27, weather: 'clear', rainStrength: 0 }, // 0..1 of a 4-min day
+  time: { dayT: 0.27, weather: 'clear', rainStrength: 0, day: 0 }, // dayT 0..1; day = whole days elapsed
+  // Loy Krathong festival — floats + sky lanterns drift on the river on schedule nights
+  festival: { active: false, floats: [], lanterns: [], announcedDay: -1 },
   wanted: { stars: 0, lastSeenAt: 0, lastSeenPos: new THREE.Vector3() },
   cash: 100,
   notifQueue: [],
   paused: false,
+  hitStop: 0,            // seconds of slow-mo remaining after a solid hit
+  skids: [],             // tire-skid decals (faded over time)
+  dust: [],              // impact dust puffs
   groundHelpers: null,
+  // Player property / ownership economy (persisted in the save).
+  econ: {
+    safehouse: { owned: false, pos: null },           // buyable respawn point
+    garage: { rented: false, stored: [], capacity: 4, retrieveIdx: 0 }, // stored: [{kind,color,plate,hp}]
+  },
 };
+
+// Economy prices (one place to balance the money sinks).
+const PRICE = { safehouse: 12000, garageRent: 4000, repaint: 250 };
+// Paint colors offered at the garage.
+const PAINT_COLORS = [0xd44b3b, 0xf3f3f3, 0x2a3a55, 0x1e9a5e, 0xe0b020, 0x101015, 0x8c3a8c, 0x35506e, 0xd96a2a];
 
 window.GAME = G; // for poking around in the console
 
@@ -97,7 +114,7 @@ window.GAME = G; // for poking around in the console
 // of them can be turned off with a one-line change.
 // -----------------------------------------------------------------------------
 const ROAD_WIDTH = 12;          // matches buildWorld's local ROAD_W
-const PED_TARGET = 60;          // pedestrians are topped back up to this count
+const PED_TARGET = 82;          // peak crowd cap; scaled by crowdFactor(dayT) per time of day
 
 const GAMEPLAY = {
   armor: true,            // armor soaks damage before HP
@@ -177,208 +194,10 @@ function disposeObject(obj) {
 }
 
 // =============================================================================
-// 1. AUDIO
-// =============================================================================
-
-function makeAudio() {
-  const ctx = new (window.AudioContext || window.webkitAudioContext)();
-  const master = ctx.createGain(); master.gain.value = 0.55; master.connect(ctx.destination);
-
-  // simple beep helper
-  function blip({freq=440, dur=0.15, type='sine', gain=0.2, attack=0.005, release=0.05, freqEnd=null}) {
-    const t = ctx.currentTime;
-    const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(freq, t);
-    if (freqEnd != null) o.frequency.exponentialRampToValueAtTime(Math.max(20, freqEnd), t + dur);
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(gain, t + attack);
-    g.gain.linearRampToValueAtTime(0.0001, t + dur + release);
-    o.connect(g).connect(master);
-    o.start(t); o.stop(t + dur + release + 0.02);
-  }
-
-  function noise(dur=0.2, gain=0.15, lp=2000) {
-    const t = ctx.currentTime;
-    const buf = ctx.createBuffer(1, Math.floor(ctx.sampleRate * dur), ctx.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
-    const src = ctx.createBufferSource(); src.buffer = buf;
-    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lp;
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(gain, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-    src.connect(f).connect(g).connect(master);
-    src.start(t);
-  }
-
-  // 7-Eleven door chime — iconic ding-dong (Bb5 then F5)
-  function chime() {
-    blip({freq: 932, dur: 0.18, type: 'sine', gain: 0.25, attack: 0.01, release: 0.25});
-    setTimeout(() => blip({freq: 698, dur: 0.28, type: 'sine', gain: 0.25, attack: 0.01, release: 0.4}), 220);
-  }
-
-  // Temple bell — low partial + harmonic
-  function bell() {
-    blip({freq: 196, dur: 1.6, type: 'sine', gain: 0.35, attack: 0.01, release: 0.8});
-    blip({freq: 392, dur: 1.4, type: 'sine', gain: 0.18, attack: 0.01, release: 0.7});
-    blip({freq: 588, dur: 1.0, type: 'sine', gain: 0.08, attack: 0.01, release: 0.5});
-  }
-
-  // Engine looper — looped buffer per vehicle, pitch-shifted by speed
-  function engineLoop({rpmBase=80, harsh=false} = {}) {
-    const o1 = ctx.createOscillator(); o1.type = 'sawtooth'; o1.frequency.value = rpmBase;
-    const o2 = ctx.createOscillator(); o2.type = 'square';   o2.frequency.value = rpmBase * 0.5;
-    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = harsh ? 1800 : 900;
-    const g  = ctx.createGain(); g.gain.value = 0;
-    o1.connect(lp); o2.connect(lp); lp.connect(g).connect(master);
-    o1.start(); o2.start();
-    return {
-      set(speed01, on) {
-        const target = on ? 0.10 + speed01 * 0.18 : 0;
-        g.gain.setTargetAtTime(target, ctx.currentTime, 0.1);
-        const f = rpmBase + speed01 * (harsh ? 380 : 180);
-        o1.frequency.setTargetAtTime(f, ctx.currentTime, 0.08);
-        o2.frequency.setTargetAtTime(f * 0.5, ctx.currentTime, 0.08);
-      },
-      kill() { try { o1.stop(); o2.stop(); g.disconnect(); } catch {} }
-    };
-  }
-
-  // Tuk-tuk two-stroke — needs the buzz
-  function tukTukLoop() {
-    const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 50;
-    const lfo = ctx.createOscillator(); lfo.type = 'square'; lfo.frequency.value = 18;
-    const lfog = ctx.createGain(); lfog.gain.value = 28;
-    lfo.connect(lfog).connect(o.frequency);
-    const lp = ctx.createBiquadFilter(); lp.type = 'bandpass'; lp.frequency.value = 600; lp.Q.value = 1.2;
-    const g  = ctx.createGain(); g.gain.value = 0;
-    o.connect(lp).connect(g).connect(master);
-    o.start(); lfo.start();
-    return {
-      set(speed01, on) {
-        const target = on ? 0.10 + speed01 * 0.18 : 0;
-        g.gain.setTargetAtTime(target, ctx.currentTime, 0.1);
-        const f = 50 + speed01 * 80;
-        o.frequency.setTargetAtTime(f, ctx.currentTime, 0.08);
-        lfo.frequency.setTargetAtTime(15 + speed01 * 22, ctx.currentTime, 0.1);
-      },
-      kill() { try { o.stop(); lfo.stop(); g.disconnect(); } catch {} }
-    };
-  }
-
-  // Footstep, punch, pistol shot, hit, ricochet, siren
-  function step(wet=false)  { noise(0.05, wet ? 0.18 : 0.10, wet ? 4000 : 1200); }
-  function punch()           { noise(0.06, 0.25, 800); blip({freq:120, dur:0.06, type:'sine', gain:0.18, freqEnd:60}); }
-  function kick()            { noise(0.10, 0.30, 600); blip({freq:90, dur:0.10, type:'sine', gain:0.22, freqEnd:40}); }
-  function hit()             { noise(0.08, 0.30, 1500); blip({freq:200, dur:0.05, type:'triangle', gain:0.15, freqEnd:80}); }
-  function shot()            { noise(0.12, 0.45, 3000); blip({freq:1800, dur:0.04, type:'square', gain:0.2, freqEnd:200}); }
-  function ricochet()        { blip({freq:2400, dur:0.18, type:'sawtooth', gain:0.08, freqEnd:1200}); }
-  function reload()          { blip({freq:300, dur:0.05, type:'square', gain:0.12}); setTimeout(()=>blip({freq:200, dur:0.07, type:'square', gain:0.12}), 220); }
-  function whistle()         { blip({freq:1800, dur:0.4, type:'sine', gain:0.18}); }
-  function siren()           {
-    const t = ctx.currentTime;
-    const o = ctx.createOscillator(); o.type = 'sine';
-    const g = ctx.createGain(); g.gain.value = 0.0;
-    g.gain.setValueAtTime(0.0, t);
-    g.gain.linearRampToValueAtTime(0.16, t + 0.05);
-    g.gain.linearRampToValueAtTime(0.0001, t + 0.95);
-    o.frequency.setValueAtTime(700, t);
-    o.frequency.linearRampToValueAtTime(1200, t + 0.45);
-    o.frequency.linearRampToValueAtTime(700, t + 0.9);
-    o.connect(g).connect(master);
-    o.start(t); o.stop(t + 1.0);
-  }
-  function thunder() { noise(1.5, 0.45, 400); }
-  function rumble() { noise(1.2, 0.06, 110); }   // low BTS pass-by rumble
-  function rainBed() {
-    // continuous filtered noise loop for rain
-    const buf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < d.length; i++) d[i] = (Math.random()*2-1) * 0.6;
-    const src = ctx.createBufferSource(); src.buffer = buf; src.loop = true;
-    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 2200; f.Q.value = 0.6;
-    const g = ctx.createGain(); g.gain.value = 0;
-    src.connect(f).connect(g).connect(master);
-    src.start();
-    return { setLevel: v => g.gain.setTargetAtTime(v, ctx.currentTime, 0.5) };
-  }
-  function ambienceBed() {
-    // distant city — low-frequency hum + occasional honks
-    const o = ctx.createOscillator(); o.type='sine'; o.frequency.value=58;
-    const g = ctx.createGain(); g.gain.value=0.045;
-    o.connect(g).connect(master); o.start();
-    return {};
-  }
-
-  function honk() {
-    blip({freq:380, dur:0.25, type:'square', gain:0.12, freqEnd:340});
-  }
-  function bark() {
-    blip({freq:380, dur:0.07, type:'sawtooth', gain:0.18, freqEnd:220});
-    setTimeout(()=>blip({freq:340, dur:0.08, type:'sawtooth', gain:0.16, freqEnd:200}),90);
-  }
-
-  const audio = {
-    ctx, master, chime, bell, step, punch, kick, hit, shot, ricochet, reload,
-    whistle, siren, thunder, rumble, honk, bark,
-    engineLoop, tukTukLoop, blip, rainBed: null, ambienceBed: null,
-    setVolume: v => { master.gain.value = v; },
-  };
-  audio.rainBed = rainBed();
-  audio.ambienceBed = ambienceBed();
-  return audio;
-}
+// 1. AUDIO → ./audio.js
 
 // =============================================================================
-// 2. INPUT
-// =============================================================================
-
-function makeInput() {
-  const keys = new Set();
-  let mouseX = 0, mouseY = 0;
-  let mouseDX = 0, mouseDY = 0;
-  let mouseDown = false, rightDown = false;
-  let pointerLocked = false;
-  let prevKeys = new Set();
-
-  window.addEventListener('keydown', e => {
-    keys.add(e.code);
-    // prevent some defaults
-    if (['Tab','Space','KeyT','KeyB'].includes(e.code)) e.preventDefault();
-  });
-  window.addEventListener('keyup',   e => keys.delete(e.code));
-  window.addEventListener('blur',    ()=> keys.clear());
-  window.addEventListener('mousemove', e => {
-    if (pointerLocked) { mouseDX += e.movementX; mouseDY += e.movementY; }
-    mouseX = e.clientX; mouseY = e.clientY;
-  });
-  window.addEventListener('mousedown', e => { if (e.button===0) mouseDown=true; if (e.button===2) rightDown=true; });
-  window.addEventListener('mouseup',   e => { if (e.button===0) mouseDown=false; if (e.button===2) rightDown=false; });
-  window.addEventListener('contextmenu', e => e.preventDefault());
-  document.addEventListener('pointerlockchange', () => {
-    pointerLocked = document.pointerLockElement != null;
-    // losing the lock while playing (Esc / alt-tab) pauses the game
-    if (!pointerLocked && G.state === 'playing') {
-      G.state = 'paused';
-      const pe = document.getElementById('pause');
-      if (pe) pe.classList.add('show');
-    }
-  });
-
-  return {
-    down: c => keys.has(c),
-    pressed: c => keys.has(c) && !prevKeys.has(c),
-    get mouseDown(){ return mouseDown; },
-    get rightDown(){ return rightDown; },
-    get pointerLocked(){ return pointerLocked; },
-    consumeMouseDelta() { const dx=mouseDX, dy=mouseDY; mouseDX=0; mouseDY=0; return [dx,dy]; },
-    requestLock() {
-      const el = G.renderer.domElement;
-      if (document.pointerLockElement !== el) el.requestPointerLock();
-    },
-    endFrame() { prevKeys = new Set(keys); },
-  };
-}
+// 2. INPUT → ./input.js
 
 // =============================================================================
 // 3. WORLD GENERATION — Sukhumvit, procedural
@@ -780,12 +599,14 @@ function buildWorld(scene) {
   const GARAGE_I = 3, GARAGE_J = -1;  // block reserved for the U-Spray garage
   const YAO_I = -2, YAO_J0 = 2, YAO_J1 = 3;  // two-block Yaowarat market street
   const GUN_I = 3, GUN_J = 1;  // block reserved for the gun shop
+  const SAFE_I = -1, SAFE_J = 1;  // block reserved for the buyable safehouse (≈ -25, 75)
 
   for (let i = -GRID/2; i < GRID/2; i++) {
     for (let j = -GRID/2; j < GRID/2; j++) {
       if (i === TEMPLE_I && j === TEMPLE_J) continue; // temple placed after loop
       if (i === RIVER_I) continue;                    // river column — no buildings
       if (i === GARAGE_I && j === GARAGE_J) continue; // U-Spray garage block
+      if (i === SAFE_I && j === SAFE_J) continue;      // safehouse block
       if (i === YAO_I && (j === YAO_J0 || j === YAO_J1)) continue; // Yaowarat market
       if (i === GUN_I && j === GUN_J) continue; // gun shop block
       const cx = (i + 0.5) * BLOCK;
@@ -1498,6 +1319,38 @@ function buildWorld(scene) {
     // service trigger zone
     world.garages = world.garages || [];
     world.garages.push({ pos: new THREE.Vector3(gx, 0, gz), r: 7, cooldownUntil: 0 });
+    // garage door — where retrieved/stored vehicles sit (front, on the open south side)
+    world.garageDoor = new THREE.Vector3(gx, 0, gz - depth / 2 - 4);
+  }
+
+  // ---- Safehouse: a buyable townhouse that becomes your respawn point ----
+  {
+    const hx = (SAFE_I + 0.5) * BLOCK, hz = (SAFE_J + 0.5) * BLOCK;  // ≈ (-25, 75)
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0xb8a78a, roughness: 0.85 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x6a3a2a, roughness: 0.8 });
+    const doorMat = new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.7 });
+    // two-storey shophouse front, set back from the south road
+    const W = 9, D = 8, H = 8;
+    const body = new THREE.Mesh(new THREE.BoxGeometry(W, H, D), wallMat);
+    body.position.set(hx, H / 2, hz); body.castShadow = true; body.receiveShadow = true; scene.add(body);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(W + 0.8, 0.6, D + 0.8), roofMat);
+    roof.position.set(hx, H + 0.3, hz); roof.castShadow = true; scene.add(roof);
+    const doorZ = hz - D / 2 - 0.05;
+    const door = new THREE.Mesh(new THREE.BoxGeometry(1.6, 3.2, 0.2), doorMat);
+    door.position.set(hx, 1.6, doorZ); scene.add(door);
+    // a little balcony slab for silhouette
+    const balcony = new THREE.Mesh(new THREE.BoxGeometry(W * 0.8, 0.2, 1.4), wallMat);
+    balcony.position.set(hx, 4.4, hz - D / 2 - 0.7); balcony.castShadow = true; scene.add(balcony);
+    // sign over the door — red FOR SALE until bought, green HOME after (toggled at runtime)
+    const signMat = new THREE.MeshStandardMaterial({ color: 0xff3344, emissive: 0xff3344, emissiveIntensity: 0.5, roughness: 0.5 });
+    G.nightEmissive.push({ mat: signMat, dayIntensity: 0.5, nightIntensity: 1.4 });
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(4, 1), signMat);
+    sign.position.set(hx, H - 1, hz - D / 2 - 0.12); sign.rotation.y = PI; scene.add(sign);
+    // collision: the house body is a solid building
+    world.buildings.push({ pos: new THREE.Vector3(hx, H / 2, hz), size: new THREE.Vector3(W, H, D) });
+    world.poi.safehouse = new THREE.Vector3(hx, 0, doorZ - 2.5);   // stand-here door spot
+    world.safehouseSign = signMat;
+    G.econ.safehouse.pos = new THREE.Vector3(hx, 0, doorZ - 4);    // respawn just outside the door
   }
 
   // ---- Gun shop: buy weapons/ammo with cash (on foot) ----
@@ -2111,29 +1964,118 @@ function makeVehicle(kind, scene) {
 // 6. NPCs — pedestrians, soi dogs, cops
 // =============================================================================
 
+// Pedestrian archetypes — silhouette + palette variety so the crowd reads as a
+// city, not a row of identical capsules. Returns a Group with an animatable limb
+// rig in userData.parts {torso, head, legL, legR, armL, armR}. `torso` stays one
+// mesh so the mugger/target/kill recolor sites keep working; forearms are bare
+// skin (Bangkok heat) so recoloring the torso never leaves mismatched sleeves.
 function makePedMesh() {
   const g = new THREE.Group();
   const roll = Math.random();
-  const monk = roll < 0.08;                 // saffron-robed monk
-  const tourist = !monk && roll < 0.26;     // bright shirt + backpack
-  const shirtColor = monk ? 0xe0892e
-    : tourist ? pick([0xff6a3a, 0x39c6c0, 0xffd23a, 0x6a3aff])
-    : pick([0xffffff, 0xeeeeee, 0xdeb887, 0x223344, 0x556677, 0xb04040, 0xddcc88]);
-  const pantsColor = monk ? 0xc8761f : pick([0x222, 0x111, 0x445566, 0x804020]);
-  const skin = pick([0xc69472, 0xb88060, 0xd6a785, 0xa57755]);
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.3, 0.55, 4, 6), new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.8 }));
-  torso.position.y = 0.95; g.add(torso);
-  const legs = new THREE.Mesh(new THREE.CapsuleGeometry(0.24, 0.5, 4, 6), new THREE.MeshStandardMaterial({ color: pantsColor }));
-  legs.position.y = 0.4; g.add(legs);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), new THREE.MeshStandardMaterial({ color: skin }));
-  head.position.y = 1.5; g.add(head);
-  if (tourist) {
-    const pack = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.42, 0.2), new THREE.MeshStandardMaterial({ color: pick([0x2a3a55, 0x803030, 0x2a5a3a]), roughness: 0.85 }));
-    pack.position.set(0, 1.0, -0.28); g.add(pack);
+  let kind;
+  if (roll < 0.07) kind = 'monk';
+  else if (roll < 0.20) kind = 'tourist';
+  else if (roll < 0.34) kind = 'office';
+  else if (roll < 0.44) kind = 'vendor';
+  else if (roll < 0.55) kind = 'laborer';
+  else kind = 'local';
+
+  const skin = pick([0xc69472, 0xb88060, 0xd6a785, 0xa57755, 0x8d5a3a]);
+  const skinMat = new THREE.MeshStandardMaterial({ color: skin, roughness: 0.7 });
+
+  let shirtColor, pantsColor, bareArms = true, skirt = false;
+  switch (kind) {
+    case 'monk':    shirtColor = 0xe0892e; pantsColor = 0xd0801f; break;
+    case 'tourist': shirtColor = pick([0xff6a3a, 0x39c6c0, 0xffd23a, 0x6a3aff, 0xff4f8b]);
+                    pantsColor = pick([0xd9d2c7, 0x8090a0, 0x6a5a45]); break;          // shorts
+    case 'office':  shirtColor = pick([0xffffff, 0xeaf0f6, 0xc7d6e6, 0xf0e6d2]);
+                    pantsColor = pick([0x222831, 0x33384a, 0x4a3a2a]); bareArms = false; break;
+    case 'vendor':  shirtColor = pick([0xd9d2c7, 0xc94f3a, 0x3a7d5a, 0xe0c060]);
+                    pantsColor = pick([0x33384a, 0x222222, 0x5a4030]); break;
+    case 'laborer': shirtColor = pick([0x6a8fb0, 0x9a8a60, 0xb0b0b0, 0x7a6a5a]);
+                    pantsColor = pick([0x3a4658, 0x4a3a2a, 0x222222]); break;
+    default:        shirtColor = pick([0xffffff, 0xeeeeee, 0xdeb887, 0x223344, 0x556677, 0xb04040, 0xddcc88, 0x3a6a8a]);
+                    pantsColor = pick([0x222222, 0x111111, 0x445566, 0x804020, 0x33384a]);
   }
-  g.userData.parts = { torso, legs, head };
-  g.castShadow = true;
+  if ((kind === 'local' || kind === 'office') && Math.random() < 0.28) skirt = true;
+
+  const shirtMat = new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.82 });
+  const pantsMat = new THREE.MeshStandardMaterial({ color: pantsColor, roughness: 0.85 });
+  const armMat = bareArms ? skinMat : shirtMat;
+
+  // torso — single mesh (recolor sites swap this material); flattened for shoulders
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.4, 3, 8), shirtMat);
+  torso.position.y = 1.18; torso.scale.set(1.18, 1, 0.72); torso.castShadow = true; g.add(torso);
+
+  // head + hair/hat
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.135, 10, 8), skinMat);
+  head.position.y = 1.5; head.castShadow = true; g.add(head);
+  if (kind === 'vendor' || kind === 'laborer') {
+    const hat = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.2, 10), new THREE.MeshStandardMaterial({ color: 0xcba76a, roughness: 0.9 }));
+    hat.position.y = 1.6; g.add(hat);                                   // conical straw hat
+  } else if (kind === 'tourist' && Math.random() < 0.6) {
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6, 0, TAU, 0, PI/2), new THREE.MeshStandardMaterial({ color: pick([0xb03030, 0x305080, 0xf0f0f0]) }));
+    cap.position.y = 1.55; g.add(cap);
+  } else if (kind !== 'monk') {
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.145, 8, 6, 0, TAU, 0, PI/1.7), new THREE.MeshStandardMaterial({ color: pick([0x1a1410, 0x2a2018, 0x0a0a0a]) }));
+    hair.position.y = 1.5; g.add(hair);
+  }
+
+  // limbs — geometry offset so the mesh origin sits at the joint (rotation.x pivots there)
+  function limb(len, r, mat, cast) {
+    const geo = new THREE.CapsuleGeometry(r, len, 3, 6);
+    geo.translate(0, -(len / 2 + r), 0);
+    const m = new THREE.Mesh(geo, mat); m.castShadow = !!cast; return m;
+  }
+  const hipY = 0.92, shoulderY = 1.42;
+  let legL, legR;
+  if (skirt) {
+    const sk = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.5, 10), pantsMat);
+    sk.position.y = 0.7; sk.castShadow = true; g.add(sk);
+    legL = limb(0.3, 0.07, skinMat, false); legL.position.set(-0.08, 0.42, 0);
+    legR = limb(0.3, 0.07, skinMat, false); legR.position.set( 0.08, 0.42, 0);
+  } else {
+    legL = limb(0.62, 0.085, pantsMat, true); legL.position.set(-0.09, hipY, 0);
+    legR = limb(0.62, 0.085, pantsMat, true); legR.position.set( 0.09, hipY, 0);
+  }
+  g.add(legL); g.add(legR);
+  const armL = limb(0.5, 0.06, armMat, false); armL.position.set(-0.25, shoulderY, 0); g.add(armL);
+  const armR = limb(0.5, 0.06, armMat, false); armR.position.set( 0.25, shoulderY, 0); g.add(armR);
+
+  // archetype props
+  if (kind === 'tourist') {
+    const pack = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.38, 0.18), new THREE.MeshStandardMaterial({ color: pick([0x2a3a55, 0x803030, 0x2a5a3a]), roughness: 0.85 }));
+    pack.position.set(0, 1.15, -0.22); g.add(pack);
+  } else if (kind === 'office') {
+    const bag = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.22, 0.3), new THREE.MeshStandardMaterial({ color: 0x2a1a10, roughness: 0.6 }));
+    bag.position.set(0, -0.56, 0.02); armR.add(bag);                    // hangs from the hand, swings with the arm
+  } else if (kind === 'monk') {
+    const bowl = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6, 0, TAU, 0, PI/2), new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.7 }));
+    bowl.rotation.x = PI; bowl.position.set(0, 1.0, 0.2); g.add(bowl);
+  }
+
+  const build = rand(0.92, 1.08);
+  g.scale.set(build, rand(0.94, 1.06), build);
+  g.userData.parts = { torso, head, legL, legR, armL, armR };
+  g.userData.kind = kind;
+  g.userData.phase = rand(0, TAU);
   return g;
+}
+
+// Shared limb animator for peds + foot cops: advances a per-mesh walk phase and
+// swings legs/arms (arms opposite the same-side leg). `moving` false → near-still
+// idle with a faint breathing bob.
+function animateWalk(mesh, speed, dt, moving) {
+  const p = mesh.userData.parts; if (!p) return;
+  const ud = mesh.userData;
+  ud.phase = (ud.phase || 0) + (moving ? (1.6 + speed) * dt * 2.0 : dt * 1.2);
+  const amp = moving ? Math.min(0.7, 0.3 + speed * 0.16) : 0.05;
+  const s = Math.sin(ud.phase), c = Math.sin(ud.phase + PI);
+  if (p.legL) p.legL.rotation.x = s * amp;
+  if (p.legR) p.legR.rotation.x = c * amp;
+  if (p.armL) p.armL.rotation.x = c * amp * 0.9;
+  if (p.armR) p.armR.rotation.x = s * amp * 0.9;
+  if (p.torso) p.torso.position.y = 1.18 + (moving ? 0 : Math.sin(ud.phase * 0.7) * 0.012);
 }
 
 function makeDogMesh() {
@@ -2149,6 +2091,20 @@ function makeDogMesh() {
     leg.position.set(x, 0.11, z); g.add(leg);
   }
   return g;
+}
+
+// A point on a sidewalk near (cx,cz): sample within `radius`, then snap onto the
+// band just outside the nearer road centerline so peds populate the pavements
+// (and read as a crowd down whatever street the camera faces) rather than a
+// uniform disc that scatters most of them into blocks and side streets.
+function sidewalkPos(cx, cz, radius) {
+  const ang = rand(0, TAU), r = rand(6, radius);
+  let x = cx + Math.cos(ang) * r, z = cz + Math.sin(ang) * r;
+  const roadX = Math.round(x / BLOCK) * BLOCK, roadZ = Math.round(z / BLOCK) * BLOCK;
+  const sw = ROAD_WIDTH / 2 + rand(1.0, 2.4);    // sidewalk band hugging the curb
+  if (Math.abs(x - roadX) < Math.abs(z - roadZ)) x = roadX + (Math.random() < 0.5 ? -sw : sw);
+  else z = roadZ + (Math.random() < 0.5 ? -sw : sw);
+  return new THREE.Vector3(clamp(x, -HALF + 5, HALF - 5), 0, clamp(z, -HALF + 5, HALF - 5));
 }
 
 function spawnPed(scene, pos) {
@@ -2243,11 +2199,7 @@ function spawnBoat(scene) {
 
 function spawnPeds(scene, n) {
   for (let i = 0; i < n; i++) {
-    const blockI = irand(-GRID/2, GRID/2-1);
-    const blockJ = irand(-GRID/2, GRID/2-1);
-    const cx = (blockI + 0.5) * BLOCK + rand(-BLOCK/2 + ROAD_WIDTH/2, BLOCK/2 - ROAD_WIDTH/2);
-    const cz = (blockJ + 0.5) * BLOCK + rand(-BLOCK/2 + ROAD_WIDTH/2, BLOCK/2 - ROAD_WIDTH/2);
-    spawnPed(scene, new THREE.Vector3(cx, 0, cz));
+    spawnPed(scene, sidewalkPos(rand(-HALF + 12, HALF - 12), rand(-HALF + 12, HALF - 12), 8));
   }
 }
 
@@ -2320,6 +2272,10 @@ function saveGame() {
       welcomeDone: !!G._welcomeDone,
       soiRunWon: !!G._soiRunWon, hitDone: !!G._hitDone,
       px: p.group.position.x, pz: p.group.position.z,
+      // property / ownership economy
+      safehouseOwned: !!G.econ.safehouse.owned,
+      garageRented: !!G.econ.garage.rented,
+      garageStored: G.econ.garage.stored,
     }));
   } catch (e) { /* storage unavailable — ignore */ }
 }
@@ -2371,6 +2327,15 @@ function loadGame() {
   if (s.soiRunWon) G._soiRunWon = true;
   if (s.hitDone) G._hitDone = true;
   if (s.welcomeDone) { G._welcomeDone = true; if (G.mission.resume) G.mission.resume(true); }
+  // property / ownership economy
+  if (s.safehouseOwned) { G.econ.safehouse.owned = true; markSafehouseOwned(); }
+  if (s.garageRented) G.econ.garage.rented = true;
+  if (Array.isArray(s.garageStored)) {
+    G.econ.garage.stored = s.garageStored
+      .filter(v => v && typeof v.kind === 'string')
+      .map(v => ({ kind: v.kind, color: v.color | 0, plate: String(v.plate || ''), hp: typeof v.hp === 'number' ? v.hp : 100 }))
+      .slice(0, G.econ.garage.capacity);
+  }
   G.hud.setCash(G.cash);
   updateAmmoHud();
 }
@@ -2448,6 +2413,7 @@ async function init() {
   { const v = spawnCopCar(scene, new THREE.Vector3(50, 0, 90)); v.driver = null; v.vel = 0; v.heading = 0; v.mesh.rotation.y = 0; }
   spawnPeds(scene, 60);
   spawnDogs(scene, 16);
+  buildClusterAnchors();
   setProgress(88);
 
   // A parked motorbike right next to the player so they can grab it immediately
@@ -2750,7 +2716,7 @@ function makeMissionSystem() {
             this.stage = 2;
             G.hud.showSubtitle("Uncle Seng: \"Good, kid. The envelope.\"", "ลุงเซ้ง: \"ดีแล้ว ส่งมา\"");
             G._welcomeDone = true;
-            G.cash += 800;
+            G.cash += 1200;
             G.hud.setCash(G.cash);
             if (GAMEPLAY.armor) G.player.armor = Math.min(G.player.armorMax, G.player.armor + 50);
             G.hud.showNotif('Mission complete: +฿800, +Armor');
@@ -2799,7 +2765,7 @@ function makeMissionSystem() {
       ],
       startTime: 55,   // seconds on the clock when you cross the start line
       cpBonus: 15,     // seconds added per checkpoint reached
-      reward: 1500,
+      reward: 2500,
       onStart() {
         this.stage = 1;
         this.cp = 0;
@@ -2885,7 +2851,7 @@ function makeMissionSystem() {
         new THREE.Vector3( 120, 0,  120),
         new THREE.Vector3( -40, 0, -150),
       ],
-      reward: 2000,
+      reward: 4000,
       onStart() {
         this.stage = 1;
         this.targets = [];
@@ -2954,7 +2920,7 @@ function makeMissionSystem() {
       drop: new THREE.Vector3(-150, 0, 150),
       home: new THREE.Vector3(100, 0, -50),
       startTime: 75,   // generous: you start at 3★ and spike strips can blow your tires
-      reward: 3000,
+      reward: 6000,
       onStart() {
         this.stage = 1;
         this.timeLeft = this.startTime;
@@ -3062,12 +3028,66 @@ function resolveVehicleVsBuildings(v) {
       v.hp -= Math.abs(v.vel) * 0.6;
       G.camRig.shake = Math.min(0.4, Math.abs(v.vel) * 0.02);
       G.audio.hit();
+      spawnDust(p.x, p.z, 16);                 // impact puff
     }
     v.vel *= 0.4;
   }
   // bounds
   p.x = clamp(p.x, -HALF + 1, HALF - 1);
   p.z = clamp(p.z, -HALF + 1, HALF - 1);
+}
+
+// ---- Juice FX: tire-skid decals + impact dust puffs ----
+const _skidGeo = new THREE.PlaneGeometry(0.34, 1.2); _skidGeo.rotateX(-PI / 2);  // lies flat, length along +Z
+const _skidMat = new THREE.MeshBasicMaterial({ color: 0x0b0b0b, transparent: true, opacity: 0.5, depthWrite: false });
+function spawnSkid(v) {
+  const now = performance.now();
+  if (now - (v._skidAt || 0) < 45) return;     // throttle
+  v._skidAt = now;
+  const fx = Math.sin(v.heading), fz = Math.cos(v.heading);
+  const rx = Math.cos(v.heading), rz = -Math.sin(v.heading);
+  for (const lat of [-0.7, 0.7]) {
+    const m = new THREE.Mesh(_skidGeo, _skidMat.clone());
+    m.position.set(v.pos.x + rx * lat - fx * 1.1, 0.045, v.pos.z + rz * lat - fz * 1.1);
+    m.rotation.y = v.heading;
+    m.frustumCulled = false;
+    G.scene.add(m);
+    G.skids.push({ mesh: m, life: 5 });
+  }
+  while (G.skids.length > 90) { const s = G.skids.shift(); G.scene.remove(s.mesh); s.mesh.material.dispose(); }
+}
+function updateSkids(dt) {
+  for (let i = G.skids.length - 1; i >= 0; i--) {
+    const s = G.skids[i]; s.life -= dt;
+    s.mesh.material.opacity = Math.max(0, s.life / 5 * 0.5);
+    if (s.life <= 0) { G.scene.remove(s.mesh); s.mesh.material.dispose(); G.skids.splice(i, 1); }
+  }
+}
+function spawnDust(x, z, n = 14) {
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(n * 3), vel = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    pos[i * 3] = x; pos[i * 3 + 1] = 0.3; pos[i * 3 + 2] = z;
+    const a = Math.random() * TAU, sp = rand(1, 4.5);
+    vel[i * 3] = Math.cos(a) * sp; vel[i * 3 + 1] = rand(1, 3.2); vel[i * 3 + 2] = Math.sin(a) * sp;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.PointsMaterial({ color: 0xbcae98, size: 0.55, transparent: true, opacity: 0.7, depthWrite: false });
+  const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; G.scene.add(pts);
+  G.dust.push({ pts, vel, life: 0.6 });
+}
+function updateDust(dt) {
+  for (let i = G.dust.length - 1; i >= 0; i--) {
+    const d = G.dust[i]; d.life -= dt;
+    const a = d.pts.geometry.attributes.position.array;
+    for (let k = 0; k < d.vel.length / 3; k++) {
+      a[k * 3] += d.vel[k * 3] * dt; a[k * 3 + 1] = Math.max(0.05, a[k * 3 + 1] + d.vel[k * 3 + 1] * dt); a[k * 3 + 2] += d.vel[k * 3 + 2] * dt;
+      d.vel[k * 3 + 1] -= 6 * dt;
+    }
+    d.pts.geometry.attributes.position.needsUpdate = true;
+    d.pts.material.opacity = Math.max(0, d.life / 0.6 * 0.7);
+    if (d.life <= 0) { G.scene.remove(d.pts); d.pts.geometry.dispose(); d.pts.material.dispose(); G.dust.splice(i, 1); }
+  }
 }
 
 // =============================================================================
@@ -3208,7 +3228,7 @@ function updateCollectibles(dt) {
       G.hud.setCash(G.cash);
       G.audio.blip({ freq: 880, dur: 0.1, gain: 0.12 });
       if (G.collected >= cs.length) {
-        G.cash += 2000; G.hud.setCash(G.cash);
+        G.cash += 3000; G.hud.setCash(G.cash);
         G.hud.showNotif(`All ${cs.length} amulets found! +฿2,000`);
       } else {
         G.hud.showNotif(`Amulet ${G.collected}/${cs.length} (+฿100)`);
@@ -3268,6 +3288,11 @@ function updatePlayerInVehicle(dt) {
   // steering — speed dependent
   const steerRate = spec.turn * (1 - Math.min(1, Math.abs(v.vel)/spec.topSpeed) * 0.4);
   v.heading += steer * steerRate * dt * (v.vel >= 0 ? 1 : -1) * (Math.abs(v.vel)>0.3 ? 1 : 0);
+  // arcade handbrake drift: extra oversteer + lay rubber while sliding
+  if (handbrake && Math.abs(v.vel) > 6 && Math.abs(steer) > 0.15 && spec.kind !== 'boat' && spec.kind !== 'bike') {
+    v.heading += steer * 1.5 * dt * (v.vel >= 0 ? 1 : -1);
+    spawnSkid(v);
+  }
 
   // motorbike lean
   if (v.spec.kind === 'bike') {
@@ -3514,6 +3539,53 @@ function updateBarks(dt) {
   }
 }
 
+// Crowd density by time of day — Bangkok rhythm: dead 2-5am, morning rush,
+// hot midday lull, evening-rush/nightlife peak, late-night taper. Returns 0..1.
+const CROWD_CURVE = [
+  [0, 0.22], [2, 0.10], [5, 0.10], [7, 0.55], [8.5, 1.0], [11, 0.72],
+  [14, 0.72], [16, 0.82], [18.5, 1.0], [21, 0.85], [23, 0.40], [24, 0.22],
+];
+function crowdFactor(dayT) {
+  const h = ((dayT % 1) + 1) % 1 * 24;
+  for (let i = 0; i < CROWD_CURVE.length - 1; i++) {
+    const a = CROWD_CURVE[i], b = CROWD_CURVE[i + 1];
+    if (h >= a[0] && h <= b[0]) return lerp(a[1], b[1], (h - a[0]) / (b[0] - a[0]));
+  }
+  return CROWD_CURVE[0][1];
+}
+function crowdTarget() { return Math.round(PED_TARGET * crowdFactor(G.time.dayT)); }
+
+// Snap the live crowd to the current time-of-day target immediately (spawn the
+// shortfall near the player, cull the farthest excess). Used by the headless
+// harness so a screenshot reflects the hour without waiting for the slow ramp;
+// gameplay reaches the same target gradually via updatePeds.
+function resyncCrowd() {
+  const pp = G.player.group.position;
+  const target = crowdTarget();
+  // pull stray wanderers onto nearby sidewalks so the count near the camera
+  // reflects the hour immediately (harness-only; gameplay distributes gradually)
+  for (const ped of G.peds) {
+    if (ped.isMugger || ped.isTarget || ped.anchor) continue;
+    if (dist2(ped.mesh.position, pp) > 95 * 95) ped.mesh.position.copy(sidewalkPos(pp.x, pp.z, 88));
+  }
+  for (let guard = 0; G.peds.length > target && guard < 500; guard++) {
+    let fi = -1, fd = -1;
+    for (let i = 0; i < G.peds.length; i++) {
+      const ped = G.peds[i];
+      if (ped.isMugger || ped.isTarget || ped.anchor) continue;
+      const d = dist2(ped.mesh.position, pp);
+      if (d > fd) { fd = d; fi = i; }
+    }
+    if (fi < 0) break;
+    G.scene.remove(G.peds[fi].mesh); disposeObject(G.peds[fi].mesh); G.peds.splice(fi, 1);
+  }
+  while (G.peds.length < target) {
+    spawnPed(G.scene, sidewalkPos(pp.x, pp.z, 88));
+  }
+  G._clusterT = 0; updateClusters(0);   // populate nearby stalls/stores for the shot too
+}
+G.resyncCrowd = resyncCrowd;   // exposed on window.GAME for the smoke harness
+
 function updatePeds(dt) {
   const playerPos = G.player.group.position;
   for (const ped of G.peds) {
@@ -3531,6 +3603,14 @@ function updatePeds(dt) {
       if (ped._barkCD <= 0 && (!G.barks || G.barks.length < 8) && Math.random() < 0.04) {
         spawnBark(ped); ped._barkCD = 4;
       }
+    } else if (ped.anchor) {
+      // cluster member: hold a slot at a food stall / 7-Eleven, drifting back
+      // to it if knocked off (e.g. after a panic), then stand and face inward
+      const slot = ped.anchor.slot;
+      const dx = slot.x - ped.mesh.position.x, dz = slot.z - ped.mesh.position.z;
+      const d = Math.hypot(dx, dz);
+      if (d > 0.5) { ped.heading = Math.atan2(dx, dz); ped.speed = 1.1; ped.state = 'returning'; }
+      else { ped.speed = 0; ped.state = 'idle'; ped.heading = ped.anchor.facing; }
     } else if (ped.state === 'walking') {
       // light wander, mostly on sidewalk side of block
       ped.waitT -= dt;
@@ -3542,43 +3622,99 @@ function updatePeds(dt) {
     ped.mesh.position.x += Math.sin(ped.heading) * ped.speed * dt;
     ped.mesh.position.z += Math.cos(ped.heading) * ped.speed * dt;
     ped.mesh.rotation.y = ped.heading;
-    // arm/leg sway
-    const t = performance.now() * 0.006;
-    const parts = ped.mesh.userData.parts;
-    if (parts) parts.legs.rotation.x = Math.sin(t * ped.speed) * 0.4;
+    animateWalk(ped.mesh, ped.speed, dt, ped.speed > 0.05);
 
     // bounds
     ped.mesh.position.x = clamp(ped.mesh.position.x, -HALF + 2, HALF - 2);
     ped.mesh.position.z = clamp(ped.mesh.position.z, -HALF + 2, HALF - 2);
 
-    // despawn far / respawn
-    if (dist2(ped.mesh.position, playerPos) > 180*180) {
-      ped.mesh.position.set(
-        playerPos.x + rand(-90, 90),
-        0,
-        playerPos.z + rand(-90, 90)
-      );
+    // recycle a wanderer that strayed too far back onto a sidewalk in view
+    // (anchored cluster peds stay put — they belong to a stall/store)
+    if (!ped.anchor && dist2(ped.mesh.position, playerPos) > 170*170) {
+      ped.mesh.position.copy(sidewalkPos(playerPos.x, playerPos.z, 75));
     }
   }
-  // keep the streets populated — busier by day, sparser at night
-  const dayK = 1 - (G.nightK || 0);
-  const target = Math.round(PED_TARGET * (0.45 + 0.55 * dayK));
-  while (G.peds.length < target) {
-    const ang = rand(0, TAU), r = rand(60, 100);
-    spawnPed(G.scene, new THREE.Vector3(
-      clamp(playerPos.x + Math.cos(ang) * r, -HALF + 5, HALF - 5), 0,
-      clamp(playerPos.z + Math.sin(ang) * r, -HALF + 5, HALF - 5)));
-  }
-  // thin the night crowd: occasionally drop a far-off ped when over target
-  if (G.peds.length > target && Math.random() < 0.03) {
-    let fi = -1, fd = 80 * 80;
+  // keep the streets populated to the time-of-day target — busy at rush hour,
+  // near-empty in the small hours (see crowdFactor)
+  const target = crowdTarget();
+  if (G.peds.length < target) {
+    spawnPed(G.scene, sidewalkPos(playerPos.x, playerPos.z, 90));   // ramps in smoothly
+  } else if (G.peds.length > target) {
+    // thin toward the target by dropping the farthest non-special ped each frame
+    let fi = -1, fd = 60 * 60;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget) continue;   // never thin mission-relevant peds
+      if (ped.isMugger || ped.isTarget || ped.anchor) continue;
       const d = dist2(ped.mesh.position, playerPos);
       if (d > fd) { fd = d; fi = i; }
     }
     if (fi >= 0) { G.scene.remove(G.peds[fi].mesh); disposeObject(G.peds[fi].mesh); G.peds.splice(fi, 1); }
+  }
+}
+
+// ---- Behavioral clusters: queues at food stalls, loiterers at 7-Elevens ----
+// Each anchor owns a few slot positions; updateClusters keeps the right number
+// of standing peds parked there for the current hour (busy midday/evening,
+// empty in the small hours), only populating anchors near the player.
+function buildClusterAnchors() {
+  G.clusterAnchors = [];
+  for (const f of (G.world.foodStalls || [])) {
+    const theta = rand(0, TAU);
+    const fwd = new THREE.Vector3(Math.sin(theta), 0, Math.cos(theta));
+    const right = new THREE.Vector3(Math.cos(theta), 0, -Math.sin(theta));
+    const slots = [];
+    for (const [d, s] of [[1.25, -0.5], [1.25, 0.55], [2.15, -0.45], [2.15, 0.5]]) {
+      const p = f.pos.clone().addScaledVector(fwd, d).addScaledVector(right, s);
+      slots.push({ pos: p, facing: theta + PI });          // face back toward the cart
+    }
+    G.clusterAnchors.push({ pos: f.pos.clone(), kind: 'food', capacity: 4, slots, peds: [] });
+  }
+  for (const e of (G.world.sevenElevens || [])) {
+    const theta = rand(0, TAU);
+    const slots = [];
+    for (let k = 0; k < 3; k++) {
+      const a = theta + (k - 1) * 0.7;
+      const p = e.pos.clone().add(new THREE.Vector3(Math.sin(a) * 2.7, 0, Math.cos(a) * 2.7));
+      slots.push({ pos: p, facing: a + PI + rand(-0.6, 0.6) });   // loiter facing the storefront / each other
+    }
+    G.clusterAnchors.push({ pos: e.pos.clone(), kind: 'store', capacity: 3, slots, peds: [] });
+  }
+}
+
+function spawnAnchoredPed(anchor, slot, slotIdx) {
+  const ped = spawnPed(G.scene, slot.pos.clone());
+  ped.anchor = { pos: anchor.pos, slot: slot.pos.clone(), facing: slot.facing };
+  ped._slotIdx = slotIdx;
+  ped.state = 'idle'; ped.speed = 0;
+  ped.mesh.rotation.y = slot.facing;
+  anchor.peds.push(ped);
+  return ped;
+}
+
+function updateClusters(dt) {
+  if (!G.clusterAnchors) return;
+  G._clusterT = (G._clusterT || 0) - dt;
+  if (G._clusterT > 0) return;
+  G._clusterT = 1.5;                                   // re-evaluate occupancy a couple times a second of sim
+  const pp = G.player.group.position;
+  const cf = crowdFactor(G.time.dayT);
+  for (const a of G.clusterAnchors) {
+    a.peds = a.peds.filter(p => !p.dead && p.anchor);  // drop any that died / got repurposed
+    const near = dist2(a.pos, pp) < 135 * 135;
+    const occ = a.kind === 'store' ? clamp(cf * 1.15, 0, 1) : cf;
+    const want = near ? Math.round(a.capacity * occ) : 0;
+    while (a.peds.length < want && a.peds.length < a.slots.length) {
+      const used = new Set(a.peds.map(p => p._slotIdx));
+      let si = -1;
+      for (let k = 0; k < a.slots.length; k++) if (!used.has(k)) { si = k; break; }
+      if (si < 0) break;
+      spawnAnchoredPed(a, a.slots[si], si);
+    }
+    while (a.peds.length > want) {
+      const ped = a.peds.pop();
+      G.scene.remove(ped.mesh); disposeObject(ped.mesh);
+      const idx = G.peds.indexOf(ped); if (idx >= 0) G.peds.splice(idx, 1);
+    }
   }
 }
 
@@ -3627,7 +3763,7 @@ function updateMuggings(dt) {
   if (m) {
     m.t += dt;
     if (m.ped.dead) {                                  // player took them down
-      const reward = 250;
+      const reward = 400;
       G.cash += reward; G.hud.setCash(G.cash);
       G.hud.showNotif(`Stopped the snatcher! +฿${reward}`);
       G.audio.blip({ freq: 720, dur: 0.12, gain: 0.12 });
@@ -3939,6 +4075,8 @@ function updateAmmoHud() {
   else G.hud.setAmmo(`${p.pistolAmmo} / ${p.pistolReserve}`, '9MM PISTOL');
 }
 
+function triggerHitStop(s) { G.hitStop = Math.max(G.hitStop || 0, s); }
+
 function doMeleeHit(kind) {
   const p = G.player;
   const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw);
@@ -3956,6 +4094,8 @@ function doMeleeHit(kind) {
         target.hp -= (kind === 'kick' ? 22 : kind === 'cross' ? 18 : 12);
         target.panicT = 6;
         hitSomething = true;
+        triggerHitStop(kind === 'kick' ? 0.07 : 0.05);     // freeze-frame the impact
+        G.camRig.shake = Math.max(G.camRig.shake, kind === 'kick' ? 0.16 : 0.1);
         if (target.hp <= 0) {
           if (G.cops.includes(target)) killCop(target);
           else killPed(target);
@@ -4079,6 +4219,7 @@ function doBulletRaycast(origin, dir, dmg = 35) {
     if (t.actor) {
       t.obj.hp -= dmg;
       t.obj.panicT = 6;
+      triggerHitStop(0.035);                 // tiny freeze so a connecting shot reads
       if (t.obj.hp <= 0) {
         if (G.cops.includes(t.obj)) killCop(t.obj);
         else killPed(t.obj);
@@ -4118,9 +4259,13 @@ function updateBullets(dt) {
 function spawnCop(scene, pos) {
   // foot cop
   const m = makePedMesh();
-  // override clothing to brown/khaki
-  m.userData.parts.torso.material = new THREE.MeshStandardMaterial({ color: 0x8a7f4a, roughness: 0.7 });
-  m.userData.parts.legs.material  = new THREE.MeshStandardMaterial({ color: 0x4a4030, roughness: 0.8 });
+  // override clothing to brown/khaki cop uniform
+  const copShirt = new THREE.MeshStandardMaterial({ color: 0x8a7f4a, roughness: 0.7 });
+  const copPants = new THREE.MeshStandardMaterial({ color: 0x4a4030, roughness: 0.8 });
+  const pp = m.userData.parts;
+  pp.torso.material = copShirt;
+  pp.armL.material = pp.armR.material = copShirt;
+  pp.legL.material = pp.legR.material = copPants;
   m.position.copy(pos);
   scene.add(m);
   const cop = {
@@ -4345,8 +4490,7 @@ function updateFootCops(dt) {
       }
     }
     c.mesh.rotation.y = c.heading;
-    const parts = c.mesh.userData.parts;
-    if (parts) parts.legs.rotation.x = Math.sin(performance.now()*0.012) * 0.5;
+    animateWalk(c.mesh, c.speed || 2.0, dt, true);
   }
 }
 
@@ -4376,11 +4520,13 @@ function respawnPlayer() {
   // clear any active cops — clean slate on respawn
   for (let i = G.cops.length - 1; i >= 0; i--) { G.scene.remove(G.cops[i].mesh); disposeObject(G.cops[i].mesh); G.cops.splice(i, 1); }
   for (let i = G.vehicles.length - 1; i >= 0; i--) { if (G.vehicles[i].isCop) { G.scene.remove(G.vehicles[i].mesh); disposeObject(G.vehicles[i].mesh); G.vehicles.splice(i, 1); } }
-  const sp = G.world.spawns.player.clone();
+  const home = G.econ.safehouse.owned && G.econ.safehouse.pos;
+  const sp = (home ? G.econ.safehouse.pos : G.world.spawns.player).clone();
   p.group.position.copy(sp);
   p.velocity.set(0, 0, 0);
   if (p.inVehicle) { p.inVehicle.driver = null; p.inVehicle = null; p.group.visible = true; }
-  G.hud.showSubtitle('You wake up at the police station.', 'ตื่นมาที่โรงพัก');
+  if (home) G.hud.showSubtitle('You wake up at home.', 'ตื่นที่บ้าน');
+  else G.hud.showSubtitle('You wake up at the police station.', 'ตื่นมาที่โรงพัก');
 }
 
 // =============================================================================
@@ -4450,6 +4596,12 @@ function updateInteraction(dt) {
   const p = G.player;
   if (p.inVehicle) return;
 
+  // Inside the garage shed, let updateGarageOwnership own the E key (rent/retrieve)
+  // so the enter-vehicle prompt doesn't fight it. The garage door sits just
+  // outside this radius, so a car parked/retrieved there is still enterable.
+  const gg = G.world.garages && G.world.garages[0];
+  if (gg && dist2(p.group.position, gg.pos) < gg.r * gg.r) return;
+
   // find nearest vehicle within reach that isn't a cop unit or a burning wreck
   let near = null, nd = Infinity;
   for (const v of G.vehicles) {
@@ -4468,6 +4620,7 @@ function updateInteraction(dt) {
   } else {
     updateGunShop(dt);   // E does shop business only when no vehicle is in reach
     update7Eleven(dt);
+    updateSafehouse(dt);
   }
 }
 
@@ -4486,6 +4639,39 @@ function update7Eleven(dt) {
     }
   }
 }
+// Safehouse (on foot at the door): buy it once, then rest to heal + save. Owning
+// it makes it your respawn point instead of the police station.
+function updateSafehouse(dt) {
+  const p = G.player;
+  const door = G.world.poi && G.world.poi.safehouse;
+  if (!door || dist2(p.group.position, door) > 6 * 6) return;
+  const sh = G.econ.safehouse;
+  if (!sh.owned) {
+    G.hud.showPrompt(`Safehouse for sale — <b>E</b>: buy (฿${PRICE.safehouse.toLocaleString()})`, 0.4);
+    if (G.input.pressed('KeyE')) {
+      if (G.cash < PRICE.safehouse) { G.hud.showNotif('Not enough cash for the safehouse'); return; }
+      G.cash -= PRICE.safehouse; G.hud.setCash(G.cash);
+      sh.owned = true;
+      markSafehouseOwned();
+      G.hud.showNotif('Safehouse bought — you respawn here now');
+      G.audio.chime();
+      saveGame();
+    }
+  } else {
+    G.hud.showPrompt('Home — <b>E</b>: rest (heal + save)', 0.4);
+    if (G.input.pressed('KeyE')) {
+      p.hp = p.hpMax; if (typeof p.stam === 'number') p.stam = p.stamMax;
+      G.hud.showNotif('Rested at home — healed & saved');
+      G.audio.chime();
+      saveGame();
+    }
+  }
+}
+function markSafehouseOwned() {
+  const m = G.world.safehouseSign;
+  if (m) { m.color.setHex(0x39ff7a); m.emissive.setHex(0x39ff7a); }   // FOR SALE → HOME
+}
+
 function storeBuy(item) {
   const p = G.player;
   let ok = false;
@@ -4549,10 +4735,26 @@ function updateCamera(dt) {
   rig.distance = lerp(rig.distance, rig.targetDistance, 0.08);
   const cy = Math.cos(rig.yaw), sy = Math.sin(rig.yaw);
   const cp = Math.cos(rig.pitch), sp = Math.sin(rig.pitch);
-  _camOffset.set(sy * cp, -sp, cy * cp).multiplyScalar(rig.distance);
-  rig.cam.position.copy(_camTarget).add(_camOffset);
+  _camOffset.set(sy * cp, -sp, cy * cp);                 // unit direction target → camera
+  // Occlusion: never let the camera sit inside a building. Cast target → camera
+  // against nearby building AABBs and pull the camera in to just shy of the wall.
+  let camDist = rig.distance;
+  _ray.ray.origin.copy(_camTarget);
+  _ray.ray.direction.copy(_camOffset);
+  for (const b of G.world.buildings) {
+    if (dist2(b.pos, _camTarget) > 50 * 50) continue;
+    _bbox.min.set(b.pos.x - b.size.x / 2, b.pos.y - b.size.y / 2, b.pos.z - b.size.z / 2);
+    _bbox.max.set(b.pos.x + b.size.x / 2, b.pos.y + b.size.y / 2, b.pos.z + b.size.z / 2);
+    const hit = _ray.ray.intersectBox(_bbox, _vBox);
+    if (hit) { const d = _camTarget.distanceTo(hit) - 0.4; if (d < camDist) camDist = Math.max(1.1, d); }
+  }
+  rig.cam.position.copy(_camTarget).addScaledVector(_camOffset, camDist);
   rig.cam.position.x += shakeX; rig.cam.position.y += shakeY + 0.6;
   rig.cam.lookAt(_camTarget);
+  // speed-based FOV kick while driving — a little sense of velocity
+  const sp01 = p.inVehicle ? Math.min(1, Math.abs(p.inVehicle.vel) / p.inVehicle.spec.topSpeed) : 0;
+  const targetFov = 72 + sp01 * 14;
+  if (Math.abs(rig.cam.fov - targetFov) > 0.05) { rig.cam.fov = lerp(rig.cam.fov, targetFov, 0.06); rig.cam.updateProjectionMatrix(); }
 }
 
 // =============================================================================
@@ -4564,7 +4766,9 @@ const DAY_LENGTH = 480; // seconds for a full 24h cycle (slow enough that a miss
                         // time-of-day keys off the normalized dayT/nightK, not this.
 
 function updateDayNight(dt) {
+  const prevT = G.time.dayT;
   G.time.dayT = (G.time.dayT + dt / DAY_LENGTH) % 1;
+  if (G.time.dayT < prevT) G.time.day++;     // crossed midnight → a whole day elapsed
   const t = G.time.dayT;          // 0..1, where 0 = midnight, 0.25 = 6am, 0.5 = noon, 0.75 = 6pm
   // sun direction — lateral z-offset keeps noon elevation at ~39° (atan 90/110)
   // so vertical facades still catch direct light at midday; the cos/sin arc
@@ -4658,6 +4862,92 @@ function updateDayNight(dt) {
 }
 
 // =============================================================================
+// 19b. LOY KRATHONG FESTIVAL — floats + sky lanterns on the river, on schedule
+// =============================================================================
+const FESTIVAL_PERIOD = 3;   // every 3rd night the river fills with krathong
+const KRATHONG_COUNT = 42;
+const RIVER_CX = -229;       // river centerline x (from buildWorld)
+
+// A lotus krathong: leaf base + petals + a glowing candle that reads at night.
+function makeKrathong() {
+  const g = new THREE.Group();
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.46, 0.16, 10),
+    new THREE.MeshStandardMaterial({ color: 0x2f7d4f, roughness: 0.8 }));
+  base.position.y = 0.08; g.add(base);
+  const petalMat = new THREE.MeshStandardMaterial({ color: pick([0xff9ec4, 0xffd1e0, 0xfff0d0, 0xffb86b]), roughness: 0.7 });
+  for (let k = 0; k < 8; k++) {
+    const p = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.22, 5), petalMat);
+    const a = k / 8 * TAU;
+    p.position.set(Math.cos(a) * 0.34, 0.18, Math.sin(a) * 0.34);
+    p.rotation.z = Math.cos(a) * 0.5; p.rotation.x = Math.sin(a) * 0.5;
+    g.add(p);
+  }
+  const candle = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.16, 6),
+    new THREE.MeshStandardMaterial({ color: 0xf0e0b0, roughness: 0.6 }));
+  candle.position.y = 0.26; g.add(candle);
+  const flame = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6),
+    new THREE.MeshStandardMaterial({ color: 0xffb030, emissive: 0xffae28, emissiveIntensity: 1.7, roughness: 0.4 }));
+  flame.position.y = 0.4; flame.scale.y = 1.7; g.add(flame);
+  return g;
+}
+// A khom loi sky lantern: a glowing ovoid that rises and fades.
+function makeSkyLantern() {
+  const mat = new THREE.MeshStandardMaterial({ color: 0xff8a2a, emissive: 0xff7a18, emissiveIntensity: 1.4, roughness: 0.6, transparent: true, opacity: 0.92 });
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.34, 0.95, 10), mat);
+  m.userData.mat = mat; m.frustumCulled = false;
+  return m;
+}
+function festivalScheduled() {
+  // every 3rd night is Loy Krathong (offset so a fresh game's first night isn't one)
+  return (G.time.day % FESTIVAL_PERIOD === 2) && (G.nightK || 0) > 0.45;
+}
+function startFestival() {
+  const f = G.festival; f.active = true; f.announcedDay = G.time.day;
+  for (let i = 0; i < KRATHONG_COUNT; i++) {
+    const m = makeKrathong();
+    m.position.set(RIVER_CX + rand(-13, 13), 0.16, rand(-HALF, HALF));
+    m.rotation.y = rand(0, TAU); m.frustumCulled = false; G.scene.add(m);
+    f.floats.push({ mesh: m, speed: rand(1.4, 3.2), spin: rand(-0.3, 0.3), phase: rand(0, TAU) });
+  }
+  G.hud.showSubtitle('Loy Krathong — the river glows with floats.', 'ลอยกระทง');
+  if (G.audio && G.audio.bell) G.audio.bell();
+}
+function stopFestival() {
+  const f = G.festival; f.active = false;
+  for (const k of f.floats) { G.scene.remove(k.mesh); disposeObject(k.mesh); }
+  for (const l of f.lanterns) { G.scene.remove(l.mesh); l.mesh.geometry.dispose(); l.mesh.userData.mat.dispose(); }
+  f.floats = []; f.lanterns = [];
+}
+function spawnSkyLantern() {
+  const m = makeSkyLantern();
+  m.position.set(rand(-HALF, -110), rand(5, 14), rand(-HALF, HALF));   // rise over the riverside/west
+  G.scene.add(m);
+  G.festival.lanterns.push({ mesh: m, rise: rand(2, 4), drift: rand(0.4, 1.5), life: rand(8, 14), maxLife: 14 });
+}
+function updateFestival(dt) {
+  const f = G.festival;
+  const want = festivalScheduled();
+  if (want && !f.active) startFestival();
+  else if (!want && f.active) stopFestival();
+  if (!f.active) return;
+  const now = performance.now();
+  for (const k of f.floats) {
+    k.mesh.position.z += dt * k.speed;                                 // drift downstream
+    k.mesh.position.y = 0.16 + Math.sin(now * 0.002 + k.phase) * 0.03; // gentle bob
+    k.mesh.rotation.y += dt * k.spin;
+    if (k.mesh.position.z > HALF + 5) k.mesh.position.z = -HALF - 5;    // recycle
+  }
+  for (let i = f.lanterns.length - 1; i >= 0; i--) {
+    const l = f.lanterns[i];
+    l.mesh.position.y += dt * l.rise; l.mesh.position.x += dt * l.drift; l.life -= dt;
+    l.mesh.userData.mat.opacity = clamp(l.life / l.maxLife, 0, 1) * 0.92;
+    if (l.life <= 0) { G.scene.remove(l.mesh); l.mesh.geometry.dispose(); l.mesh.userData.mat.dispose(); f.lanterns.splice(i, 1); }
+  }
+  f.lanternT = (f.lanternT || 0) - dt;
+  if (f.lanternT <= 0 && f.lanterns.length < 14) { spawnSkyLantern(); f.lanternT = rand(0.6, 1.7); }
+}
+
+// =============================================================================
 // 20. MAIN LOOP
 // =============================================================================
 
@@ -4693,7 +4983,7 @@ function updateTaxi(dt) {
       taxiBeam(t, t.dest, 0x39ff7a);
       const d = Math.sqrt(dist2(v.pos, t.dest));
       t.timeLeft = 25 + d / 9;
-      t.fareValue = Math.round(80 + d * 4);
+      t.fareValue = Math.round(120 + d * 5);
       t.stage = 'toDropoff';
       G.hud.showNotif('Fare aboard — drop them at the green marker');
       G.audio.blip({ freq: 600, dur: 0.08, gain: 0.1 });
@@ -4757,8 +5047,9 @@ function drawFullMap() {
     { p: poi.temple, t: 'Temple' },
     { p: poi.yaowarat, t: 'Yaowarat' },
     { p: G.world.gunShop, t: 'Guns' },
+    { p: poi.safehouse, t: G.econ.safehouse.owned ? 'Home' : 'Safehouse' },
   ];
-  for (const ga of (G.world.garages || [])) labels.push({ p: ga.pos, t: 'U-Spray' });
+  for (const ga of (G.world.garages || [])) labels.push({ p: ga.pos, t: G.econ.garage.rented ? 'Garage' : 'U-Spray' });
   ctx.fillStyle = '#cfe3e0'; ctx.font = '13px system-ui, sans-serif'; ctx.textAlign = 'center';
   for (const L of labels) if (L.p) ctx.fillText(L.t, to(L.p.x), to(L.p.z) - 8);
   ctx.textAlign = 'left';
@@ -4821,6 +5112,136 @@ function updateGarage(dt) {
   }
 }
 
+// ---- Garage ownership: rent the U-Spray, store/retrieve + repaint vehicles ----
+const STORABLE = new Set(['bike', 'tuktuk', 'hilux', 'camry', 'sedan', 'songthaew', 'bus', 'luxsedan', 'supercar']);
+
+// The repaintable body materials of a vehicle: its biggest non-wheel/non-glass
+// MeshStandard parts (body + cab), found once and cached on the vehicle.
+function collectPaintMats(mesh) {
+  const items = [];
+  mesh.traverse(o => {
+    if (!o.isMesh || !o.material || !o.material.isMeshStandardMaterial) return;
+    if (o.geometry.type === 'CylinderGeometry') return;     // wheels
+    if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+    const b = o.geometry.boundingBox;
+    items.push({ mat: o.material, v: (b.max.x - b.min.x) * (b.max.y - b.min.y) * (b.max.z - b.min.z) });
+  });
+  items.sort((a, b) => b.v - a.v);
+  const mats = [], seen = new Set();
+  for (const it of items) { if (seen.has(it.mat)) continue; seen.add(it.mat); mats.push(it.mat); if (mats.length >= 2) break; }
+  return mats;
+}
+function setVehicleColor(v, hex) {
+  if (!v.paintMats) v.paintMats = collectPaintMats(v.mesh);
+  for (const m of v.paintMats) m.color.setHex(hex);
+  v.color = hex;
+}
+function currentBodyColor(v) {
+  if (typeof v.color === 'number') return v.color;
+  const m = v.paintMats || collectPaintMats(v.mesh);
+  return m.length ? m[0].color.getHex() : 0xcccccc;
+}
+function randomPlate() {
+  const t = ['กก', 'ขข', 'งง', 'รด', 'สห', 'ทพ', 'มล', 'ญบ', 'ผด', 'นค'];
+  return `${irand(1, 9)}${pick(t)} ${irand(1000, 9999)}`;
+}
+function storedLabel(e) { return `${vehicleName(e.kind)}${e.plate ? ' ' + e.plate : ''}`; }
+
+function storeVehicle(v) {
+  const garage = G.econ.garage, p = G.player, g = G.world.garages[0];
+  const entry = { kind: v.kind, color: currentBodyColor(v), plate: v.plate || randomPlate(), hp: Math.max(40, Math.round(v.hp)) };
+  garage.stored.push(entry);
+  // step the player out at the garage, then despawn the stored car
+  p.inVehicle = null; v.driver = null; p.group.visible = true;
+  p.group.position.set(g.pos.x, 0, g.pos.z - 5);
+  G.scene.remove(v.mesh); disposeObject(v.mesh);
+  const vi = G.vehicles.indexOf(v); if (vi >= 0) G.vehicles.splice(vi, 1);
+  G.hud.showNotif(`Stored ${storedLabel(entry)} (${garage.stored.length}/${garage.capacity})`);
+  G.audio.chime();
+  saveGame();
+}
+function retrieveVehicle(idx) {
+  const garage = G.econ.garage;
+  const e = garage.stored[idx];
+  if (!e) return;
+  const v = makeVehicle(e.kind, G.scene);
+  const door = G.world.garageDoor || G.world.garages[0].pos;
+  v.pos.set(door.x, 0, door.z); v.mesh.position.copy(v.pos);
+  v.heading = PI; v.mesh.rotation.y = PI;
+  v.hp = e.hp; v.plate = e.plate;
+  setVehicleColor(v, e.color);
+  garage.stored.splice(idx, 1);
+  garage.retrieveIdx = 0;
+  G.hud.showNotif(`Brought out ${storedLabel(e)} — at the garage door`);
+  G.audio.blip({ freq: 320, dur: 0.06, gain: 0.08 });
+  saveGame();
+}
+function repaintVehicle(v) {
+  if (G.cash < PRICE.repaint) { G.hud.showNotif('Not enough cash to repaint'); return; }
+  G.cash -= PRICE.repaint; G.hud.setCash(G.cash);
+  const cur = currentBodyColor(v);
+  let i = PAINT_COLORS.indexOf(cur); i = (i + 1) % PAINT_COLORS.length;
+  setVehicleColor(v, PAINT_COLORS[i]);
+  if (!v.plate) v.plate = randomPlate();
+  G.hud.showNotif(`Repainted — new plate ${v.plate} (-฿${PRICE.repaint})`);
+  G.audio.chime();
+  saveGame();
+}
+
+function updateGarageOwnership(dt) {
+  const p = G.player;
+  if (!G.world.garages || !G.world.garages.length) return;
+  const g = G.world.garages[0], garage = G.econ.garage;
+  if (p.inVehicle) {
+    const v = p.inVehicle;
+    if (dist2(v.pos, g.pos) >= (g.r + 1) * (g.r + 1)) return;
+    if (!garage.rented) { G.hud.showPrompt('Garage — step out and rent it to store cars here', 0.4); return; }
+    if (!STORABLE.has(v.kind)) return;                      // cop cars / boats aren't storable
+    // only claim the prompt line when U-Spray isn't already offering a repair
+    const servicing = v.hp < 100 || G.wanted.stars > 0;
+    const full = garage.stored.length >= garage.capacity;
+    if (!servicing) {
+      G.hud.showPrompt(full
+        ? `Garage full — <b>C</b>: repaint (฿${PRICE.repaint})`
+        : `Garage — <b>K</b>: store this ${vehicleName(v.kind)} · <b>C</b>: repaint (฿${PRICE.repaint})`, 0.4);
+    }
+    if (G.input.pressed('KeyK') && !full) storeVehicle(v);
+    else if (G.input.pressed('KeyC')) repaintVehicle(v);
+  } else {
+    if (dist2(p.group.position, g.pos) >= g.r * g.r) return;
+    if (!garage.rented) {
+      G.hud.showPrompt(`Garage — <b>E</b>: rent (฿${PRICE.garageRent.toLocaleString()})`, 0.4);
+      if (G.input.pressed('KeyE')) {
+        if (G.cash < PRICE.garageRent) { G.hud.showNotif('Not enough cash to rent the garage'); return; }
+        G.cash -= PRICE.garageRent; G.hud.setCash(G.cash); garage.rented = true;
+        G.hud.showNotif('Garage rented — drive vehicles in to store & repaint them');
+        G.audio.chime(); saveGame();
+      }
+      return;
+    }
+    if (garage.stored.length === 0) { G.hud.showPrompt('Garage — drive a vehicle in to store it', 0.4); return; }
+    const idx = garage.retrieveIdx % garage.stored.length;
+    const e = garage.stored[idx];
+    G.hud.showPrompt(`Garage — <b>E</b>: take ${storedLabel(e)} (${idx + 1}/${garage.stored.length}) · <b>L</b>: next`, 0.4);
+    if (G.input.pressed('KeyL')) garage.retrieveIdx = (idx + 1) % garage.stored.length;
+    else if (G.input.pressed('KeyE')) retrieveVehicle(idx);
+  }
+}
+
+// Car radio: M cycles stations; music plays (and ducks the engine) only while
+// you're in a vehicle, and flashes the station name on the HUD.
+function updateRadio(dt) {
+  const a = G.audio; if (!a || !a.radio) return;
+  const inV = !!G.player.inVehicle;
+  if (G.input && G.input.pressed && G.input.pressed('KeyM') && G.state === 'playing') {
+    G.hud.showNotif('📻 ' + a.radio.next());
+  }
+  if (inV && !G._wasInVehicle) G.hud.showNotif('📻 ' + a.radio.names[a.radio.station]);
+  G._wasInVehicle = inV;
+  a.radio.tick(inV);
+  a.duckEngine(inV && a.radio.station !== 0);
+}
+
 // Free-fly camera for photo mode: mouse to look, WASD to fly, Space/Ctrl up/down.
 function updatePhotoCam(dt) {
   const pc = G.photoCam;
@@ -4846,7 +5267,10 @@ function updatePhotoCam(dt) {
 
 function loop() {
   requestAnimationFrame(loop);
-  const dt = Math.min(0.05, G.clock.getDelta());
+  const realDt = Math.min(0.05, G.clock.getDelta());
+  // hit-stop: a brief global slow-mo on a solid melee/gun connect so impacts land
+  let dt = realDt;
+  if (G.hitStop > 0) { G.hitStop -= realDt; dt = realDt * 0.12; }
 
   // phone toggle
   if (G.input && G.input.pressed && G.input.pressed('KeyT') && (G.state === 'playing' || G.state === 'phone')) {
@@ -4904,9 +5328,12 @@ function loop() {
     updateArmorPickups(dt);
     updateInteraction(dt);
     updateGarage(dt);
+    updateGarageOwnership(dt);
+    updateRadio(dt);
     updateTaxi(dt);
     updateVehicles(dt);
     updatePeds(dt);
+    updateClusters(dt);
     updateBarks(dt);
     updateMuggings(dt);
     updateSpikes(dt);
@@ -4915,10 +5342,13 @@ function loop() {
     updateFootCops(dt);
     updateBullets(dt);
     updateParticles(dt);
+    updateSkids(dt);
+    updateDust(dt);
     updateWanted(dt);
     updateCamera(dt);
     updateBTS(dt);
     updateDayNight(dt);
+    updateFestival(dt);
     // distant daytime traffic honks (ambient flavor)
     if (Math.random() < 0.004 * (1 - (G.nightK || 0))) G.audio.blip({ freq: 360, dur: 0.2, type: 'square', gain: 0.03, freqEnd: 330 });
     G._saveTimer = (G._saveTimer || 0) + dt;

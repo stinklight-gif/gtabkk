@@ -22,8 +22,10 @@ offline. Click **ENTER THE CITY** when the loader finishes.
 ## Smoke test
 
 A headless Playwright harness boots the real game, fails on any page error, and
-captures noon/night screenshots (`smoke_noon.png` / `smoke_night.png`) plus the
-renderer draw-call count:
+captures four screenshots (`smoke_noon.png` / `smoke_night.png` / `smoke_3am.png`
+— the night/3am pair from the same spot prove the crowd thins from a busy midday
+to dead small-hours — plus `smoke_festival.png`, a Loy Krathong night on the
+river) along with the renderer draw-call count:
 
 ```bash
 npm install --no-save playwright && npx playwright install chromium   # once
@@ -31,7 +33,7 @@ node tools/smoke.mjs
 ```
 
 CI (`.github/workflows/smoke.yml`) runs it on every PR and push to main, and
-uploads both screenshots as artifacts. In sandboxes where Playwright's browser
+uploads the screenshots as artifacts. In sandboxes where Playwright's browser
 CDN is blocked, point `CHROME_PATH` at any Chrome/Chromium binary.
 
 ## Controls
@@ -51,12 +53,17 @@ CDN is blocked, point `CHROME_PATH` at any Chrome/Chromium binary.
 | Ctrl | Block |
 | B | Bribe a nearby cop (฿1,000) at 1–2★ |
 | H | Honk (in vehicle) |
+| M | Car radio — cycle stations (Luk Thung / Bangkok Bars / Talk Radio / off) |
 | J | Start a taxi fare (in a songthaew) |
 | T | Phone — pauses pointer lock and shows menu |
 | P | Photo mode — free-fly camera + hidden HUD (WASD/Space/Ctrl to fly, Shift faster) |
 | V | Start Vigilante (while in a cop vehicle) |
 | N | Cycle minimap zoom |
 | O | Options — mouse sensitivity + master volume |
+| E | Buy/rest at the safehouse · rent/retrieve at the garage (on foot) |
+| K | Store the current vehicle (in a car, inside the rented garage) |
+| C | Repaint the current vehicle (฿250, at the garage) |
+| L | Cycle which stored vehicle to retrieve |
 | G | *(dev)* grant 9mm pistol |
 | Esc | Release mouse / pause (click to resume) |
 
@@ -96,22 +103,47 @@ marker to pick up a fare, then to the green marker before the timer runs out.
 Pay scales with distance. It's a standalone activity, separate from the story
 missions, so you can run fares any time.
 
+## Property (spend the money)
+
+Two things to sink cash into, both persisted in your save:
+
+- **Safehouse** (฿12,000) — a townhouse just north of the spawn (look for the red
+  **FOR SALE** sign; it turns green to **HOME** once bought). Walk to the door
+  and press **E** to buy. Owning it makes it your respawn point instead of the
+  police station, and pressing **E** at home again heals you and saves.
+- **Garage** — rent the U-Spray (฿4,000, **E** on foot inside the shed) and it
+  becomes your lock-up: drive a car in and press **K** to **store** it (up to 4),
+  **C** to **repaint** it (฿250, cycles colours and stamps a new Thai plate). On
+  foot, **E** brings a stored car back out at the door, **L** cycles which one.
+  Stored cars keep their colour, plate, and condition across reloads.
+
+Mission rewards were bumped to feed this economy (Soi Run ฿2,500, The Hit
+฿4,000, Hot Delivery ฿6,000), so the safehouse is a few jobs away.
+
 ## Architecture
 
-Everything lives in two files:
+The engine is being pulled out of one file into native ES modules (no bundler —
+the importmap resolves them, same "serve the folder and it runs" deal):
 
-- `index.html` — DOM shell, HUD overlays, importmap. No game logic.
-- `main.js` — the entire engine. Organised into numbered sections:
+- `index.html` — DOM shell, HUD overlays, importmap.
+- `audio.js` — procedural Web Audio (engine loopers, SFX, car radio). Standalone.
+- `input.js` — keyboard set + pointer-lock mouse deltas + edge-detected `pressed`.
+- `main.js` — the rest of the engine (world, vehicles, NPCs, combat, missions,
+  HUD, loop, …), still organised into the numbered sections below. Extracting
+  the remaining sections (notably the ~1.4k-line `buildWorld`) into their own
+  modules is in progress.
+
+`main.js` sections:
 
 | § | Section | Notes |
 |---|---|---|
-| 1 | Audio | Procedural Web Audio. Engine loopers, 7-Eleven chime, temple bell, footsteps, gunshots, sirens, rain bed. |
+| 1 | Audio | Procedural Web Audio. Engine loopers (on a duckable `engineBus`), 7-Eleven chime, temple bell, footsteps, gunshots, sirens, rain bed, and a **car radio** — a lookahead step-sequencer (`makeRadio`) with three procedural stations (Luk Thung synth-pop, Bangkok Bars boom-bap, AM talk/ads) that play in-vehicle and duck the engine. |
 | 2 | Input | Keyboard set + pointer-lock mouse deltas + `pressed` (edge) helper. |
-| 3 | World | Procedural 10×10 block grid (BLOCK=50m), road grid, buildings with neon strips and lit-window planes, BTS Skytrain elevated track, street lamps, 7-Elevens, spirit-house shrines, gold-shop POI with pillar of light, temple compound, a U-Spray garage (drive a vehicle in to repair it and clear your wanted level for a heat-scaled fee), a gun shop (buy pistol/shotgun/SMG/ammo with cash on foot), a Yaowarat Chinatown market street (paifang gate, dense shophouses, hanging lanterns, market stalls), and a Chao Phraya river down the west edge (water + embankment + pier + longtail boats, including one **drivable** longtail at the pier gap). Repeated props use `InstancedMesh`. Builds an off-screen canvas as the minimap base. |
+| 3 | World | Procedural 10×10 block grid (BLOCK=50m), road grid, buildings with neon strips and lit-window planes, BTS Skytrain elevated track, street lamps, 7-Elevens, spirit-house shrines, gold-shop POI with pillar of light, temple compound, a U-Spray garage (drive a vehicle in to repair it and clear your wanted level for a heat-scaled fee, or rent it as a vehicle lock-up — store/retrieve/repaint), a buyable safehouse (respawn point) just north of spawn, a gun shop (buy pistol/shotgun/SMG/ammo with cash on foot), a Yaowarat Chinatown market street (paifang gate, dense shophouses, hanging lanterns, market stalls), and a Chao Phraya river down the west edge (water + embankment + pier + longtail boats, including one **drivable** longtail at the pier gap). Repeated props use `InstancedMesh`. Builds an off-screen canvas as the minimap base. |
 | 4 | Player + Camera | Capsule character (torso/legs/head/arms), arcade third-person camera rig (orbit yaw/pitch/distance, shake decay). |
 | 5b | More vehicles | City bus, luxury sedan, and a rare-spawn supercar join the traffic mix; a drivable longtail boat sits at the river pier. |
 | 5 | Vehicles | `makeVehicleMesh(kind)` produces bike / tuk-tuk / hilux / cop / camry / sedan with per-kind `spec` (topSpeed, accel, brake, turn, mass). Tuk-tuk has a leaning wiggle, bike leans into turns. |
-| 6 | NPCs | Procedural ped/dog meshes with variety (locals, saffron-robed monks, backpacked tourists). `spawnPeds`, `spawnDogs`, `spawnTraffic`. District banners (`updateDistrict`) announce Yaowarat / The Wat / Riverside / Sukhumvit on entry. |
+| 6 | NPCs | Articulated humanoid peds (torso/head/two legs/two arms) with a shared `animateWalk` cycle and six archetype silhouettes (local, office worker w/ briefcase, tourist w/ cap+backpack, bald monk w/ alms bowl, conical-hatted vendor & laborer, plus a skirt variant). Crowd density follows the time of day (`crowdFactor` — dead 3am, rush-hour/midday busy) and peds spawn onto the sidewalk band (`sidewalkPos`). Behavioral clusters (`buildClusterAnchors`/`updateClusters`) queue customers at food stalls and loiterers at 7-Elevens. `spawnPeds`, `spawnDogs`, `spawnTraffic`. District banners announce Yaowarat / The Wat / Riverside / Sukhumvit on entry. |
 | 7 | Rain | Particle points re-centered on the player each frame, opacity fades with weather. |
 | 8 | Engine init | Renderer, lights (sun + hemi + ambient), camera, audio, world build, player, vehicles, peds, dogs. Loading bar + start gate. |
 | 9 | HUD | Star/cash/HP/stamina/ammo/clock/weather binds, subtitle + prompt + notif queues, phone (T) with live stats (amulets/fares/cops + completion %), full north-up map overlay (TAB), minimap renderer (camera-yaw rotated, mission + taxi markers, amulet + snatcher + cop dots). |
@@ -121,10 +153,10 @@ Everything lives in two files:
 | 13 | Peds + Dogs | Wander state machines; peds panic when attacked; dogs scatter when player approaches, settle back when far. |
 | 14 | Combat | Muay Thai jab/cross/kick (animated arm/leg swings), pistol + full-auto SMG + pellet-spread shotgun fire (raycast hit + tracer sphere + muzzle flash + camera shake), reload. Pistol on first cop kill; SMG drops from a destroyed 3★ Fortuner; shotgun/SMG also buyable at the gun shop. |
 | 15 | Cops + Wanted | Star-based heat with decay after 35 s out of sight. Spawns foot cops at 1★, cop-pickup chase cars at 2★, unmarked Crime Suppression Fortuners + spike strips at 3★ (after ~3 cop kills), armored SWAT vans at 4★ (after ~6 kills); a star increase flashes the HUD and whoops a siren; nights run one extra unit. Bribe with B near a foot cop (1–2★ only). |
-| 16 | Particles / FX | Smoke emitter (vehicles below 30% HP), explosion (light flash + smoke + camera shake + thunder SFX). |
+| 16 | Particles / FX | Smoke emitter (vehicles below 30% HP), explosion (light flash + smoke + camera shake + thunder SFX), tire-skid decals (`spawnSkid`, laid while drifting and faded over 5 s), impact dust puffs (`spawnDust`), and a global **hit-stop** (`triggerHitStop` slows the loop ~0.05 s on a solid melee/gun connect). |
 | 17 | Interaction | Vehicle proximity check + E to enter. |
-| 18 | Camera update | Follow rig with smoothed distance, shake decay, in-vehicle chase view auto-aligns to vehicle heading. |
-| 19 | Day/Night + Weather | 8-min day cycle drives sun position (tilted so noon actually sunlights the facades), sky/fog colours, neon and street-lamp intensity; the sun + shadow camera track the player. Monsoon weather cycle (clear ⇄ drizzle/downpour that builds and breaks) with lightning flashes during heavy rain. Dawn temple bell at 5–6 AM. |
+| 18 | Camera update | Follow rig with smoothed distance, shake decay, in-vehicle chase view auto-aligns to vehicle heading, **occlusion** (ray-casts target→camera against building AABBs and pulls in so it never clips into a wall), and a speed-based FOV kick while driving. |
+| 19 | Day/Night + Weather + Festival | 8-min day cycle drives sun position (tilted so noon actually sunlights the facades), sky/fog colours, neon and street-lamp intensity; the sun + shadow camera track the player. A whole-day counter (`G.time.day`) ticks at midnight and drives **Loy Krathong** (`updateFestival`): every 3rd night the Chao Phraya fills with drifting candle-lit krathong floats and rising sky lanterns. Monsoon weather cycle (clear ⇄ drizzle/downpour) with lightning in heavy rain. Dawn temple bell at 5–6 AM. |
 | 20 | Main loop | Single `loop()` calls every system in order. |
 
 The mutable global is `window.GAME`. Useful while developing:
@@ -140,10 +172,13 @@ GAME.player.weapons.pistol = true; GAME.player.pistolAmmo = 12;
 
 ## Saving
 
-Progress (cash, weapons + ammo, armor, amulets found, time of day, and position)
-autosaves to `localStorage` every ~8 s and on exit, and restores on reload. If
-the intro delivery was done, you respawn straight into free roam with Soi Run
-available. Wipe the save to start fresh:
+Progress (cash, weapons + ammo, armor, amulets found, time of day, position, and
+now property — the safehouse, the rented garage, and every stored car with its
+colour/plate/condition) autosaves to `localStorage` every ~8 s and on exit, and
+restores on reload. New property fields are additive, so old `gtabkk_save_v1`
+saves still load (they just start without property). If the intro delivery was
+done, you respawn straight into free roam with Soi Run available. Wipe the save
+to start fresh:
 
 ```js
 localStorage.removeItem('gtabkk_save_v1');
@@ -184,8 +219,9 @@ traffic AI.
 - Cops use lightweight road-aware steering, not true pathfinding: beyond ~25 m
   they route along the 50 m road grid (so they stop grinding the canyon walls);
   inside 25 m they pursue and ram directly. AABB pushback is still the backstop.
-- Audio is fully synthesised. No radio stations yet (Phase 2 — would need
-  hand-built procedural music or licensed-free tracks).
+- Audio is fully synthesised, including the car radio's three procedural music
+  stations — catchy enough to read as luk-thung / hip-hop / talk, but not actual
+  songs. Licensed or hand-composed tracks would be a future upgrade.
 
 ## Performance
 
@@ -196,8 +232,11 @@ material at world-build time. That takes a street-level view from ~7,700 meshes
 / ~2,800 draw calls down to ~1,200 meshes / **~370 draw calls** (measured via
 `tools/smoke.mjs`, which prints `renderer.info.render.calls`). What's left is
 mostly dynamic — vehicles, peds, dogs, the rooftop/lamp/wire `InstancedMesh`
-batches — plus a few one-off landmarks. If it still chugs, raise the
-pedestrian/traffic despawn radius or drop pixel ratio.
+batches — plus a few one-off landmarks. A busy midday crowd (the articulated
+peds are ~7 meshes each, frustum-culled) adds a few hundred calls when the
+sidewalks are full, landing the noon view around ~800; the small hours drop back
+toward the ~370 floor. If it still chugs, lower `PED_TARGET`, raise the
+pedestrian/traffic despawn radius, or drop pixel ratio.
 
 Repeated props (rooftop tanks/AC/antennas, lamps, poles, wires, Yaowarat
 lanterns, parked bikes) use `InstancedMesh`; pooled materials with night-emissive
@@ -212,13 +251,15 @@ These values were set without runtime testing; adjust to taste. Locations are in
 | Knob | Where | Value |
 |------|-------|-------|
 | Soi Run timer / per-checkpoint bonus | `soiRun.startTime` / `.cpBonus` | 55s / +15s |
-| Soi Run reward | `soiRun.reward` | ฿1,500 |
-| The Hit reward | `hit.reward` | ฿2,000 |
-| Hot Delivery timer / reward | `delivery.startTime` / `.reward` | 75s / ฿3,000 |
-| Taxi fare | `updateTaxi` | ฿80 + ฿4/m, 25s + dist |
+| Soi Run reward | `soiRun.reward` | ฿2,500 |
+| The Hit reward | `hit.reward` | ฿4,000 |
+| Hot Delivery timer / reward | `delivery.startTime` / `.reward` | 75s / ฿6,000 |
+| Safehouse / garage rent / repaint | `PRICE` | ฿12,000 / ฿4,000 / ฿250 |
+| Garage capacity | `econ.garage.capacity` | 4 cars |
+| Taxi fare | `updateTaxi` | ฿120 + ฿5/m, 25s + dist |
 | Vigilante bust / time bonus | `updateVigilante` | ฿200 + ฿100×busts / +15s |
-| Snatcher bounty | `updateMuggings` | ฿250 |
-| Amulet / full set bonus | `updateCollectibles` | ฿100 / +฿2,000 |
+| Snatcher bounty | `updateMuggings` | ฿400 |
+| Amulet / full set bonus | `updateCollectibles` | ฿100 / +฿3,000 |
 | Street-food heal | `updateFoodStalls` | +25 HP |
 | Garage respray fee | `updateGarage` | ฿300 + ฿350×stars |
 | Cops desired (1/2/3★) | `updateWanted` | 2 / 4 / 6 (+1 at night) |

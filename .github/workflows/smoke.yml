@@ -28,4 +28,6 @@ jobs:
           path: |
             smoke_noon.png
             smoke_night.png
+            smoke_3am.png
+            smoke_festival.png
           if-no-files-found: ignore
