@@ -519,12 +519,18 @@ export function spawnTraffic(scene) {
     let kind = pick(kinds);
     if (Math.random() < 0.04) kind = 'supercar';   // rare spawn
     const v = makeVehicle(kind, scene);
-    // pick a random horizontal or vertical road
-    const isEW = Math.random() < 0.5;
-    const lane = irand(-GRID/2, GRID/2);
-    const t = rand(-HALF + 10, HALF - 10);
-    if (isEW) { v.pos.set(t, 0, lane * BLOCK + (Math.random()<0.5 ? -2.5 : 2.5)); v.heading = Math.random()<0.5 ? 0 : PI; }
-    else      { v.pos.set(lane * BLOCK + (Math.random()<0.5 ? -2.5 : 2.5), 0, t); v.heading = Math.random()<0.5 ? PI/2 : -PI/2; }
+    // spawn on a road, in its proper left-hand lane, heading along it
+    if (Math.random() < 0.5) {                                   // N/S road (travels along z)
+      const road = irand(-GRID/2 + 1, GRID/2) * BLOCK;          // skip the river column
+      const north = Math.random() < 0.5;
+      v.pos.set(road + (north ? -2.5 : 2.5), 0, rand(-HALF + 10, HALF - 10));
+      v.heading = north ? 0 : PI;
+    } else {                                                     // E/W road (travels along x)
+      const road = irand(-GRID/2, GRID/2) * BLOCK;
+      const east = Math.random() < 0.5;
+      v.pos.set(rand(-HALF + 10, HALF - 10), 0, road + (east ? 2.5 : -2.5));
+      v.heading = east ? PI/2 : -PI/2;
+    }
     v.mesh.position.copy(v.pos);
     v.mesh.rotation.y = v.heading;
     v.npc = {
