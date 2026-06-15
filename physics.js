@@ -32,6 +32,29 @@ export function resolvePlayerVsBuildings(player) {
   p.z = clamp(p.z, -HALF + 1, HALF - 1);
 }
 
+// Player vs vehicles: AABB pushback in each car's local (heading-rotated) frame
+// so you can't walk through parked or moving cars. Skips your own car + wrecks.
+export function resolvePlayerVsVehicles(player) {
+  const p = player.group.position, r = 0.42;
+  for (const v of G.vehicles) {
+    if (v === player.inVehicle || v.dead || !v.boundsHalf) continue;
+    const hx = v.boundsHalf.x + r, hz = v.boundsHalf.z + r;
+    const wx = p.x - v.pos.x, wz = p.z - v.pos.z;
+    if (wx * wx + wz * wz > (hx + hz) * (hx + hz)) continue;   // cheap reject
+    const heading = v.heading || 0;
+    const c = Math.cos(heading), s = Math.sin(heading);
+    const lx = c * wx - s * wz, lz = s * wx + c * wz;          // world → car-local
+    if (Math.abs(lx) < hx && Math.abs(lz) < hz) {
+      // push out along the shallower local axis, then rotate back to world
+      let nlx = lx, nlz = lz;
+      if (hx - Math.abs(lx) < hz - Math.abs(lz)) nlx = (Math.sign(lx) || 1) * hx;
+      else                                       nlz = (Math.sign(lz) || 1) * hz;
+      p.x = v.pos.x + c * nlx + s * nlz;
+      p.z = v.pos.z - s * nlx + c * nlz;
+    }
+  }
+}
+
 // Vehicle vs buildings — soft pushback that also kills speed
 export function resolveVehicleVsBuildings(v) {
   const p = v.pos;

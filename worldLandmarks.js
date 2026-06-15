@@ -293,6 +293,10 @@ export function buildLandmarks(env) {
     pl.position.set(0, 3.5, 5); store.add(pl);
     store.position.copy(p);
     scene.add(store);
+    world.buildings.push({   // solid: the storefront blocks you, the door still triggers at <5 m
+      pos: new THREE.Vector3(p.x, 2, p.z),
+      size: new THREE.Vector3(10, 4, 8),
+    });
     world.sevenElevens.push({ pos: p.clone(), group: store, chimed: 0 });
   }
 
@@ -330,6 +334,10 @@ export function buildLandmarks(env) {
   const goldShopPos = new THREE.Vector3(-160, 0, -160);
   goldShop.position.copy(goldShopPos);
   scene.add(goldShop);
+  world.buildings.push({   // solid: don't let the player walk through the shop
+    pos: new THREE.Vector3(goldShopPos.x, 3, goldShopPos.z),
+    size: new THREE.Vector3(12, 6, 8),
+  });
   world.poi.goldShop = goldShopPos.clone();
 
   // Pillar of light to attract player
