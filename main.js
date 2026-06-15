@@ -6,6 +6,14 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { makeAudio } from './audio.js';
 import { makeInput } from './input.js';
+export * from './missions.js';
+import {
+  makeMissionSystem
+} from './missions.js';
+export * from './daynight.js';
+import {
+  DAY_LENGTH, FESTIVAL_PERIOD, KRATHONG_COUNT, RIVER_CX, festivalScheduled, makeKrathong, makeSkyLantern, spawnSkyLantern, startFestival, stopFestival, updateDayNight, updateFestival
+} from './daynight.js';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G,
   PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir,
@@ -24,7 +32,7 @@ let _copsKilled = 0;
 
 // Bump wanted level and refresh the "last seen" tracker. Replaces the same
 // three-line pattern that was copy-pasted across combat/cop code.
-function raiseWanted(n) {
+export function raiseWanted(n) {
   const prev = G.wanted.stars;
   G.wanted.stars = Math.max(G.wanted.stars, n);
   G.wanted.lastSeenAt = performance.now();
@@ -37,7 +45,7 @@ function raiseWanted(n) {
 }
 
 // Apply damage to the player, soaking into armor first when enabled.
-function damagePlayer(amount) {
+export function damagePlayer(amount) {
   const p = G.player;
   if (GAMEPLAY.armor && p.armor > 0) {
     const absorbed = Math.min(p.armor, amount * 0.6);
@@ -51,7 +59,7 @@ function damagePlayer(amount) {
 }
 
 // Award credit for a downed cop; first kill hands over the pistol (README).
-function onCopKilled() {
+export function onCopKilled() {
   _copsKilled++;
   if (GAMEPLAY.pistolOnCopKill && _copsKilled === 1 && !G.player.weapons.pistol) {
     G.player.weapons.pistol = true;
@@ -88,7 +96,7 @@ function onCopKilled() {
 
 // (moved to ./core.js)
 
-function buildWorld(scene) {
+export function buildWorld(scene) {
   const world = {
     bounds: { min: new THREE.Vector3(-HALF, 0, -HALF), max: new THREE.Vector3(HALF, 0, HALF) },
     buildings: [],       // {pos, size, mesh}
@@ -1424,7 +1432,7 @@ function buildWorld(scene) {
   return world;
 }
 
-function makeWindowTexture() {
+export function makeWindowTexture() {
   // Two canvases, one cell layout. Albedo: blue-grey mullions + glass cells that
   // read as a daytime curtain wall. Emissive: black except the "lit" cells, so
   // only those glow when the night ramp raises emissiveIntensity.
@@ -1454,7 +1462,7 @@ function makeWindowTexture() {
   return { map, emissiveMap };
 }
 
-function makeMinimapBase(world) {
+export function makeMinimapBase(world) {
   const SIZE = 256;
   const c = document.createElement('canvas'); c.width = SIZE; c.height = SIZE;
   const g = c.getContext('2d');
@@ -1516,7 +1524,7 @@ function makeMinimapBase(world) {
 // 4. PLAYER + CAMERA
 // =============================================================================
 
-function makePlayer(scene) {
+export function makePlayer(scene) {
   const group = new THREE.Group();
   // body capsule
   const bodyMat = new THREE.MeshStandardMaterial({ color: 0xd44b3b, roughness: 0.7 });
@@ -1580,7 +1588,7 @@ function makePlayer(scene) {
   };
 }
 
-function makeCamera() {
+export function makeCamera() {
   const cam = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 2200);
   cam.position.set(0, 5, 12);
   return {
@@ -1595,7 +1603,7 @@ function makeCamera() {
 // 5. VEHICLES
 // =============================================================================
 
-function makeVehicleMesh(kind) {
+export function makeVehicleMesh(kind) {
   const g = new THREE.Group();
   g.userData.kind = kind;
   if (kind === 'bike') {
@@ -1801,7 +1809,7 @@ function makeVehicleMesh(kind) {
   return g;
 }
 
-function makeVehicle(kind, scene) {
+export function makeVehicle(kind, scene) {
   const mesh = makeVehicleMesh(kind);
   scene.add(mesh);
   const spec = mesh.userData.spec;
@@ -1846,7 +1854,7 @@ function makeVehicle(kind, scene) {
 // rig in userData.parts {torso, head, legL, legR, armL, armR}. `torso` stays one
 // mesh so the mugger/target/kill recolor sites keep working; forearms are bare
 // skin (Bangkok heat) so recoloring the torso never leaves mismatched sleeves.
-function makePedMesh() {
+export function makePedMesh() {
   const g = new THREE.Group();
   const roll = Math.random();
   let kind;
@@ -1942,7 +1950,7 @@ function makePedMesh() {
 // Shared limb animator for peds + foot cops: advances a per-mesh walk phase and
 // swings legs/arms (arms opposite the same-side leg). `moving` false → near-still
 // idle with a faint breathing bob.
-function animateWalk(mesh, speed, dt, moving) {
+export function animateWalk(mesh, speed, dt, moving) {
   const p = mesh.userData.parts; if (!p) return;
   const ud = mesh.userData;
   ud.phase = (ud.phase || 0) + (moving ? (1.6 + speed) * dt * 2.0 : dt * 1.2);
@@ -1955,7 +1963,7 @@ function animateWalk(mesh, speed, dt, moving) {
   if (p.torso) p.torso.position.y = 1.18 + (moving ? 0 : Math.sin(ud.phase * 0.7) * 0.012);
 }
 
-function makeDogMesh() {
+export function makeDogMesh() {
   const g = new THREE.Group();
   const body = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.28, 0.7), new THREE.MeshStandardMaterial({ color: pick([0xc8a370, 0x8c6a3a, 0x4a3a2a, 0xdac199]) }));
   body.position.y = 0.32; g.add(body);
@@ -1974,7 +1982,7 @@ function makeDogMesh() {
 // band just outside the nearer road centerline so peds populate the pavements
 // (and read as a crowd down whatever street the camera faces) rather than a
 // uniform disc that scatters most of them into blocks and side streets.
-function sidewalkPos(cx, cz, radius) {
+export function sidewalkPos(cx, cz, radius) {
   const ang = rand(0, TAU), r = rand(6, radius);
   let x = cx + Math.cos(ang) * r, z = cz + Math.sin(ang) * r;
   const roadX = Math.round(x / BLOCK) * BLOCK, roadZ = Math.round(z / BLOCK) * BLOCK;
@@ -1984,7 +1992,7 @@ function sidewalkPos(cx, cz, radius) {
   return new THREE.Vector3(clamp(x, -HALF + 5, HALF - 5), 0, clamp(z, -HALF + 5, HALF - 5));
 }
 
-function spawnPed(scene, pos) {
+export function spawnPed(scene, pos) {
   const m = makePedMesh();
   m.position.copy(pos);
   m.userData.heading = rand(0, TAU);
@@ -2003,7 +2011,7 @@ function spawnPed(scene, pos) {
   return ped;
 }
 
-function spawnDog(scene, pos) {
+export function spawnDog(scene, pos) {
   const m = makeDogMesh();
   m.position.copy(pos);
   scene.add(m);
@@ -2019,7 +2027,7 @@ function spawnDog(scene, pos) {
   return dog;
 }
 
-function spawnTraffic(scene) {
+export function spawnTraffic(scene) {
   // Each road segment can hold some cars. We sample edges and place vehicles.
   const kinds = ['camry','camry','camry','sedan','sedan','tuktuk','hilux','songthaew','songthaew','bus','luxsedan','luxsedan','bike','bike'];
   for (let n = 0; n < 28; n++) {
@@ -2049,7 +2057,7 @@ function spawnTraffic(scene) {
 
 // A handful of parked, enterable cars at the curb so there's always a ride (and a
 // songthaew for the taxi job) without chasing moving traffic on foot.
-function spawnParkedCars(scene) {
+export function spawnParkedCars(scene) {
   const kinds = ['camry', 'sedan', 'hilux', 'songthaew', 'songthaew', 'tuktuk'];
   let placed = 0, guard = 0;
   while (placed < 10 && guard++ < 200) {
@@ -2067,20 +2075,20 @@ function spawnParkedCars(scene) {
 }
 
 // One drivable longtail at the river pier gap (z=-50) — step through the embankment to board.
-function spawnBoat(scene) {
+export function spawnBoat(scene) {
   const v = makeVehicle('boat', scene);
   v.pos.set(-212, 0.3, -50); v.mesh.position.copy(v.pos);
   v.heading = 0; v.mesh.rotation.y = 0;
   v.driver = null; v.vel = 0;
 }
 
-function spawnPeds(scene, n) {
+export function spawnPeds(scene, n) {
   for (let i = 0; i < n; i++) {
     spawnPed(scene, sidewalkPos(rand(-HALF + 12, HALF - 12), rand(-HALF + 12, HALF - 12), 8));
   }
 }
 
-function spawnDogs(scene, n) {
+export function spawnDogs(scene, n) {
   for (let i = 0; i < n; i++) {
     spawnDog(scene, new THREE.Vector3(rand(-HALF+20, HALF-20), 0, rand(-HALF+20, HALF-20)));
   }
@@ -2090,7 +2098,7 @@ function spawnDogs(scene, n) {
 // 7. RAIN PARTICLES
 // =============================================================================
 
-function makeRain(scene) {
+export function makeRain(scene) {
   const N = 1200;
   const positions = new Float32Array(N * 3);
   for (let i = 0; i < N; i++) {
@@ -2133,7 +2141,7 @@ function makeRain(scene) {
 // =============================================================================
 const SAVE_KEY = 'gtabkk_save_v1';
 
-function saveGame() {
+export function saveGame() {
   try {
     const p = G.player;
     if (!p) return;
@@ -2158,9 +2166,9 @@ function saveGame() {
 }
 
 const SETTINGS_KEY = 'gtabkk_settings';
-function applySettings() { if (G.audio && G.audio.setVolume) G.audio.setVolume(G.settings.volume); }
-function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(G.settings)); } catch (e) {} }
-function loadSettings() {
+export function applySettings() { if (G.audio && G.audio.setVolume) G.audio.setVolume(G.settings.volume); }
+export function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(G.settings)); } catch (e) {} }
+export function loadSettings() {
   G.settings = { sensitivity: 1, volume: 0.55 };
   try { const s = JSON.parse(localStorage.getItem(SETTINGS_KEY)); if (s) Object.assign(G.settings, s); } catch (e) {}
   applySettings();
@@ -2169,7 +2177,7 @@ function loadSettings() {
   if (ve) ve.value = G.settings.volume;
 }
 
-function loadGame() {
+export function loadGame() {
   let s = null;
   try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { s = null; }
   if (!s || !G.player) return;
@@ -2387,7 +2395,7 @@ async function init() {
   loop();
 }
 
-function setProgress(p) {
+export function setProgress(p) {
   const bar = document.getElementById('loadbar');
   if (bar) bar.style.width = p + '%';
 }
@@ -2396,7 +2404,7 @@ function setProgress(p) {
 // 9. HUD BINDINGS
 // =============================================================================
 
-function bindHud() {
+export function bindHud() {
   const minimap = document.getElementById('minimap');
   const mctx = minimap.getContext('2d');
   const subtitle = document.getElementById('subtitle');
@@ -2551,318 +2559,12 @@ function bindHud() {
 }
 
 // =============================================================================
-// 10. MISSION SYSTEM
-// =============================================================================
-
-function makeMissionSystem() {
-  const sys = { active: null };
-
-  // Shared mission marker beam — a single pillar of light reused by whichever
-  // mission is active. Pass null to hide it.
-  let beam = null;
-  function setBeam(pos, color = 0x21f0ff) {
-    if (!pos) { if (beam) { G.scene.remove(beam); beam = null; } return; }
-    if (!beam) {
-      beam = new THREE.Mesh(
-        new THREE.CylinderGeometry(1.2, 1.2, 80, 16, 1, true),
-        new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false })
-      );
-      G.scene.add(beam);
-    }
-    beam.material.color.setHex(color);
-    beam.position.set(pos.x, 40, pos.z);
-  }
-
-  const missions = {
-    welcome: {
-      name: 'Welcome to Krung Thep',
-      th: 'ยินดีต้อนรับสู่กรุงเทพฯ',
-      markerPos: null,
-      stage: 0,
-      onStart() {
-        G.hud.setMissionText('Welcome to Krung Thep');
-        G.hud.showSubtitle("Uncle Seng's gold shop. Yaowarat. Bring the envelope.", "ร้านทองของลุงเซ้ง");
-        this.markerPos = G.world.poi.goldShop.clone();
-        this.stage = 1;
-        G.hud.showPrompt('Head to the <b>gold marker</b> on the map.', 3);
-      },
-      update(dt) {
-        if (this.stage === 1) {
-          const d2 = dist2(G.player.group.position, this.markerPos);
-          if (d2 < 7*7) {
-            this.stage = 2;
-            G.hud.showSubtitle("Uncle Seng: \"Good, kid. The envelope.\"", "ลุงเซ้ง: \"ดีแล้ว ส่งมา\"");
-            G._welcomeDone = true;
-            G.cash += 1200;
-            G.hud.setCash(G.cash);
-            if (GAMEPLAY.armor) G.player.armor = Math.min(G.player.armorMax, G.player.armor + 50);
-            G.hud.showNotif('Mission complete: +฿800, +Armor');
-            // remove pillar
-            const beam = G.world.poi.goldShopBeam;
-            if (beam) { G.scene.remove(beam); G.world.poi.goldShopBeam = null; }
-            G.hud.setMissionText('Free Roam · Sukhumvit');
-            // Offer the next job: leave and return to the shop to start Soi Run.
-            this.stage = 3;
-            this.armed = false;
-            this.markerPos = G.world.poi.goldShop.clone();
-            setBeam(this.markerPos, 0xff2a86);
-            setTimeout(() => {
-              G.hud.showSubtitle("Uncle Seng: \"Got another job — a soi run. Come back when you're ready.\"", "ลุงเซ้ง: \"มีงานอีก เดี๋ยวมาเอา\"");
-            }, 2500);
-          }
-        } else if (this.stage === 3) {
-          // job available: leave the marker, then return to it to begin Soi Run
-          const d2 = dist2(G.player.group.position, this.markerPos);
-          if (!this.armed && d2 > 18*18) this.armed = true;
-          if (this.armed) {
-            G.hud.showPrompt('Return to the <b>marker</b> to start <b>Soi Run</b>', 0.4);
-            if (d2 < 8*8) sys.start('soiRun');
-          }
-        }
-      },
-    },
-
-    // Mission 2 — a timed checkpoint race. Built on the same stage/marker system;
-    // tune startTime / cpBonus / route below. Replayable from the start line.
-    soiRun: {
-      name: 'Soi Run',
-      th: 'ซิ่งซอย',
-      markerPos: null,
-      stage: 0,
-      armed: false,
-      cp: 0,
-      timeLeft: 0,
-      startLine: new THREE.Vector3(-150, 0, -150),
-      route: [
-        new THREE.Vector3(   0, 0, -150),
-        new THREE.Vector3( 150, 0,  -50),
-        new THREE.Vector3( 150, 0,  100),
-        new THREE.Vector3( -50, 0,  150),
-        new THREE.Vector3(-200, 0,   50),
-      ],
-      startTime: 55,   // seconds on the clock when you cross the start line
-      cpBonus: 15,     // seconds added per checkpoint reached
-      reward: 2500,
-      onStart() {
-        this.stage = 1;
-        this.cp = 0;
-        this.timeLeft = 0;
-        G.hud.setMissionText('Soi Run');
-        G.hud.showSubtitle("Soi Run: race the checkpoints. Get to the green start line.", "ซิ่งซอย — ไปจุดสตาร์ท");
-        this.markerPos = this.startLine.clone();
-        setBeam(this.markerPos, 0x39ff7a); // green = start
-      },
-      update(dt) {
-        if (this.stage === 1) {
-          if (dist2(G.player.group.position, this.markerPos) < 8*8) {
-            this.stage = 2;
-            this.cp = 0;
-            this.timeLeft = this.startTime;
-            this.markerPos = this.route[0].clone();
-            setBeam(this.markerPos, 0x21f0ff);
-            G.hud.showNotif('GO! Hit the checkpoints!');
-            G.audio.whistle();
-          }
-        } else if (this.stage === 2) {
-          this.timeLeft -= dt;
-          if (this.timeLeft <= 0) { this.fail(); return; }
-          G.hud.showPrompt(`SOI RUN &nbsp; ⏱ ${this.timeLeft.toFixed(1)}s &nbsp;·&nbsp; CP ${this.cp + 1}/${this.route.length}`, 0.4);
-          if (dist2(G.player.group.position, this.markerPos) < 8*8) {
-            this.cp++;
-            if (this.cp >= this.route.length) { this.win(); return; }
-            this.timeLeft += this.cpBonus;
-            this.markerPos = this.route[this.cp].clone();
-            setBeam(this.markerPos, 0x21f0ff);
-            G.hud.showNotif(`Checkpoint ${this.cp}/${this.route.length} · +${this.cpBonus}s`);
-            G.audio.blip({ freq: 760, dur: 0.08, gain: 0.12 });
-          }
-        } else if (this.stage === 5) {
-          // job available — leave, then return to the marker to start the next job
-          const d2 = dist2(G.player.group.position, this.markerPos);
-          if (!this.armed && d2 > 18*18) this.armed = true;
-          if (this.armed) {
-            const label = this.nextJob === 'hit' ? 'start <b>The Hit</b>' : 'run <b>Soi Run</b> again';
-            G.hud.showPrompt('Return to the <b>marker</b> to ' + label, 0.4);
-            if (d2 < 8*8) {
-              this.armed = false;
-              if (this.nextJob) sys.start(this.nextJob); else this.onStart();
-            }
-          }
-        }
-      },
-      win() {
-        G.cash += this.reward;
-        G.hud.setCash(G.cash);
-        G._soiRunWon = true;
-        G.hud.showNotif(`Soi Run complete: +฿${this.reward.toLocaleString()}`);
-        G.hud.showSubtitle("Uncle Seng: \"Fast hands, fast wheels. There's other work...\"", "ลุงเซ้ง: \"เร็วดีนี่ มีงานอีก\"");
-        this.toReoffer('hit');   // winning unlocks The Hit
-      },
-      fail() {
-        G.hud.showNotif('Soi Run failed — out of time');
-        G.hud.showSubtitle("Uncle Seng: \"Too slow. Try again.\"", "ลุงเซ้ง: \"ช้าไป ลองใหม่\"");
-        this.toReoffer(null);    // retry Soi Run
-      },
-      toReoffer(next) {
-        this.stage = 5;
-        this.armed = false;
-        this.nextJob = next || null;
-        G.hud.setMissionText('Free Roam · Sukhumvit');
-        this.markerPos = this.startLine.clone();
-        setBeam(this.markerPos, 0xff2a86);
-      },
-    },
-
-    // Mission 3 — a combat hit: chase down and eliminate a 4-person crew.
-    hit: {
-      name: 'The Hit',
-      markerPos: null,
-      stage: 0,
-      armed: false,
-      nextJob: null,
-      targets: [],
-      base: new THREE.Vector3(80, 0, -80),
-      spots: [
-        new THREE.Vector3(  80, 0,  -80),
-        new THREE.Vector3(-110, 0,   30),
-        new THREE.Vector3( 120, 0,  120),
-        new THREE.Vector3( -40, 0, -150),
-      ],
-      reward: 4000,
-      onStart() {
-        this.stage = 1;
-        this.targets = [];
-        this.base = pick(this.spots).clone();   // vary the location each run
-        for (let k = 0; k < 4; k++) {
-          const ped = spawnPed(G.scene, new THREE.Vector3(this.base.x + rand(-7, 7), 0, this.base.z + rand(-7, 7)));
-          ped.isTarget = true;
-          ped.speed = rand(2.2, 3.0);
-          const parts = ped.mesh.userData.parts;
-          if (parts) parts.torso.material = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.7 });
-          // own material per marker so disposing one dead target can't break the others
-          const mk = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8),
-            new THREE.MeshStandardMaterial({ color: 0xff2a86, emissive: 0xff2a86, emissiveIntensity: 0.8, roughness: 0.5 }));
-          mk.position.set(0, 2.5, 0); ped.mesh.add(mk);
-          this.targets.push(ped);
-        }
-        this.markerPos = this.base.clone();
-        setBeam(this.base, 0xff2a86);
-        G.hud.setMissionText('The Hit');
-        G.hud.showSubtitle("Uncle Seng: \"Four of 'em at the marker. Take them out.\"", "ลุงเซ้ง: \"จัดการให้ที\"");
-        G.hud.showPrompt('Eliminate the <b>marked crew</b> (0/4)', 3);
-      },
-      update(dt) {
-        if (this.stage === 1) {
-          let dead = 0, near = null, nd = Infinity;
-          for (const t of this.targets) {
-            if (t.dead) { dead++; continue; }
-            const d = dist2(t.mesh.position, G.player.group.position);
-            if (d < nd) { nd = d; near = t; }
-          }
-          G.hud.showPrompt(`The Hit — crew down ${dead}/${this.targets.length}`, 0.4);
-          if (near) { this.markerPos = near.mesh.position; setBeam(near.mesh.position, 0xff2a86); }
-          if (dead >= this.targets.length) this.win();
-        } else if (this.stage === 5) {
-          const d2 = dist2(G.player.group.position, this.markerPos);
-          if (!this.armed && d2 > 18*18) this.armed = true;
-          if (this.armed) {
-            const label = this.nextJob ? 'start <b>Hot Delivery</b>' : 'run <b>The Hit</b> again';
-            G.hud.showPrompt('Return to the <b>marker</b> to ' + label, 0.4);
-            if (d2 < 8*8) { this.armed = false; if (this.nextJob) sys.start(this.nextJob); else this.onStart(); }
-          }
-        }
-      },
-      win() {
-        this.stage = 5;
-        this.armed = false;
-        G.cash += this.reward;
-        G.hud.setCash(G.cash);
-        G._hitDone = true;
-        this.nextJob = 'delivery';   // winning the Hit unlocks Hot Delivery
-        G.hud.showNotif(`Hit complete: +฿${this.reward.toLocaleString()}`);
-        G.hud.showSubtitle("Uncle Seng: \"Clean enough. There's a hot run if you want it.\"", "ลุงเซ้ง: \"มีงานด่วน\"");
-        G.hud.setMissionText('Free Roam · Sukhumvit');
-        this.markerPos = this.base.clone();
-        setBeam(this.base, 0xff2a86);
-      },
-    },
-
-    // Mission 4 — Hot Delivery: move the goods across town while the heat is maxed.
-    delivery: {
-      name: 'Hot Delivery',
-      markerPos: null,
-      stage: 0,
-      armed: false,
-      timeLeft: 0,
-      drop: new THREE.Vector3(-150, 0, 150),
-      home: new THREE.Vector3(100, 0, -50),
-      startTime: 75,   // generous: you start at 3★ and spike strips can blow your tires
-      reward: 6000,
-      onStart() {
-        this.stage = 1;
-        this.timeLeft = this.startTime;
-        this.markerPos = this.drop.clone();
-        setBeam(this.drop, 0x39ff7a);
-        G.hud.setMissionText('Hot Delivery');
-        G.hud.showSubtitle("Uncle Seng: \"Hot goods — get them to the drop. Cops are on you.\"", "ลุงเซ้ง: \"ของร้อน รีบไป\"");
-        raiseWanted(3);   // you're hot the moment you take the job
-      },
-      update(dt) {
-        if (this.stage === 1) {
-          this.timeLeft -= dt;
-          if (this.timeLeft <= 0) { this.fail(); return; }
-          G.hud.showPrompt(`HOT DELIVERY &nbsp; ⏱ ${this.timeLeft.toFixed(0)}s`, 0.4);
-          if (dist2(G.player.group.position, this.drop) < 9*9) { this.win(); return; }
-        } else if (this.stage === 5) {
-          const d2 = dist2(G.player.group.position, this.markerPos);
-          if (!this.armed && d2 > 18*18) this.armed = true;
-          if (this.armed) {
-            G.hud.showPrompt('Return to the <b>marker</b> for another <b>Delivery</b>', 0.4);
-            if (d2 < 8*8) { this.armed = false; this.onStart(); }
-          }
-        }
-      },
-      win() {
-        this.stage = 5; this.armed = false;
-        G.cash += this.reward; G.hud.setCash(G.cash);
-        G.hud.showNotif(`Delivery complete: +฿${this.reward.toLocaleString()}`);
-        G.hud.showSubtitle("Uncle Seng: \"Made it. You're solid, kid.\"", "ลุงเซ้ง: \"เก่งมาก\"");
-        G.hud.setMissionText('Free Roam · Sukhumvit');
-        this.markerPos = this.home.clone();
-        setBeam(this.home, 0xff2a86);
-      },
-      fail() {
-        this.stage = 5; this.armed = false;
-        G.hud.showNotif('Delivery failed — goods lost.');
-        G.hud.showSubtitle("Uncle Seng: \"You lost the goods. Damn.\"", "ลุงเซ้ง: \"ของหายหมด\"");
-        G.hud.setMissionText('Free Roam · Sukhumvit');
-        this.markerPos = this.home.clone();
-        setBeam(this.home, 0xff2a86);
-      },
-    },
-  };
-  sys.start = id => {
-    sys.active = missions[id];
-    sys.active.onStart();
-  };
-  sys.update = dt => { if (sys.active && sys.active.update) sys.active.update(dt); };
-  // Resume from a save: if the intro was done, drop straight into free roam with
-  // Soi Run available at its marker (instead of replaying the welcome delivery).
-  sys.resume = welcomeDone => {
-    if (!welcomeDone) return;
-    if (G.world.poi.goldShopBeam) { G.scene.remove(G.world.poi.goldShopBeam); G.world.poi.goldShopBeam = null; }
-    sys.active = missions.soiRun;
-    missions.soiRun.toReoffer(null);
-  };
-  return sys;
-}
-
-// =============================================================================
+// → ./missions.js
 // 11. PHYSICS / COLLISIONS (lightweight)
 // =============================================================================
 
 // Player vs buildings: simple AABB pushback
-function resolvePlayerVsBuildings(player) {
+export function resolvePlayerVsBuildings(player) {
   const r = 0.42;
   const p = player.group.position;
   for (const b of G.world.buildings) {
@@ -2884,7 +2586,7 @@ function resolvePlayerVsBuildings(player) {
 }
 
 // Vehicle vs buildings — soft pushback that also kills speed
-function resolveVehicleVsBuildings(v) {
+export function resolveVehicleVsBuildings(v) {
   const p = v.pos;
   const r = Math.max(v.boundsHalf.x, v.boundsHalf.z) + 0.2;
   let hit = false;
@@ -2917,7 +2619,7 @@ function resolveVehicleVsBuildings(v) {
 // ---- Juice FX: tire-skid decals + impact dust puffs ----
 const _skidGeo = new THREE.PlaneGeometry(0.34, 1.2); _skidGeo.rotateX(-PI / 2);  // lies flat, length along +Z
 const _skidMat = new THREE.MeshBasicMaterial({ color: 0x0b0b0b, transparent: true, opacity: 0.5, depthWrite: false });
-function spawnSkid(v) {
+export function spawnSkid(v) {
   const now = performance.now();
   if (now - (v._skidAt || 0) < 45) return;     // throttle
   v._skidAt = now;
@@ -2933,14 +2635,14 @@ function spawnSkid(v) {
   }
   while (G.skids.length > 90) { const s = G.skids.shift(); G.scene.remove(s.mesh); s.mesh.material.dispose(); }
 }
-function updateSkids(dt) {
+export function updateSkids(dt) {
   for (let i = G.skids.length - 1; i >= 0; i--) {
     const s = G.skids[i]; s.life -= dt;
     s.mesh.material.opacity = Math.max(0, s.life / 5 * 0.5);
     if (s.life <= 0) { G.scene.remove(s.mesh); s.mesh.material.dispose(); G.skids.splice(i, 1); }
   }
 }
-function spawnDust(x, z, n = 14) {
+export function spawnDust(x, z, n = 14) {
   const geo = new THREE.BufferGeometry();
   const pos = new Float32Array(n * 3), vel = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) {
@@ -2953,7 +2655,7 @@ function spawnDust(x, z, n = 14) {
   const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; G.scene.add(pts);
   G.dust.push({ pts, vel, life: 0.6 });
 }
-function updateDust(dt) {
+export function updateDust(dt) {
   for (let i = G.dust.length - 1; i >= 0; i--) {
     const d = G.dust[i]; d.life -= dt;
     const a = d.pts.geometry.attributes.position.array;
@@ -2971,7 +2673,7 @@ function updateDust(dt) {
 // 12. UPDATE LOOPS — Player / Vehicles / NPCs
 // =============================================================================
 
-function updatePlayer(dt) {
+export function updatePlayer(dt) {
   const p = G.player;
   if (p.inVehicle) { updatePlayerInVehicle(dt); return; }
 
@@ -3059,7 +2761,7 @@ function updatePlayer(dt) {
 }
 
 // Show a banner when the player crosses into a named district.
-function updateDistrict() {
+export function updateDistrict() {
   const p = G.player.group.position;
   const poi = G.world.poi;
   let zone;
@@ -3075,7 +2777,7 @@ function updateDistrict() {
 }
 
 // Slide the Skytrain back and forth along the elevated track.
-function updateBTS(dt) {
+export function updateBTS(dt) {
   const b = G.bts;
   if (!b) return;
   b.mesh.position.x += b.dir * b.speed * dt;
@@ -3088,7 +2790,7 @@ function updateBTS(dt) {
 }
 
 // Spin/bob the hidden amulets and collect them on touch.
-function updateCollectibles(dt) {
+export function updateCollectibles(dt) {
   const cs = G.world.collectibles;
   if (!cs) return;
   const pp = G.player.group.position;
@@ -3114,7 +2816,7 @@ function updateCollectibles(dt) {
   }
 }
 
-function updatePlayerInVehicle(dt) {
+export function updatePlayerInVehicle(dt) {
   const p = G.player;
   const v = p.inVehicle;
   // vehicle destroyed under the player — blow it and kick them out
@@ -3238,7 +2940,7 @@ function updatePlayerInVehicle(dt) {
 
 // (moved to ./core.js)
 
-function killPed(ped) {
+export function killPed(ped) {
   if (ped.dead) return;
   ped.dead = true;
   // ragdoll: flatten
@@ -3252,7 +2954,7 @@ function killPed(ped) {
   }, 8000);
 }
 
-function updateVehicles(dt) {
+export function updateVehicles(dt) {
   for (const v of G.vehicles) {
     if (v.dead) continue;
     if (v.lights) {
@@ -3293,7 +2995,7 @@ function updateVehicles(dt) {
   }
 }
 
-function updateTrafficCar(v, dt) {
+export function updateTrafficCar(v, dt) {
   const npc = v.npc;
   // simple grid following: pick a heading aligned with the road, choose new heading at intersections
   // collision check ahead with player vehicle / other cars / peds
@@ -3352,12 +3054,12 @@ function updateTrafficCar(v, dt) {
   }
 }
 
-function isNearGridLine(v) {
+export function isNearGridLine(v) {
   const m = ((v + HALF) % BLOCK) - BLOCK/2;
   return Math.abs(m) < 1.5;
 }
 
-function respawnTraffic(v, playerPos) {
+export function respawnTraffic(v, playerPos) {
   const angle = rand(0, TAU);
   const r = rand(70, 130);
   const x = clamp(playerPos.x + Math.cos(angle) * r, -HALF + 5, HALF - 5);
@@ -3375,7 +3077,7 @@ function respawnTraffic(v, playerPos) {
 // =============================================================================
 
 // Floating reaction-bark sprites over panicking peds.
-function makeBarkSprite(text) {
+export function makeBarkSprite(text) {
   const c = document.createElement('canvas'); c.width = 128; c.height = 64;
   const g = c.getContext('2d');
   g.font = 'bold 34px system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -3386,14 +3088,14 @@ function makeBarkSprite(text) {
   sp.scale.set(2.2, 1.1, 1);
   return sp;
 }
-function spawnBark(ped) {
+export function spawnBark(ped) {
   if (!G.barks) G.barks = [];
   const sp = makeBarkSprite(pick(['!', '!', 'Help!', 'Run!', 'หนี!']));
   sp.position.set(ped.mesh.position.x, ped.mesh.position.y + 2.6, ped.mesh.position.z);
   G.scene.add(sp);
   G.barks.push({ sprite: sp, ped, life: 1.5 });
 }
-function updateBarks(dt) {
+export function updateBarks(dt) {
   if (!G.barks) return;
   for (let i = G.barks.length - 1; i >= 0; i--) {
     const b = G.barks[i];
@@ -3417,7 +3119,7 @@ const CROWD_CURVE = [
   [0, 0.22], [2, 0.10], [5, 0.10], [7, 0.55], [8.5, 1.0], [11, 0.72],
   [14, 0.72], [16, 0.82], [18.5, 1.0], [21, 0.85], [23, 0.40], [24, 0.22],
 ];
-function crowdFactor(dayT) {
+export function crowdFactor(dayT) {
   const h = ((dayT % 1) + 1) % 1 * 24;
   for (let i = 0; i < CROWD_CURVE.length - 1; i++) {
     const a = CROWD_CURVE[i], b = CROWD_CURVE[i + 1];
@@ -3425,13 +3127,13 @@ function crowdFactor(dayT) {
   }
   return CROWD_CURVE[0][1];
 }
-function crowdTarget() { return Math.round(PED_TARGET * crowdFactor(G.time.dayT)); }
+export function crowdTarget() { return Math.round(PED_TARGET * crowdFactor(G.time.dayT)); }
 
 // Snap the live crowd to the current time-of-day target immediately (spawn the
 // shortfall near the player, cull the farthest excess). Used by the headless
 // harness so a screenshot reflects the hour without waiting for the slow ramp;
 // gameplay reaches the same target gradually via updatePeds.
-function resyncCrowd() {
+export function resyncCrowd() {
   const pp = G.player.group.position;
   const target = crowdTarget();
   // pull stray wanderers onto nearby sidewalks so the count near the camera
@@ -3458,7 +3160,7 @@ function resyncCrowd() {
 }
 G.resyncCrowd = resyncCrowd;   // exposed on window.GAME for the smoke harness
 
-function updatePeds(dt) {
+export function updatePeds(dt) {
   const playerPos = G.player.group.position;
   for (const ped of G.peds) {
     if (ped.dead) continue;
@@ -3528,7 +3230,7 @@ function updatePeds(dt) {
 // Each anchor owns a few slot positions; updateClusters keeps the right number
 // of standing peds parked there for the current hour (busy midday/evening,
 // empty in the small hours), only populating anchors near the player.
-function buildClusterAnchors() {
+export function buildClusterAnchors() {
   G.clusterAnchors = [];
   for (const f of (G.world.foodStalls || [])) {
     const theta = rand(0, TAU);
@@ -3553,7 +3255,7 @@ function buildClusterAnchors() {
   }
 }
 
-function spawnAnchoredPed(anchor, slot, slotIdx) {
+export function spawnAnchoredPed(anchor, slot, slotIdx) {
   const ped = spawnPed(G.scene, slot.pos.clone());
   ped.anchor = { pos: anchor.pos, slot: slot.pos.clone(), facing: slot.facing };
   ped._slotIdx = slotIdx;
@@ -3563,7 +3265,7 @@ function spawnAnchoredPed(anchor, slot, slotIdx) {
   return ped;
 }
 
-function updateClusters(dt) {
+export function updateClusters(dt) {
   if (!G.clusterAnchors) return;
   G._clusterT = (G._clusterT || 0) - dt;
   if (G._clusterT > 0) return;
@@ -3593,7 +3295,7 @@ function updateClusters(dt) {
 // Random "bag-snatcher" street event — a marked ped flees (reusing the panic AI);
 // run them down for a bounty. Delivers on the intro's "beat up muggers".
 // Body-armor pickups — restore armor on foot; respawn after a cooldown.
-function updateArmorPickups(dt) {
+export function updateArmorPickups(dt) {
   const aps = G.world.armorPickups;
   if (!aps || !GAMEPLAY.armor) return;
   const now = performance.now();
@@ -3613,7 +3315,7 @@ function updateArmorPickups(dt) {
 }
 
 // Street-food stalls — visit on foot to eat (heal once) and tick the set.
-function updateFoodStalls(dt) {
+export function updateFoodStalls(dt) {
   const fs = G.world.foodStalls;
   if (!fs || G.player.inVehicle) return;
   const pp = G.player.group.position;
@@ -3630,7 +3332,7 @@ function updateFoodStalls(dt) {
   }
 }
 
-function updateMuggings(dt) {
+export function updateMuggings(dt) {
   const m = G.mugging;
   if (m) {
     m.t += dt;
@@ -3673,7 +3375,7 @@ function updateMuggings(dt) {
 
 // Spike strips at 3★ — deployed ahead of a fleeing driver; running one over blows
 // your tires (halved top speed until a respray).
-function spawnSpikeStrip(pos, dirAngle) {
+export function spawnSpikeStrip(pos, dirAngle) {
   const strip = new THREE.Group();
   const base = new THREE.Mesh(new THREE.BoxGeometry(8, 0.1, 0.6), new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9 }));
   base.position.y = 0.06; strip.add(base);
@@ -3688,7 +3390,7 @@ function spawnSpikeStrip(pos, dirAngle) {
   (G.spikes || (G.spikes = [])).push({ group: strip, pos: new THREE.Vector3(pos.x, 0, pos.z), life: 22 });
 }
 
-function updateSpikes(dt) {
+export function updateSpikes(dt) {
   const p = G.player;
   if (!G.spikes) G.spikes = [];
   // deploy ahead of the player's vehicle at 3★, on a cadence
@@ -3717,7 +3419,7 @@ function updateSpikes(dt) {
 }
 
 // Vigilante side job — drive a cop unit, press V, bust fleeing crooks for escalating cash.
-function vigilanteSpawnTarget(vg) {
+export function vigilanteSpawnTarget(vg) {
   const pp = G.player.group.position;
   const ang = rand(0, TAU), r = rand(20, 35);
   const pos = new THREE.Vector3(
@@ -3732,7 +3434,7 @@ function vigilanteSpawnTarget(vg) {
   mk.position.set(0, 2.5, 0); ped.mesh.add(mk);
   vg.target = ped; vg.marker = mk;
 }
-function vigilanteEnd(msg) {
+export function vigilanteEnd(msg) {
   const vg = G.vigilante;
   if (!vg) return;
   if (vg.target && !vg.target.dead) {     // release the current crook
@@ -3742,7 +3444,7 @@ function vigilanteEnd(msg) {
   G.hud.showNotif('Vigilante over — ' + msg);
   G.vigilante = null;
 }
-function updateVigilante(dt) {
+export function updateVigilante(dt) {
   const p = G.player;
   const inCop = p.inVehicle && p.inVehicle.isCop;
   const vg = G.vigilante;
@@ -3774,7 +3476,7 @@ function updateVigilante(dt) {
   }
 }
 
-function updateDogs(dt) {
+export function updateDogs(dt) {
   const playerPos = G.player.group.position;
   for (const dog of G.dogs) {
     dog.timer -= dt;
@@ -3815,7 +3517,7 @@ function updateDogs(dt) {
 // =============================================================================
 
 // Cycle fists -> pistol -> SMG through whatever's owned. Used on foot and in cars.
-function cycleWeapon() {
+export function cycleWeapon() {
   const p = G.player;
   const owned = ['fists'];
   if (p.weapons.pistol) owned.push('pistol');
@@ -3827,7 +3529,7 @@ function cycleWeapon() {
   updateAmmoHud();
 }
 
-function updateCombat(dt) {
+export function updateCombat(dt) {
   const p = G.player;
   if (p.attackTimer > 0) p.attackTimer -= dt;
   if (p.attackCooldown > 0) p.attackCooldown -= dt;
@@ -3939,7 +3641,7 @@ function updateCombat(dt) {
   }
 }
 
-function updateAmmoHud() {
+export function updateAmmoHud() {
   const p = G.player;
   if (p.activeWeapon === 'fists') G.hud.setAmmo('FISTS', 'MUAY THAI');
   else if (p.activeWeapon === 'smg') G.hud.setAmmo(`${p.smgAmmo} / ${p.smgReserve}`, 'SMG');
@@ -3947,9 +3649,9 @@ function updateAmmoHud() {
   else G.hud.setAmmo(`${p.pistolAmmo} / ${p.pistolReserve}`, '9MM PISTOL');
 }
 
-function triggerHitStop(s) { G.hitStop = Math.max(G.hitStop || 0, s); }
+export function triggerHitStop(s) { G.hitStop = Math.max(G.hitStop || 0, s); }
 
-function doMeleeHit(kind) {
+export function doMeleeHit(kind) {
   const p = G.player;
   const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw);
   // search nearby peds/cops/dogs in front
@@ -3989,7 +3691,7 @@ function doMeleeHit(kind) {
 }
 
 // Scatter nearby pedestrians (gunfire / explosions) — reuses the flee/panic AI.
-function scarePeds(pos, radius) {
+export function scarePeds(pos, radius) {
   const r2 = radius * radius;
   for (const ped of G.peds) {
     if (ped.dead) continue;
@@ -3997,7 +3699,7 @@ function scarePeds(pos, radius) {
   }
 }
 
-function firePistol() {
+export function firePistol() {
   const origin = G.camera.position;          // used synchronously below; copied where stored
   G.camera.getWorldDirection(_fireDir);
   // pooled muzzle flash — reused every shot, faded out in updateBullets
@@ -4014,7 +3716,7 @@ function firePistol() {
   scarePeds(origin, 14);
 }
 
-function fireSMG() {
+export function fireSMG() {
   const origin = G.camera.position;
   G.camera.getWorldDirection(_fireDir);
   // less accurate than the pistol — add a little spread
@@ -4034,7 +3736,7 @@ function fireSMG() {
   scarePeds(origin, 14);
 }
 
-function fireShotgun() {
+export function fireShotgun() {
   const origin = G.camera.position;
   if (!_muzzleLight) { _muzzleLight = new THREE.PointLight(0xffd577, 0, 6, 2); G.scene.add(_muzzleLight); }
   _muzzleLight.position.copy(origin);
@@ -4056,7 +3758,7 @@ function fireShotgun() {
   scarePeds(origin, 16);
 }
 
-function doBulletRaycast(origin, dir, dmg = 35) {
+export function doBulletRaycast(origin, dir, dmg = 35) {
   _ray.set(origin, dir); _ray.near = 0; _ray.far = 120;
   // gather targets: living actors, vehicles, and only NEARBY buildings — the
   // distance cull keeps us from raycasting all ~650 buildings on every shot.
@@ -4109,7 +3811,7 @@ function doBulletRaycast(origin, dir, dmg = 35) {
   }
 }
 
-function updateBullets(dt) {
+export function updateBullets(dt) {
   // fade the pooled muzzle/spark lights
   if (_muzzleT > 0) { _muzzleT -= dt; if (_muzzleLight) _muzzleLight.intensity = Math.max(0, _muzzleT / 0.06 * 2.5); }
   if (_sparkT  > 0) { _sparkT  -= dt; if (_sparkLight)  _sparkLight.intensity  = Math.max(0, _sparkT  / 0.08 * 1.5); }
@@ -4128,7 +3830,7 @@ function updateBullets(dt) {
 // 15. COPS + WANTED SYSTEM
 // =============================================================================
 
-function spawnCop(scene, pos) {
+export function spawnCop(scene, pos) {
   // foot cop
   const m = makePedMesh();
   // override clothing to brown/khaki cop uniform
@@ -4149,7 +3851,7 @@ function spawnCop(scene, pos) {
   return cop;
 }
 
-function spawnCopCar(scene, pos) {
+export function spawnCopCar(scene, pos) {
   const v = makeVehicle('cop', scene);
   v.pos.copy(pos);
   v.mesh.position.copy(v.pos);
@@ -4162,7 +3864,7 @@ function spawnCopCar(scene, pos) {
 
 // Unmarked Crime Suppression SUV — the 3★ unit. isCop (set in makeVehicle), so it
 // reuses the cop chase/minimap/damage/death plumbing; just faster and tankier.
-function spawnFortuner(scene, pos) {
+export function spawnFortuner(scene, pos) {
   const v = makeVehicle('fortuner', scene);
   v.pos.copy(pos);
   v.mesh.position.copy(v.pos);
@@ -4174,7 +3876,7 @@ function spawnFortuner(scene, pos) {
 }
 
 // Armored SWAT van — the 4★ unit. isCop, reuses the cop chase/damage paths.
-function spawnSwat(scene, pos) {
+export function spawnSwat(scene, pos) {
   const v = makeVehicle('swat', scene);
   v.pos.copy(pos);
   v.mesh.position.copy(v.pos);
@@ -4185,7 +3887,7 @@ function spawnSwat(scene, pos) {
   return v;
 }
 
-function killCop(cop) {
+export function killCop(cop) {
   if (cop.dead) return;
   cop.dead = true;
   cop.mesh.rotation.x = PI/2;
@@ -4199,7 +3901,7 @@ function killCop(cop) {
   }, 8000);
 }
 
-function updateWanted(dt) {
+export function updateWanted(dt) {
   const p = G.player.group.position;
   // visual: blink active cop-car light bars
   const t = performance.now() * 0.012;
@@ -4278,7 +3980,7 @@ function updateWanted(dt) {
   G.hud.setStars(G.wanted.stars);
 }
 
-function updateCop(v, dt) {
+export function updateCop(v, dt) {
   // chase player
   const p = G.player;
   const px = p.group.position.x, pz = p.group.position.z;
@@ -4331,7 +4033,7 @@ function updateCop(v, dt) {
   }
 }
 
-function updateFootCops(dt) {
+export function updateFootCops(dt) {
   const p = G.player;
   for (const c of G.cops) {
     if (c.dead) continue;
@@ -4366,7 +4068,7 @@ function updateFootCops(dt) {
   }
 }
 
-function gameOver() {
+export function gameOver() {
   const busted = G.wanted.stars >= 1;
   G.state = 'dead';                         // set before releasing lock so the pause path doesn't fire
   const el = document.getElementById('gameover');
@@ -4381,7 +4083,7 @@ function gameOver() {
   document.exitPointerLock();
 }
 
-function respawnPlayer() {
+export function respawnPlayer() {
   const p = G.player;
   p.hp = p.hpMax;
   p.armor = 0;
@@ -4405,7 +4107,7 @@ function respawnPlayer() {
 // 16. PARTICLES / FX
 // =============================================================================
 
-function makeSmokeEmitter(target, intensity=1) {
+export function makeSmokeEmitter(target, intensity=1) {
   const N = 40;
   const geom = new THREE.BufferGeometry();
   const pos = new Float32Array(N * 3);
@@ -4420,7 +4122,7 @@ function makeSmokeEmitter(target, intensity=1) {
   return entry;
 }
 
-function makeExplosion(pos) {
+export function makeExplosion(pos) {
   const flash = new THREE.PointLight(0xffaa55, 6, 22, 2);
   flash.position.copy(pos); G.scene.add(flash);
   setTimeout(()=>G.scene.remove(flash), 220);
@@ -4430,7 +4132,7 @@ function makeExplosion(pos) {
   scarePeds(pos, 22);
 }
 
-function updateParticles(dt) {
+export function updateParticles(dt) {
   for (let i = G.particles.length - 1; i >= 0; i--) {
     const e = G.particles[i];
     e.life -= dt;
@@ -4464,7 +4166,7 @@ function updateParticles(dt) {
 // 17. INTERACTION — get in/out of vehicle
 // =============================================================================
 
-function updateInteraction(dt) {
+export function updateInteraction(dt) {
   const p = G.player;
   if (p.inVehicle) return;
 
@@ -4497,7 +4199,7 @@ function updateInteraction(dt) {
 }
 
 // Enter a 7-Eleven (on foot) to open the store overlay.
-function update7Eleven(dt) {
+export function update7Eleven(dt) {
   const p = G.player;
   for (const e of G.world.sevenElevens) {
     if (dist2(p.group.position, e.pos) < 5 * 5) {
@@ -4513,7 +4215,7 @@ function update7Eleven(dt) {
 }
 // Safehouse (on foot at the door): buy it once, then rest to heal + save. Owning
 // it makes it your respawn point instead of the police station.
-function updateSafehouse(dt) {
+export function updateSafehouse(dt) {
   const p = G.player;
   const door = G.world.poi && G.world.poi.safehouse;
   if (!door || dist2(p.group.position, door) > 6 * 6) return;
@@ -4539,12 +4241,12 @@ function updateSafehouse(dt) {
     }
   }
 }
-function markSafehouseOwned() {
+export function markSafehouseOwned() {
   const m = G.world.safehouseSign;
   if (m) { m.color.setHex(0x39ff7a); m.emissive.setHex(0x39ff7a); }   // FOR SALE → HOME
 }
 
-function storeBuy(item) {
+export function storeBuy(item) {
   const p = G.player;
   let ok = false;
   if (item === 'snack' && G.cash >= 20) { G.cash -= 20; p.hp = Math.min(p.hpMax, p.hp + 40); ok = true; }
@@ -4555,7 +4257,7 @@ function storeBuy(item) {
 }
 
 // Gun shop: on foot in the shop zone, E buys the next thing you need (then ammo).
-function updateGunShop(dt) {
+export function updateGunShop(dt) {
   const p = G.player;
   const shop = G.world.gunShop;
   if (!shop || dist2(p.group.position, shop) > 7 * 7) return;
@@ -4578,7 +4280,7 @@ function updateGunShop(dt) {
   }
 }
 
-function vehicleName(k) {
+export function vehicleName(k) {
   return { bike: 'motorbike', tuktuk: 'tuk-tuk', hilux: 'pickup', camry: 'car', sedan: 'sedan', cop: 'cop pickup', fortuner: 'unmarked SUV', swat: 'SWAT van', songthaew: 'songthaew', boat: 'longtail boat', bus: 'bus', luxsedan: 'luxury sedan', supercar: 'supercar' }[k] || k;
 }
 
@@ -4586,7 +4288,7 @@ function vehicleName(k) {
 // 18. CAMERA UPDATE
 // =============================================================================
 
-function updateCamera(dt) {
+export function updateCamera(dt) {
   const p = G.player;
   const rig = G.camRig;
   // shake decay
@@ -4630,202 +4332,13 @@ function updateCamera(dt) {
 }
 
 // =============================================================================
-// 19. DAY/NIGHT + WEATHER
-// =============================================================================
-
-const DAY_LENGTH = 480; // seconds for a full 24h cycle (slow enough that a mission
-                        // doesn't blow through dusk-to-dark mid-chase). Everything
-                        // time-of-day keys off the normalized dayT/nightK, not this.
-
-function updateDayNight(dt) {
-  const prevT = G.time.dayT;
-  G.time.dayT = (G.time.dayT + dt / DAY_LENGTH) % 1;
-  if (G.time.dayT < prevT) G.time.day++;     // crossed midnight → a whole day elapsed
-  const t = G.time.dayT;          // 0..1, where 0 = midnight, 0.25 = 6am, 0.5 = noon, 0.75 = 6pm
-  // sun direction — lateral z-offset keeps noon elevation at ~39° (atan 90/110)
-  // so vertical facades still catch direct light at midday; the cos/sin arc
-  // keeps mornings/evenings raking along the east-west streets.
-  const sunAngle = (t - 0.25) * TAU; // 0 at sunrise (east)
-  const sx = Math.cos(sunAngle) * 100;
-  const sy = Math.sin(sunAngle) * 90;
-  const sz = 110;
-  // Re-anchor the sun + shadow camera on the player every frame: the shadow
-  // frustum is a ±80 m box, the map is ±250 m — anchored at the origin, most
-  // of the playable area would sample outside the frustum.
-  const pp = G.player.group.position;
-  G.sun.position.set(pp.x + sx, sy, pp.z + sz);
-  G.sun.target.position.set(pp.x, 0, pp.z);
-  G.sun.target.updateMatrixWorld();
-  // sun intensity
-  const dayK = clamp((Math.sin(sunAngle) + 0.2), 0, 1);
-  G.sun.intensity = dayK * 1.6;
-  G.hemi.intensity = 0.3 + dayK * 1.0;
-  G.amb.intensity = 0.10 + dayK * 0.18;
-  G.renderer.toneMappingExposure = 1.0 + dayK * 0.18;
-  // background color
-  const skyDay = new THREE.Color(0x8eb6e8);
-  const skyDusk = new THREE.Color(0xff8866);
-  const skyNight = new THREE.Color(0x0a1024);
-  let sky;
-  if (dayK > 0.4) sky = skyDay.clone().lerp(skyDusk, 1 - (dayK - 0.4)/0.6);
-  else if (dayK > 0.05) sky = skyDusk.clone().lerp(skyNight, 1 - (dayK - 0.05)/0.35);
-  else sky = skyNight;
-  G.scene.background.copy(sky);
-  G.scene.fog.color.copy(sky);
-  G.scene.fog.density = lerp(0.0012, 0.0035, 1 - dayK) + G.time.rainStrength * 0.004;
-
-  // neon/lamp/window emissive + accent lights: brighter at night.
-  // Iterate only the cached arrays built in buildWorld — no full scene.traverse.
-  const nightK = 1 - dayK;
-  G.nightK = nightK;   // exposed so vehicle headlights can follow day/night
-  for (let n = 0; n < G.nightLights.length; n++) {
-    const nl = G.nightLights[n];
-    nl.light.intensity = nightK * nl.base;
-  }
-  for (let n = 0; n < G.nightEmissive.length; n++) {
-    const ne = G.nightEmissive[n];
-    ne.mat.emissiveIntensity = ne.dayIntensity + (ne.nightIntensity - ne.dayIntensity) * nightK;
-  }
-
-  // clock display
-  const totalMin = t * 24 * 60;
-  const hh = Math.floor(totalMin / 60), mm = Math.floor(totalMin % 60);
-  G.hud.setClock(`${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`);
-
-  // weather cycle: clear ⇄ rain, intensity builds then breaks; lightning in downpours
-  if (G._weatherT === undefined) { G._weatherT = 0; G._weatherUntil = 60; G._rainTarget = 0; }
-  G._weatherT += dt;
-  if (G._weatherT > G._weatherUntil) {
-    if (G.time.weather === 'clear') {
-      G.time.weather = 'rain';
-      G._rainTarget = Math.random() < 0.5 ? 0.45 : 0.85;   // drizzle or downpour
-      G.hud.setWeather((G._rainTarget > 0.7 ? 'DOWNPOUR' : 'LIGHT RAIN') + ' · 28°C');
-      G.hud.showNotif(G._rainTarget > 0.7 ? 'The sky opens up.' : 'It starts to rain.');
-      G.audio.thunder();
-      G._weatherUntil = G._weatherT + rand(40, 90);
-    } else {
-      G.time.weather = 'clear';
-      G._rainTarget = 0;
-      G.hud.setWeather('CLEAR · 33°C');
-      G._weatherUntil = G._weatherT + rand(70, 150);
-    }
-  }
-  G.time.rainStrength = lerp(G.time.rainStrength, G._rainTarget, 0.012);
-  G.audio.rainBed.setLevel(G.time.rainStrength * 0.18);
-  G.rain.update(dt, G.player.group.position, G.time.rainStrength);
-
-  // lightning flashes during heavy rain (transient light boost; reset next frame)
-  if (G.time.rainStrength > 0.6 && Math.random() < 0.0045) { G._lightningT = 0.14; G.audio.thunder(); }
-  if (G._lightningT > 0) {
-    G._lightningT -= dt;
-    const f = (G._lightningT > 0.08) ? 1 : 0.35;   // bright flash, then a fainter second pop
-    G.hemi.intensity += 2.6 * f;
-    G.sun.intensity += 1.4 * f;
-  }
-
-  // periodic temple bell at dawn
-  if (!G._bellSeen) G._bellSeen = new Set();
-  const hourSlot = Math.floor(t * 24);
-  if ((hourSlot === 5 || hourSlot === 6) && !G._bellSeen.has(hourSlot)) {
-    G._bellSeen.add(hourSlot);
-    G.audio.bell();
-  }
-  if (hourSlot < 5) G._bellSeen.clear();
-}
-
-// =============================================================================
-// 19b. LOY KRATHONG FESTIVAL — floats + sky lanterns on the river, on schedule
-// =============================================================================
-const FESTIVAL_PERIOD = 3;   // every 3rd night the river fills with krathong
-const KRATHONG_COUNT = 42;
-const RIVER_CX = -229;       // river centerline x (from buildWorld)
-
-// A lotus krathong: leaf base + petals + a glowing candle that reads at night.
-function makeKrathong() {
-  const g = new THREE.Group();
-  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.46, 0.16, 10),
-    new THREE.MeshStandardMaterial({ color: 0x2f7d4f, roughness: 0.8 }));
-  base.position.y = 0.08; g.add(base);
-  const petalMat = new THREE.MeshStandardMaterial({ color: pick([0xff9ec4, 0xffd1e0, 0xfff0d0, 0xffb86b]), roughness: 0.7 });
-  for (let k = 0; k < 8; k++) {
-    const p = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.22, 5), petalMat);
-    const a = k / 8 * TAU;
-    p.position.set(Math.cos(a) * 0.34, 0.18, Math.sin(a) * 0.34);
-    p.rotation.z = Math.cos(a) * 0.5; p.rotation.x = Math.sin(a) * 0.5;
-    g.add(p);
-  }
-  const candle = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.16, 6),
-    new THREE.MeshStandardMaterial({ color: 0xf0e0b0, roughness: 0.6 }));
-  candle.position.y = 0.26; g.add(candle);
-  const flame = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 6),
-    new THREE.MeshStandardMaterial({ color: 0xffb030, emissive: 0xffae28, emissiveIntensity: 1.7, roughness: 0.4 }));
-  flame.position.y = 0.4; flame.scale.y = 1.7; g.add(flame);
-  return g;
-}
-// A khom loi sky lantern: a glowing ovoid that rises and fades.
-function makeSkyLantern() {
-  const mat = new THREE.MeshStandardMaterial({ color: 0xff8a2a, emissive: 0xff7a18, emissiveIntensity: 1.4, roughness: 0.6, transparent: true, opacity: 0.92 });
-  const m = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.34, 0.95, 10), mat);
-  m.userData.mat = mat; m.frustumCulled = false;
-  return m;
-}
-function festivalScheduled() {
-  // every 3rd night is Loy Krathong (offset so a fresh game's first night isn't one)
-  return (G.time.day % FESTIVAL_PERIOD === 2) && (G.nightK || 0) > 0.45;
-}
-function startFestival() {
-  const f = G.festival; f.active = true; f.announcedDay = G.time.day;
-  for (let i = 0; i < KRATHONG_COUNT; i++) {
-    const m = makeKrathong();
-    m.position.set(RIVER_CX + rand(-13, 13), 0.16, rand(-HALF, HALF));
-    m.rotation.y = rand(0, TAU); m.frustumCulled = false; G.scene.add(m);
-    f.floats.push({ mesh: m, speed: rand(1.4, 3.2), spin: rand(-0.3, 0.3), phase: rand(0, TAU) });
-  }
-  G.hud.showSubtitle('Loy Krathong — the river glows with floats.', 'ลอยกระทง');
-  if (G.audio && G.audio.bell) G.audio.bell();
-}
-function stopFestival() {
-  const f = G.festival; f.active = false;
-  for (const k of f.floats) { G.scene.remove(k.mesh); disposeObject(k.mesh); }
-  for (const l of f.lanterns) { G.scene.remove(l.mesh); l.mesh.geometry.dispose(); l.mesh.userData.mat.dispose(); }
-  f.floats = []; f.lanterns = [];
-}
-function spawnSkyLantern() {
-  const m = makeSkyLantern();
-  m.position.set(rand(-HALF, -110), rand(5, 14), rand(-HALF, HALF));   // rise over the riverside/west
-  G.scene.add(m);
-  G.festival.lanterns.push({ mesh: m, rise: rand(2, 4), drift: rand(0.4, 1.5), life: rand(8, 14), maxLife: 14 });
-}
-function updateFestival(dt) {
-  const f = G.festival;
-  const want = festivalScheduled();
-  if (want && !f.active) startFestival();
-  else if (!want && f.active) stopFestival();
-  if (!f.active) return;
-  const now = performance.now();
-  for (const k of f.floats) {
-    k.mesh.position.z += dt * k.speed;                                 // drift downstream
-    k.mesh.position.y = 0.16 + Math.sin(now * 0.002 + k.phase) * 0.03; // gentle bob
-    k.mesh.rotation.y += dt * k.spin;
-    if (k.mesh.position.z > HALF + 5) k.mesh.position.z = -HALF - 5;    // recycle
-  }
-  for (let i = f.lanterns.length - 1; i >= 0; i--) {
-    const l = f.lanterns[i];
-    l.mesh.position.y += dt * l.rise; l.mesh.position.x += dt * l.drift; l.life -= dt;
-    l.mesh.userData.mat.opacity = clamp(l.life / l.maxLife, 0, 1) * 0.92;
-    if (l.life <= 0) { G.scene.remove(l.mesh); l.mesh.geometry.dispose(); l.mesh.userData.mat.dispose(); f.lanterns.splice(i, 1); }
-  }
-  f.lanternT = (f.lanternT || 0) - dt;
-  if (f.lanternT <= 0 && f.lanterns.length < 14) { spawnSkyLantern(); f.lanternT = rand(0.6, 1.7); }
-}
-
-// =============================================================================
+// → ./daynight.js
 // 20. MAIN LOOP
 // =============================================================================
 
 // Songthaew taxi job — a free-roam activity (press J in a songthaew). Kept out
 // of the mission chain so it doesn't disturb the story missions.
-function updateTaxi(dt) {
+export function updateTaxi(dt) {
   const p = G.player;
   const t = G.taxi || (G.taxi = { stage: 'idle', markerPos: null, dest: null, beam: null, timeLeft: 0, fares: 0, fareValue: 0 });
   const inSong = p.inVehicle && p.inVehicle.kind === 'songthaew';
@@ -4875,7 +4388,7 @@ function updateTaxi(dt) {
     }
   }
 }
-function taxiRandPoint(from, maxd) {
+export function taxiRandPoint(from, maxd) {
   for (let tries = 0; tries < 24; tries++) {
     const gi = irand(-GRID/2 + 1, GRID/2 - 1), gj = irand(-GRID/2 + 1, GRID/2 - 1);
     const x = gi * BLOCK + (Math.random() < 0.5 ? -3 : 3), z = gj * BLOCK;
@@ -4884,7 +4397,7 @@ function taxiRandPoint(from, maxd) {
   }
   return new THREE.Vector3(clamp(from.x + rand(-80, 80), -HALF + 12, HALF - 12), 0, clamp(from.z + rand(-80, 80), -HALF + 12, HALF - 12));
 }
-function taxiBeam(t, pos, color) {
+export function taxiBeam(t, pos, color) {
   if (!t.beam) {
     t.beam = new THREE.Mesh(
       new THREE.CylinderGeometry(1.2, 1.2, 80, 12, 1, true),
@@ -4896,7 +4409,7 @@ function taxiBeam(t, pos, color) {
   t.beam.position.set(pos.x, 40, pos.z);
   t.beam.visible = true;
 }
-function taxiClear(t) {
+export function taxiClear(t) {
   t.stage = 'idle'; t.markerPos = null; t.dest = null;
   if (t.beam) t.beam.visible = false;
 }
@@ -4904,7 +4417,7 @@ function taxiClear(t) {
 // Full-screen, north-up map overlay (TAB). Draws the minimap base scaled up plus
 // live markers (amulets, mission/taxi, cops, player heading).
 let _fullmapCtx = null;
-function drawFullMap() {
+export function drawFullMap() {
   const cv = document.getElementById('fullmap');
   if (!cv) return;
   const ctx = _fullmapCtx || (_fullmapCtx = cv.getContext('2d'));
@@ -4949,7 +4462,7 @@ function drawFullMap() {
   ctx.beginPath(); ctx.arc(px, py, 5, 0, TAU); ctx.fill();
 }
 
-function updateGarage(dt) {
+export function updateGarage(dt) {
   const p = G.player;
   if (!p.inVehicle || !G.world.garages) return;
   const v = p.inVehicle;
@@ -4989,7 +4502,7 @@ const STORABLE = new Set(['bike', 'tuktuk', 'hilux', 'camry', 'sedan', 'songthae
 
 // The repaintable body materials of a vehicle: its biggest non-wheel/non-glass
 // MeshStandard parts (body + cab), found once and cached on the vehicle.
-function collectPaintMats(mesh) {
+export function collectPaintMats(mesh) {
   const items = [];
   mesh.traverse(o => {
     if (!o.isMesh || !o.material || !o.material.isMeshStandardMaterial) return;
@@ -5003,23 +4516,23 @@ function collectPaintMats(mesh) {
   for (const it of items) { if (seen.has(it.mat)) continue; seen.add(it.mat); mats.push(it.mat); if (mats.length >= 2) break; }
   return mats;
 }
-function setVehicleColor(v, hex) {
+export function setVehicleColor(v, hex) {
   if (!v.paintMats) v.paintMats = collectPaintMats(v.mesh);
   for (const m of v.paintMats) m.color.setHex(hex);
   v.color = hex;
 }
-function currentBodyColor(v) {
+export function currentBodyColor(v) {
   if (typeof v.color === 'number') return v.color;
   const m = v.paintMats || collectPaintMats(v.mesh);
   return m.length ? m[0].color.getHex() : 0xcccccc;
 }
-function randomPlate() {
+export function randomPlate() {
   const t = ['กก', 'ขข', 'งง', 'รด', 'สห', 'ทพ', 'มล', 'ญบ', 'ผด', 'นค'];
   return `${irand(1, 9)}${pick(t)} ${irand(1000, 9999)}`;
 }
-function storedLabel(e) { return `${vehicleName(e.kind)}${e.plate ? ' ' + e.plate : ''}`; }
+export function storedLabel(e) { return `${vehicleName(e.kind)}${e.plate ? ' ' + e.plate : ''}`; }
 
-function storeVehicle(v) {
+export function storeVehicle(v) {
   const garage = G.econ.garage, p = G.player, g = G.world.garages[0];
   const entry = { kind: v.kind, color: currentBodyColor(v), plate: v.plate || randomPlate(), hp: Math.max(40, Math.round(v.hp)) };
   garage.stored.push(entry);
@@ -5032,7 +4545,7 @@ function storeVehicle(v) {
   G.audio.chime();
   saveGame();
 }
-function retrieveVehicle(idx) {
+export function retrieveVehicle(idx) {
   const garage = G.econ.garage;
   const e = garage.stored[idx];
   if (!e) return;
@@ -5048,7 +4561,7 @@ function retrieveVehicle(idx) {
   G.audio.blip({ freq: 320, dur: 0.06, gain: 0.08 });
   saveGame();
 }
-function repaintVehicle(v) {
+export function repaintVehicle(v) {
   if (G.cash < PRICE.repaint) { G.hud.showNotif('Not enough cash to repaint'); return; }
   G.cash -= PRICE.repaint; G.hud.setCash(G.cash);
   const cur = currentBodyColor(v);
@@ -5060,7 +4573,7 @@ function repaintVehicle(v) {
   saveGame();
 }
 
-function updateGarageOwnership(dt) {
+export function updateGarageOwnership(dt) {
   const p = G.player;
   if (!G.world.garages || !G.world.garages.length) return;
   const g = G.world.garages[0], garage = G.econ.garage;
@@ -5102,7 +4615,7 @@ function updateGarageOwnership(dt) {
 
 // Car radio: M cycles stations; music plays (and ducks the engine) only while
 // you're in a vehicle, and flashes the station name on the HUD.
-function updateRadio(dt) {
+export function updateRadio(dt) {
   const a = G.audio; if (!a || !a.radio) return;
   const inV = !!G.player.inVehicle;
   if (G.input && G.input.pressed && G.input.pressed('KeyM') && G.state === 'playing') {
@@ -5115,7 +4628,7 @@ function updateRadio(dt) {
 }
 
 // Free-fly camera for photo mode: mouse to look, WASD to fly, Space/Ctrl up/down.
-function updatePhotoCam(dt) {
+export function updatePhotoCam(dt) {
   const pc = G.photoCam;
   if (!pc) return;
   const [dx, dy] = G.input.consumeMouseDelta();
@@ -5137,7 +4650,7 @@ function updatePhotoCam(dt) {
   G.camera.lookAt(pc.pos.clone().add(fwd));
 }
 
-function loop() {
+export function loop() {
   requestAnimationFrame(loop);
   const realDt = Math.min(0.05, G.clock.getDelta());
   // hit-stop: a brief global slow-mo on a solid melee/gun connect so impacts land
