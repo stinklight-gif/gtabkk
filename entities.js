@@ -74,7 +74,7 @@ export function makePlayer(scene) {
 }
 
 export function makeCamera() {
-  const cam = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 2200);
+  const cam = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.5, 2200);
   cam.position.set(0, 5, 12);
   return {
     cam,

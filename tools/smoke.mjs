@@ -41,6 +41,7 @@ const SHOTS = [
   { name: 'smoke_songkran.png', dayT: 0.5, songkran: true },  // Songkran water fight in the street
   { name: 'smoke_waypoint.png', dayT: 0.5, waypoint: true },  // objective waypoint + radio chip, in a car
   { name: 'smoke_map.png',      dayT: 0.5, tabmap: true   },  // TAB full map: icons, legend, objective line
+  { name: 'smoke_mall.png',     dayT: 0.5, mall: true     },  // inside Terminal 21: atrium, shops, directory
 ];
 // Extra one-off shots for tuning, e.g. SMOKE_SHOTS="dawn=0.30,dusk=0.78"
 // (these don't run in CI — only the two standard shots above are asserted).
@@ -101,10 +102,12 @@ async function main() {
     console.log('game started');
 
     for (const shot of SHOTS) {
-      await page.evaluate(({ dayT, festival, songkran, waypoint, tabmap }) => {
+      await page.evaluate(({ dayT, festival, songkran, waypoint, tabmap, mall }) => {
         const GAME = window.GAME;
         GAME.state = 'playing';                                  // force-resume if pointer lock dropped
         document.getElementById('pause').classList.remove('show');
+        document.getElementById('fullmap-wrap').classList.remove('show');  // clear a prior TAB-map shot
+        GAME.showMap = false;
         GAME.time.dayT = dayT;
         GAME._rainTarget = 0; GAME.time.rainStrength = 0;        // force clear weather
         GAME.time.weather = 'clear';
@@ -137,6 +140,12 @@ async function main() {
             document.getElementById('fullmap-wrap').classList.add('show');
             GAME.state = 'map';
           }
+        } else if (mall) {
+          // stand in the Terminal 21 atrium looking north at the directory + shops
+          const c = GAME.world.mall ? GAME.world.mall.center : { x: -25, z: 25 };
+          GAME.player.inVehicle = null; GAME.player.group.visible = true;
+          GAME.player.group.position.set(c.x, 0, c.z - 8);
+          GAME.camRig.yaw = Math.PI; GAME.camRig.pitch = -0.05;  // look across the atrium at the shops
         } else {
           GAME.player.group.position.set(0, 0, -130);            // street level, mid-map
           GAME.camRig.yaw = Math.PI; GAME.camRig.pitch = -0.02;  // aim down the street
@@ -144,7 +153,7 @@ async function main() {
         GAME.camRig.shake = 0;
         if (GAME.resyncCrowd) GAME.resyncCrowd();                // snap crowd to this hour (busy noon vs dead 3am)
       }, shot);
-      await waitFrames(page, (shot.festival || shot.songkran || shot.waypoint || shot.tabmap) ? 24 : 14);  // let day/night + camera (+ festival/map) settle
+      await waitFrames(page, (shot.festival || shot.songkran || shot.waypoint || shot.tabmap || shot.mall) ? 24 : 14);  // let day/night + camera (+ festival/map) settle
       await page.screenshot({ path: path.join(ROOT, shot.name), timeout: 120_000 });
       const size = fs.statSync(path.join(ROOT, shot.name)).size;
       const calls = await page.evaluate(() => window.GAME.renderer.info.render.calls);

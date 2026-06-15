@@ -103,6 +103,7 @@ export function updateDistrict() {
   if (p.x < -185) zone = { en: 'Riverside', th: 'ริมแม่น้ำ' };
   else if (poi.yaowarat && dist2(p, poi.yaowarat) < 62*62) zone = { en: 'Yaowarat', th: 'เยาวราช' };
   else if (poi.temple && dist2(p, poi.temple) < 46*46) zone = { en: 'The Wat', th: 'วัด' };
+  else if (poi.terminal21 && dist2(p, poi.terminal21) < 55*55) zone = { en: 'Asok', th: 'อโศก' };
   else zone = { en: 'Sukhumvit', th: 'สุขุมวิท' };
   if (zone.en !== G._districtName) {
     const first = G._districtName === undefined;   // don't banner the spawn district
@@ -187,6 +188,7 @@ export function updateInteraction(dt) {
     updateGunShop(dt);   // E does shop business only when no vehicle is in reach
     update7Eleven(dt);
     updateSafehouse(dt);
+    updateMall(dt);
   }
 }
 
@@ -196,11 +198,35 @@ export function update7Eleven(dt) {
   for (const e of G.world.sevenElevens) {
     if (dist2(p.group.position, e.pos) < 5 * 5) {
       G.hud.showPrompt('Press <b>E</b> to enter <b>7-Eleven</b>', 0.4);
-      if (G.input.pressed('KeyE')) {
-        G.state = 'store';
-        document.getElementById('store').classList.add('show');
-        document.exitPointerLock();
-      }
+      if (G.input.pressed('KeyE')) openStore('7-Eleven');
+      return;
+    }
+  }
+}
+
+// Shared store-overlay opener: shows #store with a per-shop title (the convenience
+// stock is shared for now). Used by the 7-Eleven and every Terminal 21 shop front.
+export function openStore(title) {
+  const h = document.querySelector('#store h3');
+  if (h) h.textContent = title.toUpperCase();
+  G.state = 'store';
+  document.getElementById('store').classList.add('show');
+  document.exitPointerLock();
+}
+
+// Terminal 21 — walk in (no door key), then E at a shop front to browse it.
+export function updateMall(dt) {
+  const p = G.player, mall = G.world.mall;
+  if (!mall) return;
+  const inside = Math.abs(p.group.position.x - mall.center.x) < mall.hw
+              && Math.abs(p.group.position.z - mall.center.z) < mall.hd;
+  if (inside && !G._inMall) { G._inMall = true; G.hud.showSubtitle('Terminal 21', 'เทอร์มินอล 21', 2.2); tip('mall', 'Terminal 21 — each floor is a world city. Walk up to a shop and press E to browse.', 'เทอร์มินอล 21'); }
+  else if (!inside && G._inMall) G._inMall = false;
+  if (!inside) return;
+  for (const s of mall.shops) {
+    if (dist2(p.group.position, s.pos) < 3.2 * 3.2) {
+      G.hud.showPrompt(`Press <b>E</b> to browse <b>${s.name}</b>`, 0.4);
+      if (G.input.pressed('KeyE')) openStore(s.name);
       return;
     }
   }

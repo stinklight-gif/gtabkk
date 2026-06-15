@@ -10,7 +10,7 @@ import {
 } from './core.js';
 
 export function buildLandmarks(env) {
-  const { scene, world, _m, _m2, _p, _q, _s, _e, addInstanced, bakeGroup, TEMPLE_I, TEMPLE_J, GARAGE_I, GARAGE_J, SAFE_I, SAFE_J, RIVER_I, YAO_I, YAO_J0, YAO_J1, GUN_I, GUN_J, SIDEWALK_EDGE } = env;
+  const { scene, world, _m, _m2, _p, _q, _s, _e, addInstanced, bakeGroup, TEMPLE_I, TEMPLE_J, GARAGE_I, GARAGE_J, SAFE_I, SAFE_J, RIVER_I, YAO_I, YAO_J0, YAO_J1, GUN_I, GUN_J, MALL_I, MALL_J, SIDEWALK_EDGE } = env;
 
   // ---- Parked motorbikes — clusters along curbs (Bangkok parking is everywhere) ----
   // One InstancedMesh per part type (frame / wheel / handle). The original gave each
@@ -339,6 +339,93 @@ export function buildLandmarks(env) {
     size: new THREE.Vector3(12, 6, 8),
   });
   world.poi.goldShop = goldShopPos.clone();
+
+  // ---- Terminal 21 — a walk-in mall at the Asok BTS (Goal 4) ----
+  // A real enclosed building you walk into (no teleport): perimeter walls with a
+  // street-facing entrance gap, a roofed atrium with escalators + a directory,
+  // and themed shop fronts you can browse. world.mall holds the shop triggers.
+  {
+    const cx = (MALL_I + 0.5) * BLOCK, cz = (MALL_J + 0.5) * BLOCK;   // block center (-25, 25)
+    const HW = 20, HD = 17, WALLH = 11, GAP = 9;                       // half-extents, wall height, entrance width
+    const wallMat  = new THREE.MeshStandardMaterial({ color: 0x9aa6b2, roughness: 0.7 });
+    const glassMat = new THREE.MeshStandardMaterial({ color: 0x2a3340, roughness: 0.3, metalness: 0.4, emissive: 0x0c1622 });
+    const floorMat = new THREE.MeshStandardMaterial({ color: 0xcfc6b8, roughness: 0.85 });
+    const roofMat  = new THREE.MeshStandardMaterial({ color: 0x3a3f47, roughness: 0.9 });
+
+    const addWall = (px, pz, sx, sz, mat = wallMat) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(sx, WALLH, sz), mat);
+      m.position.set(px, WALLH / 2, pz); m.castShadow = true; m.receiveShadow = true; scene.add(m);
+      world.buildings.push({ pos: new THREE.Vector3(px, WALLH / 2, pz), size: new THREE.Vector3(sx, WALLH, sz) });
+    };
+    addWall(cx, cz + HD, HW * 2, 1);                    // north (solid)
+    addWall(cx - HW, cz, 1, HD * 2);                    // west
+    addWall(cx + HW, cz, 1, HD * 2);                    // east
+    const segW = HW - GAP / 2;                          // south wall split around the entrance
+    addWall(cx - (GAP / 2 + segW / 2), cz - HD, segW, 1, glassMat);
+    addWall(cx + (GAP / 2 + segW / 2), cz - HD, segW, 1, glassMat);
+
+    const floor = new THREE.Mesh(new THREE.BoxGeometry(HW * 2, 0.1, HD * 2), floorMat);
+    floor.position.set(cx, 0.06, cz); floor.receiveShadow = true; scene.add(floor);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(HW * 2 + 8, 0.6, HD * 2 + 8), roofMat);   // wide eaves so the atrium reads as enclosed
+    roof.position.set(cx, WALLH + 0.3, cz); roof.castShadow = true; scene.add(roof);
+    for (const [lx, lz] of [[cx - 9, cz], [cx + 9, cz], [cx, cz + 9], [cx, cz - 6]]) {   // the roof blocks the sun
+      const lamp = new THREE.PointLight(0xfff0d0, 0.7, 34, 2); lamp.position.set(lx, WALLH - 2, lz); scene.add(lamp);
+    }
+
+    // canvas-texture sign helper (the only place we draw text on geometry)
+    const textSign = (text, w, h, bg, fg, px, py, pz, ry = 0) => {
+      const cnv = document.createElement('canvas'); cnv.width = 512; cnv.height = 128;
+      const c2 = cnv.getContext('2d');
+      c2.fillStyle = bg; c2.fillRect(0, 0, 512, 128);
+      c2.fillStyle = fg; c2.font = 'bold 64px system-ui, sans-serif'; c2.textAlign = 'center'; c2.textBaseline = 'middle';
+      c2.fillText(text, 256, 70);
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cnv) }));
+      m.position.set(px, py, pz); m.rotation.y = ry; scene.add(m);
+    };
+    textSign('TERMINAL 21', 15, 3.6, '#101418', '#ffcf4a', cx, WALLH - 2, cz - HD - 0.06, PI);   // exterior marquee
+
+    // central directory desk + escalators up to a mezzanine ledge
+    const desk = new THREE.Mesh(new THREE.BoxGeometry(5, 1.1, 2), new THREE.MeshStandardMaterial({ color: 0x5a4a3a, roughness: 0.7 }));
+    desk.position.set(cx, 0.6, cz); desk.castShadow = true; scene.add(desk);
+    world.buildings.push({ pos: new THREE.Vector3(cx, 0.6, cz), size: new THREE.Vector3(5, 1.1, 2) });
+    textSign('DIRECTORY', 4.6, 1.3, '#1a2230', '#9fe0ff', cx, 2.5, cz - 1.06, PI);
+    const escMat  = new THREE.MeshStandardMaterial({ color: 0x7a8088, roughness: 0.5, metalness: 0.3 });
+    const railMat = new THREE.MeshStandardMaterial({ color: 0x222831, roughness: 0.6 });
+    for (const dir of [-1, 1]) {
+      const ramp = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.5, 10), escMat);
+      ramp.position.set(cx + dir * 3.5, 2.6, cz + 9); ramp.rotation.x = -0.5; ramp.castShadow = true; scene.add(ramp);
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(0.15, 1.0, 10), railMat);
+      rail.position.set(cx + dir * 4.7, 3.2, cz + 9); rail.rotation.x = -0.5; scene.add(rail);
+    }
+    const ledge = new THREE.Mesh(new THREE.BoxGeometry(HW * 2, 0.4, 7), floorMat);
+    ledge.position.set(cx, 5.2, cz + HD - 3.5); ledge.castShadow = true; scene.add(ledge);
+
+    // themed shop fronts — Terminal 21's floors are world cities; each is browsable
+    const shopMat = new THREE.MeshStandardMaterial({ color: 0xece3d3, roughness: 0.8 });
+    const shops = [];
+    const defs = [
+      { name: 'Pier 21 Food Court', color: '#ff5a3a', wall: 'N', along: -11 },
+      { name: 'Tokyo Tech',         color: '#21f0ff', wall: 'N', along:  11 },
+      { name: 'Roma Boutique',      color: '#ff2a86', wall: 'W', along:  -5 },
+      { name: 'Paris Pharmacy',     color: '#b24bff', wall: 'E', along:  -5 },
+      { name: '7-Eleven',           color: '#39ff7a', wall: 'E', along:   8 },
+    ];
+    for (const d of defs) {
+      let cpx, cpz, ry, spx, spz, sgx, sgz, csx, csz;
+      if (d.wall === 'N')      { cpx = cx + d.along; cpz = cz + HD - 2; ry = PI;      csx = 5; csz = 2; spx = cpx;     spz = cpz - 3; sgx = cpx;       sgz = cpz - 1.05; }
+      else if (d.wall === 'E') { cpx = cx + HW - 2;  cpz = cz + d.along; ry = -PI / 2; csx = 2; csz = 5; spx = cpx - 3; spz = cpz;     sgx = cpx - 1.05; sgz = cpz; }
+      else                     { cpx = cx - HW + 2;  cpz = cz + d.along; ry =  PI / 2; csx = 2; csz = 5; spx = cpx + 3; spz = cpz;     sgx = cpx + 1.05; sgz = cpz; }
+      const counter = new THREE.Mesh(new THREE.BoxGeometry(csx, 1.1, csz), shopMat);
+      counter.position.set(cpx, 0.55, cpz); counter.castShadow = true; scene.add(counter);
+      world.buildings.push({ pos: new THREE.Vector3(cpx, 0.55, cpz), size: new THREE.Vector3(csx, 1.1, csz) });
+      textSign(d.name.toUpperCase(), 6, 1.3, '#0c0f14', d.color, sgx, 3.4, sgz, ry);
+      shops.push({ name: d.name, pos: new THREE.Vector3(spx, 0, spz) });
+    }
+
+    world.mall = { center: new THREE.Vector3(cx, 0, cz), hw: HW, hd: HD, shops };
+    world.poi.terminal21 = new THREE.Vector3(cx, 0, cz - HD - 2);   // stand-here just outside the entrance
+    const glow = new THREE.PointLight(0xffcf4a, 0.8, 24, 2); glow.position.set(cx, 5, cz - HD - 3); scene.add(glow);
+  }
 
   // Pillar of light to attract player
   const pillarBeam = new THREE.Mesh(

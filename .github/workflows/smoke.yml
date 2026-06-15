@@ -33,4 +33,5 @@ jobs:
             smoke_songkran.png
             smoke_waypoint.png
             smoke_map.png
+            smoke_mall.png
           if-no-files-found: ignore

@@ -14,6 +14,7 @@ import {
 // -----------------------------------------------------------------------------
 export const HOME_COLOR = '#4fe3c0';     // Home / Safehouse (teal)
 export const GARAGE_COLOR = '#5b9cff';   // Garage / U-Spray (blue)
+export const MALL_COLOR = '#c98bff';     // Terminal 21 mall (purple)
 
 export function drawHouseGlyph(ctx, x, y, s, color, filled) {
   ctx.beginPath();                       // a little house silhouette (body + roof)
@@ -37,6 +38,15 @@ export function drawGarageGlyph(ctx, x, y, s, color, filled) {
   ctx.beginPath();
   for (let i = -1; i <= 1; i++) { ctx.moveTo(x - s * 0.6, y + i * s * 0.5); ctx.lineTo(x + s * 0.6, y + i * s * 0.5); }
   ctx.stroke();
+}
+
+export function drawMallGlyph(ctx, x, y, s, color, filled = true) {
+  ctx.beginPath();                       // a storefront box with an awning bar on top
+  ctx.rect(x - s, y - s, s * 2, s * 2);
+  if (filled) { ctx.fillStyle = color; ctx.fill(); }
+  ctx.strokeStyle = color; ctx.lineWidth = Math.max(1, s * 0.26); ctx.stroke();
+  ctx.fillStyle = filled ? 'rgba(8,12,20,0.75)' : color;
+  ctx.fillRect(x - s, y - s, s * 2, s * 0.5);
 }
 
 // pooled scratch for the on-screen waypoint projection (module-private — it
@@ -191,6 +201,8 @@ export function bindHud() {
     if (shPos) { const [hx, hy] = mm(shPos); drawHouseGlyph(mctx, hx, hy, 5, HOME_COLOR, !!(G.econ.safehouse && G.econ.safehouse.owned)); }
     const ga0 = G.world.garages && G.world.garages[0];
     if (ga0 && ga0.pos) { const [gx, gy] = mm(ga0.pos); drawGarageGlyph(mctx, gx, gy, 4.5, GARAGE_COLOR, !!(G.econ.garage && G.econ.garage.rented)); }
+    const t21 = G.world.poi && G.world.poi.terminal21;
+    if (t21) { const [tx2, ty2] = mm(t21); drawMallGlyph(mctx, tx2, ty2, 5, MALL_COLOR); }
     mctx.restore();
     // player blip (always center, facing up)
     mctx.fillStyle = '#21f0ff';
