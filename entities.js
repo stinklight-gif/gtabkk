@@ -1,0 +1,620 @@
+// =============================================================================
+// ENTITIES — extracted from main.js (see numbered sections). No logic change.
+// =============================================================================
+import * as THREE from 'three';
+import {
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+} from './core.js';
+
+// 4. PLAYER + CAMERA
+// =============================================================================
+
+export function makePlayer(scene) {
+  const group = new THREE.Group();
+  // body capsule
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xd44b3b, roughness: 0.7 });
+  const pantsMat = new THREE.MeshStandardMaterial({ color: 0x232a35, roughness: 0.8 });
+  const skinMat = new THREE.MeshStandardMaterial({ color: 0xc69472, roughness: 0.8 });
+
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 0.6, 4, 8), bodyMat);
+  torso.position.y = 1.05; torso.castShadow = true; group.add(torso);
+  const legGeo = new THREE.CapsuleGeometry(0.28, 0.55, 4, 8);
+  legGeo.translate(0, -0.555, 0);   // origin at the hip so rotation pivots there, not mid-thigh
+  const legs = new THREE.Mesh(legGeo, pantsMat);
+  legs.position.y = 1.0; legs.castShadow = true; group.add(legs);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), skinMat);
+  head.position.y = 1.65; head.castShadow = true; group.add(head);
+
+  // arms (used for swinging while punching)
+  const armGeo = new THREE.CapsuleGeometry(0.1, 0.5, 4, 6);
+  armGeo.translate(0, -0.35, 0);    // origin at the shoulder so swings pivot there, not mid-arm
+  const armL = new THREE.Mesh(armGeo, bodyMat);
+  armL.position.set(-0.42, 1.5, 0); armL.castShadow = true; group.add(armL);
+  const armR = new THREE.Mesh(armGeo, bodyMat);
+  armR.position.set( 0.42, 1.5, 0); armR.castShadow = true; group.add(armR);
+
+  // pistol model (hidden by default)
+  const pistol = new THREE.Group();
+  const gunBody = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.12, 0.22), new THREE.MeshStandardMaterial({ color: 0x222, metalness: 0.7, roughness: 0.4 }));
+  pistol.add(gunBody);
+  const gunGrip = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.18, 0.10), new THREE.MeshStandardMaterial({ color: 0x111 }));
+  gunGrip.position.set(-0.02, -0.13, 0); pistol.add(gunGrip);
+  pistol.visible = false;
+  group.add(pistol);
+
+  group.position.copy(G.world.spawns.player);
+  scene.add(group);
+
+  return {
+    group, torso, legs, head, armL, armR, pistol,
+    velocity: new THREE.Vector3(),
+    yaw: 0, pitch: 0,
+    grounded: true,
+    hp: 100, hpMax: 100,
+    stam: 100, stamMax: 100,
+    armor: 0, armorMax: 100,
+    sprintLock: false,
+    weapons: { fists: true, pistol: false, smg: false, shotgun: false },
+    activeWeapon: 'fists',
+    pistolAmmo: 0, pistolMag: 12, pistolReserve: 36,
+    smgAmmo: 0, smgMag: 30, smgReserve: 90,
+    shotgunAmmo: 0, shotgunMag: 6, shotgunReserve: 24,
+    inVehicle: null,
+    // combat anim state
+    attackTimer: 0, attackKind: null, attackCooldown: 0,
+    blocking: false,
+    // hit recovery
+    hitFlashT: 0,
+    deadT: 0,
+    gunRecoil: 0,
+    regenLockT: 0,
+    // bribe
+    canBribeUntil: 0,
+  };
+}
+
+export function makeCamera() {
+  const cam = new THREE.PerspectiveCamera(72, window.innerWidth / window.innerHeight, 0.1, 2200);
+  cam.position.set(0, 5, 12);
+  return {
+    cam,
+    yaw: 0, pitch: -0.15,
+    distance: 4.5, height: 1.9, targetDistance: 4.5,
+    shake: 0,
+  };
+}
+
+// =============================================================================
+// 5. VEHICLES
+// =============================================================================
+
+export function makeVehicleMesh(kind) {
+  const g = new THREE.Group();
+  g.userData.kind = kind;
+  if (kind === 'bike') {
+    const frame = new THREE.Mesh(
+      new THREE.BoxGeometry(0.5, 0.4, 1.6),
+      new THREE.MeshStandardMaterial({ color: 0xd6363c, roughness: 0.5, metalness: 0.4 })
+    );
+    frame.position.y = 0.5; g.add(frame);
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.1, 0.6), new THREE.MeshStandardMaterial({ color: 0x222 }));
+    seat.position.set(0, 0.78, -0.05); g.add(seat);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111, roughness: 0.8 });
+    const wF = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.08, 8, 16), wheelMat);
+    wF.rotation.y = PI/2; wF.position.set(0, 0.32, 0.8); g.add(wF);
+    const wR = wF.clone(); wR.position.z = -0.8; g.add(wR);
+    const handle = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.06, 0.08), new THREE.MeshStandardMaterial({ color: 0x111 }));
+    handle.position.set(0, 1.0, 0.7); g.add(handle);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 8), new THREE.MeshBasicMaterial({ color: 0xffffaa }));
+    head.position.set(0, 0.85, 0.9); g.add(head);
+    g.userData.dims = { L: 1.9, W: 0.7, H: 1.2 };
+    g.userData.spec = { topSpeed: 22, accel: 14, brake: 18, turn: 2.4, mass: 180, kind: 'bike' };
+  } else if (kind === 'tuktuk') {
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.2, 2.4), new THREE.MeshStandardMaterial({ color: 0x1e9a5e, roughness: 0.5 }));
+    body.position.y = 0.85; g.add(body);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 2.2), new THREE.MeshStandardMaterial({ color: 0xffcf4a, roughness: 0.5 }));
+    roof.position.y = 1.55; g.add(roof);
+    const windshield = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.7), new THREE.MeshBasicMaterial({ color: 0x223344, transparent:true, opacity: 0.65 }));
+    windshield.position.set(0, 1.2, 1.25); g.add(windshield);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111 });
+    const wF = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.18, 12), wheelMat);
+    wF.rotation.z = PI/2; wF.position.set(0, 0.32, 1.0); g.add(wF);
+    for (const x of [-0.65, 0.65]) {
+      const wR = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.18, 12), wheelMat);
+      wR.rotation.z = PI/2; wR.position.set(x, 0.32, -0.9); g.add(wR);
+    }
+    g.userData.dims = { L: 2.6, W: 1.5, H: 1.7 };
+    g.userData.spec = { topSpeed: 16, accel: 9, brake: 14, turn: 2.0, mass: 350, kind: 'tuktuk' };
+  } else if (kind === 'hilux') {
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.0, 3.5), new THREE.MeshStandardMaterial({ color: 0x2a3a55, roughness: 0.7 }));
+    body.position.y = 0.9; g.add(body);
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.8, 1.6), new THREE.MeshStandardMaterial({ color: 0x2a3a55, roughness: 0.7 }));
+    cab.position.set(0, 1.65, 0.4); g.add(cab);
+    const bed = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.4, 1.6), new THREE.MeshStandardMaterial({ color: 0x1a2335 }));
+    bed.position.set(0, 1.25, -1.0); g.add(bed);
+    const windshield = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.6), new THREE.MeshBasicMaterial({ color: 0x223344, transparent:true, opacity: 0.65 }));
+    windshield.position.set(0, 1.85, 1.21); g.add(windshield);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111 });
+    for (const z of [-1.3, 1.3]) for (const x of [-0.9, 0.9]) {
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.3, 14), wheelMat);
+      w.rotation.z = PI/2; w.position.set(x, 0.42, z); g.add(w);
+    }
+    g.userData.dims = { L: 3.8, W: 2.0, H: 2.2 };
+    g.userData.spec = { topSpeed: 26, accel: 12, brake: 18, turn: 1.6, mass: 1800, kind: 'hilux' };
+  } else if (kind === 'cop') {
+    // cop = isuzu d-max — orange hilux variant with blue/red light bar
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.0, 3.5), new THREE.MeshStandardMaterial({ color: 0x1a3a6a, roughness: 0.65 }));
+    body.position.y = 0.9; g.add(body);
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.8, 1.6), new THREE.MeshStandardMaterial({ color: 0xf0f0f0, roughness: 0.65 }));
+    cab.position.set(0, 1.65, 0.4); g.add(cab);
+    const bed = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.4, 1.6), new THREE.MeshStandardMaterial({ color: 0x101a2a }));
+    bed.position.set(0, 1.25, -1.0); g.add(bed);
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.18, 0.4), new THREE.MeshStandardMaterial({ color: 0x222 }));
+    bar.position.set(0, 2.1, 0.4); g.add(bar);
+    const lampR = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.3), new THREE.MeshBasicMaterial({ color: 0xff2222 }));
+    lampR.position.set(-0.4, 2.2, 0.4); g.add(lampR);
+    const lampB = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.3), new THREE.MeshBasicMaterial({ color: 0x2266ff }));
+    lampB.position.set( 0.4, 2.2, 0.4); g.add(lampB);
+    g.userData.copLamps = [lampR, lampB];
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111 });
+    for (const z of [-1.3, 1.3]) for (const x of [-0.9, 0.9]) {
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.3, 14), wheelMat);
+      w.rotation.z = PI/2; w.position.set(x, 0.42, z); g.add(w);
+    }
+    g.userData.dims = { L: 3.8, W: 2.0, H: 2.2 };
+    g.userData.spec = { topSpeed: 28, accel: 13, brake: 18, turn: 1.7, mass: 1800, kind: 'cop' };
+  } else if (kind === 'fortuner') {
+    // unmarked Crime Suppression SUV — dark, no light bar, just a dash flasher
+    const paint = 0x15161c;
+    const paintMat = new THREE.MeshStandardMaterial({ color: paint, roughness: 0.5, metalness: 0.5 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.95, 1.15, 3.7), paintMat);
+    body.position.y = 0.95; g.add(body);
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.95, 2.4), paintMat);
+    cab.position.set(0, 1.75, -0.1); g.add(cab);
+    const windshield = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.7), new THREE.MeshBasicMaterial({ color: 0x111820, transparent: true, opacity: 0.7 }));
+    windshield.position.set(0, 1.85, 1.12); g.add(windshield);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111 });
+    for (const z of [-1.35, 1.35]) for (const x of [-0.92, 0.92]) {
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.44, 0.32, 14), wheelMat);
+      w.rotation.z = PI/2; w.position.set(x, 0.44, z); g.add(w);
+    }
+    // small red dash flasher (static) — the only tell that it's police
+    const dash = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.06, 0.12), new THREE.MeshBasicMaterial({ color: 0xff2222 }));
+    dash.position.set(0, 1.55, 1.0); g.add(dash);
+    g.userData.dims = { L: 4.0, W: 2.0, H: 2.3 };
+    g.userData.spec = { topSpeed: 32, accel: 15, brake: 19, turn: 1.7, mass: 2000, kind: 'fortuner' };
+  } else if (kind === 'swat') {
+    // armored SWAT van — the 4★ response
+    const paint = new THREE.MeshStandardMaterial({ color: 0x1a2028, roughness: 0.6, metalness: 0.4 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.0, 4.8), paint);
+    body.position.y = 1.3; g.add(body);
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(2.1, 1.0, 1.4), paint);
+    cab.position.set(0, 2.0, 1.4); g.add(cab);
+    const windshield = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 0.7), new THREE.MeshBasicMaterial({ color: 0x111820, transparent: true, opacity: 0.8 }));
+    windshield.position.set(0, 2.0, 2.11); g.add(windshield);
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.18, 0.3), new THREE.MeshBasicMaterial({ color: 0x2244ff }));
+    bar.position.set(0, 2.6, 0.4); g.add(bar);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+    for (const z of [-1.6, 1.6]) for (const x of [-1.05, 1.05]) {
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.4, 14), wheelMat);
+      w.rotation.z = PI/2; w.position.set(x, 0.5, z); g.add(w);
+    }
+    g.userData.dims = { L: 4.9, W: 2.3, H: 2.8 };
+    g.userData.spec = { topSpeed: 26, accel: 13, brake: 18, turn: 1.4, mass: 3500, kind: 'swat' };
+  } else if (kind === 'songthaew') {
+    // red shared-taxi pickup with a covered passenger bench in the back
+    const red = 0xb83434;
+    const paint = new THREE.MeshStandardMaterial({ color: red, roughness: 0.6 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.0, 3.6), paint);
+    body.position.y = 0.9; g.add(body);
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.8, 1.3), paint);
+    cab.position.set(0, 1.65, 0.9); g.add(cab);
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.12, 2.0), new THREE.MeshStandardMaterial({ color: 0xd9d9d9, roughness: 0.7 }));
+    canopy.position.set(0, 2.15, -0.7); g.add(canopy);
+    for (const xx of [-0.85, 0.85]) for (const zz of [0.2, -1.6]) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.1, 0.08), new THREE.MeshStandardMaterial({ color: 0x888888 }));
+      post.position.set(xx, 1.6, zz); g.add(post);
+    }
+    const windshield = new THREE.Mesh(new THREE.PlaneGeometry(1.7, 0.6), new THREE.MeshBasicMaterial({ color: 0x223344, transparent: true, opacity: 0.65 }));
+    windshield.position.set(0, 1.85, 1.56); g.add(windshield);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+    for (const z of [-1.3, 1.3]) for (const x of [-0.9, 0.9]) {
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.3, 14), wheelMat);
+      w.rotation.z = PI/2; w.position.set(x, 0.4, z); g.add(w);
+    }
+    g.userData.dims = { L: 3.8, W: 2.0, H: 2.4 };
+    g.userData.spec = { topSpeed: 22, accel: 11, brake: 16, turn: 1.6, mass: 1700, kind: 'songthaew' };
+  } else if (kind === 'boat') {
+    // longtail boat — long thin hull, bench seat, raised stern motor pole
+    const hull = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.6, 7), new THREE.MeshStandardMaterial({ color: 0x9a3a3a, roughness: 0.7 }));
+    hull.position.y = 0.35; g.add(hull);
+    const trim = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.16, 7.1), new THREE.MeshStandardMaterial({ color: 0xe0c060, roughness: 0.6 }));
+    trim.position.y = 0.62; g.add(trim);
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.2, 0.8), new THREE.MeshStandardMaterial({ color: 0x5a3a2a }));
+    seat.position.set(0, 0.7, 0.5); g.add(seat);
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 3, 6), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+    pole.position.set(0, 1.0, -3.6); pole.rotation.x = 0.6; g.add(pole);
+    const prop = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.1), new THREE.MeshStandardMaterial({ color: 0x222222 }));
+    prop.position.set(0, 0.2, -4.6); g.add(prop);
+    g.userData.dims = { L: 7.0, W: 1.7, H: 1.2 };
+    g.userData.spec = { topSpeed: 18, accel: 8, brake: 7, turn: 1.2, mass: 800, kind: 'boat' };
+  } else if (kind === 'bus') {
+    const paint = pick([0x2a6a9a, 0x9a3a3a, 0x3a8a5a]);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2.4, 10.5), new THREE.MeshStandardMaterial({ color: paint, roughness: 0.5, metalness: 0.3 }));
+    body.position.y = 1.6; g.add(body);
+    const win = new THREE.Mesh(new THREE.BoxGeometry(2.52, 0.8, 9), new THREE.MeshBasicMaterial({ color: 0x223344, transparent: true, opacity: 0.7 }));
+    win.position.set(0, 2.1, 0); g.add(win);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+    for (const z of [-3.5, 0, 3.2]) for (const x of [-1.2, 1.2]) {
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.4, 14), wheelMat);
+      w.rotation.z = PI/2; w.position.set(x, 0.55, z); g.add(w);
+    }
+    g.userData.dims = { L: 10.8, W: 2.6, H: 3.3 };
+    g.userData.spec = { topSpeed: 16, accel: 6, brake: 13, turn: 1.0, mass: 6000, kind: 'bus' };
+  } else if (kind === 'luxsedan') {
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.75, 4.4), new THREE.MeshStandardMaterial({ color: pick([0x101015, 0x303842, 0x6a1020]), roughness: 0.25, metalness: 0.8 }));
+    body.position.y = 0.7; g.add(body);
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.6, 2.2), new THREE.MeshStandardMaterial({ color: 0x111418, roughness: 0.3, metalness: 0.6 }));
+    cab.position.set(0, 1.25, -0.1); g.add(cab);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+    for (const z of [-1.5, 1.5]) for (const x of [-0.9, 0.9]) {
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.3, 16), wheelMat);
+      w.rotation.z = PI/2; w.position.set(x, 0.42, z); g.add(w);
+    }
+    g.userData.dims = { L: 4.4, W: 1.9, H: 1.5 };
+    g.userData.spec = { topSpeed: 30, accel: 16, brake: 18, turn: 1.8, mass: 1500, kind: 'luxsedan' };
+  } else if (kind === 'supercar') {
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.5, 4.2), new THREE.MeshStandardMaterial({ color: pick([0xffcc00, 0xff2a2a, 0x10b0d0]), roughness: 0.2, metalness: 0.85 }));
+    body.position.y = 0.5; g.add(body);
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.45, 1.6), new THREE.MeshBasicMaterial({ color: 0x111418, transparent: true, opacity: 0.8 }));
+    cab.position.set(0, 0.92, -0.2); g.add(cab);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+    for (const z of [-1.5, 1.5]) for (const x of [-0.92, 0.92]) {
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.34, 16), wheelMat);
+      w.rotation.z = PI/2; w.position.set(x, 0.4, z); g.add(w);
+    }
+    g.userData.dims = { L: 4.2, W: 1.95, H: 1.0 };
+    g.userData.spec = { topSpeed: 40, accel: 22, brake: 22, turn: 2.0, mass: 1200, kind: 'supercar' };
+  } else if (kind === 'camry' || kind === 'sedan') {
+    const color = kind === 'sedan' ? pick([0x222, 0xf5f5f5, 0xc23a3a, 0x335a99, 0x8c8c8c]) : 0xeeeeee;
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.9, 3.6), new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.4 }));
+    body.position.y = 0.7; g.add(body);
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.65, 1.5), new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.4 }));
+    cab.position.set(0, 1.35, 0.1); g.add(cab);
+    const windshield = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.55), new THREE.MeshBasicMaterial({ color: 0x223344, transparent:true, opacity: 0.6 }));
+    windshield.position.set(0, 1.55, 0.86); g.add(windshield);
+    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111 });
+    for (const z of [-1.2, 1.2]) for (const x of [-0.78, 0.78]) {
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.22, 12), wheelMat);
+      w.rotation.z = PI/2; w.position.set(x, 0.32, z); g.add(w);
+    }
+    g.userData.dims = { L: 3.8, W: 1.8, H: 1.6 };
+    g.userData.spec = { topSpeed: 24, accel: 11, brake: 16, turn: 1.7, mass: 1500, kind };
+  }
+  return g;
+}
+
+export function makeVehicle(kind, scene) {
+  const mesh = makeVehicleMesh(kind);
+  scene.add(mesh);
+  const spec = mesh.userData.spec;
+  // head/tail lights — per-vehicle materials that glow at night (driven from
+  // G.nightK in updateVehicles; per-vehicle so disposeObject stays safe).
+  const dims = mesh.userData.dims;
+  const headMat = new THREE.MeshStandardMaterial({ color: 0x999999, emissive: 0xfff2cc, emissiveIntensity: 0 });
+  const tailMat = new THREE.MeshStandardMaterial({ color: 0x331111, emissive: 0xff2222, emissiveIntensity: 0 });
+  const lightGeo = new THREE.PlaneGeometry(0.3, 0.18);
+  const lz = dims.L * 0.46, lx = dims.W * 0.3, ly = dims.H * 0.32 + 0.2;
+  for (const sx of [-1, 1]) {
+    const hl = new THREE.Mesh(lightGeo, headMat);
+    hl.position.set(sx * lx, ly, lz); mesh.add(hl);
+    const tl = new THREE.Mesh(lightGeo, tailMat);
+    tl.position.set(sx * lx, ly, -lz); tl.rotation.y = PI; mesh.add(tl);
+  }
+  const veh = {
+    kind, mesh, spec,
+    pos: mesh.position,
+    vel: 0,            // forward speed (m/s)
+    heading: 0,        // yaw radians
+    hp: 100,
+    smoke: null, fire: null,
+    dead: false,
+    driver: null,      // 'player' | npc obj | null
+    npc: null,
+    audio: null,
+    isCop: kind === 'cop' || kind === 'fortuner' || kind === 'swat',
+    lights: [headMat, tailMat],
+    boundsHalf: { x: mesh.userData.dims.W * 0.5, z: mesh.userData.dims.L * 0.5 },
+  };
+  G.vehicles.push(veh);
+  return veh;
+}
+
+// =============================================================================
+// 6. NPCs — pedestrians, soi dogs, cops
+// =============================================================================
+
+// Pedestrian archetypes — silhouette + palette variety so the crowd reads as a
+// city, not a row of identical capsules. Returns a Group with an animatable limb
+// rig in userData.parts {torso, head, legL, legR, armL, armR}. `torso` stays one
+// mesh so the mugger/target/kill recolor sites keep working; forearms are bare
+// skin (Bangkok heat) so recoloring the torso never leaves mismatched sleeves.
+export function makePedMesh() {
+  const g = new THREE.Group();
+  const roll = Math.random();
+  let kind;
+  if (roll < 0.07) kind = 'monk';
+  else if (roll < 0.20) kind = 'tourist';
+  else if (roll < 0.34) kind = 'office';
+  else if (roll < 0.44) kind = 'vendor';
+  else if (roll < 0.55) kind = 'laborer';
+  else kind = 'local';
+
+  const skin = pick([0xc69472, 0xb88060, 0xd6a785, 0xa57755, 0x8d5a3a]);
+  const skinMat = new THREE.MeshStandardMaterial({ color: skin, roughness: 0.7 });
+
+  let shirtColor, pantsColor, bareArms = true, skirt = false;
+  switch (kind) {
+    case 'monk':    shirtColor = 0xe0892e; pantsColor = 0xd0801f; break;
+    case 'tourist': shirtColor = pick([0xff6a3a, 0x39c6c0, 0xffd23a, 0x6a3aff, 0xff4f8b]);
+                    pantsColor = pick([0xd9d2c7, 0x8090a0, 0x6a5a45]); break;          // shorts
+    case 'office':  shirtColor = pick([0xffffff, 0xeaf0f6, 0xc7d6e6, 0xf0e6d2]);
+                    pantsColor = pick([0x222831, 0x33384a, 0x4a3a2a]); bareArms = false; break;
+    case 'vendor':  shirtColor = pick([0xd9d2c7, 0xc94f3a, 0x3a7d5a, 0xe0c060]);
+                    pantsColor = pick([0x33384a, 0x222222, 0x5a4030]); break;
+    case 'laborer': shirtColor = pick([0x6a8fb0, 0x9a8a60, 0xb0b0b0, 0x7a6a5a]);
+                    pantsColor = pick([0x3a4658, 0x4a3a2a, 0x222222]); break;
+    default:        shirtColor = pick([0xffffff, 0xeeeeee, 0xdeb887, 0x223344, 0x556677, 0xb04040, 0xddcc88, 0x3a6a8a]);
+                    pantsColor = pick([0x222222, 0x111111, 0x445566, 0x804020, 0x33384a]);
+  }
+  if ((kind === 'local' || kind === 'office') && Math.random() < 0.28) skirt = true;
+
+  const shirtMat = new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.82 });
+  const pantsMat = new THREE.MeshStandardMaterial({ color: pantsColor, roughness: 0.85 });
+  const armMat = bareArms ? skinMat : shirtMat;
+
+  // torso — single mesh (recolor sites swap this material); flattened for shoulders
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.4, 3, 8), shirtMat);
+  torso.position.y = 1.18; torso.scale.set(1.18, 1, 0.72); torso.castShadow = true; g.add(torso);
+
+  // head + hair/hat
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.135, 10, 8), skinMat);
+  head.position.y = 1.5; head.castShadow = true; g.add(head);
+  if (kind === 'vendor' || kind === 'laborer') {
+    const hat = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.2, 10), new THREE.MeshStandardMaterial({ color: 0xcba76a, roughness: 0.9 }));
+    hat.position.y = 1.6; g.add(hat);                                   // conical straw hat
+  } else if (kind === 'tourist' && Math.random() < 0.6) {
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6, 0, TAU, 0, PI/2), new THREE.MeshStandardMaterial({ color: pick([0xb03030, 0x305080, 0xf0f0f0]) }));
+    cap.position.y = 1.55; g.add(cap);
+  } else if (kind !== 'monk') {
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.145, 8, 6, 0, TAU, 0, PI/1.7), new THREE.MeshStandardMaterial({ color: pick([0x1a1410, 0x2a2018, 0x0a0a0a]) }));
+    hair.position.y = 1.5; g.add(hair);
+  }
+
+  // limbs — geometry offset so the mesh origin sits at the joint (rotation.x pivots there)
+  function limb(len, r, mat, cast) {
+    const geo = new THREE.CapsuleGeometry(r, len, 3, 6);
+    geo.translate(0, -(len / 2 + r), 0);
+    const m = new THREE.Mesh(geo, mat); m.castShadow = !!cast; return m;
+  }
+  const hipY = 0.92, shoulderY = 1.42;
+  let legL, legR;
+  if (skirt) {
+    const sk = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.5, 10), pantsMat);
+    sk.position.y = 0.7; sk.castShadow = true; g.add(sk);
+    legL = limb(0.3, 0.07, skinMat, false); legL.position.set(-0.08, 0.42, 0);
+    legR = limb(0.3, 0.07, skinMat, false); legR.position.set( 0.08, 0.42, 0);
+  } else {
+    legL = limb(0.62, 0.085, pantsMat, true); legL.position.set(-0.09, hipY, 0);
+    legR = limb(0.62, 0.085, pantsMat, true); legR.position.set( 0.09, hipY, 0);
+  }
+  g.add(legL); g.add(legR);
+  const armL = limb(0.5, 0.06, armMat, false); armL.position.set(-0.25, shoulderY, 0); g.add(armL);
+  const armR = limb(0.5, 0.06, armMat, false); armR.position.set( 0.25, shoulderY, 0); g.add(armR);
+
+  // archetype props
+  if (kind === 'tourist') {
+    const pack = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.38, 0.18), new THREE.MeshStandardMaterial({ color: pick([0x2a3a55, 0x803030, 0x2a5a3a]), roughness: 0.85 }));
+    pack.position.set(0, 1.15, -0.22); g.add(pack);
+  } else if (kind === 'office') {
+    const bag = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.22, 0.3), new THREE.MeshStandardMaterial({ color: 0x2a1a10, roughness: 0.6 }));
+    bag.position.set(0, -0.56, 0.02); armR.add(bag);                    // hangs from the hand, swings with the arm
+  } else if (kind === 'monk') {
+    const bowl = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6, 0, TAU, 0, PI/2), new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.7 }));
+    bowl.rotation.x = PI; bowl.position.set(0, 1.0, 0.2); g.add(bowl);
+  }
+
+  const build = rand(0.92, 1.08);
+  g.scale.set(build, rand(0.94, 1.06), build);
+  g.userData.parts = { torso, head, legL, legR, armL, armR };
+  g.userData.kind = kind;
+  g.userData.phase = rand(0, TAU);
+  return g;
+}
+
+// Shared limb animator for peds + foot cops: advances a per-mesh walk phase and
+// swings legs/arms (arms opposite the same-side leg). `moving` false → near-still
+// idle with a faint breathing bob.
+export function animateWalk(mesh, speed, dt, moving) {
+  const p = mesh.userData.parts; if (!p) return;
+  const ud = mesh.userData;
+  ud.phase = (ud.phase || 0) + (moving ? (1.6 + speed) * dt * 2.0 : dt * 1.2);
+  const amp = moving ? Math.min(0.7, 0.3 + speed * 0.16) : 0.05;
+  const s = Math.sin(ud.phase), c = Math.sin(ud.phase + PI);
+  if (p.legL) p.legL.rotation.x = s * amp;
+  if (p.legR) p.legR.rotation.x = c * amp;
+  if (p.armL) p.armL.rotation.x = c * amp * 0.9;
+  if (p.armR) p.armR.rotation.x = s * amp * 0.9;
+  if (p.torso) p.torso.position.y = 1.18 + (moving ? 0 : Math.sin(ud.phase * 0.7) * 0.012);
+}
+
+export function makeDogMesh() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.28, 0.7), new THREE.MeshStandardMaterial({ color: pick([0xc8a370, 0x8c6a3a, 0x4a3a2a, 0xdac199]) }));
+  body.position.y = 0.32; g.add(body);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.26), body.material);
+  head.position.set(0, 0.42, 0.42); g.add(head);
+  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.3), body.material);
+  tail.position.set(0, 0.4, -0.4); g.add(tail);
+  for (const z of [-0.2, 0.2]) for (const x of [-0.12, 0.12]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.22, 0.08), new THREE.MeshStandardMaterial({ color: 0x2a2a2a }));
+    leg.position.set(x, 0.11, z); g.add(leg);
+  }
+  return g;
+}
+
+// A point on a sidewalk near (cx,cz): sample within `radius`, then snap onto the
+// band just outside the nearer road centerline so peds populate the pavements
+// (and read as a crowd down whatever street the camera faces) rather than a
+// uniform disc that scatters most of them into blocks and side streets.
+export function sidewalkPos(cx, cz, radius) {
+  const ang = rand(0, TAU), r = rand(6, radius);
+  let x = cx + Math.cos(ang) * r, z = cz + Math.sin(ang) * r;
+  const roadX = Math.round(x / BLOCK) * BLOCK, roadZ = Math.round(z / BLOCK) * BLOCK;
+  const sw = ROAD_WIDTH / 2 + rand(1.0, 2.4);    // sidewalk band hugging the curb
+  if (Math.abs(x - roadX) < Math.abs(z - roadZ)) x = roadX + (Math.random() < 0.5 ? -sw : sw);
+  else z = roadZ + (Math.random() < 0.5 ? -sw : sw);
+  return new THREE.Vector3(clamp(x, -HALF + 5, HALF - 5), 0, clamp(z, -HALF + 5, HALF - 5));
+}
+
+export function spawnPed(scene, pos) {
+  const m = makePedMesh();
+  m.position.copy(pos);
+  m.userData.heading = rand(0, TAU);
+  scene.add(m);
+  const ped = {
+    mesh: m,
+    heading: m.userData.heading,
+    speed: rand(0.9, 1.7),
+    state: 'walking',
+    waitT: 0,
+    panicT: 0,
+    hp: 30,
+    dead: false,
+  };
+  G.peds.push(ped);
+  return ped;
+}
+
+export function spawnDog(scene, pos) {
+  const m = makeDogMesh();
+  m.position.copy(pos);
+  scene.add(m);
+  const dog = {
+    mesh: m,
+    heading: rand(0, TAU),
+    speed: rand(0.6, 1.0),
+    state: 'lying',       // lying | walking | fleeing | barking
+    timer: rand(2, 7),
+    hp: 20,
+  };
+  G.dogs.push(dog);
+  return dog;
+}
+
+export function spawnTraffic(scene) {
+  // Each road segment can hold some cars. We sample edges and place vehicles.
+  const kinds = ['camry','camry','camry','sedan','sedan','tuktuk','hilux','songthaew','songthaew','bus','luxsedan','luxsedan','bike','bike'];
+  for (let n = 0; n < 28; n++) {
+    let kind = pick(kinds);
+    if (Math.random() < 0.04) kind = 'supercar';   // rare spawn
+    const v = makeVehicle(kind, scene);
+    // pick a random horizontal or vertical road
+    const isEW = Math.random() < 0.5;
+    const lane = irand(-GRID/2, GRID/2);
+    const t = rand(-HALF + 10, HALF - 10);
+    if (isEW) { v.pos.set(t, 0, lane * BLOCK + (Math.random()<0.5 ? -2.5 : 2.5)); v.heading = Math.random()<0.5 ? 0 : PI; }
+    else      { v.pos.set(lane * BLOCK + (Math.random()<0.5 ? -2.5 : 2.5), 0, t); v.heading = Math.random()<0.5 ? PI/2 : -PI/2; }
+    v.mesh.position.copy(v.pos);
+    v.mesh.rotation.y = v.heading;
+    v.npc = {
+      kind: 'traffic',
+      // assign nearest grid intersection ahead as the immediate target
+      targetIdx: null,
+      cruiseSpeed: rand(8, 14) * (kind==='bike'?1.2:1) * (kind==='tuktuk'?0.7:1),
+      reactionT: 0,
+      stopT: 0,
+      honkCooldown: rand(5, 20),
+    };
+    v.vel = v.npc.cruiseSpeed;
+  }
+}
+
+// A handful of parked, enterable cars at the curb so there's always a ride (and a
+// songthaew for the taxi job) without chasing moving traffic on foot.
+export function spawnParkedCars(scene) {
+  const kinds = ['camry', 'sedan', 'hilux', 'songthaew', 'songthaew', 'tuktuk'];
+  let placed = 0, guard = 0;
+  while (placed < 10 && guard++ < 200) {
+    const lane = irand(-GRID/2 + 1, GRID/2 - 1);          // NS road, x in -200..200
+    const x = lane * BLOCK + (Math.random() < 0.5 ? -4.5 : 4.5);  // against a curb
+    const z = rand(-HALF + 20, HALF - 20);
+    if (x < -195) continue;                                // keep out of the river
+    const v = makeVehicle(pick(kinds), scene);
+    v.pos.set(x, 0, z); v.mesh.position.copy(v.pos);
+    v.heading = Math.random() < 0.5 ? 0 : PI;
+    v.mesh.rotation.y = v.heading;
+    v.driver = null; v.vel = 0;                            // parked: enterable, no AI
+    placed++;
+  }
+}
+
+// One drivable longtail at the river pier gap (z=-50) — step through the embankment to board.
+export function spawnBoat(scene) {
+  const v = makeVehicle('boat', scene);
+  v.pos.set(-212, 0.3, -50); v.mesh.position.copy(v.pos);
+  v.heading = 0; v.mesh.rotation.y = 0;
+  v.driver = null; v.vel = 0;
+}
+
+export function spawnPeds(scene, n) {
+  for (let i = 0; i < n; i++) {
+    spawnPed(scene, sidewalkPos(rand(-HALF + 12, HALF - 12), rand(-HALF + 12, HALF - 12), 8));
+  }
+}
+
+export function spawnDogs(scene, n) {
+  for (let i = 0; i < n; i++) {
+    spawnDog(scene, new THREE.Vector3(rand(-HALF+20, HALF-20), 0, rand(-HALF+20, HALF-20)));
+  }
+}
+
+// =============================================================================
+// 7. RAIN PARTICLES
+// =============================================================================
+
+export function makeRain(scene) {
+  const N = 1200;
+  const positions = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    positions[i*3+0] = rand(-60, 60);
+    positions[i*3+1] = rand(0, 40);
+    positions[i*3+2] = rand(-60, 60);
+  }
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const mat = new THREE.PointsMaterial({ color: 0xaaccff, size: 0.08, transparent: true, opacity: 0.0, depthWrite: false });
+  const pts = new THREE.Points(geom, mat);
+  pts.frustumCulled = false;
+  scene.add(pts);
+  return {
+    points: pts, mat, N,
+    update(dt, playerPos, strength) {
+      const fall = 28 * dt;
+      const arr = pts.geometry.attributes.position.array;
+      for (let i = 0; i < N; i++) {
+        arr[i*3+1] -= fall;
+        if (arr[i*3+1] < 0) {
+          arr[i*3+0] = playerPos.x + rand(-50, 50);
+          arr[i*3+1] = rand(20, 40);
+          arr[i*3+2] = playerPos.z + rand(-50, 50);
+        }
+      }
+      pts.geometry.attributes.position.needsUpdate = true;
+      pts.position.set(0, 0, 0);
+      mat.opacity = lerp(mat.opacity, strength * 0.55, 0.05);
+    }
+  };
+}
+
+// =============================================================================
