@@ -47,6 +47,23 @@
   }
   #loading .start.ready { opacity: 1; pointer-events: auto; }
   #loading .start:hover { background: var(--gold); color: #0a0a14; }
+  #menu { display: none; flex-direction: column; align-items: center; gap: 10px; margin-top: 24px; }
+  #menu.ready { display: flex; }
+  #slots { display: flex; flex-direction: column; gap: 8px; }
+  #slots .slot {
+    position: relative; min-width: 320px; padding: 12px 20px; font: inherit; font-size: 14px;
+    letter-spacing: 2px; text-align: left; background: rgba(20,22,30,.7); color: var(--cream);
+    border: 1px solid #3a3f4a; border-radius: 4px; cursor: pointer; transition: background .2s, border-color .2s;
+  }
+  #slots .slot:hover { background: rgba(40,44,56,.9); border-color: var(--gold); }
+  #slots .slot b { color: var(--gold); margin-right: 8px; }
+  #slots .slot .sub { display: block; font-size: 11px; opacity: .6; letter-spacing: 1px; margin-top: 3px; }
+  #slots .slot-wipe {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    color: #b06; font-size: 16px; opacity: .55; padding: 4px 8px;
+  }
+  #slots .slot-wipe:hover { opacity: 1; color: var(--neon-pink); }
+  #menu-options { margin-top: 6px; opacity: 1; pointer-events: auto; }
 
   /* --- HUD --- */
   #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
@@ -216,7 +233,10 @@
   <h2>กรุงเทพ &nbsp;·&nbsp; 2026</h2>
   <div class="bar"><div id="loadbar"></div></div>
   <div class="hint">Loading the city…</div>
-  <button id="startbtn" class="start">ENTER THE CITY</button>
+  <div id="menu">
+    <div id="slots"></div>
+    <button id="menu-options" class="start">OPTIONS</button>
+  </div>
 </div>
 
 <div id="hud">

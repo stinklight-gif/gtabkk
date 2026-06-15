@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
-import { resolvePlayerVsBuildings, saveGame, updateAmmoHud, updateCombat, updatePlayerInVehicle } from './main.js';
+import { tip, resolvePlayerVsBuildings, saveGame, updateAmmoHud, updateCombat, updatePlayerInVehicle } from './main.js';
 
 export function updatePlayer(dt) {
   const p = G.player;
@@ -212,6 +212,7 @@ export function updateSafehouse(dt) {
   if (!door || dist2(p.group.position, door) > 6 * 6) return;
   const sh = G.econ.safehouse;
   if (!sh.owned) {
+    tip('home', 'A safehouse — buy it (E) and you respawn here instead of the police station.', 'บ้านปลอดภัย');
     G.hud.showPrompt(`Safehouse for sale — <b>E</b>: buy (฿${PRICE.safehouse.toLocaleString()})`, 0.4);
     if (G.input.pressed('KeyE')) {
       if (G.cash < PRICE.safehouse) { G.hud.showNotif('Not enough cash for the safehouse'); return; }

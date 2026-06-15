@@ -30,4 +30,5 @@ jobs:
             smoke_night.png
             smoke_3am.png
             smoke_festival.png
+            smoke_songkran.png
           if-no-files-found: ignore

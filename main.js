@@ -48,7 +48,7 @@ import {
 } from './missions.js';
 export * from './daynight.js';
 import {
-  DAY_LENGTH, FESTIVAL_PERIOD, KRATHONG_COUNT, RIVER_CX, festivalScheduled, makeKrathong, makeSkyLantern, spawnSkyLantern, startFestival, stopFestival, updateDayNight, updateFestival
+  DAY_LENGTH, FESTIVAL_PERIOD, KRATHONG_COUNT, RIVER_CX, scheduledFestival, makeKrathong, makeSkyLantern, spawnSkyLantern, startFestival, stopFestival, updateDayNight, updateFestival
 } from './daynight.js';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G,
@@ -130,14 +130,27 @@ export function onCopKilled() {
 // =============================================================================
 //  SAVE / LOAD (localStorage) — autosaves money/gear/amulets/time/position
 // =============================================================================
-const SAVE_KEY = 'gtabkk_save_v1';
+const SAVE_KEY = 'gtabkk_save_v1';   // legacy single-slot key; migrates into slot 0
+export function slotKey(n) { return SAVE_KEY + '_s' + (n === undefined ? (G.saveSlot || 0) : n); }
+// One-time: fold a pre-slots save into slot 0 so returning players keep progress.
+export function migrateLegacySave() {
+  try { const old = localStorage.getItem(SAVE_KEY); if (old && !localStorage.getItem(slotKey(0))) localStorage.setItem(slotKey(0), old); } catch (e) {}
+}
+// Lightweight read of a slot for the menu (cash + in-game day), without loading.
+export function slotSummary(n) {
+  try {
+    const s = JSON.parse(localStorage.getItem(slotKey(n)));
+    if (!s) return { empty: true };
+    return { empty: false, cash: s.cash | 0, day: (s.day | 0) + 1 };
+  } catch (e) { return { empty: true }; }
+}
 
 export function saveGame() {
   try {
     const p = G.player;
     if (!p) return;
-    localStorage.setItem(SAVE_KEY, JSON.stringify({
-      cash: G.cash, armor: p.armor, dayT: G.time.dayT, copsKilled: _copsKilled,
+    localStorage.setItem(slotKey(), JSON.stringify({
+      cash: G.cash, armor: p.armor, dayT: G.time.dayT, day: G.time.day | 0, copsKilled: _copsKilled,
       weapons: { pistol: !!p.weapons.pistol, smg: !!p.weapons.smg, shotgun: !!p.weapons.shotgun },
       pistolAmmo: p.pistolAmmo, pistolReserve: p.pistolReserve,
       smgAmmo: p.smgAmmo, smgReserve: p.smgReserve,
@@ -170,12 +183,13 @@ export function loadSettings() {
 
 export function loadGame() {
   let s = null;
-  try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { s = null; }
+  try { s = JSON.parse(localStorage.getItem(slotKey())); } catch (e) { s = null; }
   if (!s || !G.player) return;
   const p = G.player;
   if (typeof s.cash === 'number') G.cash = s.cash;
   if (typeof s.armor === 'number') p.armor = s.armor;
   if (typeof s.dayT === 'number') G.time.dayT = s.dayT;
+  if (typeof s.day === 'number') G.time.day = s.day;
   if (typeof s.copsKilled === 'number') _copsKilled = s.copsKilled;
   if (s.weapons) {
     p.weapons.pistol = !!s.weapons.pistol;
@@ -214,6 +228,55 @@ export function loadGame() {
   }
   G.hud.setCash(G.cash);
   updateAmmoHud();
+}
+
+// ---- Start menu + save slots ----
+function startPlaying(fresh) {
+  document.getElementById('loading').style.opacity = '0';
+  setTimeout(() => { const l = document.getElementById('loading'); if (l) l.style.display = 'none'; }, 800);
+  G.state = 'playing';
+  G.input.requestLock();
+  if (G.audio.ctx.state === 'suspended') G.audio.ctx.resume();
+  G.audio.bell();
+  if (fresh) tip('move', 'WASD to move, SHIFT to sprint. Walk up to a vehicle and press E to drive.', 'WASD เดิน · E ขึ้นรถ');
+}
+function buildMenu() {
+  migrateLegacySave();
+  const hint = document.querySelector('#loading .hint'); if (hint) hint.textContent = 'Choose a save slot';
+  const slotsEl = document.getElementById('slots'); if (!slotsEl) return;
+  slotsEl.innerHTML = '';
+  for (let n = 0; n < 3; n++) {
+    const sum = slotSummary(n);
+    const btn = document.createElement('button');
+    btn.className = 'slot';
+    btn.innerHTML = sum.empty
+      ? `<b>Slot ${n + 1}</b> New game<span class="sub">a fresh Krung Thep</span>`
+      : `<b>Slot ${n + 1}</b> Continue<span class="sub">฿${sum.cash.toLocaleString()} · Day ${sum.day}</span>`;
+    btn.addEventListener('click', () => {
+      G.saveSlot = n;
+      if (!sum.empty) loadGame();
+      else { try { localStorage.removeItem(slotKey(n)); } catch (e) {} }
+      startPlaying(sum.empty);
+    });
+    if (!sum.empty) {
+      const wipe = document.createElement('span');
+      wipe.className = 'slot-wipe'; wipe.textContent = '✕'; wipe.title = 'Erase this slot';
+      wipe.addEventListener('click', e => { e.stopPropagation(); try { localStorage.removeItem(slotKey(n)); } catch (er) {} buildMenu(); });
+      btn.appendChild(wipe);
+    }
+    slotsEl.appendChild(btn);
+  }
+  document.getElementById('menu').classList.add('ready');
+}
+
+// ---- Contextual onboarding tips — shown once each, persisted globally ----
+function loadTips() { try { return new Set(JSON.parse(localStorage.getItem('gtabkk_tips') || '[]')); } catch (e) { return new Set(); } }
+export function tip(id, en, th) {
+  if (!G._tips) G._tips = loadTips();
+  if (G._tips.has(id)) return;
+  G._tips.add(id);
+  try { localStorage.setItem('gtabkk_tips', JSON.stringify([...G._tips])); } catch (e) {}
+  if (G.hud && G.hud.showSubtitle) G.hud.showSubtitle(en, th || '', 5.5);
 }
 
 async function init() {
@@ -334,17 +397,13 @@ async function init() {
   // Tab → map zoom (placeholder)
   setProgress(100);
 
-  // Reveal start button once everything is ready
-  const startBtn = document.getElementById('startbtn');
-  startBtn.classList.add('ready');
-  startBtn.addEventListener('click', () => {
-    document.getElementById('loading').style.opacity = '0';
-    setTimeout(() => document.getElementById('loading').style.display = 'none', 800);
-    G.state = 'playing';
-    G.input.requestLock();
-    if (G.audio.ctx.state === 'suspended') G.audio.ctx.resume();
-    G.audio.bell();   // dawn bell to set tone
-  });
+  // Save-slot menu once everything is ready
+  buildMenu();
+  const moEl = document.getElementById('menu-options');
+  if (moEl) moEl.addEventListener('click', () => document.getElementById('options').classList.toggle('show'));
+  // clicking the options overlay (pre-game) dismisses it back to the menu
+  const optEl = document.getElementById('options');
+  if (optEl) optEl.addEventListener('click', e => { if (G.state !== 'playing' && (e.target === optEl)) optEl.classList.remove('show'); });
 
   // Pause overlay: click to resume (re-locks the pointer)
   const pauseEl = document.getElementById('pause');
@@ -378,7 +437,7 @@ async function init() {
   sbind('store-leave', () => { document.getElementById('store').classList.remove('show'); G.state = 'playing'; G.input.requestLock(); });
 
   // Restore saved progress, then autosave on unload
-  loadGame();
+  // (loadGame is deferred until a slot is chosen in the menu)
   window.addEventListener('beforeunload', saveGame);
 
   // Start loop
@@ -539,7 +598,10 @@ export function updateRadio(dt) {
   if (G.input && G.input.pressed && G.input.pressed('KeyM') && G.state === 'playing') {
     G.hud.showNotif('📻 ' + a.radio.next());
   }
-  if (inV && !G._wasInVehicle) G.hud.showNotif('📻 ' + a.radio.names[a.radio.station]);
+  if (inV && !G._wasInVehicle) {
+    G.hud.showNotif('📻 ' + a.radio.names[a.radio.station]);
+    tip('drive', 'Driving: W/S throttle, A/D steer, SPACE handbrake, SHIFT boost. Press M to change the radio.', 'M เปลี่ยนวิทยุ');
+  }
   G._wasInVehicle = inV;
   a.radio.tick(inV);
   a.duckEngine(inV && a.radio.station !== 0);

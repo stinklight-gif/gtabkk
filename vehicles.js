@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
-import { cycleWeapon, damagePlayer, firePistol, fireSMG, fireShotgun, makeExplosion, makeSmokeEmitter, makeVehicle, onCopKilled, raiseWanted, resolveVehicleVsBuildings, saveGame, spawnSkid, updateAmmoHud, updateCop, vehicleName } from './main.js';
+import { tip, cycleWeapon, damagePlayer, firePistol, fireSMG, fireShotgun, makeExplosion, makeSmokeEmitter, makeVehicle, onCopKilled, raiseWanted, resolveVehicleVsBuildings, saveGame, spawnSkid, updateAmmoHud, updateCop, vehicleName } from './main.js';
 
 export function updatePlayerInVehicle(dt) {
   const p = G.player;
@@ -41,6 +41,7 @@ export function updatePlayerInVehicle(dt) {
   const forward = (G.input.down('KeyW')?1:0) - (G.input.down('KeyS')?1:0);
   const steer   = (G.input.down('KeyA')?1:0) - (G.input.down('KeyD')?1:0);
   const handbrake = G.input.down('Space');
+  const slip = G.festival.type === 'songkran' && v.spec.kind !== 'boat' && v.spec.kind !== 'bike';  // slippery wet roads
   const boost = G.input.down('ShiftLeft');
 
   const spec = v.spec;
@@ -50,7 +51,7 @@ export function updatePlayerInVehicle(dt) {
     if (v.vel > 0.2) v.vel -= spec.brake * dt;
     else v.vel -= spec.accel * 0.6 * dt; // reverse
   } else {
-    v.vel *= Math.pow(0.985, dt * 60);
+    v.vel *= Math.pow(slip ? 0.995 : 0.985, dt * 60);   // wet Songkran roads glide
   }
   if (handbrake) v.vel *= Math.pow(0.94, dt*60);
   const speedMul = v.tiresBlown ? 0.5 : 1;   // spike strips halve your top speed
@@ -61,6 +62,10 @@ export function updatePlayerInVehicle(dt) {
   // arcade handbrake drift: extra oversteer + lay rubber while sliding
   if (handbrake && Math.abs(v.vel) > 6 && Math.abs(steer) > 0.15 && spec.kind !== 'boat' && spec.kind !== 'bike') {
     v.heading += steer * 1.5 * dt * (v.vel >= 0 ? 1 : -1);
+    spawnSkid(v);
+  }
+  if (slip && !handbrake && Math.abs(v.vel) > 5 && Math.abs(steer) > 0.1) {   // wet-road slide
+    v.heading += steer * 0.5 * dt * (v.vel >= 0 ? 1 : -1);
     spawnSkid(v);
   }
 
@@ -186,63 +191,79 @@ export function updateVehicles(dt) {
   }
 }
 
+// Cardinal directions for grid traffic: 0=N(+z) 1=E(+x) 2=S(-z) 3=W(-x).
+const DVX = [0, 1, 0, -1], DVZ = [1, 0, -1, 0], DH = [0, PI / 2, PI, -PI / 2];
+const LANESIGN = [-1, 1, 1, -1];   // perpendicular lane offset (left-hand traffic)
+const LANE = 2.5, GRID_I = GRID / 2;
+
+function inferDir(h) {
+  h = Math.atan2(Math.sin(h), Math.cos(h));
+  let best = 0, bd = 9;
+  for (let d = 0; d < 4; d++) { const dd = Math.abs(Math.atan2(Math.sin(h - DH[d]), Math.cos(h - DH[d]))); if (dd < bd) { bd = dd; best = d; } }
+  return best;
+}
+
 export function updateTrafficCar(v, dt) {
   const npc = v.npc;
-  // simple grid following: pick a heading aligned with the road, choose new heading at intersections
-  // collision check ahead with player vehicle / other cars / peds
-  const headingX = Math.sin(v.heading), headingZ = Math.cos(v.heading);
-  let block = false;
-  for (const o of G.vehicles) {
-    if (o === v) continue;
-    const dx = o.pos.x - v.pos.x;
-    const dz = o.pos.z - v.pos.z;
-    const fwd = dx * headingX + dz * headingZ;
-    const side = -dx * headingZ + dz * headingX;
-    if (fwd > 0 && fwd < 8 && Math.abs(side) < 1.6) { block = true; break; }
-  }
-  // peds in road
-  for (const ped of G.peds) {
-    if (ped.dead) continue;
-    const dx = ped.mesh.position.x - v.pos.x;
-    const dz = ped.mesh.position.z - v.pos.z;
-    const fwd = dx * headingX + dz * headingZ;
-    const side = -dx * headingZ + dz * headingX;
-    if (fwd > 0 && fwd < 5 && Math.abs(side) < 1.2) { block = true; break; }
-  }
-  // approaching intersection: random turn
-  const nearIntersection = isNearGridLine(v.pos.x) && isNearGridLine(v.pos.z);
-  if (nearIntersection && !npc.turnedRecently) {
-    if (Math.random() < 0.25) {
-      // 90-degree turn
-      const turn = Math.random() < 0.5 ? PI/2 : -PI/2;
-      v.heading += turn;
+  if (npc.dir === undefined) npc.dir = inferDir(v.heading);
+  let dir = npc.dir;
+
+  // --- intersection: maybe turn (straight / left / right), validated against the grid ---
+  const even = dir % 2 === 0;                       // N/S travel along z; E/W along x
+  const alongVal = even ? v.pos.z : v.pos.x;
+  const grid = Math.round(alongVal / BLOCK) * BLOCK;
+  npc.turnCD = Math.max(0, (npc.turnCD || 0) - dt);
+  if (Math.abs(alongVal - grid) < 2.2 && npc.turnCD === 0) {
+    npc.turnCD = 1.3;
+    if (Math.random() < 0.45) {
+      const nd = Math.random() < 0.5 ? (dir + 1) % 4 : (dir + 3) % 4;   // right / left
+      const ix = Math.round(v.pos.x / BLOCK), iz = Math.round(v.pos.z / BLOCK);
+      const nx = ix + DVX[nd], nz = iz + DVZ[nd];
+      if (nx >= -GRID_I + 1 && nx <= GRID_I && nz >= -GRID_I && nz <= GRID_I) {  // keep out of the river col + off-map
+        dir = npc.dir = nd;
+        if (even) v.pos.z = grid; else v.pos.x = grid;                  // pivot on the intersection
+      }
     }
-    npc.turnedRecently = 0.8;
   }
-  if (npc.turnedRecently > 0) npc.turnedRecently = Math.max(0, npc.turnedRecently - dt);
 
-  // accel
-  const target = block ? 0 : npc.cruiseSpeed;
+  // --- lane target on the perpendicular axis ---
+  const even2 = dir % 2 === 0;
+  const road = Math.round((even2 ? v.pos.x : v.pos.z) / BLOCK) * BLOCK;
+  const laneTarget = road + LANE * LANESIGN[dir];
+
+  // --- yield: brake for the nearest obstacle ahead in the lane ---
+  const hx = DVX[dir], hz = DVZ[dir];
+  let gap = 999;
+  const consider = (px, pz, halfLat) => {
+    const dx = px - v.pos.x, dz = pz - v.pos.z;
+    const fwd = dx * hx + dz * hz, lat = -dx * hz + dz * hx;
+    if (fwd > 0.2 && Math.abs(lat) < halfLat) gap = Math.min(gap, fwd);
+  };
+  for (const o of G.vehicles) if (o !== v) consider(o.pos.x, o.pos.z, 1.8);
+  for (const ped of G.peds) if (!ped.dead) consider(ped.mesh.position.x, ped.mesh.position.z, 1.3);
+  const pp = G.player.group.position;
+  if (!G.player.inVehicle) consider(pp.x, pp.z, 1.6);   // yield to the player on foot
+
+  let target = npc.cruiseSpeed;
+  if (gap < 3.5) target = 0;
+  else if (gap < 10) target = npc.cruiseSpeed * (gap - 3.5) / 6.5;
+  if (G.wanted.stars > 0 && dist2(v.pos, pp) < 22 * 22) target = Math.min(target, npc.cruiseSpeed * 0.4); // cautious during a shootout
   if (v.vel < target) v.vel = Math.min(target, v.vel + v.spec.accel * dt);
-  else v.vel = Math.max(target, v.vel - v.spec.brake * dt);
+  else v.vel = Math.max(target, v.vel - v.spec.brake * 1.4 * dt);
 
-  v.pos.x += Math.sin(v.heading) * v.vel * dt;
-  v.pos.z += Math.cos(v.heading) * v.vel * dt;
+  // --- move along the cardinal, keep the lane, ease the visual heading around ---
+  v.pos.x += hx * v.vel * dt;
+  v.pos.z += hz * v.vel * dt;
+  if (even2) v.pos.x = lerp(v.pos.x, laneTarget, Math.min(1, dt * 4));
+  else       v.pos.z = lerp(v.pos.z, laneTarget, Math.min(1, dt * 4));
+  v.pos.x = clamp(v.pos.x, -HALF + 8, HALF - 2);   // out of the river, inside bounds
+  v.pos.z = clamp(v.pos.z, -HALF + 2, HALF - 2);
+  v.heading = lerpAngle(v.heading, DH[dir], Math.min(1, dt * 6));
   v.mesh.position.copy(v.pos);
   v.mesh.rotation.y = v.heading;
 
-  // honk if blocked
-  if (block && (npc.honkCooldown -= dt) <= 0) {
-    G.audio.honk();
-    npc.honkCooldown = rand(2, 6);
-  }
-
-  // bounds wrap / despawn-respawn far from player
-  const playerPos = G.player.group.position;
-  if (dist2(v.pos, playerPos) > 220*220) {
-    // teleport ahead of player on a road
-    respawnTraffic(v, playerPos);
-  }
+  if (target < npc.cruiseSpeed * 0.3 && (npc.honkCooldown -= dt) <= 0) { G.audio.honk(); npc.honkCooldown = rand(2, 6); }
+  if (dist2(v.pos, pp) > 220 * 220) respawnTraffic(v, pp);
 }
 
 export function isNearGridLine(v) {
@@ -251,16 +272,17 @@ export function isNearGridLine(v) {
 }
 
 export function respawnTraffic(v, playerPos) {
-  const angle = rand(0, TAU);
-  const r = rand(70, 130);
-  const x = clamp(playerPos.x + Math.cos(angle) * r, -HALF + 5, HALF - 5);
-  const z = clamp(playerPos.z + Math.sin(angle) * r, -HALF + 5, HALF - 5);
-  // snap to nearest road
-  const ix = Math.round(x / BLOCK) * BLOCK;
-  const iz = Math.round(z / BLOCK) * BLOCK;
-  if (Math.abs(x - ix) < Math.abs(z - iz)) { v.pos.set(ix + (Math.random()<0.5?-2.5:2.5), 0, z); v.heading = Math.random()<0.5 ? 0 : PI; v.heading = (v.pos.x > ix ? 0 : PI); }
-  else { v.pos.set(x, 0, iz + (Math.random()<0.5?-2.5:2.5)); v.heading = (v.pos.z > iz ? -PI/2 : PI/2); }
+  // place on a nearby road in its proper lane, heading a valid cardinal direction
+  const dir = irand(0, 3);
+  const r = rand(80, 140), a = rand(0, TAU);
+  let x = clamp(playerPos.x + Math.cos(a) * r, -HALF + 12, HALF - 5);
+  let z = clamp(playerPos.z + Math.sin(a) * r, -HALF + 5, HALF - 5);
+  if (dir % 2 === 0) { const road = clamp(Math.round(x / BLOCK), -GRID_I + 1, GRID_I) * BLOCK; x = road + LANE * LANESIGN[dir]; }
+  else               { const road = clamp(Math.round(z / BLOCK), -GRID_I, GRID_I) * BLOCK; z = road + LANE * LANESIGN[dir]; }
+  v.pos.set(x, 0, z);
+  v.heading = DH[dir]; v.npc.dir = dir; v.npc.turnCD = 0.6;
   v.vel = v.npc.cruiseSpeed * 0.7;
+  v.mesh.position.copy(v.pos); v.mesh.rotation.y = v.heading;
 }
 
 // =============================================================================
@@ -441,6 +463,7 @@ export function updateGarageOwnership(dt) {
     else if (G.input.pressed('KeyC')) repaintVehicle(v);
   } else {
     if (dist2(p.group.position, g.pos) >= g.r * g.r) return;
+    tip('garage', 'Your garage: rent it (E), then drive a car in to store (K) or repaint (C) it; on foot, E brings one back out.', 'อู่รถ');
     if (!garage.rented) {
       G.hud.showPrompt(`Garage — <b>E</b>: rent (฿${PRICE.garageRent.toLocaleString()})`, 0.4);
       if (G.input.pressed('KeyE')) {
