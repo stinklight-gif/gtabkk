@@ -41,6 +41,7 @@ export function updatePlayerInVehicle(dt) {
   const forward = (G.input.down('KeyW')?1:0) - (G.input.down('KeyS')?1:0);
   const steer   = (G.input.down('KeyA')?1:0) - (G.input.down('KeyD')?1:0);
   const handbrake = G.input.down('Space');
+  const slip = G.festival.type === 'songkran' && v.spec.kind !== 'boat' && v.spec.kind !== 'bike';  // slippery wet roads
   const boost = G.input.down('ShiftLeft');
 
   const spec = v.spec;
@@ -50,7 +51,7 @@ export function updatePlayerInVehicle(dt) {
     if (v.vel > 0.2) v.vel -= spec.brake * dt;
     else v.vel -= spec.accel * 0.6 * dt; // reverse
   } else {
-    v.vel *= Math.pow(0.985, dt * 60);
+    v.vel *= Math.pow(slip ? 0.995 : 0.985, dt * 60);   // wet Songkran roads glide
   }
   if (handbrake) v.vel *= Math.pow(0.94, dt*60);
   const speedMul = v.tiresBlown ? 0.5 : 1;   // spike strips halve your top speed
@@ -61,6 +62,10 @@ export function updatePlayerInVehicle(dt) {
   // arcade handbrake drift: extra oversteer + lay rubber while sliding
   if (handbrake && Math.abs(v.vel) > 6 && Math.abs(steer) > 0.15 && spec.kind !== 'boat' && spec.kind !== 'bike') {
     v.heading += steer * 1.5 * dt * (v.vel >= 0 ? 1 : -1);
+    spawnSkid(v);
+  }
+  if (slip && !handbrake && Math.abs(v.vel) > 5 && Math.abs(steer) > 0.1) {   // wet-road slide
+    v.heading += steer * 0.5 * dt * (v.vel >= 0 ? 1 : -1);
     spawnSkid(v);
   }
 

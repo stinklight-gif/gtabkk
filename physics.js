@@ -102,6 +102,20 @@ export function spawnDust(x, z, n = 14) {
   const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; G.scene.add(pts);
   G.dust.push({ pts, vel, life: 0.6 });
 }
+// Songkran water splash — a blue droplet burst (reuses the dust particle system).
+export function splashWater(x, y, z, n = 16) {
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(n * 3), vel = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    pos[i * 3] = x; pos[i * 3 + 1] = y; pos[i * 3 + 2] = z;
+    const a = Math.random() * TAU, sp = rand(1.5, 5);
+    vel[i * 3] = Math.cos(a) * sp; vel[i * 3 + 1] = rand(2, 5); vel[i * 3 + 2] = Math.sin(a) * sp;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.PointsMaterial({ color: 0x9fd8ff, size: 0.9, transparent: true, opacity: 0.9, depthWrite: false });
+  const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; G.scene.add(pts);
+  G.dust.push({ pts, vel, life: 1.0 });
+}
 export function updateDust(dt) {
   for (let i = G.dust.length - 1; i >= 0; i--) {
     const d = G.dust[i]; d.life -= dt;

@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
+import { makePedMesh, splashWater } from './main.js';
 
 // 19. DAY/NIGHT + WEATHER
 // =============================================================================
@@ -145,26 +146,41 @@ export function makeSkyLantern() {
   m.userData.mat = mat; m.frustumCulled = false;
   return m;
 }
-export function festivalScheduled() {
-  // every 3rd night is Loy Krathong (offset so a fresh game's first night isn't one)
-  return (G.time.day % FESTIVAL_PERIOD === 2) && (G.nightK || 0) > 0.45;
+// Which festival (if any) is on right now — Loy Krathong nights vs Songkran days,
+// on distinct days so they never overlap, and only at the right time of day.
+export function scheduledFestival() {
+  const d = G.time.day, night = (G.nightK || 0) > 0.45;
+  if (night && d % 4 === 2) return 'loykrathong';
+  if (!night && G.time.dayT > 0.34 && G.time.dayT < 0.62 && d % 4 === 0) return 'songkran';
+  return null;
 }
-export function startFestival() {
-  const f = G.festival; f.active = true; f.announcedDay = G.time.day;
-  for (let i = 0; i < KRATHONG_COUNT; i++) {
-    const m = makeKrathong();
-    m.position.set(RIVER_CX + rand(-13, 13), 0.16, rand(-HALF, HALF));
-    m.rotation.y = rand(0, TAU); m.frustumCulled = false; G.scene.add(m);
-    f.floats.push({ mesh: m, speed: rand(1.4, 3.2), spin: rand(-0.3, 0.3), phase: rand(0, TAU) });
+export function startFestival(type) {
+  const f = G.festival; f.type = type; f.announcedDay = G.time.day;
+  if (type === 'loykrathong') {
+    for (let i = 0; i < KRATHONG_COUNT; i++) {
+      const m = makeKrathong();
+      m.position.set(RIVER_CX + rand(-13, 13), 0.16, rand(-HALF, HALF));
+      m.rotation.y = rand(0, TAU); m.frustumCulled = false; G.scene.add(m);
+      f.floats.push({ mesh: m, speed: rand(1.4, 3.2), spin: rand(-0.3, 0.3), phase: rand(0, TAU) });
+    }
+    for (let i = 0; i < 16; i++) {        // riverside crowd, facing the water
+      const m = makePedMesh();
+      m.position.set(rand(-206, -200), 0, rand(-HALF + 20, HALF - 20));
+      m.rotation.y = -PI / 2; m.frustumCulled = false; G.scene.add(m);
+      f.watchers.push(m);
+    }
+    G.hud.showSubtitle('Loy Krathong — float a krathong on the river.', 'ลอยกระทง');
+  } else if (type === 'songkran') {
+    G.hud.showSubtitle('Songkran! The whole city is a water fight.', 'สงกรานต์');
   }
-  G.hud.showSubtitle('Loy Krathong — the river glows with floats.', 'ลอยกระทง');
   if (G.audio && G.audio.bell) G.audio.bell();
 }
 export function stopFestival() {
-  const f = G.festival; f.active = false;
+  const f = G.festival;
   for (const k of f.floats) { G.scene.remove(k.mesh); disposeObject(k.mesh); }
   for (const l of f.lanterns) { G.scene.remove(l.mesh); l.mesh.geometry.dispose(); l.mesh.userData.mat.dispose(); }
-  f.floats = []; f.lanterns = [];
+  for (const m of f.watchers) { G.scene.remove(m); disposeObject(m); }
+  f.floats = []; f.lanterns = []; f.watchers = []; f.type = null;
 }
 export function spawnSkyLantern() {
   const m = makeSkyLantern();
@@ -174,16 +190,19 @@ export function spawnSkyLantern() {
 }
 export function updateFestival(dt) {
   const f = G.festival;
-  const want = festivalScheduled();
-  if (want && !f.active) startFestival();
-  else if (!want && f.active) stopFestival();
-  if (!f.active) return;
-  const now = performance.now();
+  const want = scheduledFestival();
+  if (want !== f.type) { stopFestival(); if (want) startFestival(want); }
+  if (!f.type) return;
+  if (f.type === 'loykrathong') updateLoyKrathong(dt);
+  else updateSongkran(dt);
+}
+function updateLoyKrathong(dt) {
+  const f = G.festival, now = performance.now();
   for (const k of f.floats) {
-    k.mesh.position.z += dt * k.speed;                                 // drift downstream
-    k.mesh.position.y = 0.16 + Math.sin(now * 0.002 + k.phase) * 0.03; // gentle bob
+    k.mesh.position.z += dt * k.speed;
+    k.mesh.position.y = 0.16 + Math.sin(now * 0.002 + k.phase) * 0.03;
     k.mesh.rotation.y += dt * k.spin;
-    if (k.mesh.position.z > HALF + 5) k.mesh.position.z = -HALF - 5;    // recycle
+    if (k.mesh.position.z > HALF + 5) k.mesh.position.z = -HALF - 5;
   }
   for (let i = f.lanterns.length - 1; i >= 0; i--) {
     const l = f.lanterns[i];
@@ -193,6 +212,48 @@ export function updateFestival(dt) {
   }
   f.lanternT = (f.lanternT || 0) - dt;
   if (f.lanternT <= 0 && f.lanterns.length < 14) { spawnSkyLantern(); f.lanternT = rand(0.6, 1.7); }
+  for (const m of f.watchers) m.position.y = Math.sin(now * 0.002 + m.position.z) * 0.02;  // gentle sway
+  // player floats their own krathong at the riverbank
+  const p = G.player;
+  if (!p.inVehicle && p.group.position.x < -198 && p.group.position.x > -250) {
+    G.hud.showPrompt('Press <b>E</b> to float a krathong', 0.4);
+    if (G.input.pressed('KeyE')) {
+      const m = makeKrathong();
+      m.position.set(clamp(p.group.position.x - 4, -244, -212), 0.16, p.group.position.z);
+      m.frustumCulled = false; G.scene.add(m);
+      f.floats.push({ mesh: m, speed: rand(1.4, 3.2), spin: rand(-0.3, 0.3), phase: rand(0, TAU) });
+      f.krathongFloated = (f.krathongFloated || 0) + 1;
+      G.cash += 50; G.hud.setCash(G.cash);
+      G.hud.showNotif('You float a krathong — make a wish (+฿50)');
+      if (G.audio && G.audio.chime) G.audio.chime();
+    }
+  }
+}
+function updateSongkran(dt) {
+  const f = G.festival, p = G.player, pp = p.group.position;
+  // peds splash water at each other near the player (visible participation)
+  f.splashT = (f.splashT || 0) - dt;
+  if (f.splashT <= 0 && G.peds.length) {
+    f.splashT = rand(0.08, 0.2);
+    let thrown = 0;
+    for (let t = 0; t < 7 && thrown < 3; t++) {
+      const ped = G.peds[irand(0, G.peds.length - 1)];
+      if (ped && !ped.dead && dist2(ped.mesh.position, pp) < 85 * 85) {
+        splashWater(ped.mesh.position.x, 1.4, ped.mesh.position.z, 20);
+        thrown++;
+      }
+    }
+    if (thrown && Math.random() < 0.4 && G.audio && G.audio.step) G.audio.step(true);
+    // a splash near the player too, so the fight is always around you
+    if (Math.random() < 0.6) splashWater(pp.x + rand(-4, 4), 1.4, pp.z + rand(2, 10), 22);
+  }
+  // player joins: F on foot throws water in the facing direction
+  if (!p.inVehicle && G.input && G.input.pressed && G.input.pressed('KeyF')) {
+    const yaw = p.yaw || 0;
+    splashWater(pp.x - Math.sin(yaw) * 1.6, 1.3, pp.z - Math.cos(yaw) * 1.6, 20);
+    if (G.audio && G.audio.step) G.audio.step(true);
+  }
+  G.hud.showPrompt('Songkran — <b>F</b> to throw water', 0.3);
 }
 
 // =============================================================================

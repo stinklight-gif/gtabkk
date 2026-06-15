@@ -78,8 +78,8 @@ export const G = {
   particles: [],
   effects: [],
   time: { dayT: 0.27, weather: 'clear', rainStrength: 0, day: 0 }, // dayT 0..1; day = whole days elapsed
-  // Loy Krathong festival — floats + sky lanterns drift on the river on schedule nights
-  festival: { active: false, floats: [], lanterns: [], announcedDay: -1 },
+  // Festivals — Loy Krathong (night, floats/lanterns) and Songkran (day, water fight)
+  festival: { type: null, floats: [], lanterns: [], watchers: [], announcedDay: -1, krathongFloated: 0 },
   wanted: { stars: 0, lastSeenAt: 0, lastSeenPos: new THREE.Vector3() },
   cash: 100,
   notifQueue: [],

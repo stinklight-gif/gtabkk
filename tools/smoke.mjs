@@ -38,6 +38,7 @@ const SHOTS = [
   { name: 'smoke_night.png', dayT: 0.87 },  // ~20:50 — full neon
   { name: 'smoke_3am.png',   dayT: 0.13 },  // ~03:00 — dead streets (same spot as noon)
   { name: 'smoke_festival.png', dayT: 0.9, festival: true },  // Loy Krathong on the river
+  { name: 'smoke_songkran.png', dayT: 0.5, songkran: true },  // Songkran water fight in the street
 ];
 // Extra one-off shots for tuning, e.g. SMOKE_SHOTS="dawn=0.30,dusk=0.78"
 // (these don't run in CI — only the two standard shots above are asserted).
@@ -98,7 +99,7 @@ async function main() {
     console.log('game started');
 
     for (const shot of SHOTS) {
-      await page.evaluate(({ dayT, festival }) => {
+      await page.evaluate(({ dayT, festival, songkran }) => {
         const GAME = window.GAME;
         GAME.state = 'playing';                                  // force-resume if pointer lock dropped
         document.getElementById('pause').classList.remove('show');
@@ -108,9 +109,13 @@ async function main() {
         GAME._weatherUntil = 1e9;
         if (festival) {
           // schedule-driven: set the in-game date to a Loy Krathong night and stand on the river
-          GAME.time.day = 2;                                     // day % 3 === 2 → festival night
+          GAME.time.day = 2;                                     // day % 4 === 2 + night → Loy Krathong
           GAME.player.group.position.set(-228, 0, -120);
           GAME.camRig.yaw = Math.PI; GAME.camRig.pitch = -0.15; // look down-river (the floats recede north)
+        } else if (songkran) {
+          GAME.time.day = 0;                                     // day % 4 === 0 + midday → Songkran
+          GAME.player.group.position.set(0, 0, -130);
+          GAME.camRig.yaw = Math.PI; GAME.camRig.pitch = -0.04;  // street full of splashing peds
         } else {
           GAME.player.group.position.set(0, 0, -130);            // street level, mid-map
           GAME.camRig.yaw = Math.PI; GAME.camRig.pitch = -0.02;  // aim down the street
@@ -118,7 +123,7 @@ async function main() {
         GAME.camRig.shake = 0;
         if (GAME.resyncCrowd) GAME.resyncCrowd();                // snap crowd to this hour (busy noon vs dead 3am)
       }, shot);
-      await waitFrames(page, shot.festival ? 22 : 14);  // let day/night + camera (+ festival spawn) settle
+      await waitFrames(page, (shot.festival || shot.songkran) ? 24 : 14);  // let day/night + camera (+ festival) settle
       await page.screenshot({ path: path.join(ROOT, shot.name), timeout: 120_000 });
       const size = fs.statSync(path.join(ROOT, shot.name)).size;
       const calls = await page.evaluate(() => window.GAME.renderer.info.render.calls);
