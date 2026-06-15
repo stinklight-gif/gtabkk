@@ -247,11 +247,29 @@ function updateSongkran(dt) {
     // a splash near the player too, so the fight is always around you
     if (Math.random() < 0.6) splashWater(pp.x + rand(-4, 4), 1.4, pp.z + rand(2, 10), 22);
   }
-  // player joins: F on foot throws water in the facing direction
+  // player joins: F on foot throws water in the facing direction — and shoves +
+  // startles whoever it lands on (a real splash with physics, not just particles)
   if (!p.inVehicle && G.input && G.input.pressed && G.input.pressed('KeyF')) {
     const yaw = p.yaw || 0;
-    splashWater(pp.x - Math.sin(yaw) * 1.6, 1.3, pp.z - Math.cos(yaw) * 1.6, 20);
+    const dirX = -Math.sin(yaw), dirZ = -Math.cos(yaw);
+    splashWater(pp.x + dirX * 1.6, 1.3, pp.z + dirZ * 1.6, 20);
+    const RANGE = 6;
+    let soaked = 0;
+    for (const ped of G.peds) {
+      if (ped.dead) continue;
+      const rx = ped.mesh.position.x - pp.x, rz = ped.mesh.position.z - pp.z;
+      const d = Math.hypot(rx, rz);
+      if (d > RANGE || d < 0.01) continue;
+      if ((rx / d) * dirX + (rz / d) * dirZ < 0.4) continue;        // only those in the throw cone
+      const f = 7 * (1 - d / RANGE);                                // shove harder up close
+      ped.knockX = (ped.knockX || 0) + (rx / d) * f;
+      ped.knockZ = (ped.knockZ || 0) + (rz / d) * f;
+      ped.panicT = Math.max(ped.panicT || 0, 1.2);                  // flinch + scurry a moment
+      splashWater(ped.mesh.position.x, 1.4, ped.mesh.position.z, 10);
+      soaked++;
+    }
     if (G.audio && G.audio.step) G.audio.step(true);
+    if (soaked && G.audio && G.audio.blip) G.audio.blip({ freq: 520, dur: 0.06, gain: 0.08 });
   }
   G.hud.showPrompt('Songkran — <b>F</b> to throw water', 0.3);
 }
