@@ -1,0 +1,464 @@
+// =============================================================================
+// VEHICLES — extracted from main.js (see numbered sections). No logic change.
+// =============================================================================
+import * as THREE from 'three';
+import {
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+} from './core.js';
+import { cycleWeapon, damagePlayer, firePistol, fireSMG, fireShotgun, makeExplosion, makeSmokeEmitter, makeVehicle, onCopKilled, raiseWanted, resolveVehicleVsBuildings, saveGame, spawnSkid, updateAmmoHud, updateCop, vehicleName } from './main.js';
+
+export function updatePlayerInVehicle(dt) {
+  const p = G.player;
+  const v = p.inVehicle;
+  // vehicle destroyed under the player — blow it and kick them out
+  if (v.hp <= 0 && !v.fire) {
+    v.fire = true; v.dead = true; v.driver = null;
+    p.inVehicle = null; p.group.visible = true;
+    p.group.position.set(v.pos.x + Math.cos(v.heading) * 1.8, 0, v.pos.z - Math.sin(v.heading) * 1.8);
+    v.mesh.children.forEach(c => { if (c.material && c.material.color) c.material.color.lerp(_blackColor, 0.6); });
+    makeExplosion(v.pos);
+    damagePlayer(20);
+    setTimeout(() => {
+      const i = G.vehicles.indexOf(v); if (i >= 0) G.vehicles.splice(i, 1);
+      G.scene.remove(v.mesh); disposeObject(v.mesh);
+    }, 6000);
+    return;
+  }
+  // exit
+  if (G.input.pressed('KeyE')) {
+    p.inVehicle = null;
+    v.driver = null;
+    if (v.audio) { v.audio.set(0, false); }
+    // place player next to vehicle on left
+    const ox = Math.cos(v.heading) * 1.4;
+    const oz = -Math.sin(v.heading) * 1.4;
+    p.group.position.set(v.pos.x + ox, 0, v.pos.z + oz);
+    p.group.visible = true;
+    return;
+  }
+
+  // controls
+  const forward = (G.input.down('KeyW')?1:0) - (G.input.down('KeyS')?1:0);
+  const steer   = (G.input.down('KeyA')?1:0) - (G.input.down('KeyD')?1:0);
+  const handbrake = G.input.down('Space');
+  const boost = G.input.down('ShiftLeft');
+
+  const spec = v.spec;
+  // accel
+  if (forward > 0) v.vel += spec.accel * (boost ? 1.3 : 1) * dt;
+  else if (forward < 0) {
+    if (v.vel > 0.2) v.vel -= spec.brake * dt;
+    else v.vel -= spec.accel * 0.6 * dt; // reverse
+  } else {
+    v.vel *= Math.pow(0.985, dt * 60);
+  }
+  if (handbrake) v.vel *= Math.pow(0.94, dt*60);
+  const speedMul = v.tiresBlown ? 0.5 : 1;   // spike strips halve your top speed
+  v.vel = clamp(v.vel, -spec.topSpeed * 0.4 * speedMul, spec.topSpeed * (boost ? 1.15 : 1) * speedMul);
+  // steering — speed dependent
+  const steerRate = spec.turn * (1 - Math.min(1, Math.abs(v.vel)/spec.topSpeed) * 0.4);
+  v.heading += steer * steerRate * dt * (v.vel >= 0 ? 1 : -1) * (Math.abs(v.vel)>0.3 ? 1 : 0);
+  // arcade handbrake drift: extra oversteer + lay rubber while sliding
+  if (handbrake && Math.abs(v.vel) > 6 && Math.abs(steer) > 0.15 && spec.kind !== 'boat' && spec.kind !== 'bike') {
+    v.heading += steer * 1.5 * dt * (v.vel >= 0 ? 1 : -1);
+    spawnSkid(v);
+  }
+
+  // motorbike lean
+  if (v.spec.kind === 'bike') {
+    v.mesh.rotation.z = lerp(v.mesh.rotation.z || 0, -steer * 0.35, 0.15);
+  } else if (v.spec.kind === 'tuktuk') {
+    // tippy oversteer wiggle
+    v.mesh.rotation.z = lerp(v.mesh.rotation.z || 0, -steer * 0.18 + Math.sin(performance.now()*0.01)*0.02, 0.2);
+  }
+
+  // apply motion
+  v.pos.x += Math.sin(v.heading) * v.vel * dt;
+  v.pos.z += Math.cos(v.heading) * v.vel * dt;
+  if (v.spec.kind === 'boat') {            // keep the boat in the river channel
+    v.pos.x = clamp(v.pos.x, -248, -210);
+    v.pos.z = clamp(v.pos.z, -246, 246);
+    v.pos.y = 0.3;
+  }
+  v.mesh.position.copy(v.pos);
+  v.mesh.rotation.y = v.heading;
+
+  if (v.spec.kind !== 'boat') resolveVehicleVsBuildings(v);
+
+  // place player at seat (invisible while inside)
+  p.group.visible = false;
+  p.group.position.copy(v.pos); p.group.position.y = 0.5;
+
+  // audio
+  if (!v.audio) {
+    v.audio = (v.spec.kind === 'tuktuk') ? G.audio.tukTukLoop() : G.audio.engineLoop({ rpmBase: v.spec.kind === 'bike' ? 110 : 70, harsh: v.spec.kind === 'bike' });
+  }
+  v.audio.set(clamp(Math.abs(v.vel)/spec.topSpeed, 0, 1), true);
+
+  // honk
+  if (G.input.pressed('KeyH')) G.audio.honk();
+
+  // drive-by: fire the active gun from the vehicle (combat update doesn't run here)
+  if (p.attackCooldown > 0) p.attackCooldown -= dt;
+  if (p.gunRecoil > 0) p.gunRecoil = Math.max(0, p.gunRecoil - dt * 6);
+  if (G.input.pressed('KeyQ')) cycleWeapon();
+  if (p.activeWeapon !== 'fists' && p.weapons[p.activeWeapon]) {
+    G.hud.setCrosshair(G.input.rightDown);
+    const w = p.activeWeapon;            // 'pistol' | 'smg' | 'shotgun'
+    const ammo = w + 'Ammo';
+    const cd = w === 'smg' ? 0.07 : w === 'shotgun' ? 0.8 : 0.18;
+    if (G.input.mouseDown && p.attackCooldown <= 0 && p[ammo] > 0) {
+      if (w === 'smg') fireSMG(); else if (w === 'shotgun') fireShotgun(); else firePistol();
+      p[ammo]--; p.attackCooldown = cd; p.gunRecoil = 1;
+      updateAmmoHud();
+    }
+  } else {
+    G.hud.setCrosshair(false);
+  }
+
+  // crashing into things — handled by vehicle vs vehicle below
+
+  // ramming peds
+  for (const ped of G.peds) {
+    if (ped.dead) continue;
+    if (dist2(ped.mesh.position, v.pos) < 1.6*1.6 && Math.abs(v.vel) > 4) {
+      killPed(ped);
+      raiseWanted(2);
+      G.hud.showNotif('Hit & Run! +Wanted Star');
+    }
+  }
+}
+
+// (moved to ./core.js)
+
+export function killPed(ped) {
+  if (ped.dead) return;
+  ped.dead = true;
+  // ragdoll: flatten
+  ped.mesh.rotation.x = PI/2;
+  ped.mesh.position.y = 0.05;
+  G.audio.hit();
+  setTimeout(() => {
+    G.scene.remove(ped.mesh);
+    disposeObject(ped.mesh);
+    const i = G.peds.indexOf(ped); if (i >= 0) G.peds.splice(i, 1);
+  }, 8000);
+}
+
+export function updateVehicles(dt) {
+  for (const v of G.vehicles) {
+    if (v.dead) continue;
+    if (v.lights) {
+      const base = G.nightK || 0;
+      v.lights[0].emissiveIntensity = base;   // headlights
+      const braking = v.driver === 'player' && (G.input.down('KeyS') || G.input.down('Space'));
+      v.lights[1].emissiveIntensity = braking ? Math.max(base, 0.9) : base;  // tail/brake lights
+    }
+    if (v.driver === 'player') continue;
+    if (v.isCop && v.driver) updateCop(v, dt);
+    else if (v.npc) updateTrafficCar(v, dt);
+    // damage smoke
+    if (v.hp < 30 && !v.smoke) {
+      v.smoke = makeSmokeEmitter(v.mesh.position, 0.5);
+    }
+    if (v.hp <= 0 && !v.fire) {
+      v.fire = true;
+      v.dead = true;
+      v.driver = null;
+      v.mesh.children.forEach(c => { if (c.material && c.material.color) c.material.color.lerp(_blackColor, 0.6); });
+      makeExplosion(v.pos);
+      v.vel = 0;
+      if (v.isCop) { raiseWanted(2); onCopKilled(); }
+      if (v.kind === 'fortuner' && !G.player.weapons.smg) {
+        G.player.weapons.smg = true;
+        G.player.smgAmmo = G.player.smgMag;
+        G.hud.showNotif('Picked up an SMG');
+      }
+      if (v.smoke) v.smoke.life = 0;   // stop the damage smoke
+      // remove the wreck after a delay, freeing its GPU resources
+      setTimeout(() => {
+        const i = G.vehicles.indexOf(v);
+        if (i >= 0) G.vehicles.splice(i, 1);
+        G.scene.remove(v.mesh);
+        disposeObject(v.mesh);
+      }, 6000);
+    }
+  }
+}
+
+export function updateTrafficCar(v, dt) {
+  const npc = v.npc;
+  // simple grid following: pick a heading aligned with the road, choose new heading at intersections
+  // collision check ahead with player vehicle / other cars / peds
+  const headingX = Math.sin(v.heading), headingZ = Math.cos(v.heading);
+  let block = false;
+  for (const o of G.vehicles) {
+    if (o === v) continue;
+    const dx = o.pos.x - v.pos.x;
+    const dz = o.pos.z - v.pos.z;
+    const fwd = dx * headingX + dz * headingZ;
+    const side = -dx * headingZ + dz * headingX;
+    if (fwd > 0 && fwd < 8 && Math.abs(side) < 1.6) { block = true; break; }
+  }
+  // peds in road
+  for (const ped of G.peds) {
+    if (ped.dead) continue;
+    const dx = ped.mesh.position.x - v.pos.x;
+    const dz = ped.mesh.position.z - v.pos.z;
+    const fwd = dx * headingX + dz * headingZ;
+    const side = -dx * headingZ + dz * headingX;
+    if (fwd > 0 && fwd < 5 && Math.abs(side) < 1.2) { block = true; break; }
+  }
+  // approaching intersection: random turn
+  const nearIntersection = isNearGridLine(v.pos.x) && isNearGridLine(v.pos.z);
+  if (nearIntersection && !npc.turnedRecently) {
+    if (Math.random() < 0.25) {
+      // 90-degree turn
+      const turn = Math.random() < 0.5 ? PI/2 : -PI/2;
+      v.heading += turn;
+    }
+    npc.turnedRecently = 0.8;
+  }
+  if (npc.turnedRecently > 0) npc.turnedRecently = Math.max(0, npc.turnedRecently - dt);
+
+  // accel
+  const target = block ? 0 : npc.cruiseSpeed;
+  if (v.vel < target) v.vel = Math.min(target, v.vel + v.spec.accel * dt);
+  else v.vel = Math.max(target, v.vel - v.spec.brake * dt);
+
+  v.pos.x += Math.sin(v.heading) * v.vel * dt;
+  v.pos.z += Math.cos(v.heading) * v.vel * dt;
+  v.mesh.position.copy(v.pos);
+  v.mesh.rotation.y = v.heading;
+
+  // honk if blocked
+  if (block && (npc.honkCooldown -= dt) <= 0) {
+    G.audio.honk();
+    npc.honkCooldown = rand(2, 6);
+  }
+
+  // bounds wrap / despawn-respawn far from player
+  const playerPos = G.player.group.position;
+  if (dist2(v.pos, playerPos) > 220*220) {
+    // teleport ahead of player on a road
+    respawnTraffic(v, playerPos);
+  }
+}
+
+export function isNearGridLine(v) {
+  const m = ((v + HALF) % BLOCK) - BLOCK/2;
+  return Math.abs(m) < 1.5;
+}
+
+export function respawnTraffic(v, playerPos) {
+  const angle = rand(0, TAU);
+  const r = rand(70, 130);
+  const x = clamp(playerPos.x + Math.cos(angle) * r, -HALF + 5, HALF - 5);
+  const z = clamp(playerPos.z + Math.sin(angle) * r, -HALF + 5, HALF - 5);
+  // snap to nearest road
+  const ix = Math.round(x / BLOCK) * BLOCK;
+  const iz = Math.round(z / BLOCK) * BLOCK;
+  if (Math.abs(x - ix) < Math.abs(z - iz)) { v.pos.set(ix + (Math.random()<0.5?-2.5:2.5), 0, z); v.heading = Math.random()<0.5 ? 0 : PI; v.heading = (v.pos.x > ix ? 0 : PI); }
+  else { v.pos.set(x, 0, iz + (Math.random()<0.5?-2.5:2.5)); v.heading = (v.pos.z > iz ? -PI/2 : PI/2); }
+  v.vel = v.npc.cruiseSpeed * 0.7;
+}
+
+// =============================================================================
+export function updateCamera(dt) {
+  const p = G.player;
+  const rig = G.camRig;
+  // shake decay
+  rig.shake *= Math.pow(0.001, dt);
+  const shakeX = (Math.random()*2-1) * rig.shake;
+  const shakeY = (Math.random()*2-1) * rig.shake;
+
+  if (p.inVehicle) {
+    _camTarget.copy(p.inVehicle.pos); _camTarget.y += 1.2;
+    // chase camera: ride behind the vehicle heading, but slow yaw follow lets player look around
+    const followYaw = p.inVehicle.heading + PI; // behind
+    rig.yaw = lerpAngle(rig.yaw, followYaw, dt * 1.4);
+    rig.targetDistance = p.inVehicle.spec.kind === 'bike' ? 4.8 : 6.5;
+  } else {
+    _camTarget.copy(p.group.position); _camTarget.y += 1.5;
+    rig.targetDistance = 4.5;
+  }
+  rig.distance = lerp(rig.distance, rig.targetDistance, 0.08);
+  const cy = Math.cos(rig.yaw), sy = Math.sin(rig.yaw);
+  const cp = Math.cos(rig.pitch), sp = Math.sin(rig.pitch);
+  _camOffset.set(sy * cp, -sp, cy * cp);                 // unit direction target → camera
+  // Occlusion: never let the camera sit inside a building. Cast target → camera
+  // against nearby building AABBs and pull the camera in to just shy of the wall.
+  let camDist = rig.distance;
+  _ray.ray.origin.copy(_camTarget);
+  _ray.ray.direction.copy(_camOffset);
+  for (const b of G.world.buildings) {
+    if (dist2(b.pos, _camTarget) > 50 * 50) continue;
+    _bbox.min.set(b.pos.x - b.size.x / 2, b.pos.y - b.size.y / 2, b.pos.z - b.size.z / 2);
+    _bbox.max.set(b.pos.x + b.size.x / 2, b.pos.y + b.size.y / 2, b.pos.z + b.size.z / 2);
+    const hit = _ray.ray.intersectBox(_bbox, _vBox);
+    if (hit) { const d = _camTarget.distanceTo(hit) - 0.4; if (d < camDist) camDist = Math.max(1.1, d); }
+  }
+  rig.cam.position.copy(_camTarget).addScaledVector(_camOffset, camDist);
+  rig.cam.position.x += shakeX; rig.cam.position.y += shakeY + 0.6;
+  rig.cam.lookAt(_camTarget);
+  // speed-based FOV kick while driving — a little sense of velocity
+  const sp01 = p.inVehicle ? Math.min(1, Math.abs(p.inVehicle.vel) / p.inVehicle.spec.topSpeed) : 0;
+  const targetFov = 72 + sp01 * 14;
+  if (Math.abs(rig.cam.fov - targetFov) > 0.05) { rig.cam.fov = lerp(rig.cam.fov, targetFov, 0.06); rig.cam.updateProjectionMatrix(); }
+}
+
+// =============================================================================
+
+export function updateGarage(dt) {
+  const p = G.player;
+  if (!p.inVehicle || !G.world.garages) return;
+  const v = p.inVehicle;
+  for (const g of G.world.garages) {
+    if (dist2(v.pos, g.pos) >= g.r * g.r) continue;
+    const now = performance.now();
+    if (now < g.cooldownUntil) return;
+    const needsService = G.wanted.stars > 0 || v.hp < 100;
+    if (!needsService) { G.hud.showPrompt('U-Spray — nothing to fix', 0.4); return; }
+    const fee = 300 + G.wanted.stars * 350;   // pricier the hotter you are
+    if (G.cash < fee) { G.hud.showPrompt(`U-Spray needs <b>฿${fee}</b>`, 0.4); return; }
+    // pay, repair, and shed the heat
+    G.cash -= fee;
+    v.hp = 100;
+    v.tiresBlown = false;   // respray patches the tires too
+    if (v.smoke) { v.smoke.life = 0; v.smoke = null; }
+    G.wanted.stars = 0;
+    G.wanted.lastSeenAt = now;
+    // clear every active cop (foot + vehicles)
+    for (let i = G.cops.length - 1; i >= 0; i--) {
+      G.scene.remove(G.cops[i].mesh); disposeObject(G.cops[i].mesh); G.cops.splice(i, 1);
+    }
+    for (let i = G.vehicles.length - 1; i >= 0; i--) {
+      if (G.vehicles[i].isCop) { G.scene.remove(G.vehicles[i].mesh); disposeObject(G.vehicles[i].mesh); G.vehicles.splice(i, 1); }
+    }
+    G.hud.setCash(G.cash);
+    G.hud.setStars(0);
+    G.hud.showNotif(`Resprayed — repaired & lost the cops (-฿${fee})`);
+    G.audio.blip({ freq: 520, dur: 0.12, gain: 0.12 });
+    g.cooldownUntil = now + 8000;
+    return;
+  }
+}
+
+// ---- Garage ownership: rent the U-Spray, store/retrieve + repaint vehicles ----
+export const STORABLE = new Set(['bike', 'tuktuk', 'hilux', 'camry', 'sedan', 'songthaew', 'bus', 'luxsedan', 'supercar']);
+
+// The repaintable body materials of a vehicle: its biggest non-wheel/non-glass
+// MeshStandard parts (body + cab), found once and cached on the vehicle.
+export function collectPaintMats(mesh) {
+  const items = [];
+  mesh.traverse(o => {
+    if (!o.isMesh || !o.material || !o.material.isMeshStandardMaterial) return;
+    if (o.geometry.type === 'CylinderGeometry') return;     // wheels
+    if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+    const b = o.geometry.boundingBox;
+    items.push({ mat: o.material, v: (b.max.x - b.min.x) * (b.max.y - b.min.y) * (b.max.z - b.min.z) });
+  });
+  items.sort((a, b) => b.v - a.v);
+  const mats = [], seen = new Set();
+  for (const it of items) { if (seen.has(it.mat)) continue; seen.add(it.mat); mats.push(it.mat); if (mats.length >= 2) break; }
+  return mats;
+}
+export function setVehicleColor(v, hex) {
+  if (!v.paintMats) v.paintMats = collectPaintMats(v.mesh);
+  for (const m of v.paintMats) m.color.setHex(hex);
+  v.color = hex;
+}
+export function currentBodyColor(v) {
+  if (typeof v.color === 'number') return v.color;
+  const m = v.paintMats || collectPaintMats(v.mesh);
+  return m.length ? m[0].color.getHex() : 0xcccccc;
+}
+export function randomPlate() {
+  const t = ['กก', 'ขข', 'งง', 'รด', 'สห', 'ทพ', 'มล', 'ญบ', 'ผด', 'นค'];
+  return `${irand(1, 9)}${pick(t)} ${irand(1000, 9999)}`;
+}
+export function storedLabel(e) { return `${vehicleName(e.kind)}${e.plate ? ' ' + e.plate : ''}`; }
+
+export function storeVehicle(v) {
+  const garage = G.econ.garage, p = G.player, g = G.world.garages[0];
+  const entry = { kind: v.kind, color: currentBodyColor(v), plate: v.plate || randomPlate(), hp: Math.max(40, Math.round(v.hp)) };
+  garage.stored.push(entry);
+  // step the player out at the garage, then despawn the stored car
+  p.inVehicle = null; v.driver = null; p.group.visible = true;
+  p.group.position.set(g.pos.x, 0, g.pos.z - 5);
+  G.scene.remove(v.mesh); disposeObject(v.mesh);
+  const vi = G.vehicles.indexOf(v); if (vi >= 0) G.vehicles.splice(vi, 1);
+  G.hud.showNotif(`Stored ${storedLabel(entry)} (${garage.stored.length}/${garage.capacity})`);
+  G.audio.chime();
+  saveGame();
+}
+export function retrieveVehicle(idx) {
+  const garage = G.econ.garage;
+  const e = garage.stored[idx];
+  if (!e) return;
+  const v = makeVehicle(e.kind, G.scene);
+  const door = G.world.garageDoor || G.world.garages[0].pos;
+  v.pos.set(door.x, 0, door.z); v.mesh.position.copy(v.pos);
+  v.heading = PI; v.mesh.rotation.y = PI;
+  v.hp = e.hp; v.plate = e.plate;
+  setVehicleColor(v, e.color);
+  garage.stored.splice(idx, 1);
+  garage.retrieveIdx = 0;
+  G.hud.showNotif(`Brought out ${storedLabel(e)} — at the garage door`);
+  G.audio.blip({ freq: 320, dur: 0.06, gain: 0.08 });
+  saveGame();
+}
+export function repaintVehicle(v) {
+  if (G.cash < PRICE.repaint) { G.hud.showNotif('Not enough cash to repaint'); return; }
+  G.cash -= PRICE.repaint; G.hud.setCash(G.cash);
+  const cur = currentBodyColor(v);
+  let i = PAINT_COLORS.indexOf(cur); i = (i + 1) % PAINT_COLORS.length;
+  setVehicleColor(v, PAINT_COLORS[i]);
+  if (!v.plate) v.plate = randomPlate();
+  G.hud.showNotif(`Repainted — new plate ${v.plate} (-฿${PRICE.repaint})`);
+  G.audio.chime();
+  saveGame();
+}
+
+export function updateGarageOwnership(dt) {
+  const p = G.player;
+  if (!G.world.garages || !G.world.garages.length) return;
+  const g = G.world.garages[0], garage = G.econ.garage;
+  if (p.inVehicle) {
+    const v = p.inVehicle;
+    if (dist2(v.pos, g.pos) >= (g.r + 1) * (g.r + 1)) return;
+    if (!garage.rented) { G.hud.showPrompt('Garage — step out and rent it to store cars here', 0.4); return; }
+    if (!STORABLE.has(v.kind)) return;                      // cop cars / boats aren't storable
+    // only claim the prompt line when U-Spray isn't already offering a repair
+    const servicing = v.hp < 100 || G.wanted.stars > 0;
+    const full = garage.stored.length >= garage.capacity;
+    if (!servicing) {
+      G.hud.showPrompt(full
+        ? `Garage full — <b>C</b>: repaint (฿${PRICE.repaint})`
+        : `Garage — <b>K</b>: store this ${vehicleName(v.kind)} · <b>C</b>: repaint (฿${PRICE.repaint})`, 0.4);
+    }
+    if (G.input.pressed('KeyK') && !full) storeVehicle(v);
+    else if (G.input.pressed('KeyC')) repaintVehicle(v);
+  } else {
+    if (dist2(p.group.position, g.pos) >= g.r * g.r) return;
+    if (!garage.rented) {
+      G.hud.showPrompt(`Garage — <b>E</b>: rent (฿${PRICE.garageRent.toLocaleString()})`, 0.4);
+      if (G.input.pressed('KeyE')) {
+        if (G.cash < PRICE.garageRent) { G.hud.showNotif('Not enough cash to rent the garage'); return; }
+        G.cash -= PRICE.garageRent; G.hud.setCash(G.cash); garage.rented = true;
+        G.hud.showNotif('Garage rented — drive vehicles in to store & repaint them');
+        G.audio.chime(); saveGame();
+      }
+      return;
+    }
+    if (garage.stored.length === 0) { G.hud.showPrompt('Garage — drive a vehicle in to store it', 0.4); return; }
+    const idx = garage.retrieveIdx % garage.stored.length;
+    const e = garage.stored[idx];
+    G.hud.showPrompt(`Garage — <b>E</b>: take ${storedLabel(e)} (${idx + 1}/${garage.stored.length}) · <b>L</b>: next`, 0.4);
+    if (G.input.pressed('KeyL')) garage.retrieveIdx = (idx + 1) % garage.stored.length;
+    else if (G.input.pressed('KeyE')) retrieveVehicle(idx);
+  }
+}
+
+// Car radio: M cycles stations; music plays (and ducks the engine) only while
+// you're in a vehicle, and flashes the station name on the HUD.
