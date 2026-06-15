@@ -17,7 +17,7 @@ python3 -m http.server 8765
 ```
 
 Three.js is vendored in `vendor/` (resolved via importmap), so it works fully
-offline. Click **ENTER THE CITY** when the loader finishes.
+offline. When the loader finishes, pick a save slot to start.
 
 ## Smoke test
 
@@ -190,18 +190,22 @@ GAME.time.weather = 'rain';     // force monsoon
 GAME.player.weapons.pistol = true; GAME.player.pistolAmmo = 12;
 ```
 
-## Saving
+## Start menu, save slots & onboarding
 
-Progress (cash, weapons + ammo, armor, amulets found, time of day, position, and
-now property — the safehouse, the rented garage, and every stored car with its
-colour/plate/condition) autosaves to `localStorage` every ~8 s and on exit, and
-restores on reload. New property fields are additive, so old `gtabkk_save_v1`
-saves still load (they just start without property). If the intro delivery was
-done, you respawn straight into free roam with Soi Run available. Wipe the save
-to start fresh:
+On load you get a **start menu** with three **save slots** — each shows New game
+or *Continue* with its cash and in-game day, and an ✕ to erase it. Pick a slot to
+play; that slot autosaves (cash, weapons + ammo, armor, amulets, time/day,
+position, and property — the safehouse, the rented garage, and every stored car
+with its colour/plate/condition) to `localStorage` every ~8 s and on exit. A
+legacy single-slot `gtabkk_save_v1` save migrates into Slot 1.
+
+First-time **tips** surface each new control the moment it's relevant (driving +
+the radio when you first get in a car, the garage when you're inside it, the
+safehouse at its door) and never repeat — they're tracked in `gtabkk_tips`. Wipe
+everything to start truly fresh:
 
 ```js
-localStorage.removeItem('gtabkk_save_v1');
+for (const k of Object.keys(localStorage)) if (k.startsWith('gtabkk_')) localStorage.removeItem(k);
 ```
 
 ## Extending

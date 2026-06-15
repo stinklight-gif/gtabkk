@@ -91,7 +91,7 @@ async function main() {
     await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
     // Playwright auto-waits for the button to become clickable (the .ready class
     // drops its pointer-events:none). World build is CPU-rendered → generous timeout.
-    await page.click('#startbtn', { timeout: 180_000 });
+    await page.click('#slots button', { timeout: 180_000 });
     await page.waitForFunction(
       () => window.GAME && (window.GAME.state === 'playing' || window.GAME.state === 'paused'),
       null, { timeout: 180_000 },

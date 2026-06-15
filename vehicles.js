@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
-import { cycleWeapon, damagePlayer, firePistol, fireSMG, fireShotgun, makeExplosion, makeSmokeEmitter, makeVehicle, onCopKilled, raiseWanted, resolveVehicleVsBuildings, saveGame, spawnSkid, updateAmmoHud, updateCop, vehicleName } from './main.js';
+import { tip, cycleWeapon, damagePlayer, firePistol, fireSMG, fireShotgun, makeExplosion, makeSmokeEmitter, makeVehicle, onCopKilled, raiseWanted, resolveVehicleVsBuildings, saveGame, spawnSkid, updateAmmoHud, updateCop, vehicleName } from './main.js';
 
 export function updatePlayerInVehicle(dt) {
   const p = G.player;
@@ -463,6 +463,7 @@ export function updateGarageOwnership(dt) {
     else if (G.input.pressed('KeyC')) repaintVehicle(v);
   } else {
     if (dist2(p.group.position, g.pos) >= g.r * g.r) return;
+    tip('garage', 'Your garage: rent it (E), then drive a car in to store (K) or repaint (C) it; on foot, E brings one back out.', 'อู่รถ');
     if (!garage.rented) {
       G.hud.showPrompt(`Garage — <b>E</b>: rent (฿${PRICE.garageRent.toLocaleString()})`, 0.4);
       if (G.input.pressed('KeyE')) {
