@@ -6,131 +6,17 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { makeAudio } from './audio.js';
 import { makeInput } from './input.js';
+import {
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G,
+  PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir,
+  _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+} from './core.js';
 
 // =============================================================================
 // 0. UTILITIES
 // =============================================================================
 
-// Static-geometry baker: the city is ~7,700 individual static meshes (road
-// stripes, sidewalks, building boxes, window/neon planes…). Rendered one-per
-// draw call that's thousands of calls. The baker accumulates each static piece
-// as a world-space-baked geometry clone, grouped by material, and flushes one
-// merged Mesh per material — collapsing thousands of draw calls into a handful
-// while preserving the exact look (geometry, position and per-material night
-// ramps are all unchanged). Only ever fed provably-static geometry.
-function makeStaticBaker() {
-  const buckets = new Map();  // material -> { geos, cast, receive }
-  return {
-    // geo: a (shared, unmodified) BufferGeometry; matrix: its world transform.
-    add(geo, matrix, material, cast = false, receive = false) {
-      let bk = buckets.get(material);
-      if (!bk) { bk = { geos: [], cast, receive }; buckets.set(material, bk); }
-      bk.geos.push(geo.clone().applyMatrix4(matrix));
-    },
-    flush(scene) {
-      let meshes = 0;
-      for (const [material, bk] of buckets) {
-        if (!bk.geos.length) continue;
-        const merged = mergeGeometries(bk.geos, false);
-        bk.geos.forEach(g => g.dispose());
-        const mesh = new THREE.Mesh(merged, material);
-        mesh.castShadow = bk.cast; mesh.receiveShadow = bk.receive;
-        mesh.frustumCulled = false;   // a merged mesh spans the map; its box can't cull usefully
-        scene.add(mesh);
-        meshes++;
-      }
-      buckets.clear();
-      return meshes;
-    },
-  };
-}
-
-const PI = Math.PI, TAU = PI * 2;
-const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
-const lerp  = (a, b, t) => a + (b - a) * t;
-const rand  = (a, b) => a + Math.random() * (b - a);
-const irand = (a, b) => Math.floor(rand(a, b + 1));
-const pick  = arr => arr[Math.floor(Math.random() * arr.length)];
-const sign  = x => (x > 0 ? 1 : x < 0 ? -1 : 0);
-const dist2 = (a, b) => { const dx = a.x - b.x, dz = a.z - b.z; return dx*dx + dz*dz; };
-
-// Deterministic-ish color palettes per district
-const COLORS = {
-  // Bangkok surfaces are sun-bleached, not charcoal — albedos must survive
-  // daylight without rendering black (see goal2.md phase 1.3).
-  asphalt:  0x34373c,
-  sidewalk: 0x6f6f6f,
-  curb:     0x3a3a3a,
-  building: [0x7a7a88, 0x8d8794, 0x9a8a70, 0x837a7a, 0x6e7077],
-  neon:     [0xff2a86, 0x21f0ff, 0xff7a1a, 0xb24bff, 0xffcf4a, 0x39ff7a],
-  khlong:   0x3a4f3a,
-};
-
-// Global container, populated by init()
-export const G = {
-  THREE, scene: null, camera: null, renderer: null, clock: null,
-  audio: null,           // AudioContext + helpers
-  state: 'loading',      // 'playing' | 'paused' | 'phone' | 'map'
-  input: null,           // keyboard/mouse state
-  player: null,
-  hud: null,
-  mission: null,
-  world: null,           // city geometry + spatial helpers
-  vehicles: [],          // all vehicles in the world (NPC + player)
-  peds: [],
-  dogs: [],
-  cops: [],
-  bullets: [],
-  particles: [],
-  effects: [],
-  time: { dayT: 0.27, weather: 'clear', rainStrength: 0, day: 0 }, // dayT 0..1; day = whole days elapsed
-  // Loy Krathong festival — floats + sky lanterns drift on the river on schedule nights
-  festival: { active: false, floats: [], lanterns: [], announcedDay: -1 },
-  wanted: { stars: 0, lastSeenAt: 0, lastSeenPos: new THREE.Vector3() },
-  cash: 100,
-  notifQueue: [],
-  paused: false,
-  hitStop: 0,            // seconds of slow-mo remaining after a solid hit
-  skids: [],             // tire-skid decals (faded over time)
-  dust: [],              // impact dust puffs
-  groundHelpers: null,
-  // Player property / ownership economy (persisted in the save).
-  econ: {
-    safehouse: { owned: false, pos: null },           // buyable respawn point
-    garage: { rented: false, stored: [], capacity: 4, retrieveIdx: 0 }, // stored: [{kind,color,plate,hp}]
-  },
-};
-
-// Economy prices (one place to balance the money sinks).
-const PRICE = { safehouse: 12000, garageRent: 4000, repaint: 250 };
-// Paint colors offered at the garage.
-const PAINT_COLORS = [0xd44b3b, 0xf3f3f3, 0x2a3a55, 0x1e9a5e, 0xe0b020, 0x101015, 0x8c3a8c, 0x35506e, 0xd96a2a];
-
-window.GAME = G; // for poking around in the console
-
-// -----------------------------------------------------------------------------
-// Shared gameplay helpers + pooled temporaries (reused across the update loop to
-// avoid per-frame allocations). GAMEPLAY flags gate the optional systems so any
-// of them can be turned off with a one-line change.
-// -----------------------------------------------------------------------------
-const ROAD_WIDTH = 12;          // matches buildWorld's local ROAD_W
-const PED_TARGET = 82;          // peak crowd cap; scaled by crowdFactor(dayT) per time of day
-
-const GAMEPLAY = {
-  armor: true,            // armor soaks damage before HP
-  vulnerableOnFoot: true, // cops can hurt the player while on foot
-  pistolOnCopKill: true,  // first cop kill grants the 9mm (per README)
-  wantedLOS: true,        // stars only decay once no cop is within sight
-};
-
-// pooled scratch objects (never returned/stored — copy out before reuse)
-const _camTarget = new THREE.Vector3();
-const _camOffset = new THREE.Vector3();
-const _fireDir   = new THREE.Vector3();
-const _ray       = new THREE.Raycaster();
-const _bbox      = new THREE.Box3();   // scratch AABB for ray-vs-building tests
-const _vBox      = new THREE.Vector3();
-const _blackColor = new THREE.Color(0x111111);
+// (moved to ./core.js)
 
 // pooled fire FX lights (created lazily, reused every shot, decayed in the loop)
 let _muzzleLight = null, _sparkLight = null, _muzzleT = 0, _sparkT = 0;
@@ -184,14 +70,7 @@ function onCopKilled() {
   }
 }
 
-// Free GPU resources for a mesh/group that's leaving the scene for good.
-function disposeObject(obj) {
-  obj.traverse(o => {
-    if (o.geometry) o.geometry.dispose();
-    const m = o.material;
-    if (m) { if (Array.isArray(m)) m.forEach(x => x.dispose()); else m.dispose(); }
-  });
-}
+// (moved to ./core.js)
 
 // =============================================================================
 // 1. AUDIO → ./audio.js
@@ -207,9 +86,7 @@ function disposeObject(obj) {
 // Roads on the grid lines. Sois are smaller cross streets. BTS elevated track
 // runs east-west down the middle on concrete pillars.
 
-const BLOCK = 50;
-const GRID  = 10;
-const HALF  = (BLOCK * GRID) / 2; // 250
+// (moved to ./core.js)
 
 function buildWorld(scene) {
   const world = {
@@ -3359,12 +3236,7 @@ function updatePlayerInVehicle(dt) {
   }
 }
 
-function lerpAngle(a, b, t) {
-  let d = b - a;
-  while (d > PI) d -= TAU;
-  while (d < -PI) d += TAU;
-  return a + d * t;
-}
+// (moved to ./core.js)
 
 function killPed(ped) {
   if (ped.dead) return;

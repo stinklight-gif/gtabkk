@@ -1,7 +1,7 @@
 // =============================================================================
 // INPUT — keyboard set, pointer-lock mouse deltas, edge-detected `pressed`.
 // =============================================================================
-import { G } from './main.js';
+import { G } from './core.js';
 
 export function makeInput() {
   const keys = new Set();
