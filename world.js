@@ -481,6 +481,161 @@ export function buildWorld(scene) {
   addInstanced(antGeo, antMat, antM, false, false);
   addInstanced(dishGeo, dishMat, dishM, false, false);
 
+  // temple + power lines (kept inline to balance file sizes)
+  // ---- Temple compound (wat) — a landmark block with viharn + chedi ----
+  {
+    const cx = (TEMPLE_I + 0.5) * BLOCK;
+    const cz = (TEMPLE_J + 0.5) * BLOCK;
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0xddd0b8, roughness: 0.95 });
+    const wallH = 2.4;
+    const wallExtent = SIDEWALK_EDGE;
+    // perimeter wall with gaps for gates (south + east gates)
+    function wallStrip(x, y, z, sx, sy, sz) {
+      const w = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), wallMat);
+      w.position.set(x, y, z); w.castShadow = true; w.receiveShadow = true; scene.add(w);
+    }
+    // north + west walls full, south + east walls with a gap in the middle (gate)
+    wallStrip(cx, wallH/2, cz + wallExtent, wallExtent*2, wallH, 0.7);
+    wallStrip(cx - wallExtent, wallH/2, cz, 0.7, wallH, wallExtent*2);
+    // south wall: two segments leaving a 4m gate
+    wallStrip(cx - (wallExtent+3)/2, wallH/2, cz - wallExtent, wallExtent - 3, wallH, 0.7);
+    wallStrip(cx + (wallExtent+3)/2, wallH/2, cz - wallExtent, wallExtent - 3, wallH, 0.7);
+    // east wall: two segments leaving a gate
+    wallStrip(cx + wallExtent, wallH/2, cz - (wallExtent+3)/2, 0.7, wallH, wallExtent - 3);
+    wallStrip(cx + wallExtent, wallH/2, cz + (wallExtent+3)/2, 0.7, wallH, wallExtent - 3);
+
+    // Main viharn (hall) — cream walls with stacked golden roofs
+    const viharnMat = new THREE.MeshStandardMaterial({ color: 0xf5ead8, roughness: 0.85 });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0xd9a134, roughness: 0.5, metalness: 0.65 });
+    const viharn = new THREE.Mesh(new THREE.BoxGeometry(13, 5.5, 8), viharnMat);
+    viharn.position.set(cx + 1.5, 2.75, cz + 1);
+    viharn.castShadow = true; viharn.receiveShadow = true; scene.add(viharn);
+    // tiered pyramid roof (3 levels)
+    const r1 = new THREE.Mesh(new THREE.ConeGeometry(9.5, 3.6, 4), roofMat);
+    r1.position.set(cx + 1.5, 7.5, cz + 1); r1.rotation.y = PI/4; r1.castShadow = true; scene.add(r1);
+    const r2 = new THREE.Mesh(new THREE.ConeGeometry(7, 3.0, 4), roofMat);
+    r2.position.set(cx + 1.5, 10.0, cz + 1); r2.rotation.y = PI/4; scene.add(r2);
+    const r3 = new THREE.Mesh(new THREE.ConeGeometry(4.5, 2.6, 4), roofMat);
+    r3.position.set(cx + 1.5, 12.4, cz + 1); r3.rotation.y = PI/4; scene.add(r3);
+    const spire = new THREE.Mesh(new THREE.ConeGeometry(0.3, 2.2, 6), roofMat);
+    spire.position.set(cx + 1.5, 14.8, cz + 1); scene.add(spire);
+
+    // Chedi (white bell-spire) in corner
+    const chediWhiteMat = new THREE.MeshStandardMaterial({ color: 0xf3eede, roughness: 0.75 });
+    const chediGoldMat = new THREE.MeshStandardMaterial({ color: 0xd9a134, roughness: 0.5, metalness: 0.6 });
+    const chediX = cx - 8, chediZ = cz - 6;
+    const cBase = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.8, 3, 12), chediWhiteMat);
+    cBase.position.set(chediX, 1.5, chediZ); cBase.castShadow = true; scene.add(cBase);
+    const cBell = new THREE.Mesh(new THREE.SphereGeometry(1.95, 14, 10, 0, TAU, 0, PI/2), chediWhiteMat);
+    cBell.position.set(chediX, 3.0, chediZ); scene.add(cBell);
+    const cTube = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.7, 2, 8), chediWhiteMat);
+    cTube.position.set(chediX, 5.5, chediZ); scene.add(cTube);
+    const cSpire = new THREE.Mesh(new THREE.ConeGeometry(0.5, 5.5, 8), chediGoldMat);
+    cSpire.position.set(chediX, 9.3, chediZ); scene.add(cSpire);
+
+    // soft warm glow over the temple — a real accent light, cached for day/night
+    const templeLight = new THREE.PointLight(0xffd577, 0.6, 30, 2);
+    templeLight.position.set(cx, 7, cz);
+    scene.add(templeLight);
+    G.nightLights.push({ light: templeLight, base: 0.8 });
+
+    // collision: viharn + chedi base
+    world.buildings.push({
+      pos: new THREE.Vector3(cx + 1.5, 2.75, cz + 1),
+      size: new THREE.Vector3(13, 5.5, 8),
+      mesh: viharn,
+    });
+    world.buildings.push({
+      pos: new THREE.Vector3(chediX, 4.5, chediZ),
+      size: new THREE.Vector3(5, 9, 5),
+      mesh: cBase,
+    });
+    world.poi.temple = new THREE.Vector3(cx, 0, cz);
+  }
+
+  // ---- Power lines: utility poles + tangled overhead wires (the Bangkok cue) ----
+  const poleMat = new THREE.MeshStandardMaterial({ color: 0x554a3e, roughness: 0.9 });
+  const wireMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.95 });
+  const junctionMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.9 });
+  const POLE_H = 6.4, POLE_R = 0.13;
+  const POLE_SPACING = 28;
+  // shared geometries (reuse across many poles)
+  const poleGeo = new THREE.CylinderGeometry(POLE_R*0.85, POLE_R, POLE_H, 6);
+  const armGeoEW = new THREE.BoxGeometry(1.6, 0.10, 0.10);
+  const armGeoNS = new THREE.BoxGeometry(0.10, 0.10, 1.6);
+  const junctionGeo = new THREE.BoxGeometry(0.32, 0.5, 0.28);
+  const wireGeo = new THREE.CylinderGeometry(0.035, 0.035, 1, 4); // unit; scaled in Y
+  // Instancing accumulators — one Matrix4 per instance, built into InstancedMeshes below.
+  const poleM = [], armEWM = [], armNSM = [], junctionM = [], wireM = [];
+
+  function makePole(x, z, isEW) {
+    _q.identity(); _s.set(1, 1, 1);
+    _p.set(x, POLE_H/2, z);
+    poleM.push(_m.compose(_p, _q, _s).clone());
+    _p.set(x, POLE_H - 0.55, z);
+    (isEW ? armEWM : armNSM).push(_m.compose(_p, _q, _s).clone());
+    if (Math.random() < 0.4) {
+      _p.set(x, 4.0 + rand(-0.3, 0.4), z);
+      junctionM.push(_m.compose(_p, _q, _s).clone());
+    }
+  }
+
+  function makeWire(x1, z1, x2, z2, y, lateral, isEW) {
+    const dx = x2 - x1, dz = z2 - z1;
+    const len = Math.hypot(dx, dz);
+    if (len < 1 || len > POLE_SPACING * 1.6) return;
+    let cx, cz;
+    if (isEW) { cx = (x1+x2)/2; cz = (z1+z2)/2 + lateral; }
+    else      { cx = (x1+x2)/2 + lateral; cz = (z1+z2)/2; }
+    _p.set(cx, y, cz);
+    // unit cylinder long-axis is Y; scale Y by length, then rotate to run along road
+    _q.setFromEuler(_e.set(isEW ? 0 : PI/2, 0, isEW ? PI/2 : 0));
+    _s.set(1, len, 1);
+    wireM.push(_m.compose(_p, _q, _s).clone());
+  }
+
+  // Poles along EW roads — on both sidewalks (north & south of each road)
+  for (let i = -GRID/2; i <= GRID/2; i++) {
+    const zRoad = i * BLOCK;
+    for (const zSign of [-1, +1]) {
+      const zPole = zRoad + zSign * 8.5;
+      let prevX = null;
+      for (let x = -HALF + 14; x <= HALF - 14; x += POLE_SPACING) {
+        makePole(x, zPole, true);
+        if (prevX !== null) {
+          for (const off of [-0.55, 0, 0.55]) {
+            makeWire(prevX, zPole, x, zPole, POLE_H - 0.7 + rand(-0.05, 0.05), off, true);
+          }
+        }
+        prevX = x;
+      }
+    }
+  }
+  // Poles along NS roads
+  for (let i = -GRID/2; i <= GRID/2; i++) {
+    const xRoad = i * BLOCK;
+    for (const xSign of [-1, +1]) {
+      const xPole = xRoad + xSign * 8.5;
+      let prevZ = null;
+      for (let z = -HALF + 14; z <= HALF - 14; z += POLE_SPACING) {
+        makePole(xPole, z, false);
+        if (prevZ !== null) {
+          for (const off of [-0.55, 0, 0.55]) {
+            makeWire(xPole, prevZ, xPole, z, POLE_H - 0.7 + rand(-0.05, 0.05), off, false);
+          }
+        }
+        prevZ = z;
+      }
+    }
+  }
+  // Build power-line InstancedMeshes (poles cast+receive shadow like the originals)
+  addInstanced(poleGeo, poleMat, poleM, true, true);
+  addInstanced(armGeoEW, poleMat, armEWM, false, false);
+  addInstanced(armGeoNS, poleMat, armNSM, false, false);
+  addInstanced(junctionGeo, junctionMat, junctionM, false, false);
+  addInstanced(wireGeo, wireMat, wireM, false, false);
+
+
   buildLandmarks({ scene, world, _m, _m2, _p, _q, _s, _e, addInstanced, bakeGroup, TEMPLE_I, TEMPLE_J, GARAGE_I, GARAGE_J, SAFE_I, SAFE_J, RIVER_I, YAO_I, YAO_J0, YAO_J1, GUN_I, GUN_J, SIDEWALK_EDGE });
   // ---- Flush static-geometry bakers → a handful of merged meshes ----
   // Everything routed through `baker`/`flatBaker` above (road stripes, sidewalks,

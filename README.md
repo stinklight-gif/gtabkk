@@ -122,18 +122,38 @@ Mission rewards were bumped to feed this economy (Soi Run ฿2,500, The Hit
 
 ## Architecture
 
-The engine is being pulled out of one file into native ES modules (no bundler —
-the importmap resolves them, same "serve the folder and it runs" deal):
+The engine is split into native ES modules — no bundler, the importmap resolves
+them, same "serve the folder and it runs" deal. `core.js` holds the shared
+primitives (helpers, constants, the global game object `G`, pooled scratch); the
+rest import from it, and `main.js` is a re-export barrel so any module can pull a
+gameplay function from `./main.js` without caring which module defines it. Every
+file is under ~800 lines.
 
 - `index.html` — DOM shell, HUD overlays, importmap.
-- `audio.js` — procedural Web Audio (engine loopers, SFX, car radio). Standalone.
+- `core.js` — helpers, constants, palettes, `G` (`window.GAME`), scratch, the
+  static-geometry baker, `disposeObject`, `lerpAngle`. Pure leaf.
+- `audio.js` — procedural Web Audio (engine loopers, SFX, the car radio).
 - `input.js` — keyboard set + pointer-lock mouse deltas + edge-detected `pressed`.
-- `main.js` — the rest of the engine (world, vehicles, NPCs, combat, missions,
-  HUD, loop, …), still organised into the numbered sections below. Extracting
-  the remaining sections (notably the ~1.4k-line `buildWorld`) into their own
-  modules is in progress.
+- `world.js` — `buildWorld`: grid/roads/sidewalks/buildings, instancing, the
+  static-merge baker, window texture + minimap base.
+- `worldLandmarks.js` — `buildLandmarks(env)`: BTS, river, garage, safehouse,
+  gun shop, Yaowarat, shrines, collectibles, food/armor pickups… (the inline
+  landmark blocks, fed `buildWorld`'s locals via `env`).
+- `entities.js` — player/camera/vehicle/NPC mesh makers + spawns + rain.
+- `player.js` — on-foot player update + interaction (enter/exit, 7-Eleven,
+  safehouse, gun shop).
+- `vehicles.js` — vehicle update loops, chase camera, garage store/retrieve/repaint.
+- `npcs.js` — peds/dogs/crowd/clusters/muggings/spikes/vigilante.
+- `combat.js` — melee + guns + bullets.
+- `wanted.js` — cops + wanted system + game-over/respawn.
+- `missions.js` — the stage-based mission system.
+- `hud.js` — HUD bindings + full-map render.
+- `physics.js` — collision resolvers + skid/dust/smoke/explosion FX.
+- `daynight.js` — day/night/weather + the Loy Krathong festival.
+- `main.js` — the entry: init/save, taxi, radio, photo mode, the main loop,
+  boot, and the re-export barrel.
 
-`main.js` sections:
+The original numbered sections (now spread across those modules):
 
 | § | Section | Notes |
 |---|---|---|
