@@ -31,4 +31,6 @@ jobs:
             smoke_3am.png
             smoke_festival.png
             smoke_songkran.png
+            smoke_waypoint.png
+            smoke_map.png
           if-no-files-found: ignore

@@ -6,6 +6,43 @@ import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 
+// -----------------------------------------------------------------------------
+// Shared map glyphs + colors, used by BOTH the always-on minimap (drawMinimap
+// below) and the TAB full map (main.js drawFullMap). Each is a 2D-canvas draw
+// centered at (x,y) in the *current* transform; `s` is the glyph half-size and
+// `filled` means owned/rented (solid) vs. for-sale/for-rent (hollow outline).
+// -----------------------------------------------------------------------------
+export const HOME_COLOR = '#4fe3c0';     // Home / Safehouse (teal)
+export const GARAGE_COLOR = '#5b9cff';   // Garage / U-Spray (blue)
+
+export function drawHouseGlyph(ctx, x, y, s, color, filled) {
+  ctx.beginPath();                       // a little house silhouette (body + roof)
+  ctx.moveTo(x - s, y + s);
+  ctx.lineTo(x - s, y - s * 0.15);
+  ctx.lineTo(x, y - s);                  // roof apex
+  ctx.lineTo(x + s, y - s * 0.15);
+  ctx.lineTo(x + s, y + s);
+  ctx.closePath();
+  if (filled) { ctx.fillStyle = color; ctx.fill(); }
+  ctx.strokeStyle = color; ctx.lineWidth = Math.max(1, s * 0.3); ctx.stroke();
+}
+
+export function drawGarageGlyph(ctx, x, y, s, color, filled) {
+  ctx.beginPath();                       // a box with roller-door slats
+  ctx.rect(x - s, y - s, s * 2, s * 2);
+  if (filled) { ctx.fillStyle = color; ctx.fill(); }
+  ctx.strokeStyle = color; ctx.lineWidth = Math.max(1, s * 0.26); ctx.stroke();
+  ctx.strokeStyle = filled ? 'rgba(8,12,20,0.7)' : color;
+  ctx.lineWidth = Math.max(0.6, s * 0.16);
+  ctx.beginPath();
+  for (let i = -1; i <= 1; i++) { ctx.moveTo(x - s * 0.6, y + i * s * 0.5); ctx.lineTo(x + s * 0.6, y + i * s * 0.5); }
+  ctx.stroke();
+}
+
+// pooled scratch for the on-screen waypoint projection (module-private — it
+// never leaks onto window.GAME, per the goal's guardrails).
+const _wp = new THREE.Vector3();
+
 // 9. HUD BINDINGS
 // =============================================================================
 
@@ -19,6 +56,11 @@ export function bindHud() {
   const notif = document.getElementById('notif');
   const phone = document.getElementById('phone');
   const crosshair = document.getElementById('crosshair');
+  const waypoint = document.getElementById('waypoint');
+  const wpArrow = document.getElementById('wp-arrow');
+  const wpLabel = document.getElementById('wp-label');
+  const wpDist = document.getElementById('wp-dist');
+  const radioChip = document.getElementById('radio-chip');
   let subT = 0, promptT = 0, notifT = 0;
 
   function setStars(n) {
@@ -93,8 +135,10 @@ export function bindHud() {
     // draw base
     mctx.clearRect(0,0,256,256);
     // center the world on the player by translating
-    const ppx = (player.group.position.x + HALF) * (256 / (HALF*2));
-    const ppy = (player.group.position.z + HALF) * (256 / (HALF*2));
+    const SCALE = 256 / (HALF * 2);                 // world metres → minimap px
+    const ppx = (player.group.position.x + HALF) * SCALE;
+    const ppy = (player.group.position.z + HALF) * SCALE;
+    const mm = p => [(p.x + HALF) * SCALE - ppx, (p.z + HALF) * SCALE - ppy];
     mctx.save();
     mctx.translate(128, 128);
     // rotate by camera yaw so up = forward
@@ -141,6 +185,12 @@ export function bindHud() {
       const y = (v.pos.z + HALF) * (256 / (HALF*2));
       mctx.beginPath(); mctx.arc(x - ppx, y - ppy, 2.5, 0, TAU); mctx.fill();
     }
+    // Home + Garage icons — inside the transform so they translate + rotate with
+    // the map exactly like the dots above. State-coded: filled once owned/rented.
+    const shPos = G.world.poi && G.world.poi.safehouse;
+    if (shPos) { const [hx, hy] = mm(shPos); drawHouseGlyph(mctx, hx, hy, 5, HOME_COLOR, !!(G.econ.safehouse && G.econ.safehouse.owned)); }
+    const ga0 = G.world.garages && G.world.garages[0];
+    if (ga0 && ga0.pos) { const [gx, gy] = mm(ga0.pos); drawGarageGlyph(mctx, gx, gy, 4.5, GARAGE_COLOR, !!(G.econ.garage && G.econ.garage.rented)); }
     mctx.restore();
     // player blip (always center, facing up)
     mctx.fillStyle = '#21f0ff';
@@ -157,9 +207,71 @@ export function bindHud() {
     document.getElementById('compass').textContent = dirs[idx];
   }
 
+  // On-screen objective waypoint: a pill at the projected marker with a live
+  // distance, or an edge-clamped arrow that points to it when it's off-screen.
+  // Complements the 3D pillar-of-light beam; only shown while actually playing.
+  function drawWaypoint() {
+    if (!waypoint) return;
+    if (G.state !== 'playing') { waypoint.classList.remove('show'); return; }
+    // Target priority: the active mission marker, then an active taxi fare.
+    let target = null, color = '#ff2a86', label = 'Objective';
+    const m = G.mission && G.mission.active;
+    if (m && m.markerPos) { target = m.markerPos; color = '#ff2a86'; label = m.name || 'Objective'; }
+    else if (G.taxi && G.taxi.stage && G.taxi.stage !== 'idle' && G.taxi.markerPos) {
+      target = G.taxi.markerPos; color = '#39ff7a'; label = G.taxi.stage === 'toDropoff' ? 'Drop-off' : 'Pick-up';
+    }
+    if (!target) { waypoint.classList.remove('show'); return; }
+
+    const cam = G.camera;
+    const W = window.innerWidth, H = window.innerHeight, margin = 46;
+    const ty = (target.y || 0) + 2;                  // aim ~2 m up, like the beam
+    // project() returns flipped/garbage NDC for points behind the camera, so test
+    // for that first (dot of camera→target with the camera forward direction).
+    cam.getWorldDirection(_wp);                      // borrow _wp as the forward vec
+    const behind = ((target.x - cam.position.x) * _wp.x + (ty - cam.position.y) * _wp.y + (target.z - cam.position.z) * _wp.z) < 0;
+    _wp.set(target.x, ty, target.z).project(cam);    // → NDC (x,y,z in [-1,1])
+    const sx = (_wp.x * 0.5 + 0.5) * W;
+    const sy = (-_wp.y * 0.5 + 0.5) * H;
+
+    const pp = (G.player.inVehicle && G.player.inVehicle.pos) || G.player.group.position;
+    const distM = Math.round(Math.hypot(target.x - pp.x, target.z - pp.z));
+
+    const onScreen = !behind && sx >= margin && sx <= W - margin && sy >= margin && sy <= H - margin;
+    if (onScreen) {
+      wpArrow.style.display = 'none';
+      waypoint.style.left = sx + 'px';
+      waypoint.style.top = sy + 'px';
+    } else {
+      // off-screen: project the screen-space direction (flip NDC if behind) and
+      // clamp the pill to the screen-edge rectangle, arrow rotated toward target.
+      let ndx = _wp.x, ndy = _wp.y;
+      if (behind) { ndx = -ndx; ndy = -ndy; }
+      let dirX = ndx, dirY = -ndy;                   // NDC → screen (y axis flips)
+      const len = Math.hypot(dirX, dirY) || 1; dirX /= len; dirY /= len;
+      const reach = Math.min((W / 2 - margin) / (Math.abs(dirX) || 1e-6), (H / 2 - margin) / (Math.abs(dirY) || 1e-6));
+      waypoint.style.left = (W / 2 + dirX * reach) + 'px';
+      waypoint.style.top = (H / 2 + dirY * reach) + 'px';
+      wpArrow.style.display = 'inline-block';
+      wpArrow.style.transform = 'rotate(' + (Math.atan2(dirX, -dirY) * 180 / PI) + 'deg)';
+    }
+    wpLabel.textContent = label;
+    wpDist.textContent = distM + ' m';
+    waypoint.style.borderColor = color;
+    wpArrow.style.color = color;
+    waypoint.classList.add('show');
+  }
+
+  // Persistent radio chip near the minimap: shown while driving with a station
+  // tuned in; hidden on foot or at RADIO OFF. Called from main.js updateRadio.
+  function setRadioChip(text) {
+    if (!radioChip) return;
+    if (text) { radioChip.textContent = text; radioChip.classList.add('show'); }
+    else radioChip.classList.remove('show');
+  }
+
   return {
     setStars, flashWanted, setCash, setBars, setAmmo, setMissionText, setClock, setWeather, setCrosshair, setPhoneStats, setVehicle,
-    showSubtitle, showPrompt, showNotif, togglePhone, update, drawMinimap
+    showSubtitle, showPrompt, showNotif, togglePhone, update, drawMinimap, drawWaypoint, setRadioChip
   };
 }
 

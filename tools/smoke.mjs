@@ -39,6 +39,8 @@ const SHOTS = [
   { name: 'smoke_3am.png',   dayT: 0.13 },  // ~03:00 — dead streets (same spot as noon)
   { name: 'smoke_festival.png', dayT: 0.9, festival: true },  // Loy Krathong on the river
   { name: 'smoke_songkran.png', dayT: 0.5, songkran: true },  // Songkran water fight in the street
+  { name: 'smoke_waypoint.png', dayT: 0.5, waypoint: true },  // objective waypoint + radio chip, in a car
+  { name: 'smoke_map.png',      dayT: 0.5, tabmap: true   },  // TAB full map: icons, legend, objective line
 ];
 // Extra one-off shots for tuning, e.g. SMOKE_SHOTS="dawn=0.30,dusk=0.78"
 // (these don't run in CI — only the two standard shots above are asserted).
@@ -99,7 +101,7 @@ async function main() {
     console.log('game started');
 
     for (const shot of SHOTS) {
-      await page.evaluate(({ dayT, festival, songkran }) => {
+      await page.evaluate(({ dayT, festival, songkran, waypoint, tabmap }) => {
         const GAME = window.GAME;
         GAME.state = 'playing';                                  // force-resume if pointer lock dropped
         document.getElementById('pause').classList.remove('show');
@@ -116,6 +118,25 @@ async function main() {
           GAME.time.day = 0;                                     // day % 4 === 0 + midday → Songkran
           GAME.player.group.position.set(0, 0, -130);
           GAME.camRig.yaw = Math.PI; GAME.camRig.pitch = -0.04;  // street full of splashing peds
+        } else if (waypoint || tabmap) {
+          // objective waypoint + radio chip: set a mission marker, drop into a car
+          GAME.player.group.position.set(0, 0, -110);
+          GAME.mission.active = { name: 'Soi Run', markerPos: new GAME.THREE.Vector3(10, 0, -55) };
+          if (GAME.taxi) GAME.taxi.stage = 'idle';
+          const car = GAME.vehicles.find(v => !v.driver && !v.dead && v.spec);
+          if (car) {
+            car.pos.set(0, 0, -110); if (car.group) car.group.position.copy(car.pos);
+            car.heading = 0; car.vel = 0;                        // heading 0 → chase cam settles to yaw PI
+            GAME.player.inVehicle = car; car.driver = 'player'; car.npc = null;
+            GAME.player.group.visible = false;
+          }
+          if (GAME.audio && GAME.audio.radio && GAME.audio.radio.station === 0) GAME.audio.radio.next();
+          GAME.camRig.yaw = Math.PI; GAME.camRig.pitch = -0.06;
+          if (tabmap) {                                          // open the full-screen TAB map overlay
+            GAME.showMap = true;
+            document.getElementById('fullmap-wrap').classList.add('show');
+            GAME.state = 'map';
+          }
         } else {
           GAME.player.group.position.set(0, 0, -130);            // street level, mid-map
           GAME.camRig.yaw = Math.PI; GAME.camRig.pitch = -0.02;  // aim down the street
@@ -123,7 +144,7 @@ async function main() {
         GAME.camRig.shake = 0;
         if (GAME.resyncCrowd) GAME.resyncCrowd();                // snap crowd to this hour (busy noon vs dead 3am)
       }, shot);
-      await waitFrames(page, (shot.festival || shot.songkran) ? 24 : 14);  // let day/night + camera (+ festival) settle
+      await waitFrames(page, (shot.festival || shot.songkran || shot.waypoint || shot.tabmap) ? 24 : 14);  // let day/night + camera (+ festival/map) settle
       await page.screenshot({ path: path.join(ROOT, shot.name), timeout: 120_000 });
       const size = fs.statSync(path.join(ROOT, shot.name)).size;
       const calls = await page.evaluate(() => window.GAME.renderer.info.render.calls);
