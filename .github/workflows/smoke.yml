@@ -34,4 +34,5 @@ jobs:
             smoke_waypoint.png
             smoke_map.png
             smoke_mall.png
+            smoke_bts.png
           if-no-files-found: ignore
