@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
-import { tip, resolvePlayerVsBuildings, resolvePlayerVsVehicles, saveGame, updateAmmoHud, updateCombat, updatePlayerInVehicle } from './main.js';
+import { tip, resolvePlayerVsBuildings, resolvePlayerVsVehicles, resolvePlayerVsMall, mallSupportY, saveGame, updateAmmoHud, updateCombat, updatePlayerInVehicle } from './main.js';
 
 export function updatePlayer(dt) {
   const p = G.player;
@@ -44,10 +44,15 @@ export function updatePlayer(dt) {
     p.velocity.y -= 18 * dt;
   }
   p.group.position.addScaledVector(p.velocity, dt);
-  if (p.group.position.y <= 0) { p.group.position.y = 0; p.velocity.y = 0; p.grounded = true; }
 
   resolvePlayerVsBuildings(p);
   resolvePlayerVsVehicles(p);
+  resolvePlayerVsMall(p);
+  // Vertical support: city ground (y=0) or a Terminal 21 floor / escalator under
+  // the player's feet. Walk off an edge → support drops → you fall.
+  const gy = mallSupportY(p.group.position.x, p.group.position.z, p.group.position.y);
+  if (p.group.position.y <= gy + 0.02) { p.group.position.y = gy; p.velocity.y = 0; p.grounded = true; }
+  else p.grounded = false;
 
   // body face direction of movement (or aim if firing)
   if (p.activeWeapon === 'pistol' && G.input.rightDown) {
@@ -211,28 +216,42 @@ export function shopItems(name) {
   const heal = n => () => { p.hp = Math.min(p.hpMax, p.hp + n); };
   const fullStam = () => { p.stam = p.stamMax; };
   const fullArmor = () => { p.armor = p.armorMax; };
-  switch (name) {
-    case 'Pier 21 Food Court': return [
+  const tee = hex => () => setShirt(hex);
+  const CAT = {
+    'Pier 21 Food Court': 'food', 'Sushi Bar': 'food', 'Manga Café': 'food', 'Le Café': 'food',
+    'Tokyo Tech': 'gear', 'Akihabara Arcade': 'gear',
+    'Paris Pharmacy': 'meds',
+    'Roma Boutique': 'clothes', 'London Threads': 'clothes2', 'Watch Boutique': 'clothes2',
+  };
+  switch (CAT[name] || 'convenience') {
+    case 'food': return [
       { label: 'Pad Thai · +60 HP',       cost: 40,  effect: heal(60) },
       { label: 'Som Tam · +35 HP',        cost: 25,  effect: heal(35) },
       { label: 'Thai Iced Tea · stamina', cost: 20,  effect: fullStam },
     ];
-    case 'Tokyo Tech': return [
+    case 'gear': return [
       { label: 'Body Armor · full',       cost: 200, effect: fullArmor },
       { label: 'Pistol Ammo · +30',       cost: 150, need: () => p.weapons && p.weapons.pistol, effect: () => { p.pistolReserve += 30; updateAmmoHud(); } },
       { label: 'Energy Drink · stamina',  cost: 30,  effect: fullStam },
     ];
-    case 'Paris Pharmacy': return [
+    case 'meds': return [
       { label: 'First-Aid Kit · full HP', cost: 120, effect: () => { p.hp = p.hpMax; } },
       { label: 'Painkillers · +45 HP',    cost: 40,  effect: heal(45) },
       { label: 'Vitamins · stamina',      cost: 25,  effect: fullStam },
     ];
-    case 'Roma Boutique': return [
-      { label: '👕 Crimson Tee',  cost: 150, effect: () => setShirt(0xb02a2a) },
-      { label: '👕 Azure Shirt',  cost: 150, effect: () => setShirt(0x2a5aad) },
-      { label: '👕 Emerald Polo', cost: 180, effect: () => setShirt(0x1e9a5e) },
-      { label: '🧥 Gold Jacket',  cost: 400, effect: () => setShirt(0xe0b020) },
-      { label: '🖤 Noir Black',   cost: 120, effect: () => setShirt(0x161616) },
+    case 'clothes': return [
+      { label: '👕 Crimson Tee',  cost: 150, effect: tee(0xb02a2a) },
+      { label: '👕 Azure Shirt',  cost: 150, effect: tee(0x2a5aad) },
+      { label: '👕 Emerald Polo', cost: 180, effect: tee(0x1e9a5e) },
+      { label: '🧥 Gold Jacket',  cost: 400, effect: tee(0xe0b020) },
+      { label: '🖤 Noir Black',   cost: 120, effect: tee(0x161616) },
+    ];
+    case 'clothes2': return [
+      { label: '👕 Royal Purple',  cost: 200, effect: tee(0x7a3aad) },
+      { label: '👕 Sunset Orange', cost: 180, effect: tee(0xe06a20) },
+      { label: '👕 Ivory White',   cost: 160, effect: tee(0xeae0d0) },
+      { label: '🧥 Teal Bomber',   cost: 350, effect: tee(0x1f9aa0) },
+      { label: '🖤 Charcoal',      cost: 140, effect: tee(0x2a2e34) },
     ];
     default: return [                                  // 7-Eleven / convenience
       { label: 'Snack · +40 HP',          cost: 20,  effect: heal(40) },
@@ -283,11 +302,12 @@ export function updateMall(dt) {
   if (!mall) return;
   const inside = Math.abs(p.group.position.x - mall.center.x) < mall.hw
               && Math.abs(p.group.position.z - mall.center.z) < mall.hd;
-  if (inside && !G._inMall) { G._inMall = true; G.hud.showSubtitle('Terminal 21', 'เทอร์มินอล 21', 2.2); tip('mall', 'Terminal 21 — each floor is a world city. Walk up to a shop and press E to browse.', 'เทอร์มินอล 21'); }
+  if (inside && !G._inMall) { G._inMall = true; G.hud.showSubtitle('Terminal 21', 'เทอร์มินอล 21', 2.2); tip('mall', 'Terminal 21 — 3 floors, each a world city. Ride the escalators; press E at a shop to browse.', 'เทอร์มินอล 21'); }
   else if (!inside && G._inMall) G._inMall = false;
   if (!inside) return;
   for (const s of mall.shops) {
-    if (dist2(p.group.position, s.pos) < 3.2 * 3.2) {
+    // floor-aware: a shop only triggers on its own level, not from the floor below
+    if (dist2(p.group.position, s.pos) < 3.2 * 3.2 && Math.abs(p.group.position.y - s.pos.y) < 2.5) {
       G.hud.showPrompt(`Press <b>E</b> to browse <b>${s.name}</b>`, 0.4);
       if (G.input.pressed('KeyE')) openStore(s.name);
       return;
