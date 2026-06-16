@@ -204,14 +204,77 @@ export function update7Eleven(dt) {
   }
 }
 
-// Shared store-overlay opener: shows #store with a per-shop title (the convenience
-// stock is shared for now). Used by the 7-Eleven and every Terminal 21 shop front.
+// Shared store overlay. Each shop has its own themed inventory (the convenience
+// stock is the default, used by every 7-Eleven). Buttons are generated per shop.
+export function shopItems(name) {
+  const p = G.player;
+  const heal = n => () => { p.hp = Math.min(p.hpMax, p.hp + n); };
+  const fullStam = () => { p.stam = p.stamMax; };
+  const fullArmor = () => { p.armor = p.armorMax; };
+  switch (name) {
+    case 'Pier 21 Food Court': return [
+      { label: 'Pad Thai · +60 HP',       cost: 40,  effect: heal(60) },
+      { label: 'Som Tam · +35 HP',        cost: 25,  effect: heal(35) },
+      { label: 'Thai Iced Tea · stamina', cost: 20,  effect: fullStam },
+    ];
+    case 'Tokyo Tech': return [
+      { label: 'Body Armor · full',       cost: 200, effect: fullArmor },
+      { label: 'Pistol Ammo · +30',       cost: 150, need: () => p.weapons && p.weapons.pistol, effect: () => { p.pistolReserve += 30; updateAmmoHud(); } },
+      { label: 'Energy Drink · stamina',  cost: 30,  effect: fullStam },
+    ];
+    case 'Paris Pharmacy': return [
+      { label: 'First-Aid Kit · full HP', cost: 120, effect: () => { p.hp = p.hpMax; } },
+      { label: 'Painkillers · +45 HP',    cost: 40,  effect: heal(45) },
+      { label: 'Vitamins · stamina',      cost: 25,  effect: fullStam },
+    ];
+    case 'Roma Boutique': return [
+      { label: '👕 Crimson Tee',  cost: 150, effect: () => setShirt(0xb02a2a) },
+      { label: '👕 Azure Shirt',  cost: 150, effect: () => setShirt(0x2a5aad) },
+      { label: '👕 Emerald Polo', cost: 180, effect: () => setShirt(0x1e9a5e) },
+      { label: '🧥 Gold Jacket',  cost: 400, effect: () => setShirt(0xe0b020) },
+      { label: '🖤 Noir Black',   cost: 120, effect: () => setShirt(0x161616) },
+    ];
+    default: return [                                  // 7-Eleven / convenience
+      { label: 'Snack · +40 HP',          cost: 20,  effect: heal(40) },
+      { label: 'Energy Drink · stamina',  cost: 30,  effect: fullStam },
+      { label: 'Body Armor · full',       cost: 200, effect: fullArmor },
+    ];
+  }
+}
+
+// Player cosmetic: recolor the shirt (the torso + arms share one material).
+export function setShirt(hex) {
+  G._shirtColor = hex;
+  const t = G.player && G.player.torso;
+  if (t && t.material && t.material.color) t.material.color.setHex(hex);
+}
+
 export function openStore(title) {
   const h = document.querySelector('#store h3');
   if (h) h.textContent = title.toUpperCase();
+  const box = document.getElementById('store-items');
+  if (box) {
+    box.innerHTML = '';
+    for (const it of shopItems(title)) {
+      if (it.need && !it.need()) continue;
+      const btn = document.createElement('button');
+      btn.textContent = `${it.label} — ฿${it.cost.toLocaleString()}`;
+      btn.addEventListener('click', () => buyItem(it));
+      box.appendChild(btn);
+    }
+  }
   G.state = 'store';
   document.getElementById('store').classList.add('show');
   document.exitPointerLock();
+}
+
+export function buyItem(it) {
+  const p = G.player;
+  if (G.cash < it.cost) { G.hud.showNotif('Not enough cash'); return; }
+  G.cash -= it.cost; G.hud.setCash(G.cash);
+  it.effect();
+  G.hud.setBars(p.hp, p.armor, p.stam);
+  if (G.audio && G.audio.chime) G.audio.chime();
 }
 
 // Terminal 21 — walk in (no door key), then E at a shop front to browse it.
@@ -263,16 +326,6 @@ export function updateSafehouse(dt) {
 export function markSafehouseOwned() {
   const m = G.world.safehouseSign;
   if (m) { m.color.setHex(0x39ff7a); m.emissive.setHex(0x39ff7a); }   // FOR SALE → HOME
-}
-
-export function storeBuy(item) {
-  const p = G.player;
-  let ok = false;
-  if (item === 'snack' && G.cash >= 20) { G.cash -= 20; p.hp = Math.min(p.hpMax, p.hp + 40); ok = true; }
-  else if (item === 'drink' && G.cash >= 30) { G.cash -= 30; p.stam = p.stamMax; ok = true; }
-  else if (item === 'vest' && G.cash >= 200) { G.cash -= 200; p.armor = p.armorMax; ok = true; }
-  if (ok) { G.hud.setCash(G.cash); G.audio.chime(); }
-  else G.hud.showNotif('Not enough cash');
 }
 
 // Gun shop: on foot in the shop zone, E buys the next thing you need (then ammo).

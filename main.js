@@ -8,7 +8,7 @@ import { makeAudio } from './audio.js';
 import { makeInput } from './input.js';
 export * from './player.js';
 import {
-  markSafehouseOwned, storeBuy, update7Eleven, updateBTS, updateCollectibles, updateDistrict, updateGunShop, updateInteraction, updatePlayer, updateSafehouse, vehicleName
+  markSafehouseOwned, setShirt, update7Eleven, updateBTS, updateCollectibles, updateDistrict, updateGunShop, updateInteraction, updatePlayer, updateSafehouse, vehicleName
 } from './player.js';
 export * from './vehicles.js';
 import {
@@ -165,6 +165,7 @@ export function saveGame() {
       safehouseOwned: !!G.econ.safehouse.owned,
       garageRented: !!G.econ.garage.rented,
       garageStored: G.econ.garage.stored,
+      shirtColor: G._shirtColor,
     }));
   } catch (e) { /* storage unavailable — ignore */ }
 }
@@ -226,6 +227,7 @@ export function loadGame() {
       .map(v => ({ kind: v.kind, color: v.color | 0, plate: String(v.plate || ''), hp: typeof v.hp === 'number' ? v.hp : 100 }))
       .slice(0, G.econ.garage.capacity);
   }
+  if (typeof s.shirtColor === 'number') setShirt(s.shirtColor);   // restore bought outfit
   G.hud.setCash(G.cash);
   updateAmmoHud();
 }
@@ -429,12 +431,9 @@ async function init() {
   const optVol = document.getElementById('opt-vol');
   if (optVol) optVol.addEventListener('input', e => { G.settings.volume = parseFloat(e.target.value); applySettings(); saveSettings(); });
 
-  // 7-Eleven store overlay buttons
-  const sbind = (id, fn) => { const el = document.getElementById(id); if (el) el.addEventListener('click', fn); };
-  sbind('buy-snack', () => storeBuy('snack'));
-  sbind('buy-drink', () => storeBuy('drink'));
-  sbind('buy-vest', () => storeBuy('vest'));
-  sbind('store-leave', () => { document.getElementById('store').classList.remove('show'); G.state = 'playing'; G.input.requestLock(); });
+  // Store overlay "Leave" button (item buttons are generated per shop in openStore)
+  const leaveBtn = document.getElementById('store-leave');
+  if (leaveBtn) leaveBtn.addEventListener('click', () => { document.getElementById('store').classList.remove('show'); G.state = 'playing'; G.input.requestLock(); });
 
   // Restore saved progress, then autosave on unload
   // (loadGame is deferred until a slot is chosen in the menu)

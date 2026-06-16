@@ -100,33 +100,52 @@ async function main() {
     assert(walked.z > southWallZ + 2, `player walked through the entrance into the atrium (z ${start.z.toFixed(1)} → ${walked.z.toFixed(1)}, past ${southWallZ})`);
     assert(walked.inMall, 'inside-the-mall flag set after walking in');
 
-    // ---- 3. Browse a shop front + buy ----------------------------------------
-    console.log('\n[3] browse a shop + buy');
+    // ---- 3. Browse the food court: its own menu + buy ------------------------
+    console.log('\n[3] shop has its own menu + buy');
     const shop0 = await page.evaluate(() => {
       const GAME = window.GAME;
       GAME.state = 'playing'; document.getElementById('pause').classList.remove('show');
-      const s = GAME.world.mall.shops[0];
-      GAME.player.group.position.set(s.pos.x, 0, s.pos.z);   // stand at the shop front
+      const s = GAME.world.mall.shops[0];                    // Pier 21 Food Court
+      GAME.player.group.position.set(s.pos.x, 0, s.pos.z);
       GAME.player.velocity.set(0, 0, 0);
-      GAME.cash = 1000; GAME.player.hp = 10;                 // set up a measurable buy
+      GAME.cash = 2000; GAME.player.hp = 10;                 // set up a measurable buy
       GAME.hud.setCash(GAME.cash);
       return { name: s.name };
     });
-    await page.keyboard.down('KeyE');
-    await waitFrames(page, 3);
-    await page.keyboard.up('KeyE');
-    await waitFrames(page, 3);
+    await page.keyboard.down('KeyE'); await waitFrames(page, 3); await page.keyboard.up('KeyE'); await waitFrames(page, 3);
     const browse = await page.evaluate(() => ({
       state: window.GAME.state,
       shown: document.getElementById('store').classList.contains('show'),
       title: document.querySelector('#store h3').textContent,
+      items: [...document.querySelectorAll('#store-items button')].map(b => b.textContent),
     }));
     assert(browse.shown && browse.state === 'store', 'E at the shop front opens the store overlay');
     assert(browse.title === shop0.name.toUpperCase(), `store is titled for the shop ("${browse.title}")`);
-    await page.click('#buy-snack');
+    assert(browse.items.length >= 2 && browse.items.some(t => /Pad Thai|Som Tam|Tea/.test(t)), `food court has its own themed menu (${browse.items.length} items)`);
+    const cashBefore = await page.evaluate(() => window.GAME.cash);
+    await page.click('#store-items button');                 // buy the first item
     await waitFrames(page, 2);
     const bought = await page.evaluate(() => ({ cash: window.GAME.cash, hp: window.GAME.player.hp }));
-    assert(bought.cash < 1000 && bought.hp > 10, `buying spends cash + heals (cash ${bought.cash}, hp ${bought.hp})`);
+    assert(bought.cash < cashBefore && bought.hp > 10, `buying spends cash + heals (cash ${cashBefore} → ${bought.cash}, hp ${bought.hp})`);
+
+    // ---- 4. Clothing shop changes the player's outfit ------------------------
+    console.log('\n[4] clothing shop cosmetics');
+    const cloth = await page.evaluate(() => {
+      const GAME = window.GAME;
+      document.getElementById('store').classList.remove('show'); GAME.state = 'playing';
+      const s = GAME.world.mall.shops.find(s => s.name === 'Roma Boutique');
+      GAME.player.group.position.set(s.pos.x, 0, s.pos.z);
+      GAME.player.velocity.set(0, 0, 0); GAME.cash = 2000; GAME.hud.setCash(2000);
+      return { before: GAME.player.torso.material.color.getHex() };
+    });
+    await page.keyboard.down('KeyE'); await waitFrames(page, 3); await page.keyboard.up('KeyE'); await waitFrames(page, 3);
+    const clothItems = await page.evaluate(() => [...document.querySelectorAll('#store-items button')].map(b => b.textContent));
+    assert(clothItems.some(t => /Tee|Shirt|Jacket|Polo|Noir/.test(t)), `boutique sells clothing (${clothItems.length} items)`);
+    await page.click('#store-items button');                 // buy the first outfit
+    await waitFrames(page, 2);
+    const after = await page.evaluate(() => ({ color: window.GAME.player.torso.material.color.getHex(), saved: window.GAME._shirtColor }));
+    assert(after.color !== cloth.before, `buying clothing recolors the player (0x${cloth.before.toString(16)} → 0x${after.color.toString(16)})`);
+    assert(after.saved === after.color, 'the chosen outfit is recorded for the save');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
