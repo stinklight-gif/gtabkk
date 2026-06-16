@@ -206,6 +206,40 @@ async function main() {
     const after = await page.evaluate(() => ({ color: window.GAME.player.torso.material.color.getHex(), saved: window.GAME._shirtColor }));
     assert(after.color !== cloth.before, `buying clothing recolors the player (0x${cloth.before.toString(16)} → 0x${after.color.toString(16)})`);
     assert(after.saved === after.color, 'the chosen outfit is recorded for the save');
+    // buy a hat → it appears on the player's head + is recorded as owned
+    await page.evaluate(() => {
+      const GAME = window.GAME;
+      document.getElementById('store').classList.remove('show'); GAME.state = 'playing';
+      const s = GAME.world.mall.shops.find(s => s.name === 'Roma Boutique');
+      GAME.player.group.position.set(s.pos.x, s.pos.y, s.pos.z); GAME.cash = 2000;
+    });
+    await page.keyboard.down('KeyE'); await waitFrames(page, 3); await page.keyboard.up('KeyE'); await waitFrames(page, 3);
+    const hatIdx = await page.evaluate(() => [...document.querySelectorAll('#store-items button')].findIndex(b => /Cap|Hat|Helmet/.test(b.textContent)));
+    assert(hatIdx >= 0, 'the boutique sells a hat');
+    await page.evaluate(i => document.querySelectorAll('#store-items button')[i].click(), hatIdx);
+    await waitFrames(page, 2);
+    const hat = await page.evaluate(() => ({ hat: window.GAME._hat, mesh: !!window.GAME.player._hat, owned: (window.GAME._owned || []).slice() }));
+    assert(hat.hat && hat.hat !== 'none' && hat.mesh, `buying a hat puts it on the player (${hat.hat})`);
+    assert(hat.owned.some(k => k.startsWith('hat:')), 'the hat is recorded as owned');
+
+    // ---- 5. Safehouse wardrobe re-equips owned cosmetics ---------------------
+    console.log('\n[5] safehouse wardrobe');
+    await page.evaluate(() => {
+      const GAME = window.GAME;
+      document.getElementById('store').classList.remove('show'); GAME.state = 'playing';
+      GAME.econ.safehouse.owned = true;
+      const d = GAME.world.poi.safehouse;
+      GAME.player.group.position.set(d.x, 0, d.z); GAME.player.velocity.set(0, 0, 0);
+    });
+    await waitFrames(page, 2);
+    await page.keyboard.down('KeyF'); await waitFrames(page, 3); await page.keyboard.up('KeyF'); await waitFrames(page, 3);
+    const ward = await page.evaluate(() => ({
+      shown: document.getElementById('store').classList.contains('show'),
+      title: document.querySelector('#store h3').textContent,
+      items: [...document.querySelectorAll('#store-items button')].map(b => b.textContent),
+    }));
+    assert(ward.shown && ward.title === 'WARDROBE', 'F at home opens the wardrobe');
+    assert(ward.items.some(t => /Remove/.test(t)), `wardrobe lists re-equip options (${ward.items.length} buttons)`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

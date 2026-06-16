@@ -216,7 +216,7 @@ export function shopItems(name) {
   const heal = n => () => { p.hp = Math.min(p.hpMax, p.hp + n); };
   const fullStam = () => { p.stam = p.stamMax; };
   const fullArmor = () => { p.armor = p.armorMax; };
-  const tee = hex => () => setShirt(hex);
+  const cos = (key, cost) => ({ label: COSMETICS[key].label, cost, own: key, effect: COSMETICS[key].apply });
   const CAT = {
     'Pier 21 Food Court': 'food', 'Sushi Bar': 'food', 'Manga Café': 'food', 'Le Café': 'food',
     'Tokyo Tech': 'gear', 'Akihabara Arcade': 'gear',
@@ -240,18 +240,12 @@ export function shopItems(name) {
       { label: 'Vitamins · stamina',      cost: 25,  effect: fullStam },
     ];
     case 'clothes': return [
-      { label: '👕 Crimson Tee',  cost: 150, effect: tee(0xb02a2a) },
-      { label: '👕 Azure Shirt',  cost: 150, effect: tee(0x2a5aad) },
-      { label: '👕 Emerald Polo', cost: 180, effect: tee(0x1e9a5e) },
-      { label: '🧥 Gold Jacket',  cost: 400, effect: tee(0xe0b020) },
-      { label: '🖤 Noir Black',   cost: 120, effect: tee(0x161616) },
+      cos('shirt:crimson', 150), cos('shirt:azure', 150), cos('shirt:emerald', 180),
+      cos('hat:cap', 120), cos('jacket:teal', 350),
     ];
     case 'clothes2': return [
-      { label: '👕 Royal Purple',  cost: 200, effect: tee(0x7a3aad) },
-      { label: '👕 Sunset Orange', cost: 180, effect: tee(0xe06a20) },
-      { label: '👕 Ivory White',   cost: 160, effect: tee(0xeae0d0) },
-      { label: '🧥 Teal Bomber',   cost: 350, effect: tee(0x1f9aa0) },
-      { label: '🖤 Charcoal',      cost: 140, effect: tee(0x2a2e34) },
+      cos('shirt:purple', 200), cos('shirt:ivory', 160), cos('shirt:gold', 220),
+      cos('hat:bucket', 130), cos('hat:helmet', 160), cos('jacket:crimson', 380), cos('jacket:noir', 420),
     ];
     default: return [                                  // 7-Eleven / convenience
       { label: 'Snack · +40 HP',          cost: 20,  effect: heal(40) },
@@ -261,11 +255,91 @@ export function shopItems(name) {
   }
 }
 
-// Player cosmetic: recolor the shirt (the torso + arms share one material).
-export function setShirt(hex) {
+// ---- Player cosmetics: shirt colour, hats, jackets (3 outfit slots) ----
+export function setShirt(hex) {                 // torso + arms share one material
   G._shirtColor = hex;
   const t = G.player && G.player.torso;
   if (t && t.material && t.material.color) t.material.color.setHex(hex);
+}
+export function setHat(id) {
+  G._hat = id || 'none';
+  const p = G.player; if (!p || !p.head) return;
+  if (p._hat) { p.head.remove(p._hat); disposeObject(p._hat); p._hat = null; }
+  if (G._hat === 'none') return;
+  const g = new THREE.Group();
+  if (id === 'cap') {
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.235, 10, 6, 0, TAU, 0, PI / 2), new THREE.MeshStandardMaterial({ color: 0xb03030, roughness: 0.7 }));
+    const brim = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.04, 0.26), new THREE.MeshStandardMaterial({ color: 0x8a2020 }));
+    brim.position.set(0, 0, 0.2); g.add(dome, brim);
+  } else if (id === 'bucket') {
+    const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.24, 0.18, 12), new THREE.MeshStandardMaterial({ color: 0xd9c27a, roughness: 0.9 }));
+    crown.position.y = 0.09;
+    const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.04, 12), new THREE.MeshStandardMaterial({ color: 0xc9b26a, roughness: 0.9 }));
+    g.add(crown, brim);
+  } else if (id === 'helmet') {
+    const shell = new THREE.Mesh(new THREE.SphereGeometry(0.25, 10, 8, 0, TAU, 0, PI / 1.9), new THREE.MeshStandardMaterial({ color: 0xffcf2a, roughness: 0.5, metalness: 0.2 }));
+    g.add(shell);
+  }
+  g.position.set(0, 0.16, 0); p.head.add(g); p._hat = g;
+}
+export function setJacket(hex) {
+  G._jacketColor = hex || null;
+  const p = G.player; if (!p || !p.torso) return;
+  if (!p._jacket) {
+    p._jacket = new THREE.Mesh(new THREE.CapsuleGeometry(0.39, 0.58, 4, 8), new THREE.MeshStandardMaterial({ color: 0x2a2e34, roughness: 0.7 }));
+    p._jacket.position.copy(p.torso.position); p._jacket.castShadow = true; p.group.add(p._jacket);
+  }
+  if (hex) { p._jacket.visible = true; p._jacket.material.color.setHex(hex); }
+  else p._jacket.visible = false;
+}
+export function applyCosmetics(c) {
+  if (!c) return;
+  if (typeof c.shirt === 'number') setShirt(c.shirt);
+  setHat(c.hat || 'none');
+  setJacket(typeof c.jacket === 'number' ? c.jacket : null);
+}
+
+// Cosmetic catalogue: each key maps to a label + how to wear it. Shops sell them
+// (recording ownership); the safehouse wardrobe re-equips owned ones for free.
+export const COSMETICS = {
+  'shirt:crimson': { label: '👕 Crimson Tee',   apply: () => setShirt(0xb02a2a) },
+  'shirt:azure':   { label: '👕 Azure Shirt',   apply: () => setShirt(0x2a5aad) },
+  'shirt:emerald': { label: '👕 Emerald Polo',  apply: () => setShirt(0x1e9a5e) },
+  'shirt:gold':    { label: '👕 Gold Tee',      apply: () => setShirt(0xe0b020) },
+  'shirt:noir':    { label: '👕 Noir Black',    apply: () => setShirt(0x161616) },
+  'shirt:purple':  { label: '👕 Royal Purple',  apply: () => setShirt(0x7a3aad) },
+  'shirt:ivory':   { label: '👕 Ivory White',   apply: () => setShirt(0xeae0d0) },
+  'hat:cap':       { label: '🧢 Red Cap',       apply: () => setHat('cap') },
+  'hat:bucket':    { label: '👒 Bucket Hat',    apply: () => setHat('bucket') },
+  'hat:helmet':    { label: '⛑️ Site Helmet',   apply: () => setHat('helmet') },
+  'jacket:teal':   { label: '🧥 Teal Bomber',   apply: () => setJacket(0x1f9aa0) },
+  'jacket:crimson':{ label: '🧥 Crimson Coat',  apply: () => setJacket(0x8a2330) },
+  'jacket:noir':   { label: '🧥 Black Leather', apply: () => setJacket(0x1a1a1e) },
+  'hat:none':      { label: '🚫 Remove Hat',    apply: () => setHat('none') },
+  'jacket:none':   { label: '🚫 Remove Jacket', apply: () => setJacket(null) },
+};
+
+// Safehouse wardrobe: re-equip anything you've bought (free), plus removers.
+export function openWardrobe() {
+  const h = document.querySelector('#store h3'); if (h) h.textContent = 'WARDROBE';
+  const box = document.getElementById('store-items');
+  if (box) {
+    box.innerHTML = '';
+    const keys = ['hat:none', 'jacket:none', ...(G._owned || [])];
+    for (const key of keys) {
+      const c = COSMETICS[key]; if (!c) continue;
+      const btn = document.createElement('button');
+      btn.textContent = c.label;
+      btn.addEventListener('click', () => { c.apply(); if (G.audio && G.audio.chime) G.audio.chime(); });
+      box.appendChild(btn);
+    }
+    if (!(G._owned || []).length) {
+      const note = document.createElement('button'); note.textContent = 'Buy outfits at Terminal 21'; note.disabled = true; box.appendChild(note);
+    }
+  }
+  G.state = 'store';
+  document.getElementById('store').classList.add('show');
+  document.exitPointerLock();
 }
 
 export function openStore(title) {
@@ -292,6 +366,7 @@ export function buyItem(it) {
   if (G.cash < it.cost) { G.hud.showNotif('Not enough cash'); return; }
   G.cash -= it.cost; G.hud.setCash(G.cash);
   it.effect();
+  if (it.own) { G._owned = G._owned || []; if (!G._owned.includes(it.own)) G._owned.push(it.own); }   // unlock for the wardrobe
   G.hud.setBars(p.hp, p.armor, p.stam);
   if (G.audio && G.audio.chime) G.audio.chime();
 }
@@ -348,13 +423,14 @@ export function updateSafehouse(dt) {
       saveGame();
     }
   } else {
-    G.hud.showPrompt('Home — <b>E</b>: rest (heal + save)', 0.4);
+    G.hud.showPrompt('Home — <b>E</b>: rest (heal + save) · <b>F</b>: wardrobe', 0.4);
     if (G.input.pressed('KeyE')) {
       p.hp = p.hpMax; if (typeof p.stam === 'number') p.stam = p.stamMax;
       G.hud.showNotif('Rested at home — healed & saved');
       G.audio.chime();
       saveGame();
     }
+    if (G.input.pressed('KeyF')) openWardrobe();
   }
 }
 export function markSafehouseOwned() {
