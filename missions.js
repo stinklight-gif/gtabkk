@@ -273,8 +273,8 @@ export function makeMissionSystem() {
           const d2 = dist2(G.player.group.position, this.markerPos);
           if (!this.armed && d2 > 18*18) this.armed = true;
           if (this.armed) {
-            G.hud.showPrompt('Return to the <b>marker</b> for another <b>Delivery</b>', 0.4);
-            if (d2 < 8*8) { this.armed = false; this.onStart(); }
+            G.hud.showPrompt('Return to the <b>marker</b> to start the <b>Mall Job</b>', 0.4);
+            if (d2 < 8*8) { this.armed = false; sys.start('mallJob'); }
           }
         }
       },
@@ -294,6 +294,68 @@ export function makeMissionSystem() {
         G.hud.setMissionText('Free Roam · Sukhumvit');
         this.markerPos = this.home.clone();
         setBeam(this.home, 0xff2a86);
+      },
+    },
+
+    // Mission 5 — Mall Job: grab the watches from Terminal 21's 2nd floor (ride the
+    // escalators up), then the alarm trips and you run the heat to a drop. Uses the
+    // multi-floor interior + the wanted/cop system.
+    mallJob: {
+      name: 'Mall Job',
+      markerPos: null,
+      stage: 0,
+      armed: false,
+      drop: new THREE.Vector3(120, 0, -60),
+      reward: 8000,
+      onStart() {
+        this.stage = 1;
+        this.markerPos = (G.world.poi.terminal21 || G.world.mall.center).clone();
+        setBeam(this.markerPos, 0xff2a86);
+        G.hud.setMissionText('Mall Job');
+        G.hud.showSubtitle("Uncle Seng: \"Watch shop, 2nd floor of Terminal 21. Grab the goods and run.\"", "ลุงเซ้ง: \"ขึ้นชั้นสองห้างเทอร์มินอล 21\"");
+        G.hud.showPrompt('Get to <b>Terminal 21</b> at Asok', 3);
+      },
+      update(dt) {
+        const pp = G.player.group.position;
+        if (this.stage === 1) {
+          if (dist2(pp, this.markerPos) < 11 * 11) {
+            this.stage = 2;
+            const shop = (G.world.mall && G.world.mall.shops || []).find(s => s.name === 'Watch Boutique');
+            this.markerPos = (shop ? shop.pos : new THREE.Vector3(G.world.mall.center.x, 10, G.world.mall.center.z)).clone();
+            setBeam(this.markerPos, 0xff2a86);
+            G.hud.showNotif('Inside — take the escalators up to the 2nd floor');
+          }
+        } else if (this.stage === 2) {
+          // floor-aware: must actually be up on the 2nd floor, not below the marker
+          if (dist2(pp, this.markerPos) < 4.5 * 4.5 && Math.abs(pp.y - this.markerPos.y) < 3) {
+            this.stage = 3;
+            raiseWanted(3);                                  // alarm! cops incoming
+            if (G.audio && G.audio.siren) G.audio.siren();
+            this.markerPos = this.drop.clone();
+            setBeam(this.markerPos, 0x39ff7a);
+            G.hud.showNotif('Got the watches! Cops incoming — get to the drop!');
+            G.hud.showSubtitle("Make a run for it — get the goods to the drop.", "รีบหนีไปจุดส่ง");
+          }
+        } else if (this.stage === 3) {
+          G.hud.showPrompt('MALL JOB &nbsp;→&nbsp; reach the green drop', 0.4);
+          if (dist2(pp, this.drop) < 9 * 9) { this.win(); return; }
+        } else if (this.stage === 5) {
+          const d2 = dist2(pp, this.markerPos);
+          if (!this.armed && d2 > 18 * 18) this.armed = true;
+          if (this.armed) {
+            G.hud.showPrompt('Return to the <b>marker</b> to run the <b>Mall Job</b> again', 0.4);
+            if (d2 < 8 * 8) { this.armed = false; this.onStart(); }
+          }
+        }
+      },
+      win() {
+        this.stage = 5; this.armed = false;
+        G.cash += this.reward; G.hud.setCash(G.cash);
+        G.hud.showNotif(`Mall Job complete: +฿${this.reward.toLocaleString()}`);
+        G.hud.showSubtitle("Uncle Seng: \"Clean grab. That's a payday.\"", "ลุงเซ้ง: \"งานสะอาด ได้เงินก้อน\"");
+        G.hud.setMissionText('Free Roam · Sukhumvit');
+        this.markerPos = this.drop.clone();
+        setBeam(this.markerPos, 0xff2a86);
       },
     },
   };
