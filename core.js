@@ -92,8 +92,17 @@ export const G = {
   econ: {
     safehouse: { owned: false, pos: null },           // buyable respawn point
     garage: { rented: false, stored: [], capacity: 4, retrieveIdx: 0 }, // stored: [{kind,color,plate,hp}]
+    businesses: {},                                   // id -> { owned, pending } passive-income holdings
   },
 };
+
+// Buyable businesses: walk up and E to buy; while owned they accrue passive
+// income (rate/s, capped) you return to collect. Persisted in the save.
+export const BUSINESSES = [
+  { id: 'noodle',   name: 'Noodle Cart',          price: 5000,  rate: 25,  cap: 1500, pos: new THREE.Vector3(8, 0, 30) },
+  { id: 'tukstand', name: 'Tuk-Tuk Stand',        price: 12000, rate: 50,  cap: 3000, pos: new THREE.Vector3(8, 0, -44) },
+  { id: 't21unit',  name: 'Terminal 21 Retail Unit', price: 30000, rate: 110, cap: 7000, pos: new THREE.Vector3(-25, 0, 18) },
+];
 
 // Economy prices (one place to balance the money sinks).
 export const PRICE = { safehouse: 12000, garageRent: 4000, repaint: 250 };

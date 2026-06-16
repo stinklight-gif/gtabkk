@@ -289,6 +289,24 @@ async function main() {
     await page.keyboard.down('Space'); await waitFrames(page, 3); await page.keyboard.up('Space'); await waitFrames(page, 3);
     const arcLeft = await page.evaluate(() => window.GAME.state);
     assert(arcLeft === 'playing', 'finishing the arcade returns you to the game');
+
+    // ---- 8. Buyable business (passive income) --------------------------------
+    console.log('\n[8] buyable business');
+    await page.evaluate(() => {
+      const GAME = window.GAME;
+      document.getElementById('arcade').classList.remove('show'); document.getElementById('store').classList.remove('show');
+      GAME.state = 'playing'; GAME.player.inVehicle = null;
+      GAME.player.group.position.set(-25, 0, 18);            // the Terminal 21 retail-unit podium
+      GAME.player.velocity.set(0, 0, 0); GAME.cash = 50000; GAME.hud.setCash(50000);
+    });
+    await waitFrames(page, 2);
+    await page.keyboard.down('KeyE'); await waitFrames(page, 3); await page.keyboard.up('KeyE'); await waitFrames(page, 3);
+    const bizBought = await page.evaluate(() => ({ owned: !!(window.GAME.econ.businesses.t21unit && window.GAME.econ.businesses.t21unit.owned), cash: window.GAME.cash }));
+    assert(bizBought.owned && bizBought.cash < 50000, `you can buy a business (Terminal 21 unit, cash now ${bizBought.cash})`);
+    const c0 = await page.evaluate(() => { window.GAME.econ.businesses.t21unit.pending = 2000; return window.GAME.cash; });
+    await page.keyboard.down('KeyE'); await waitFrames(page, 3); await page.keyboard.up('KeyE'); await waitFrames(page, 3);
+    const collected = await page.evaluate(() => window.GAME.cash);
+    assert(collected > c0, `you collect its passive income (+฿${collected - c0})`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

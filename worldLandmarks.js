@@ -6,7 +6,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { makePedMesh } from './entities.js';
 
@@ -325,6 +325,25 @@ export function buildLandmarks(env) {
     world.buildings.push({ pos: new THREE.Vector3(p.x - HX, H / 2, p.z), size: new THREE.Vector3(0.4, H, HZ * 2) });
     world.buildings.push({ pos: new THREE.Vector3(p.x + HX, H / 2, p.z), size: new THREE.Vector3(0.4, H, HZ * 2) });
     world.sevenElevens.push({ pos: p.clone(), group: store, chimed: 0 });
+  }
+
+  // ---- Buyable business kiosks (passive income — see player.js updateBusinesses) ----
+  for (const b of BUSINESSES) {
+    if (b.id === 't21unit') {                          // a leasing podium by the mall directory
+      const podium = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.2, 1.4), new THREE.MeshStandardMaterial({ color: 0x4a3a5a, roughness: 0.6 }));
+      podium.position.set(b.pos.x, 0.6, b.pos.z); podium.castShadow = true; scene.add(podium);
+      const sgn = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.7), new THREE.MeshBasicMaterial({ color: 0xc98bff }));
+      sgn.position.set(b.pos.x, 1.8, b.pos.z + 0.72); scene.add(sgn);
+      continue;
+    }
+    const cart = new THREE.Group();
+    const counter = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.0, 1.4), new THREE.MeshStandardMaterial({ color: 0xb04030, roughness: 0.7 }));
+    counter.position.y = 0.5; counter.castShadow = true; cart.add(counter);
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 2.4, 6), new THREE.MeshStandardMaterial({ color: 0x886644 })); pole.position.y = 1.2; cart.add(pole);
+    const umbrella = new THREE.Mesh(new THREE.ConeGeometry(1.8, 0.6, 8), new THREE.MeshStandardMaterial({ color: 0xff8a2a, roughness: 0.8, side: THREE.DoubleSide })); umbrella.position.y = 2.5; cart.add(umbrella);
+    const board = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.5), new THREE.MeshBasicMaterial({ color: 0x39ff7a })); board.position.set(0, 1.55, 0.72); cart.add(board);
+    const gl = new THREE.PointLight(0xffd27a, 0.5, 9, 2); gl.position.set(0, 2, 0); cart.add(gl);
+    cart.position.copy(b.pos); scene.add(cart);
   }
 
   // ---- Shrines (spirit houses) — small gold structures ----
