@@ -406,6 +406,7 @@ export function buildWorld(scene) {
   const YAO_I = -2, YAO_J0 = 2, YAO_J1 = 3;  // two-block Yaowarat market street
   const GUN_I = 3, GUN_J = 1;  // block reserved for the gun shop
   const SAFE_I = -1, SAFE_J = 1;  // block reserved for the buyable safehouse (≈ -25, 75)
+  const MALL_I = -1, MALL_J = 0;  // block reserved for Terminal 21 at Asok (≈ -25, 25)
 
   for (let i = -GRID/2; i < GRID/2; i++) {
     for (let j = -GRID/2; j < GRID/2; j++) {
@@ -415,6 +416,7 @@ export function buildWorld(scene) {
       if (i === SAFE_I && j === SAFE_J) continue;      // safehouse block
       if (i === YAO_I && (j === YAO_J0 || j === YAO_J1)) continue; // Yaowarat market
       if (i === GUN_I && j === GUN_J) continue; // gun shop block
+      if (i === MALL_I && j === MALL_J) continue; // Terminal 21 mall block
       const cx = (i + 0.5) * BLOCK;
       const cz = (j + 0.5) * BLOCK;
 
@@ -636,7 +638,7 @@ export function buildWorld(scene) {
   addInstanced(wireGeo, wireMat, wireM, false, false);
 
 
-  buildLandmarks({ scene, world, _m, _m2, _p, _q, _s, _e, addInstanced, bakeGroup, TEMPLE_I, TEMPLE_J, GARAGE_I, GARAGE_J, SAFE_I, SAFE_J, RIVER_I, YAO_I, YAO_J0, YAO_J1, GUN_I, GUN_J, SIDEWALK_EDGE });
+  buildLandmarks({ scene, world, _m, _m2, _p, _q, _s, _e, addInstanced, bakeGroup, TEMPLE_I, TEMPLE_J, GARAGE_I, GARAGE_J, SAFE_I, SAFE_J, RIVER_I, YAO_I, YAO_J0, YAO_J1, GUN_I, GUN_J, MALL_I, MALL_J, SIDEWALK_EDGE });
   // ---- Flush static-geometry bakers → a handful of merged meshes ----
   // Everything routed through `baker`/`flatBaker` above (road stripes, sidewalks,
   // building/shop/setback boxes, window + neon planes) collapses here into one

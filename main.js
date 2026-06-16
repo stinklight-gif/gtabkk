@@ -40,7 +40,7 @@ import {
 } from './combat.js';
 export * from './hud.js';
 import {
-  bindHud, drawHouseGlyph, drawGarageGlyph, HOME_COLOR, GARAGE_COLOR
+  bindHud, drawHouseGlyph, drawGarageGlyph, drawMallGlyph, HOME_COLOR, GARAGE_COLOR, MALL_COLOR
 } from './hud.js';
 export * from './missions.js';
 import {
@@ -577,6 +577,11 @@ export function drawFullMap() {
     drawGarageGlyph(ctx, gx, gy, 7, GARAGE_COLOR, G.econ.garage.rented);
     ctx.fillStyle = GARAGE_COLOR; ctx.fillText(G.econ.garage.rented ? 'Garage' : 'U-Spray', gx, gy - 15);
   }
+  if (poi.terminal21) {
+    const tx = to(poi.terminal21.x), ty = to(poi.terminal21.z);
+    drawMallGlyph(ctx, tx, ty, 7, MALL_COLOR);
+    ctx.fillStyle = MALL_COLOR; ctx.fillText('Terminal 21', tx, ty - 15);
+  }
   ctx.fillStyle = '#cfe3e0'; ctx.textAlign = 'left';
   if (G.world.collectibles) {
     ctx.fillStyle = '#ffcf4a';
@@ -611,6 +616,7 @@ export function drawFullMap() {
   const items = [
     ['home',   HOME_COLOR,   'Home'],
     ['garage', GARAGE_COLOR, 'Garage'],
+    ['mall',   MALL_COLOR,   'Mall'],
     ['dot',    '#ff2a86',    'Objective'],
     ['dot',    '#ff3333',    'Cops'],
     ['dot',    '#ffcf4a',    'Amulet'],
@@ -623,6 +629,7 @@ export function drawFullMap() {
     const [kind, color, text] = items[i], yy = ly0 + i * rowH;
     if (kind === 'home') drawHouseGlyph(ctx, lx + 8, yy, 6, color, true);
     else if (kind === 'garage') drawGarageGlyph(ctx, lx + 8, yy, 5, color, true);
+    else if (kind === 'mall') drawMallGlyph(ctx, lx + 8, yy, 5, color, true);
     else { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(lx + 8, yy, 5, 0, TAU); ctx.fill(); }
     ctx.fillStyle = '#dfeee9'; ctx.fillText(text, lx + 24, yy + 4);
   }
