@@ -141,11 +141,12 @@ async function main() {
             GAME.state = 'map';
           }
         } else if (mall) {
-          // stand in the Terminal 21 atrium looking north at the directory + shops
+          // stand on floor 1 looking south + down across the atrium void (the south
+          // wall sits behind the view, so all three levels read without bleed-through)
           const c = GAME.world.mall ? GAME.world.mall.center : { x: -25, z: 25 };
           GAME.player.inVehicle = null; GAME.player.group.visible = true;
-          GAME.player.group.position.set(c.x, 0, c.z - 8);
-          GAME.camRig.yaw = Math.PI; GAME.camRig.pitch = -0.05;  // look across the atrium at the shops
+          GAME.player.group.position.set(c.x, 5.1, c.z + 11);
+          GAME.camRig.yaw = 0; GAME.camRig.pitch = -0.12;
         } else {
           GAME.player.group.position.set(0, 0, -130);            // street level, mid-map
           GAME.camRig.yaw = Math.PI; GAME.camRig.pitch = -0.02;  // aim down the street

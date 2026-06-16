@@ -55,6 +55,42 @@ export function resolvePlayerVsVehicles(player) {
   }
 }
 
+// ---- Mall interiors: multi-floor support + height-gated collision ----
+// The city is otherwise flat (you ground at y=0). Terminal 21 has floors and
+// escalators, so mallSupportY returns the walkable surface height under the
+// player's feet (a floor strip, an escalator ramp, or 0 for the ground), and
+// resolvePlayerVsMall blocks rails/counters only on the floor they belong to.
+const MALL_STEP = 0.6;   // how far up you can step / ride per frame (escalators rise gently)
+export function mallSupportY(x, z, curY) {
+  const mall = G.world && G.world.mall;
+  let support = 0;
+  if (!mall) return support;
+  for (const f of mall.platforms) {
+    if (x >= f.x0 && x <= f.x1 && z >= f.z0 && z <= f.z1 && f.y <= curY + MALL_STEP && f.y > support) support = f.y;
+  }
+  for (const rmp of mall.ramps) {
+    if (x < rmp.x0 || x > rmp.x1 || z < rmp.z0 || z > rmp.z1) continue;
+    const t = rmp.axis === 'z' ? (z - rmp.z0) / (rmp.z1 - rmp.z0) : (x - rmp.x0) / (rmp.x1 - rmp.x0);
+    const h = rmp.yLo + (rmp.yHi - rmp.yLo) * t;
+    if (h <= curY + MALL_STEP && h > support) support = h;
+  }
+  return support;
+}
+export function resolvePlayerVsMall(player) {
+  const mall = G.world && G.world.mall;
+  if (!mall || !mall.solids) return;
+  const p = player.group.position, r = 0.42, y = p.y;
+  for (const s of mall.solids) {
+    if (y < s.y0 - 0.2 || y > s.y1) continue;        // only collide on this solid's floor
+    const hx = s.sx / 2 + r, hz = s.sz / 2 + r;
+    const dx = p.x - s.x, dz = p.z - s.z;
+    if (Math.abs(dx) < hx && Math.abs(dz) < hz) {
+      if (hx - Math.abs(dx) < hz - Math.abs(dz)) p.x = s.x + (Math.sign(dx) || 1) * hx;
+      else                                       p.z = s.z + (Math.sign(dz) || 1) * hz;
+    }
+  }
+}
+
 // Vehicle vs buildings — soft pushback that also kills speed
 export function resolveVehicleVsBuildings(v) {
   const p = v.pos;

@@ -100,6 +100,39 @@ async function main() {
     assert(walked.z > southWallZ + 2, `player walked through the entrance into the atrium (z ${start.z.toFixed(1)} → ${walked.z.toFixed(1)}, past ${southWallZ})`);
     assert(walked.inMall, 'inside-the-mall flag set after walking in');
 
+    // ---- 2b. Escalators + upper floors are walkable ---------------------------
+    console.log('\n[2b] escalators + floor support');
+    // stand on escalator A's mid-point → the ramp surface holds you up
+    await page.evaluate(() => {
+      const GAME = window.GAME, c = GAME.world.mall.center;
+      GAME.state = 'playing'; document.getElementById('pause').classList.remove('show');
+      GAME.player.inVehicle = null; GAME.player.velocity.set(0, 0, 0);
+      GAME.player.group.position.set(c.x - 4, 2.6, c.z + 1);   // escalator A surface, halfway up (ramp y≈2.5)
+    });
+    await waitFrames(page, 3);
+    const onRamp = await page.evaluate(() => window.GAME.player.group.position.y);
+    assert(onRamp > 2 && onRamp < 3, `the escalator is solid underfoot (stood at y=${onRamp.toFixed(2)})`);
+    // stand on the floor-1 mezzanine → it's solid at y≈5
+    await page.evaluate(() => {
+      const GAME = window.GAME, c = GAME.world.mall.center;
+      GAME.player.velocity.set(0, 0, 0);
+      GAME.player.group.position.set(c.x, 5.2, c.z + 12);      // floor-1 north strip
+    });
+    await waitFrames(page, 3);
+    const onF1 = await page.evaluate(() => window.GAME.player.group.position.y);
+    assert(Math.abs(onF1 - 5) < 0.25, `floor 1 is solid — you stand at y≈5 (got ${onF1.toFixed(2)})`);
+    // actually walk up escalator A and gain height (the reported bug)
+    const climb0 = await page.evaluate(() => {
+      const GAME = window.GAME, c = GAME.world.mall.center;
+      GAME.player.inVehicle = null; GAME.player.velocity.set(0, 0, 0);
+      GAME.player.group.position.set(c.x - 4, 0, c.z - 5);     // escalator A foot, on the ground
+      GAME.camRig.yaw = Math.PI;                               // face up the ramp (+z)
+      return GAME.player.group.position.y;
+    });
+    await page.keyboard.down('KeyW'); await waitFrames(page, 95); await page.keyboard.up('KeyW'); await waitFrames(page, 3);
+    const climb1 = await page.evaluate(() => window.GAME.player.group.position.y);
+    assert(climb1 > climb0 + 2.5, `walking up the escalator raises you (y ${climb0.toFixed(1)} → ${climb1.toFixed(1)})`);
+
     // ---- 3. Browse the food court: its own menu + buy ------------------------
     console.log('\n[3] shop has its own menu + buy');
     const shop0 = await page.evaluate(() => {
@@ -127,6 +160,23 @@ async function main() {
     await waitFrames(page, 2);
     const bought = await page.evaluate(() => ({ cash: window.GAME.cash, hp: window.GAME.player.hp }));
     assert(bought.cash < cashBefore && bought.hp > 10, `buying spends cash + heals (cash ${cashBefore} → ${bought.cash}, hp ${bought.hp})`);
+
+    // ---- 3b. An upper-floor shop browses on its own level --------------------
+    console.log('\n[3b] upper-floor shop');
+    const up = await page.evaluate(() => {
+      const GAME = window.GAME;
+      document.getElementById('store').classList.remove('show'); GAME.state = 'playing';
+      const s = GAME.world.mall.shops.find(s => s.pos.y > 4 && s.pos.y < 9);   // a floor-1 shop
+      GAME.player.group.position.set(s.pos.x, s.pos.y, s.pos.z);
+      GAME.player.velocity.set(0, 0, 0); GAME.cash = 2000; GAME.hud.setCash(2000);
+      return { name: s.name, y: s.pos.y };
+    });
+    await page.keyboard.down('KeyE'); await waitFrames(page, 3); await page.keyboard.up('KeyE'); await waitFrames(page, 3);
+    const upOpen = await page.evaluate(() => ({
+      shown: document.getElementById('store').classList.contains('show'),
+      title: document.querySelector('#store h3').textContent,
+    }));
+    assert(upOpen.shown && upOpen.title === up.name.toUpperCase(), `upper-floor shop "${up.name}" (y≈${up.y}) browses on its own level`);
 
     // ---- 4. Clothing shop changes the player's outfit ------------------------
     console.log('\n[4] clothing shop cosmetics');
