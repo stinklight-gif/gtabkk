@@ -157,7 +157,80 @@ export function updateWanted(dt) {
     }
   }
 
+  updateHelicopter(dt);   // 4★+ searchlight
+  maybeAmbush();          // 3★+ roadblock ahead while driving
   G.hud.setStars(G.wanted.stars);
+}
+
+// ---- Police helicopter (4★+): a searchlight that keeps the heat fresh while
+// you're out in the open. Duck inside (Terminal 21) to break its line of sight. ----
+function spawnHelicopter() {
+  const p = G.player.group.position;
+  const g = new THREE.Group();
+  const dark = new THREE.MeshStandardMaterial({ color: 0x1b2330, roughness: 0.5, metalness: 0.3 });
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.95, 1.7, 6, 10), dark); body.rotation.z = PI / 2; body.castShadow = true; g.add(body);
+  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.28, 3), dark); tail.position.set(0, 0.15, -2.4); g.add(tail);
+  const fin = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.8, 0.5), dark); fin.position.set(0, 0.5, -3.7); g.add(fin);
+  for (const sx of [-0.6, 0.6]) { const skid = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 2.4), dark); skid.position.set(sx, -0.9, 0); g.add(skid); }
+  const rotor = new THREE.Group();
+  for (let i = 0; i < 2; i++) { const b = new THREE.Mesh(new THREE.BoxGeometry(8, 0.06, 0.34), new THREE.MeshStandardMaterial({ color: 0x15151a })); b.rotation.y = i * PI / 2; rotor.add(b); }
+  rotor.position.y = 0.95; g.add(rotor);
+  const tailRotor = new THREE.Mesh(new THREE.BoxGeometry(0.05, 1.4, 0.18), new THREE.MeshStandardMaterial({ color: 0x15151a })); tailRotor.position.set(0.16, 0.15, -3.7); g.add(tailRotor);
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff2222 })); beacon.position.set(0, -0.9, 0); g.add(beacon);
+  g.position.set(p.x, 40, p.z); G.scene.add(g);
+  const beam = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.3, 7, 40, 18, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xfff3c0, transparent: true, opacity: 0.1, side: THREE.DoubleSide, depthWrite: false })
+  );
+  beam.position.set(p.x, 20, p.z); beam.frustumCulled = false; G.scene.add(beam);
+  G.heli = { mesh: g, rotor, beam, beacon, ang: rand(0, TAU), t: 0 };
+  G.hud.showNotif('🚁 Police helicopter inbound');
+  if (G.audio && G.audio.siren) G.audio.siren();
+}
+function despawnHelicopter() {
+  if (!G.heli) return;
+  G.scene.remove(G.heli.mesh); disposeObject(G.heli.mesh);
+  G.scene.remove(G.heli.beam); G.heli.beam.geometry.dispose(); G.heli.beam.material.dispose();
+  G.heli = null;
+}
+export function updateHelicopter(dt) {
+  const stars = G.wanted.stars;
+  if (stars >= 4 && !G.heli) spawnHelicopter();
+  else if (stars < 4 && G.heli) { despawnHelicopter(); return; }
+  if (!G.heli) return;
+  const h = G.heli, p = G.player.group.position;
+  h.ang += dt * 0.5; h.t += dt;
+  const tx = p.x + Math.cos(h.ang) * 11, tz = p.z + Math.sin(h.ang) * 11;
+  h.mesh.position.x = lerp(h.mesh.position.x, tx, 0.05);
+  h.mesh.position.z = lerp(h.mesh.position.z, tz, 0.05);
+  h.mesh.position.y = 40 + Math.sin(h.t * 1.3) * 0.6;
+  h.mesh.rotation.y = Math.atan2(p.x - h.mesh.position.x, p.z - h.mesh.position.z);
+  if (h.rotor) h.rotor.rotation.y += dt * 32;
+  h.beam.position.set(h.mesh.position.x, 20, h.mesh.position.z);
+  if (h.beacon) h.beacon.material.color.setHex(Math.sin(performance.now() * 0.02) > 0 ? 0xff2222 : 0x2266ff);
+  // searchlight: outdoors + roughly under it → the heat stays fresh (can't shake it)
+  if (!G._inMall && dist2(h.mesh.position, p) < 55 * 55) G.wanted.lastSeenAt = performance.now();
+  if (Math.random() < 0.03 && G.audio && G.audio.blip) G.audio.blip({ freq: 84, dur: 0.07, gain: 0.05, type: 'square' });
+}
+
+// ---- Roadblock/ambush (3★+ while driving): drop cop cars on the road ahead so
+// the chase comes at you from the front too, not just from behind. ----
+function maybeAmbush() {
+  const p = G.player;
+  if (G.wanted.stars < 3 || !p.inVehicle) return;
+  if (performance.now() < (G._ambushCD || 0)) return;
+  G._ambushCD = performance.now() + 20000;   // ~20 s between roadblocks
+  const v = p.inVehicle;
+  const fx = Math.sin(v.heading), fz = Math.cos(v.heading);
+  const rx = fz, rz = -fx, bx = v.pos.x + fx * 55, bz = v.pos.z + fz * 55;
+  let n = 0;
+  for (let i = -1; i <= 1; i++) {
+    const cx = clamp(bx + rx * i * 3.6, -HALF + 6, HALF - 6);
+    const cz = clamp(bz + rz * i * 3.6, -HALF + 6, HALF - 6);
+    const car = spawnCopCar(G.scene, new THREE.Vector3(cx, 0, cz));
+    if (car) { car.heading = v.heading + PI / 2; car.vel = 0; n++; }
+  }
+  if (n) G.hud.showNotif('🚧 Roadblock ahead!');
 }
 
 export function updateCop(v, dt) {

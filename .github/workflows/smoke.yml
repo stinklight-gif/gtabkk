@@ -35,4 +35,5 @@ jobs:
             smoke_map.png
             smoke_mall.png
             smoke_bts.png
+            smoke_heli.png
           if-no-files-found: ignore

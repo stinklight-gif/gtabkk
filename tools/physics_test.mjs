@@ -179,6 +179,32 @@ async function main() {
     await page.keyboard.down('KeyW'); await waitFrames(page, 95); await page.keyboard.up('KeyW'); await waitFrames(page, 3);
     const bUp1 = await page.evaluate(() => window.GAME.player.group.position.y);
     assert(bUp1 > bUp0 + 4, `walking up the BTS escalator raises you (y ${bUp0.toFixed(1)} → ${bUp1.toFixed(1)})`);
+
+    // ---- 5. Police helicopter at 4 stars -------------------------------------
+    console.log('\n[5] police helicopter (4★)');
+    await page.evaluate(() => {
+      const G = window.GAME;
+      G.state = 'playing'; document.getElementById('pause').classList.remove('show');
+      G.player.inVehicle = null; G._inMall = false; G.player.group.position.set(0, 0, 0);
+      G.wanted.stars = 4; G.wanted.lastSeenAt = performance.now();
+    });
+    await waitFrames(page, 8);
+    const heli = await page.evaluate(() => {
+      const G = window.GAME, p = G.player.group.position;
+      return G.heli ? { y: G.heli.mesh.position.y, gap: Math.hypot(G.heli.mesh.position.x - p.x, G.heli.mesh.position.z - p.z) } : null;
+    });
+    assert(heli && heli.y > 30, `a helicopter spawns at 4★ and flies overhead (y=${heli && heli.y.toFixed(0)})`);
+    assert(heli && heli.gap < 20, `the searchlight is over the player (gap ${heli && heli.gap.toFixed(0)} m)`);
+    // it chases: move the player, the heli closes in
+    await page.evaluate(() => window.GAME.player.group.position.set(80, 0, 80));
+    await waitFrames(page, 36);
+    const follow = await page.evaluate(() => { const h = window.GAME.heli, p = window.GAME.player.group.position; return h ? Math.hypot(h.mesh.position.x - p.x, h.mesh.position.z - p.z) : 999; });
+    assert(follow < 30, `the helicopter chases the player (gap ${follow.toFixed(0)} m)`);
+    // clear the heat → it leaves
+    await page.evaluate(() => { window.GAME.wanted.stars = 0; });
+    await waitFrames(page, 5);
+    const gone = await page.evaluate(() => !window.GAME.heli);
+    assert(gone, 'the helicopter leaves when the heat is gone');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
