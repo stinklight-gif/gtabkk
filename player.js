@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
-import { tip, resolvePlayerVsBuildings, resolvePlayerVsVehicles, resolvePlayerVsPlatforms, worldSupportY, saveGame, updateAmmoHud, updateCombat, updatePlayerInVehicle } from './main.js';
+import { tip, resolvePlayerVsBuildings, resolvePlayerVsVehicles, resolvePlayerVsPlatforms, worldSupportY, saveGame, startArcade, updateAmmoHud, updateCombat, updatePlayerInVehicle } from './main.js';
 
 export function updatePlayer(dt) {
   const p = G.player;
@@ -397,8 +397,9 @@ export function updateMall(dt) {
   for (const s of mall.shops) {
     // floor-aware: a shop only triggers on its own level, not from the floor below
     if (dist2(p.group.position, s.pos) < 3.2 * 3.2 && Math.abs(p.group.position.y - s.pos.y) < 2.5) {
-      G.hud.showPrompt(`Press <b>E</b> to browse <b>${s.name}</b>`, 0.4);
-      if (G.input.pressed('KeyE')) openStore(s.name);
+      const arcade = s.name === 'Akihabara Arcade';
+      G.hud.showPrompt(`Press <b>E</b> to ${arcade ? 'play <b>Tuk-Tuk Dash</b>' : `browse <b>${s.name}</b>`}`, 0.4);
+      if (G.input.pressed('KeyE')) { if (arcade) startArcade(); else openStore(s.name); }
       return;
     }
   }

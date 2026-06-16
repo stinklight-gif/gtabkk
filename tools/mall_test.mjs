@@ -176,7 +176,7 @@ async function main() {
     const up = await page.evaluate(() => {
       const GAME = window.GAME;
       document.getElementById('store').classList.remove('show'); GAME.state = 'playing';
-      const s = GAME.world.mall.shops.find(s => s.pos.y > 4 && s.pos.y < 9);   // a floor-1 shop
+      const s = GAME.world.mall.shops.find(s => s.pos.y > 4 && s.pos.y < 9 && s.name !== 'Akihabara Arcade');   // a floor-1 *store* (not the arcade)
       GAME.player.group.position.set(s.pos.x, s.pos.y, s.pos.z);
       GAME.player.velocity.set(0, 0, 0); GAME.cash = 2000; GAME.hud.setCash(2000);
       return { name: s.name, y: s.pos.y };
@@ -267,6 +267,28 @@ async function main() {
     await waitFrames(page, 5);
     const m3 = await page.evaluate(() => ({ stage: window.GAME.mission.active.stage, cash: window.GAME.cash }));
     assert(m3.stage === 5 && m3.cash > cash0, `reaching the drop completes the job (+฿${m3.cash - cash0})`);
+
+    // ---- 7. Arcade mini-game (Akihabara Arcade, floor 1) ---------------------
+    console.log('\n[7] arcade mini-game');
+    await page.evaluate(() => {
+      const GAME = window.GAME;
+      GAME.state = 'playing'; document.getElementById('store').classList.remove('show');
+      const s = GAME.world.mall.shops.find(s => s.name === 'Akihabara Arcade');
+      GAME.player.group.position.set(s.pos.x, s.pos.y, s.pos.z); GAME.cash = 500; GAME.hud.setCash(500);
+    });
+    await page.keyboard.down('KeyE'); await waitFrames(page, 3); await page.keyboard.up('KeyE'); await waitFrames(page, 3);
+    const inArc = await page.evaluate(() => ({ state: window.GAME.state, shown: document.getElementById('arcade').classList.contains('show') }));
+    assert(inArc.state === 'arcade' && inArc.shown, 'E at the arcade launches Tuk-Tuk Dash');
+    for (let r = 0; r < 3; r++) {                            // play 3 rounds, marker frozen on the bullseye
+      await page.evaluate(() => { const a = window.GAME.arcade; if (a && !a.done && !a.locked) { a.marker = 0.5; a.speed = 0; } });
+      await page.keyboard.down('Space'); await waitFrames(page, 2); await page.keyboard.up('Space'); await waitFrames(page, 18);
+    }
+    const arcDone = await page.evaluate(() => ({ done: !!(window.GAME.arcade && window.GAME.arcade.done), score: window.GAME.arcade && window.GAME.arcade.score, payout: window.GAME.arcade && window.GAME.arcade.payout, cash: window.GAME.cash }));
+    assert(arcDone.done && arcDone.score > 0, `3 rounds scores points (score ${arcDone.score})`);
+    assert(arcDone.payout > 0 && arcDone.cash > 500, `the arcade pays out cash (฿${arcDone.payout})`);
+    await page.keyboard.down('Space'); await waitFrames(page, 3); await page.keyboard.up('Space'); await waitFrames(page, 3);
+    const arcLeft = await page.evaluate(() => window.GAME.state);
+    assert(arcLeft === 'playing', 'finishing the arcade returns you to the game');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
