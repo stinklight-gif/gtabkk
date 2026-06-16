@@ -132,6 +132,16 @@ async function main() {
     await page.keyboard.down('KeyW'); await waitFrames(page, 95); await page.keyboard.up('KeyW'); await waitFrames(page, 3);
     const climb1 = await page.evaluate(() => window.GAME.player.group.position.y);
     assert(climb1 > climb0 + 2.5, `walking up the escalator raises you (y ${climb0.toFixed(1)} → ${climb1.toFixed(1)})`);
+    // the elevator lifts you a floor on E
+    await page.evaluate(() => {
+      const GAME = window.GAME, e = GAME.world.mall.elevator;
+      GAME.player.inVehicle = null; GAME.player.velocity.set(0, 0, 0);
+      GAME.player.group.position.set(e.x, 0, e.z);            // stand in the lift on the ground floor
+    });
+    await waitFrames(page, 2);
+    await page.keyboard.down('KeyE'); await waitFrames(page, 3); await page.keyboard.up('KeyE'); await waitFrames(page, 4);
+    const lift = await page.evaluate(() => window.GAME.player.group.position.y);
+    assert(lift > 4 && lift < 11, `the elevator lifts you a floor (y=${lift.toFixed(2)})`);
 
     // ---- 3. Browse the food court: its own menu + buy ------------------------
     console.log('\n[3] shop has its own menu + buy');

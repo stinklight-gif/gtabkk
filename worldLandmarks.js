@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
+import { makePedMesh } from './entities.js';
 
 export function buildLandmarks(env) {
   const { scene, world, _m, _m2, _p, _q, _s, _e, addInstanced, bakeGroup, TEMPLE_I, TEMPLE_J, GARAGE_I, GARAGE_J, SAFE_I, SAFE_J, RIVER_I, YAO_I, YAO_J0, YAO_J1, GUN_I, GUN_J, MALL_I, MALL_J, SIDEWALK_EDGE } = env;
@@ -467,6 +468,29 @@ export function buildLandmarks(env) {
     world.mall = { center: new THREE.Vector3(cx, 0, cz), hw: HW, hd: HD, platforms, ramps, solids, shops };
     world.poi.terminal21 = new THREE.Vector3(cx, 0, cz - HD - 2);   // stand-here just outside the entrance
     const glow = new THREE.PointLight(0xffcf4a, 0.8, 24, 2); glow.position.set(cx, 5, cz - HD - 3); scene.add(glow);
+
+    // ---- Elevator: a quick lift between floors (north strip, east of the escalators) ----
+    const elx = cx + 12, elz = cz + HD - 1.2;
+    const elMat = new THREE.MeshStandardMaterial({ color: 0x39424c, roughness: 0.5, metalness: 0.4 });
+    for (const fy of [0, F1, F2]) {
+      const cab = new THREE.Mesh(new THREE.BoxGeometry(2.8, 3, 0.4), elMat);
+      cab.position.set(elx, fy + 1.5, elz + 0.5); cab.castShadow = true; scene.add(cab);
+      const btn = new THREE.Mesh(new THREE.PlaneGeometry(0.35, 0.6), new THREE.MeshBasicMaterial({ color: 0x39ff7a }));
+      btn.position.set(elx + 1.1, fy + 1.4, elz - 0.41); btn.rotation.y = PI; scene.add(btn);
+      textSign('LIFT', 1.8, 0.7, '#101418', '#9fe0ff', elx, fy + 2.6, elz - 0.42, PI);
+    }
+    world.mall.elevator = new THREE.Vector3(elx, 0, elz - 1.8);   // stand-here spot in front of the lift
+    world.mall.floors = [0, F1, F2];
+
+    // ---- Window shoppers — a couple standing on every floor (decorative, no AI) ----
+    for (const [px, pz, fy, rot] of [
+      [cx - 6, cz - 12, 0, 1.2], [cx + 9, cz - 10, 0, 4.1],          // ground
+      [cx - 15, cz, F1, 0.5], [cx + 11, cz + 1, F1, 3.3],          // floor 1 (W / E strips)
+      [cx - 5, cz + 12, F2, 2.4], [cx + 8, cz - 13, F2, 5.6],       // floor 2 (N / S strips)
+    ]) {
+      const ped = makePedMesh();
+      ped.position.set(px, fy, pz); ped.rotation.y = rot; ped.frustumCulled = false; scene.add(ped);
+    }
   }
 
   // Pillar of light to attract player
