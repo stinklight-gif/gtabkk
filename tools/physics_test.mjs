@@ -205,6 +205,23 @@ async function main() {
     await waitFrames(page, 5);
     const gone = await page.evaluate(() => !window.GAME.heli);
     assert(gone, 'the helicopter leaves when the heat is gone');
+
+    // ---- 6. Walk-in 7-Eleven -------------------------------------------------
+    console.log('\n[6] walk-in 7-Eleven');
+    const e = await page.evaluate(() => {
+      const G = window.GAME, s = G.world.sevenElevens[0];
+      G.state = 'playing'; document.getElementById('store').classList.remove('show');
+      G.wanted.stars = 0; G.player.inVehicle = null; G.player.group.visible = true;
+      G.player.group.position.set(s.pos.x, 0, s.pos.z + 6.5);   // just outside the front door
+      G.player.velocity.set(0, 0, 0); G.camRig.yaw = 0;         // forward = -z, into the store
+      return { x: s.pos.x, z: s.pos.z };
+    });
+    await page.keyboard.down('KeyW'); await waitFrames(page, 44); await page.keyboard.up('KeyW'); await waitFrames(page, 3);
+    const ins = await page.evaluate(e => { const p = window.GAME.player.group.position; return { x: p.x, z: p.z, inX: Math.abs(p.x - e.x) < 4.5, inZ: p.z < e.z + 3.5 && p.z > e.z - 3.5 }; }, e);
+    assert(ins.inX && ins.inZ, `you walk in through the 7-Eleven door (now at z ${ins.z.toFixed(1)}, front was ${(e.z + 4).toFixed(1)})`);
+    await page.keyboard.down('KeyE'); await waitFrames(page, 3); await page.keyboard.up('KeyE'); await waitFrames(page, 3);
+    const shop = await page.evaluate(() => ({ state: window.GAME.state, title: document.querySelector('#store h3').textContent }));
+    assert(shop.state === 'store' && /7-ELEVEN/.test(shop.title), 'the shop opens from inside the 7-Eleven');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

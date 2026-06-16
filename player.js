@@ -202,7 +202,7 @@ export function update7Eleven(dt) {
   const p = G.player;
   for (const e of G.world.sevenElevens) {
     if (dist2(p.group.position, e.pos) < 5 * 5) {
-      G.hud.showPrompt('Press <b>E</b> to enter <b>7-Eleven</b>', 0.4);
+      G.hud.showPrompt('Press <b>E</b> to shop at <b>7-Eleven</b>', 0.4);
       if (G.input.pressed('KeyE')) openStore('7-Eleven');
       return;
     }

@@ -289,28 +289,41 @@ export function buildLandmarks(env) {
   ];
   for (const p of elevenSpots) {
     const store = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(10, 4, 8), new THREE.MeshStandardMaterial({ color: 0xf3f3f3, roughness: 0.6 }));
-    body.position.y = 2; store.add(body);
-    const sign = new THREE.Mesh(
-      new THREE.PlaneGeometry(8, 1.4),
-      new THREE.MeshBasicMaterial({ color: 0xff5a23 })
-    );
-    sign.position.set(0, 3.8, 4.05); store.add(sign);
-    const sign2 = new THREE.Mesh(
-      new THREE.PlaneGeometry(8, 1.4),
-      new THREE.MeshBasicMaterial({ color: 0x21bb6a })
-    );
-    sign2.position.set(0, 2.4, 4.05); store.add(sign2);
-    const door = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 2.6), new THREE.MeshBasicMaterial({ color: 0x113355 }));
-    door.position.set(0, 1.3, 4.06); store.add(door);
-    const pl = new THREE.PointLight(0xff8855, 0.8, 14, 2);
-    pl.position.set(0, 3.5, 5); store.add(pl);
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0xeef0ee, roughness: 0.6 });
+    const H = 3.6, HX = 5, HZ = 4, DOOR = 1.4;          // half-extents + half door width
+    const segW = HX - DOOR;                              // front-wall segment width
+    const addBox = (px, py, pz, sx, sy, sz, mat = wallMat) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mat);
+      m.position.set(px, py, pz); m.castShadow = true; m.receiveShadow = true; store.add(m);
+    };
+    // hollow shell: front (split around a door gap), back, sides, roof, floor
+    addBox(-(DOOR + segW / 2), H / 2, HZ, segW, H, 0.2);
+    addBox( (DOOR + segW / 2), H / 2, HZ, segW, H, 0.2);
+    addBox(0, H / 2, -HZ, HX * 2, H, 0.2);
+    addBox(-HX, H / 2, 0, 0.2, H, HZ * 2);
+    addBox( HX, H / 2, 0, 0.2, H, HZ * 2);
+    addBox(0, H + 0.1, 0, HX * 2 + 0.4, 0.2, HZ * 2 + 0.4, new THREE.MeshStandardMaterial({ color: 0xff5a23, roughness: 0.7 }));   // orange roof
+    addBox(0, 0.05, 0, HX * 2 - 0.4, 0.1, HZ * 2 - 0.4, new THREE.MeshStandardMaterial({ color: 0xcfcfc8, roughness: 0.9 }));      // floor
+    // signage over the door
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(8, 1.0), new THREE.MeshBasicMaterial({ color: 0xff5a23 }));  sign.position.set(0, H + 0.5, HZ + 0.12); store.add(sign);
+    const sign2 = new THREE.Mesh(new THREE.PlaneGeometry(8, 0.8), new THREE.MeshBasicMaterial({ color: 0x21bb6a })); sign2.position.set(0, H + 1.4, HZ + 0.12); store.add(sign2);
+    // interior: checkout counter, aisle shelves, a glowing fridge wall, cashier, light
+    addBox(-3, 0.55, -2.6, 3.4, 1.1, 1.2, new THREE.MeshStandardMaterial({ color: 0xc0b89a, roughness: 0.8 }));
+    const shelfMat = new THREE.MeshStandardMaterial({ color: 0xb8bcc2, roughness: 0.7 });
+    addBox(1.6, 0.7, -0.6, 3.0, 1.4, 1.0, shelfMat);
+    addBox(1.6, 0.7,  1.8, 3.0, 1.4, 1.0, shelfMat);
+    const fridge = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.4, 6), new THREE.MeshStandardMaterial({ color: 0x9fd8d0, roughness: 0.3, emissive: 0x113330, emissiveIntensity: 0.5 }));
+    fridge.position.set(HX - 0.45, 1.2, 0); store.add(fridge);
+    const pl = new THREE.PointLight(0xfff0d0, 0.7, 16, 2); pl.position.set(0, H - 0.6, 0); store.add(pl);
+    const cashier = makePedMesh(); cashier.position.set(-3, 0, -3.2); store.add(cashier);
     store.position.copy(p);
     scene.add(store);
-    world.buildings.push({   // solid: the storefront blocks you, the door still triggers at <5 m
-      pos: new THREE.Vector3(p.x, 2, p.z),
-      size: new THREE.Vector3(10, 4, 8),
-    });
+    // wall collision (world coords) with a walkable door gap in the front (+z) face
+    world.buildings.push({ pos: new THREE.Vector3(p.x - (DOOR + segW / 2), H / 2, p.z + HZ), size: new THREE.Vector3(segW, H, 0.4) });
+    world.buildings.push({ pos: new THREE.Vector3(p.x + (DOOR + segW / 2), H / 2, p.z + HZ), size: new THREE.Vector3(segW, H, 0.4) });
+    world.buildings.push({ pos: new THREE.Vector3(p.x, H / 2, p.z - HZ), size: new THREE.Vector3(HX * 2, H, 0.4) });
+    world.buildings.push({ pos: new THREE.Vector3(p.x - HX, H / 2, p.z), size: new THREE.Vector3(0.4, H, HZ * 2) });
+    world.buildings.push({ pos: new THREE.Vector3(p.x + HX, H / 2, p.z), size: new THREE.Vector3(0.4, H, HZ * 2) });
     world.sevenElevens.push({ pos: p.clone(), group: store, chimed: 0 });
   }
 
