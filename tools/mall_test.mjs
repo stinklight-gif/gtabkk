@@ -240,6 +240,33 @@ async function main() {
     }));
     assert(ward.shown && ward.title === 'WARDROBE', 'F at home opens the wardrobe');
     assert(ward.items.some(t => /Remove/.test(t)), `wardrobe lists re-equip options (${ward.items.length} buttons)`);
+
+    // ---- 6. Mall Job mission (grab on floor 2 → heat → drop) ------------------
+    console.log('\n[6] Mall Job mission');
+    const m0 = await page.evaluate(() => {
+      const GAME = window.GAME;
+      document.getElementById('store').classList.remove('show'); GAME.state = 'playing';
+      GAME.mission.start('mallJob');
+      const m = GAME.mission.active;
+      return { name: m.name, stage: m.stage };
+    });
+    assert(m0.name === 'Mall Job' && m0.stage === 1, 'Mall Job starts and points at the mall');
+    // stage 1 → 2: reach the mall entrance
+    await page.evaluate(() => { const m = window.GAME.mission.active; window.GAME.player.group.position.set(m.markerPos.x, 0, m.markerPos.z); window.GAME.player.velocity.set(0, 0, 0); });
+    await waitFrames(page, 5);
+    const m1 = await page.evaluate(() => ({ stage: window.GAME.mission.active.stage, my: window.GAME.mission.active.markerPos.y }));
+    assert(m1.stage === 2 && m1.my > 8, `reaching the mall sends you to the 2nd-floor grab (stage ${m1.stage}, markerY ${m1.my.toFixed(0)})`);
+    // stage 2 → 3: reach the floor-2 target → the alarm raises the heat
+    await page.evaluate(() => { const m = window.GAME.mission.active; window.GAME.player.group.position.set(m.markerPos.x, m.markerPos.y, m.markerPos.z); window.GAME.wanted.stars = 0; });
+    await waitFrames(page, 5);
+    const m2 = await page.evaluate(() => ({ stage: window.GAME.mission.active.stage, stars: window.GAME.wanted.stars }));
+    assert(m2.stage === 3 && m2.stars >= 1, `grabbing the goods trips the alarm (stage ${m2.stage}, ${m2.stars}★)`);
+    // stage 3 → win: reach the drop
+    const cash0 = await page.evaluate(() => window.GAME.cash);
+    await page.evaluate(() => { const m = window.GAME.mission.active; window.GAME.player.group.position.set(m.markerPos.x, 0, m.markerPos.z); window.GAME.player.velocity.set(0, 0, 0); });
+    await waitFrames(page, 5);
+    const m3 = await page.evaluate(() => ({ stage: window.GAME.mission.active.stage, cash: window.GAME.cash }));
+    assert(m3.stage === 5 && m3.cash > cash0, `reaching the drop completes the job (+฿${m3.cash - cash0})`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
