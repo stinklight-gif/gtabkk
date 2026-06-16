@@ -129,6 +129,7 @@
   #store { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 10px; background: rgba(8,12,10,0.86); z-index: 75; }
   #store.show { display: flex; }
   #store h3 { color: #ff7a3a; letter-spacing: 4px; margin: 0 0 8px; }
+  #store-items { display: flex; flex-direction: column; gap: 10px; }
   #store button { font: inherit; color: #eaf6f2; background: #1b2a2a; border: 1px solid #2f6a5a; padding: 10px 18px; min-width: 280px; border-radius: 6px; cursor: pointer; letter-spacing: 1px; }
   #store button:hover { background: #244a44; }
   #store #store-leave { border-color: #555; margin-top: 6px; }
@@ -347,9 +348,7 @@
 
 <div id="store">
   <h3>7-ELEVEN</h3>
-  <button id="buy-snack">Snack — ฿20 (+40 HP)</button>
-  <button id="buy-drink">Energy drink — ฿30 (full stamina)</button>
-  <button id="buy-vest">Body armor — ฿200 (full)</button>
+  <div id="store-items"></div>
   <button id="store-leave">Leave</button>
 </div>
 
