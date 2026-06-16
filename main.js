@@ -8,7 +8,7 @@ import { makeAudio } from './audio.js';
 import { makeInput } from './input.js';
 export * from './player.js';
 import {
-  markSafehouseOwned, setShirt, update7Eleven, updateBTS, updateCollectibles, updateDistrict, updateGunShop, updateInteraction, updatePlayer, updateSafehouse, vehicleName
+  markSafehouseOwned, applyCosmetics, update7Eleven, updateBTS, updateCollectibles, updateDistrict, updateGunShop, updateInteraction, updatePlayer, updateSafehouse, vehicleName
 } from './player.js';
 export * from './vehicles.js';
 import {
@@ -165,7 +165,8 @@ export function saveGame() {
       safehouseOwned: !!G.econ.safehouse.owned,
       garageRented: !!G.econ.garage.rented,
       garageStored: G.econ.garage.stored,
-      shirtColor: G._shirtColor,
+      cosmetics: { shirt: G._shirtColor, hat: G._hat, jacket: G._jacketColor },
+      owned: G._owned || [],
     }));
   } catch (e) { /* storage unavailable — ignore */ }
 }
@@ -227,7 +228,9 @@ export function loadGame() {
       .map(v => ({ kind: v.kind, color: v.color | 0, plate: String(v.plate || ''), hp: typeof v.hp === 'number' ? v.hp : 100 }))
       .slice(0, G.econ.garage.capacity);
   }
-  if (typeof s.shirtColor === 'number') setShirt(s.shirtColor);   // restore bought outfit
+  if (Array.isArray(s.owned)) G._owned = s.owned.slice();           // restore bought cosmetics
+  if (s.cosmetics) applyCosmetics(s.cosmetics);
+  else if (typeof s.shirtColor === 'number') applyCosmetics({ shirt: s.shirtColor });   // back-compat
   G.hud.setCash(G.cash);
   updateAmmoHud();
 }
