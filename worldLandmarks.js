@@ -12,6 +12,8 @@ import { makePedMesh } from './entities.js';
 
 export function buildLandmarks(env) {
   const { scene, world, _m, _m2, _p, _q, _s, _e, addInstanced, bakeGroup, TEMPLE_I, TEMPLE_J, GARAGE_I, GARAGE_J, SAFE_I, SAFE_J, RIVER_I, YAO_I, YAO_J0, YAO_J1, GUN_I, GUN_J, MALL_I, MALL_J, SIDEWALK_EDGE } = env;
+  // Walkable structures shared by the floor-support physics (mall + BTS platforms).
+  world.walk = { platforms: [], ramps: [], solids: [] };
 
   // ---- Parked motorbikes — clusters along curbs (Bangkok parking is everywhere) ----
   // One InstancedMesh per part type (frame / wheel / handle). The original gave each
@@ -217,22 +219,32 @@ export function buildLandmarks(env) {
       const col = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 4.4, 8), colMat);
       col.position.set(cx2, stationFloorY + 2.5, cz2); scene.add(col);
     }
-    // side walls (low) on north & south edges of platform
+    // The platform is a walkable surface (worldSupportY) you reach by escalator.
+    const PY = stationFloorY + 0.3;                                  // platform walk height
+    world.walk.platforms.push({ x0: sx - 11, x1: sx + 11, z0: -5.5, z1: 5.5, y: PY });
+
+    // side rails: visual low walls + height-gated solids on the platform level
     const sideWallMat = new THREE.MeshStandardMaterial({ color: 0xbbbbbb, roughness: 0.7 });
-    const wallN = new THREE.Mesh(new THREE.BoxGeometry(22, 1.1, 0.18), sideWallMat);
-    wallN.position.set(sx, stationFloorY + 0.85, 5.5); scene.add(wallN);
-    const wallS = new THREE.Mesh(new THREE.BoxGeometry(22, 1.1, 0.18), sideWallMat);
-    wallS.position.set(sx, stationFloorY + 0.85, -5.5); scene.add(wallS);
-    // stair tower descending to street level on the south side
-    const stairMat = new THREE.MeshStandardMaterial({ color: 0xc8c8c8, roughness: 0.85 });
-    const stairTower = new THREE.Mesh(new THREE.BoxGeometry(4, stationFloorY, 3), stairMat);
-    stairTower.position.set(sx, stationFloorY/2, -8.5); stairTower.castShadow = true; scene.add(stairTower);
-    // collision for stair tower so the player can walk against it
-    world.buildings.push({
-      pos: new THREE.Vector3(sx, stationFloorY/2, -8.5),
-      size: new THREE.Vector3(4, stationFloorY, 3),
-      mesh: stairTower,
-    });
+    const railWall = (px, pz, sxw, szw) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(sxw, 1.1, szw), sideWallMat);
+      m.position.set(px, PY + 0.55, pz); scene.add(m);
+      world.walk.solids.push({ x: px, z: pz, sx: sxw, sz: szw, y0: PY, y1: PY + 1.3 });
+    };
+    railWall(sx, 5.5, 22, 0.3);                                      // north edge (full)
+    railWall(sx - 6.75, -5.5, 8.5, 0.3);                            // south edge (gap for the escalator)
+    railWall(sx + 6.75, -5.5, 8.5, 0.3);
+    railWall(sx - 11, 0, 0.3, 11); railWall(sx + 11, 0, 0.3, 11);   // west / east ends
+
+    // walk-up escalator from the street to the platform (over the open avenue)
+    const escMat = new THREE.MeshStandardMaterial({ color: 0x9a9a9a, roughness: 0.6, metalness: 0.2 });
+    world.walk.ramps.push({ x0: sx - 2.5, x1: sx + 2.5, z0: -25, z1: -5, axis: 'z', yLo: 0, yHi: PY });
+    const escLen = Math.hypot(20, PY), escAng = Math.atan2(PY, 20);
+    const escMesh = new THREE.Mesh(new THREE.BoxGeometry(5, 0.5, escLen), escMat);
+    escMesh.position.set(sx, PY / 2, -15); escMesh.rotation.x = -escAng; escMesh.castShadow = true; escMesh.receiveShadow = true; scene.add(escMesh);
+    for (const sxr of [-2.6, 2.6]) {
+      const r = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.0, escLen), sideWallMat);
+      r.position.set(sx + sxr, PY / 2 + 0.6, -15); r.rotation.x = -escAng; scene.add(r);
+    }
     // station sign
     const stationSign = new THREE.Mesh(
       new THREE.PlaneGeometry(6, 1.0),
@@ -240,6 +252,7 @@ export function buildLandmarks(env) {
     );
     stationSign.position.set(sx, stationFloorY + 5.0, 6.05);
     scene.add(stationSign);
+    world.bts = { x: sx, platformY: PY };   // walkable platform info (probe / future use)
   }
 
   // ---- Street lamps at intersections ----
@@ -358,7 +371,8 @@ export function buildLandmarks(env) {
     const railMat  = new THREE.MeshStandardMaterial({ color: 0x2a3138, roughness: 0.6, metalness: 0.3 });
     const shopMat  = new THREE.MeshStandardMaterial({ color: 0xece3d3, roughness: 0.8 });
 
-    const platforms = [], ramps = [], solids = [], shops = [];
+    const { platforms, ramps, solids } = world.walk;   // shared with the BTS platform
+    const shops = [];
 
     const addWall = (px, pz, sx, sz, mat = wallMat) => {
       const m = new THREE.Mesh(new THREE.BoxGeometry(sx, WALLH, sz), mat);
@@ -465,7 +479,7 @@ export function buildLandmarks(env) {
       shops.push({ name: d.name, pos: new THREE.Vector3(spx, fy, spz) });
     }
 
-    world.mall = { center: new THREE.Vector3(cx, 0, cz), hw: HW, hd: HD, platforms, ramps, solids, shops };
+    world.mall = { center: new THREE.Vector3(cx, 0, cz), hw: HW, hd: HD, shops };
     world.poi.terminal21 = new THREE.Vector3(cx, 0, cz - HD - 2);   // stand-here just outside the entrance
     const glow = new THREE.PointLight(0xffcf4a, 0.8, 24, 2); glow.position.set(cx, 5, cz - HD - 3); scene.add(glow);
 

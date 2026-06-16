@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
-import { tip, resolvePlayerVsBuildings, resolvePlayerVsVehicles, resolvePlayerVsMall, mallSupportY, saveGame, updateAmmoHud, updateCombat, updatePlayerInVehicle } from './main.js';
+import { tip, resolvePlayerVsBuildings, resolvePlayerVsVehicles, resolvePlayerVsPlatforms, worldSupportY, saveGame, updateAmmoHud, updateCombat, updatePlayerInVehicle } from './main.js';
 
 export function updatePlayer(dt) {
   const p = G.player;
@@ -47,10 +47,10 @@ export function updatePlayer(dt) {
 
   resolvePlayerVsBuildings(p);
   resolvePlayerVsVehicles(p);
-  resolvePlayerVsMall(p);
-  // Vertical support: city ground (y=0) or a Terminal 21 floor / escalator under
-  // the player's feet. Walk off an edge → support drops → you fall.
-  const gy = mallSupportY(p.group.position.x, p.group.position.z, p.group.position.y);
+  resolvePlayerVsPlatforms(p);
+  // Vertical support: city ground (y=0) or a walkable floor / escalator (mall, BTS
+  // platform) under the player's feet. Walk off an edge → support drops → you fall.
+  const gy = worldSupportY(p.group.position.x, p.group.position.z, p.group.position.y);
   if (p.group.position.y <= gy + 0.02) { p.group.position.y = gy; p.velocity.y = 0; p.grounded = true; }
   else p.grounded = false;
 

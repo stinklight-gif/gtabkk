@@ -144,6 +144,41 @@ async function main() {
       assert(after.dist > before.dist + 0.3, `water throw pushed the ped away (${before.dist.toFixed(2)} → ${after.dist.toFixed(2)} m)`);
       assert(after.panicT > 0, `water throw startled the ped (panicT ${after.panicT.toFixed(2)})`);
     }
+
+    // ---- 4. BTS Skytrain platform is walk-up ---------------------------------
+    console.log('\n[4] BTS walk-up platform');
+    const bts = await page.evaluate(() => window.GAME.world.bts);
+    assert(bts && bts.platformY > 10, `BTS platform is registered (y=${bts && bts.platformY})`);
+    // stand on the escalator halfway up
+    await page.evaluate(b => {
+      const GAME = window.GAME;
+      GAME.state = 'playing'; document.getElementById('pause').classList.remove('show');
+      GAME.player.inVehicle = null; GAME.player.velocity.set(0, 0, 0);
+      GAME.player.group.position.set(b.x, 7, -15);          // BTS escalator mid-point
+    }, bts);
+    await waitFrames(page, 3);
+    const escY = await page.evaluate(() => window.GAME.player.group.position.y);
+    assert(escY > 5 && escY < 9, `BTS escalator is solid underfoot (y=${escY.toFixed(2)})`);
+    // stand on the platform
+    await page.evaluate(b => {
+      const GAME = window.GAME;
+      GAME.player.velocity.set(0, 0, 0);
+      GAME.player.group.position.set(b.x, b.platformY + 0.3, 0);
+    }, bts);
+    await waitFrames(page, 3);
+    const platY = await page.evaluate(() => window.GAME.player.group.position.y);
+    assert(Math.abs(platY - bts.platformY) < 0.25, `BTS platform is solid — you stand at y≈${bts.platformY} (got ${platY.toFixed(2)})`);
+    // walk up the escalator from the street and gain height
+    const bUp0 = await page.evaluate(b => {
+      const GAME = window.GAME;
+      GAME.player.inVehicle = null; GAME.player.velocity.set(0, 0, 0);
+      GAME.player.group.position.set(b.x, 0, -25);          // escalator foot
+      GAME.camRig.yaw = Math.PI;                            // face up the ramp (+z)
+      return GAME.player.group.position.y;
+    }, bts);
+    await page.keyboard.down('KeyW'); await waitFrames(page, 95); await page.keyboard.up('KeyW'); await waitFrames(page, 3);
+    const bUp1 = await page.evaluate(() => window.GAME.player.group.position.y);
+    assert(bUp1 > bUp0 + 4, `walking up the BTS escalator raises you (y ${bUp0.toFixed(1)} → ${bUp1.toFixed(1)})`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
