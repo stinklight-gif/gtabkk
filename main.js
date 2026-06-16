@@ -437,6 +437,8 @@ async function init() {
   // Store overlay "Leave" button (item buttons are generated per shop in openStore)
   const leaveBtn = document.getElementById('store-leave');
   if (leaveBtn) leaveBtn.addEventListener('click', () => { document.getElementById('store').classList.remove('show'); G.state = 'playing'; G.input.requestLock(); });
+  const arcadeLeave = document.getElementById('arcade-leave');
+  if (arcadeLeave) arcadeLeave.addEventListener('click', () => closeArcade());
 
   // Restore saved progress, then autosave on unload
   // (loadGame is deferred until a slot is chosen in the menu)
@@ -667,6 +669,72 @@ export function updateRadio(dt) {
   G.hud.setRadioChip(inV && a.radio.station !== 0 ? '📻 ' + a.radio.names[a.radio.station] : null);
 }
 
+// =============================================================================
+// Arcade mini-game (Akihabara Arcade, Terminal 21 floor 1): "Tuk-Tuk Dash" — a
+// timing game. Stop the sweeping marker in the green over 3 rounds; the closer
+// to centre, the higher the score; payout = score × 2 baht. Its own G.state so
+// the world pauses while you play.
+// =============================================================================
+let _arcadeCtx = null;
+export function startArcade() {
+  G.arcade = { round: 0, results: [], marker: 0, dir: 1, speed: 1.0, locked: false, lockT: 0, score: 0, payout: 0, done: false };
+  G.state = 'arcade';
+  document.getElementById('arcade').classList.add('show');
+  document.exitPointerLock();
+}
+export function closeArcade() {
+  document.getElementById('arcade').classList.remove('show');
+  G.arcade = null; G.state = 'playing'; if (G.input.requestLock) G.input.requestLock();
+}
+export function updateArcade(dt) {
+  const a = G.arcade; if (!a) return;
+  if (!a.done) {
+    if (!a.locked) {
+      a.marker += a.dir * a.speed * dt;
+      if (a.marker > 1) { a.marker = 1; a.dir = -1; } else if (a.marker < 0) { a.marker = 0; a.dir = 1; }
+      if (G.input.pressed('Space')) {
+        a.locked = true; a.lockT = 0.6;
+        const s = Math.max(0, Math.round(100 - Math.abs(a.marker - 0.5) * 220));
+        a.results.push(s); a.score += s;
+        if (G.audio && G.audio.blip) G.audio.blip({ freq: 360 + s * 6, dur: 0.1, gain: 0.12 });
+      }
+    } else {
+      a.lockT -= dt;
+      if (a.lockT <= 0) {
+        a.round++;
+        if (a.round >= 3) {
+          a.done = true; a.payout = a.score * 2; G.cash += a.payout; G.hud.setCash(G.cash);
+          if (a.payout > 0 && G.audio && G.audio.chime) G.audio.chime();
+        } else { a.locked = false; a.marker = 0; a.dir = 1; a.speed = 1.0 + a.round * 0.45; }
+      }
+    }
+  } else if (G.input.pressed('Space')) { closeArcade(); return; }
+  const cv = document.getElementById('arcade-canvas');
+  if (cv) renderArcade(_arcadeCtx || (_arcadeCtx = cv.getContext('2d')), a);
+}
+function renderArcade(ctx, a) {
+  ctx.clearRect(0, 0, 520, 220); ctx.fillStyle = '#0a0814'; ctx.fillRect(0, 0, 520, 220);
+  const x0 = 40, x1 = 480, y = 130, w = x1 - x0, mid = (x0 + x1) / 2;
+  ctx.fillStyle = '#2a2440'; ctx.fillRect(x0, y - 10, w, 20);
+  ctx.fillStyle = 'rgba(57,255,122,0.35)'; ctx.fillRect(mid - 40, y - 10, 80, 20);
+  ctx.fillStyle = '#39ff7a'; ctx.fillRect(mid - 3, y - 15, 6, 30);
+  const mx = x0 + a.marker * w;
+  ctx.fillStyle = a.locked ? '#ffcf4a' : '#ff2a86'; ctx.fillRect(mx - 2, y - 24, 4, 48);
+  ctx.fillStyle = '#cfe3e0'; ctx.font = '16px system-ui, sans-serif';
+  ctx.textAlign = 'left'; ctx.fillText(`Round ${Math.min(a.round + 1, 3)}/3`, 20, 30);
+  ctx.textAlign = 'right'; ctx.fillText(`Score ${a.score}`, 500, 30);
+  ctx.textAlign = 'center';
+  if (a.done) {
+    ctx.fillStyle = '#ffcf4a'; ctx.font = 'bold 22px system-ui, sans-serif';
+    ctx.fillText(`SCORE ${a.score} — WON ฿${a.payout}`, mid, 80);
+    ctx.fillStyle = '#9fe0ff'; ctx.font = '14px system-ui, sans-serif';
+    ctx.fillText('SPACE or Leave to exit', mid, 195);
+  } else if (a.results.length) {
+    ctx.fillStyle = '#8a8aa0'; ctx.font = '13px system-ui, sans-serif';
+    ctx.fillText('rounds: ' + a.results.join('  ·  '), mid, 195);
+  }
+}
+
 // Free-fly camera for photo mode: mouse to look, WASD to fly, Space/Ctrl up/down.
 export function updatePhotoCam(dt) {
   const pc = G.photoCam;
@@ -815,6 +883,9 @@ export function loop() {
   } else if (G.state === 'options') {
     if (G.input.endFrame) G.input.endFrame();
   } else if (G.state === 'store') {
+    if (G.input.endFrame) G.input.endFrame();
+  } else if (G.state === 'arcade') {
+    updateArcade(dt);
     if (G.input.endFrame) G.input.endFrame();
   }
 

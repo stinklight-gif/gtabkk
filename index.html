@@ -133,6 +133,13 @@
   #store button { font: inherit; color: #eaf6f2; background: #1b2a2a; border: 1px solid #2f6a5a; padding: 10px 18px; min-width: 280px; border-radius: 6px; cursor: pointer; letter-spacing: 1px; }
   #store button:hover { background: #244a44; }
   #store #store-leave { border-color: #555; margin-top: 6px; }
+  #arcade { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 12px; background: rgba(6,4,14,0.9); z-index: 76; }
+  #arcade.show { display: flex; }
+  #arcade h3 { color: #ff2a86; letter-spacing: 4px; margin: 0; text-shadow: 0 0 10px #ff2a86; }
+  #arcade-canvas { border: 2px solid #ff2a86; box-shadow: 0 0 26px rgba(255,42,134,0.35); background: #0a0814; image-rendering: pixelated; }
+  #arcade-info { color: #9fe0ff; font-size: 13px; letter-spacing: 2px; }
+  #arcade button { font: inherit; color: #eaf6f2; background: #1b1430; border: 1px solid #6a2f6a; padding: 8px 18px; border-radius: 6px; cursor: pointer; letter-spacing: 1px; }
+  #arcade button:hover { background: #2a1d44; }
   #gameover { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; background: rgba(18,3,3,0.8); z-index: 80; cursor: pointer; }
   #gameover.show { display: flex; }
   #gameover .go-title { color: #ff3344; letter-spacing: 10px; font-size: 56px; margin: 0; text-shadow: 0 0 24px #ff3344; }
@@ -350,6 +357,13 @@
   <h3>7-ELEVEN</h3>
   <div id="store-items"></div>
   <button id="store-leave">Leave</button>
+</div>
+
+<div id="arcade">
+  <h3>ARCADE · TUK-TUK DASH</h3>
+  <canvas id="arcade-canvas" width="520" height="220"></canvas>
+  <div id="arcade-info">Stop the marker in the green — <b>SPACE</b> · 3 rounds</div>
+  <button id="arcade-leave">Leave</button>
 </div>
 
 <div id="gameover">
