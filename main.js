@@ -165,6 +165,7 @@ export function saveGame() {
       safehouseOwned: !!G.econ.safehouse.owned,
       garageRented: !!G.econ.garage.rented,
       garageStored: G.econ.garage.stored,
+      businesses: G.econ.businesses,
       cosmetics: { shirt: G._shirtColor, hat: G._hat, jacket: G._jacketColor },
       owned: G._owned || [],
     }));
@@ -227,6 +228,12 @@ export function loadGame() {
       .filter(v => v && typeof v.kind === 'string')
       .map(v => ({ kind: v.kind, color: v.color | 0, plate: String(v.plate || ''), hp: typeof v.hp === 'number' ? v.hp : 100 }))
       .slice(0, G.econ.garage.capacity);
+  }
+  if (s.businesses && typeof s.businesses === 'object') {           // restore owned businesses + pending takings
+    for (const id in s.businesses) {
+      const b = s.businesses[id];
+      if (b && typeof b === 'object') G.econ.businesses[id] = { owned: !!b.owned, pending: Math.max(0, +b.pending || 0) };
+    }
   }
   if (Array.isArray(s.owned)) G._owned = s.owned.slice();           // restore bought cosmetics
   if (s.cosmetics) applyCosmetics(s.cosmetics);
