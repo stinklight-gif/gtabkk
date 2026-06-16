@@ -160,7 +160,7 @@ export function saveGame() {
       collected: G.collected || 0,
       welcomeDone: !!G._welcomeDone,
       soiRunWon: !!G._soiRunWon, hitDone: !!G._hitDone,
-      px: p.group.position.x, pz: p.group.position.z,
+      px: p.group.position.x, py: p.group.position.y, pz: p.group.position.z,
       // property / ownership economy
       safehouseOwned: !!G.econ.safehouse.owned,
       garageRented: !!G.econ.garage.rented,
@@ -214,7 +214,7 @@ export function loadGame() {
     s.food.forEach((v, i) => { const f = G.world.foodStalls[i]; if (v && f && !f.visited) { f.visited = true; f.glowMat.emissiveIntensity = 0; f.glowMat.color.setHex(0x555555); } });
     G.foodVisited = (typeof s.foodVisited === 'number') ? s.foodVisited : s.food.filter(Boolean).length;
   }
-  if (typeof s.px === 'number' && typeof s.pz === 'number') p.group.position.set(s.px, 0, s.pz);
+  if (typeof s.px === 'number' && typeof s.pz === 'number') p.group.position.set(s.px, Math.max(0, s.py || 0), s.pz);   // py = which mall floor you were on
   if (s.soiRunWon) G._soiRunWon = true;
   if (s.hitDone) G._hitDone = true;
   if (s.welcomeDone) { G._welcomeDone = true; if (G.mission.resume) G.mission.resume(true); }

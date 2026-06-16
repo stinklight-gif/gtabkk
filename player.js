@@ -305,6 +305,20 @@ export function updateMall(dt) {
   if (inside && !G._inMall) { G._inMall = true; G.hud.showSubtitle('Terminal 21', 'เทอร์มินอล 21', 2.2); tip('mall', 'Terminal 21 — 3 floors, each a world city. Ride the escalators; press E at a shop to browse.', 'เทอร์มินอล 21'); }
   else if (!inside && G._inMall) G._inMall = false;
   if (!inside) return;
+  // Elevator: a quick lift between floors (escalators are the scenic route).
+  if (mall.elevator && Math.abs(p.group.position.x - mall.elevator.x) < 2.4 && Math.abs(p.group.position.z - mall.elevator.z) < 2.4) {
+    const floors = mall.floors;
+    let cur = 0;
+    for (let i = 1; i < floors.length; i++) if (Math.abs(p.group.position.y - floors[i]) < Math.abs(p.group.position.y - floors[cur])) cur = i;
+    const next = (cur + 1) % floors.length;
+    G.hud.showPrompt(`Lift — <b>E</b>: go to floor ${next === 0 ? 'G' : next}`, 0.4);
+    if (G.input.pressed('KeyE')) {
+      p.group.position.y = floors[next] + 0.05; p.velocity.set(0, 0, 0); p.grounded = false;
+      G.hud.showNotif(`Floor ${next === 0 ? 'G · Asok' : next === 1 ? '1 · Tokyo' : '2 · Europe'}`);
+      if (G.audio && G.audio.blip) G.audio.blip({ freq: 660, dur: 0.08, gain: 0.12 });
+    }
+    return;
+  }
   for (const s of mall.shops) {
     // floor-aware: a shop only triggers on its own level, not from the floor below
     if (dist2(p.group.position, s.pos) < 3.2 * 3.2 && Math.abs(p.group.position.y - s.pos.y) < 2.5) {
