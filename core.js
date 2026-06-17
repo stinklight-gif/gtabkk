@@ -94,8 +94,18 @@ export const G = {
     safehouse: { owned: false, pos: null },           // buyable respawn point
     garage: { rented: false, stored: [], capacity: 4, retrieveIdx: 0 }, // stored: [{kind,color,plate,hp}]
     businesses: {},                                   // id -> { owned, pending } passive-income holdings
+    upgrades: { engine: 0, nitro: 0, armor: 0 },      // account-wide vehicle tuning (levels 0..3)
   },
 };
+
+// Garage vehicle upgrades: account-wide tuning levels you buy at the U-Spray,
+// applied to whatever car you drive (see vehicles.js applyUpgrades). A money
+// sink for late-game wealth that meaningfully changes chases/getaways.
+export const UPGRADES = [
+  { id: 'engine', label: 'Engine', max: 3, prices: [4000, 9000, 18000],  desc: 'Top speed + acceleration' },
+  { id: 'nitro',  label: 'Nitro',  max: 3, prices: [3500, 8000, 16000],  desc: 'Stronger SHIFT boost' },
+  { id: 'armor',  label: 'Armor',  max: 3, prices: [3000, 7000, 14000],  desc: 'Less crash damage' },
+];
 
 // Buyable businesses: walk up and E to buy; while owned they accrue passive
 // income (rate/s, capped) you return to collect. Persisted in the save.

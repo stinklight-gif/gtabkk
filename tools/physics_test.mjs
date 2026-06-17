@@ -277,6 +277,36 @@ async function main() {
       return { half, full };
     });
     assert(comp.half === '15%' && comp.full === '30%', `completion tracks all 6 chain milestones (3 jobs ${comp.half} → 6 jobs ${comp.full})`);
+
+    // ---- 8. Garage vehicle upgrades ------------------------------------------
+    console.log('\n[8] garage vehicle upgrades');
+    const setup = await page.evaluate(() => {
+      const G = window.GAME;
+      G.state = 'playing'; document.getElementById('garageup').classList.remove('show');
+      G.wanted.stars = 0; G.econ.garage.rented = true; G.econ.upgrades = { engine: 0, nitro: 0, armor: 0 };
+      G.cash = 50000; G.hud.setCash(50000);
+      const car = G.vehicles.find(v => v.spec && !v.dead && !v.isCop) || G.vehicles[0];
+      const g = G.world.garages[0];
+      car.pos.set(g.pos.x, 0, g.pos.z); if (car.group) car.group.position.copy(car.pos);
+      car.hp = 100; car.driver = 'player'; car.npc = null; G.player.inVehicle = car;
+      G.player.group.position.set(g.pos.x, 0, g.pos.z);
+      return { baseTop: car.spec.topSpeed };
+    });
+    await page.keyboard.down('KeyU'); await waitFrames(page, 3); await page.keyboard.up('KeyU'); await waitFrames(page, 3);
+    const opened = await page.evaluate(() => ({ shown: document.getElementById('garageup').classList.contains('show'), n: document.querySelectorAll('#garageup-items button').length, state: window.GAME.state }));
+    assert(opened.shown && opened.n === 3 && opened.state === 'store', 'U at the garage opens the upgrades menu (3 categories)');
+    await page.click('#garageup-items button');   // first button = Engine
+    await waitFrames(page, 2);
+    const eng = await page.evaluate(() => ({ lvl: window.GAME.econ.upgrades.engine, cash: window.GAME.cash, top: window.GAME.player.inVehicle.spec.topSpeed }));
+    assert(eng.lvl === 1 && eng.cash === 46000, `buying Engine costs ฿4,000 and levels up (lv ${eng.lvl}, cash ${eng.cash})`);
+    assert(eng.top > setup.baseTop, `the Engine upgrade raises top speed (${setup.baseTop.toFixed(1)} → ${eng.top.toFixed(1)})`);
+    await page.evaluate(() => document.querySelectorAll('#garageup-items button')[2].click());   // Armor
+    await waitFrames(page, 2);
+    const arm = await page.evaluate(() => ({ lvl: window.GAME.econ.upgrades.armor, mul: window.GAME.player.inVehicle.spec.armorMul }));
+    assert(arm.lvl === 1 && arm.mul < 1, `the Armor upgrade softens crashes (armorMul ${arm.mul})`);
+    await page.click('#garageup-leave'); await waitFrames(page, 3);
+    const left = await page.evaluate(() => window.GAME.state);
+    assert(left === 'playing', 'leaving the upgrades menu returns to the game');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
