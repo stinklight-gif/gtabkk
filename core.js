@@ -99,10 +99,16 @@ export const G = {
 
 // Buyable businesses: walk up and E to buy; while owned they accrue passive
 // income (rate/s, capped) you return to collect. Persisted in the save.
+//
+// Economy curve (for balancing): jobs are the primary earner — welcome ฿1,200,
+// Soi Run ฿2,500, Hit ฿4,000, Delivery ฿6,000, Mall Job ฿8,000. Businesses are a
+// supplement, not a replacement: combined ~140 ฿/s (down from 185), each
+// recouping its price in ~4–5 min of accrual, with caps that punish neglect so
+// you can't idle-hoard. Tuned so active jobs stay worthwhile vs. passive income.
 export const BUSINESSES = [
-  { id: 'noodle',   name: 'Noodle Cart',          price: 5000,  rate: 25,  cap: 1500, pos: new THREE.Vector3(8, 0, 30) },
-  { id: 'tukstand', name: 'Tuk-Tuk Stand',        price: 12000, rate: 50,  cap: 3000, pos: new THREE.Vector3(8, 0, -44) },
-  { id: 't21unit',  name: 'Terminal 21 Retail Unit', price: 30000, rate: 110, cap: 7000, pos: new THREE.Vector3(-25, 0, 18) },
+  { id: 'noodle',   name: 'Noodle Cart',          price: 5000,  rate: 20, cap: 1200, pos: new THREE.Vector3(8, 0, 30) },
+  { id: 'tukstand', name: 'Tuk-Tuk Stand',        price: 12000, rate: 40, cap: 2400, pos: new THREE.Vector3(8, 0, -44) },
+  { id: 't21unit',  name: 'Terminal 21 Retail Unit', price: 26000, rate: 80, cap: 4800, pos: new THREE.Vector3(-25, 0, 18) },
 ];
 
 // Economy prices (one place to balance the money sinks).

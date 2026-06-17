@@ -311,7 +311,7 @@ async function main() {
     assert(collected > c0, `you collect its passive income (+฿${collected - c0})`);
     // the phone tracks owned businesses + their income rate (map icons verified by smoke_map.png)
     const bizLine = await page.evaluate(() => { window.GAME.hud.setPhoneStats(); return document.getElementById('ph-biz').textContent; });
-    assert(/1 \/ 3/.test(bizLine) && /฿110\/s/.test(bizLine), `phone shows owned businesses + income ("${bizLine}")`);
+    assert(/1 \/ 3/.test(bizLine) && /฿80\/s/.test(bizLine), `phone shows owned businesses + income ("${bizLine}")`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
