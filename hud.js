@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 
 // -----------------------------------------------------------------------------
@@ -15,6 +15,26 @@ import {
 export const HOME_COLOR = '#4fe3c0';     // Home / Safehouse (teal)
 export const GARAGE_COLOR = '#5b9cff';   // Garage / U-Spray (blue)
 export const MALL_COLOR = '#c98bff';     // Terminal 21 mall (purple)
+export const BIZ_COLOR = '#39ff7a';      // Buyable businesses (green); filled = owned
+export const BTS_COLOR = '#3fd0ff';      // BTS Skytrain station (cyan)
+export const SEVEN_COLOR = '#ff7a2a';    // 7-Eleven (orange)
+
+export function drawBizGlyph(ctx, x, y, s, color, filled) {
+  ctx.beginPath();                       // a diamond ("฿" stand-in); hollow = for sale
+  ctx.moveTo(x, y - s); ctx.lineTo(x + s, y); ctx.lineTo(x, y + s); ctx.lineTo(x - s, y); ctx.closePath();
+  if (filled) { ctx.fillStyle = color; ctx.fill(); }
+  ctx.strokeStyle = color; ctx.lineWidth = Math.max(1, s * 0.3); ctx.stroke();
+}
+
+export function drawBtsGlyph(ctx, x, y, s, color) {
+  ctx.fillStyle = color;                 // a little train car with two windows
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(x - s, y - s * 0.7, s * 2, s * 1.4, s * 0.4); else ctx.rect(x - s, y - s * 0.7, s * 2, s * 1.4);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(8,12,20,0.85)';
+  ctx.fillRect(x - s * 0.62, y - s * 0.28, s * 0.5, s * 0.55);
+  ctx.fillRect(x + s * 0.12, y - s * 0.28, s * 0.5, s * 0.55);
+}
 
 export function drawHouseGlyph(ctx, x, y, s, color, filled) {
   ctx.beginPath();                       // a little house silhouette (body + roof)
@@ -117,11 +137,17 @@ export function bindHud() {
     const total = (G.world && G.world.collectibles) ? G.world.collectibles.length : 0;
     document.getElementById('ph-amulets').textContent = `${G.collected || 0} / ${total}`;
     document.getElementById('ph-fares').textContent = (G.taxi && G.taxi.fares) || 0;
-    document.getElementById('ph-cops').textContent = _copsKilled || 0;
+    document.getElementById('ph-cops').textContent = G.copsKilled || 0;
     const milestones = (G._welcomeDone ? 1 : 0) + (G._soiRunWon ? 1 : 0) + (G._hitDone ? 1 : 0);
     const pct = Math.round((G.collected || 0) / Math.max(1, total) * 70 + milestones / 3 * 30);
     document.getElementById('ph-complete').textContent = pct + '%';
     document.getElementById('ph-food').textContent = `${G.foodVisited || 0} / ${(G.world.foodStalls || []).length}`;
+    const bizEl = document.getElementById('ph-biz');
+    if (bizEl) {
+      let owned = 0, rate = 0, pending = 0;
+      for (const b of BUSINESSES) { const s = G.econ.businesses[b.id]; if (s && s.owned) { owned++; rate += b.rate; pending += Math.floor(s.pending || 0); } }
+      bizEl.textContent = `${owned} / ${BUSINESSES.length} · ฿${rate}/s` + (pending > 0 ? ` · ฿${pending.toLocaleString()} ready` : '');
+    }
   }
   function setVehicle(hp, show) {
     const row = document.getElementById('veh-row');
@@ -203,6 +229,12 @@ export function bindHud() {
     if (ga0 && ga0.pos) { const [gx, gy] = mm(ga0.pos); drawGarageGlyph(mctx, gx, gy, 4.5, GARAGE_COLOR, !!(G.econ.garage && G.econ.garage.rented)); }
     const t21 = G.world.poi && G.world.poi.terminal21;
     if (t21) { const [tx2, ty2] = mm(t21); drawMallGlyph(mctx, tx2, ty2, 5, MALL_COLOR); }
+    // 7-Elevens (small orange squares)
+    if (G.world.sevenElevens) { mctx.fillStyle = SEVEN_COLOR; for (const e of G.world.sevenElevens) { const [x, y] = mm(e.pos); mctx.fillRect(x - 2, y - 2, 4, 4); } }
+    // BTS station
+    if (G.world.bts) { const [x, y] = mm({ x: G.world.bts.x, z: G.world.bts.z || 0 }); drawBtsGlyph(mctx, x, y, 4, BTS_COLOR); }
+    // buyable businesses (diamonds; filled once owned)
+    for (const b of BUSINESSES) { if (!b.pos) continue; const [x, y] = mm(b.pos); drawBizGlyph(mctx, x, y, 4, BIZ_COLOR, !!(G.econ.businesses[b.id] && G.econ.businesses[b.id].owned)); }
     mctx.restore();
     // player blip (always center, facing up)
     mctx.fillStyle = '#21f0ff';

@@ -138,6 +138,7 @@ async function main() {
           if (GAME.audio && GAME.audio.radio && GAME.audio.radio.station === 0) GAME.audio.radio.next();
           GAME.camRig.yaw = Math.PI; GAME.camRig.pitch = -0.06;
           if (tabmap) {                                          // open the full-screen TAB map overlay
+            GAME.econ.businesses.noodle = { owned: true, pending: 800 };   // show one owned business (filled icon)
             GAME.showMap = true;
             document.getElementById('fullmap-wrap').classList.add('show');
             GAME.state = 'map';
