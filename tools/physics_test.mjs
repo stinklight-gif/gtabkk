@@ -218,9 +218,16 @@ async function main() {
       G.player.velocity.set(0, 0, 0); G.camRig.yaw = 0;         // forward = -z, into the store
       return { x: s.pos.x, z: s.pos.z };
     });
-    await page.keyboard.down('KeyW'); await waitFrames(page, 44); await page.keyboard.up('KeyW'); await waitFrames(page, 3);
-    const ins = await page.evaluate(e => { const p = window.GAME.player.group.position; return { x: p.x, z: p.z, inX: Math.abs(p.x - e.x) < 4.5, inZ: p.z < e.z + 3.5 && p.z > e.z - 3.5 }; }, e);
-    assert(ins.inX && ins.inZ, `you walk in through the 7-Eleven door (now at z ${ins.z.toFixed(1)}, front was ${(e.z + 4).toFixed(1)})`);
+    // Poll until inside: distance walked per frame-count varies with SwiftShader
+    // frame timing, so step and check rather than assume a fixed walk distance.
+    await page.keyboard.down('KeyW');
+    let ins = null;
+    for (let k = 0; k < 16 && !(ins && ins.in); k++) {
+      await waitFrames(page, 8);
+      ins = await page.evaluate(e => { const p = window.GAME.player.group.position; return { x: p.x, z: p.z, in: Math.abs(p.x - e.x) < 4.5 && p.z < e.z + 3.5 && p.z > e.z - 4 }; }, e);
+    }
+    await page.keyboard.up('KeyW'); await waitFrames(page, 3);
+    assert(ins && ins.in, `you walk in through the 7-Eleven door (now at z ${ins && ins.z.toFixed(1)}, front was ${(e.z + 4).toFixed(1)})`);
     await page.keyboard.down('KeyE'); await waitFrames(page, 3); await page.keyboard.up('KeyE'); await waitFrames(page, 3);
     const shop = await page.evaluate(() => ({ state: window.GAME.state, title: document.querySelector('#store h3').textContent }));
     assert(shop.state === 'store' && /7-ELEVEN/.test(shop.title), 'the shop opens from inside the 7-Eleven');
@@ -259,6 +266,17 @@ async function main() {
     const gwDone = await page.evaluate(() => ({ stage: window.GAME.mission.active.stage, done: !!window.GAME._getawayDone, cash: window.GAME.cash }));
     assert(gwDone.done && gwDone.stage === 5, `hitting all drops completes the Getaway (stage ${gwDone.stage})`);
     assert(gwDone.cash > gwCash0, `the Getaway pays out (+฿${gwDone.cash - gwCash0})`);
+    // completion % now tracks the full 6-job chain (not just the first 3)
+    const comp = await page.evaluate(() => {
+      const G = window.GAME; G.collected = 0;
+      G._welcomeDone = G._soiRunWon = G._hitDone = true;
+      G._deliveryDone = G._mallJobDone = G._getawayDone = false;
+      G.hud.setPhoneStats(); const half = document.getElementById('ph-complete').textContent;
+      G._deliveryDone = G._mallJobDone = G._getawayDone = true;
+      G.hud.setPhoneStats(); const full = document.getElementById('ph-complete').textContent;
+      return { half, full };
+    });
+    assert(comp.half === '15%' && comp.full === '30%', `completion tracks all 6 chain milestones (3 jobs ${comp.half} → 6 jobs ${comp.full})`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

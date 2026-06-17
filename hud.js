@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, missionMilestones, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 
 // -----------------------------------------------------------------------------
@@ -138,8 +138,8 @@ export function bindHud() {
     document.getElementById('ph-amulets').textContent = `${G.collected || 0} / ${total}`;
     document.getElementById('ph-fares').textContent = (G.taxi && G.taxi.fares) || 0;
     document.getElementById('ph-cops').textContent = G.copsKilled || 0;
-    const milestones = (G._welcomeDone ? 1 : 0) + (G._soiRunWon ? 1 : 0) + (G._hitDone ? 1 : 0);
-    const pct = Math.round((G.collected || 0) / Math.max(1, total) * 70 + milestones / 3 * 30);
+    const mm = missionMilestones();
+    const pct = Math.round((G.collected || 0) / Math.max(1, total) * 70 + mm.done / mm.total * 30);
     document.getElementById('ph-complete').textContent = pct + '%';
     document.getElementById('ph-food').textContent = `${G.foodVisited || 0} / ${(G.world.foodStalls || []).length}`;
     const bizEl = document.getElementById('ph-biz');

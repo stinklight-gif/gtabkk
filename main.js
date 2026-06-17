@@ -53,7 +53,7 @@ import {
 } from './daynight.js';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G,
-  PRICE, PAINT_COLORS, BUSINESSES, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir,
+  PRICE, PAINT_COLORS, BUSINESSES, missionMilestones, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir,
   _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 
@@ -161,6 +161,7 @@ export function saveGame() {
       collected: G.collected || 0,
       welcomeDone: !!G._welcomeDone,
       soiRunWon: !!G._soiRunWon, hitDone: !!G._hitDone,
+      deliveryDone: !!G._deliveryDone, mallJobDone: !!G._mallJobDone, getawayDone: !!G._getawayDone,
       px: p.group.position.x, py: p.group.position.y, pz: p.group.position.z,
       // property / ownership economy
       safehouseOwned: !!G.econ.safehouse.owned,
@@ -220,6 +221,9 @@ export function loadGame() {
   if (typeof s.px === 'number' && typeof s.pz === 'number') p.group.position.set(s.px, Math.max(0, s.py || 0), s.pz);   // py = which mall floor you were on
   if (s.soiRunWon) G._soiRunWon = true;
   if (s.hitDone) G._hitDone = true;
+  if (s.deliveryDone) G._deliveryDone = true;
+  if (s.mallJobDone) G._mallJobDone = true;
+  if (s.getawayDone) G._getawayDone = true;
   if (s.welcomeDone) { G._welcomeDone = true; if (G.mission.resume) G.mission.resume(true); }
   // property / ownership economy
   if (s.safehouseOwned) { G.econ.safehouse.owned = true; markSafehouseOwned(); }
@@ -876,11 +880,11 @@ export function loop() {
     if (Math.random() < 0.004 * (1 - (G.nightK || 0))) G.audio.blip({ freq: 360, dur: 0.2, type: 'square', gain: 0.03, freqEnd: 330 });
     G._saveTimer = (G._saveTimer || 0) + dt;
     if (G._saveTimer > 8) { G._saveTimer = 0; saveGame(); }
-    // one-time 100% celebration (cheap: amulet counter + 3 mission flags)
+    // one-time 100% celebration (cheap: amulet counter + the 6 mission flags)
     if (!G._congrats) {
-      const ms = (G._welcomeDone ? 1 : 0) + (G._soiRunWon ? 1 : 0) + (G._hitDone ? 1 : 0);
+      const mm = missionMilestones();
       const total = G.world.collectibles ? G.world.collectibles.length : 15;
-      if ((G.collected || 0) / Math.max(1, total) * 70 + ms / 3 * 30 >= 99.5) {
+      if ((G.collected || 0) / Math.max(1, total) * 70 + mm.done / mm.total * 30 >= 99.5) {
         G._congrats = true;
         G.hud.showSubtitle('100% — KING OF KRUNG THEP', 'เจ้าพ่อกรุงเทพฯ', 5);
         G.hud.showNotif('100% complete!');

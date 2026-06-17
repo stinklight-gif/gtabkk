@@ -111,6 +111,13 @@ export const BUSINESSES = [
   { id: 't21unit',  name: 'Terminal 21 Retail Unit', price: 26000, rate: 80, cap: 4800, pos: new THREE.Vector3(-25, 0, 18) },
 ];
 
+// Story-mission milestones, in chain order — single source of truth for the
+// completion % (phone + 100% celebration) so it tracks the whole 6-job chain.
+export function missionMilestones() {
+  const flags = [G._welcomeDone, G._soiRunWon, G._hitDone, G._deliveryDone, G._mallJobDone, G._getawayDone];
+  return { done: flags.reduce((n, f) => n + (f ? 1 : 0), 0), total: flags.length };
+}
+
 // Economy prices (one place to balance the money sinks).
 export const PRICE = { safehouse: 12000, garageRent: 4000, repaint: 250 };
 // Paint colors offered at the garage.
