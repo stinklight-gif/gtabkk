@@ -252,7 +252,7 @@ export function buildLandmarks(env) {
     );
     stationSign.position.set(sx, stationFloorY + 5.0, 6.05);
     scene.add(stationSign);
-    world.bts = { x: sx, platformY: PY };   // walkable platform info (probe / future use)
+    world.bts = { x: sx, z: 0, platformY: PY };   // platform center + height (probe / map icon)
   }
 
   // ---- Street lamps at intersections ----

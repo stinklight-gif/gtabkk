@@ -82,6 +82,7 @@ export const G = {
   festival: { type: null, floats: [], lanterns: [], watchers: [], announcedDay: -1, krathongFloated: 0 },
   wanted: { stars: 0, lastSeenAt: 0, lastSeenPos: new THREE.Vector3() },
   cash: 100,
+  copsKilled: 0,         // lifetime cop takedowns (drives pistol/heat unlocks + phone stat)
   notifQueue: [],
   paused: false,
   hitStop: 0,            // seconds of slow-mo remaining after a solid hit

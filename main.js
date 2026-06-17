@@ -40,7 +40,8 @@ import {
 } from './combat.js';
 export * from './hud.js';
 import {
-  bindHud, drawHouseGlyph, drawGarageGlyph, drawMallGlyph, HOME_COLOR, GARAGE_COLOR, MALL_COLOR
+  bindHud, drawHouseGlyph, drawGarageGlyph, drawMallGlyph, drawBizGlyph, drawBtsGlyph,
+  HOME_COLOR, GARAGE_COLOR, MALL_COLOR, BIZ_COLOR, BTS_COLOR, SEVEN_COLOR
 } from './hud.js';
 export * from './missions.js';
 import {
@@ -52,7 +53,7 @@ import {
 } from './daynight.js';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G,
-  PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir,
+  PRICE, PAINT_COLORS, BUSINESSES, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir,
   _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 
@@ -63,7 +64,7 @@ import {
 // (moved to ./core.js)
 
 // pooled fire FX lights (created lazily, reused every shot, decayed in the loop)
-let _copsKilled = 0;
+// cops-killed count lives on G.copsKilled (shared with hud.js setPhoneStats)
 
 // Bump wanted level and refresh the "last seen" tracker. Replaces the same
 // three-line pattern that was copy-pasted across combat/cop code.
@@ -95,19 +96,19 @@ export function damagePlayer(amount) {
 
 // Award credit for a downed cop; first kill hands over the pistol (README).
 export function onCopKilled() {
-  _copsKilled++;
-  if (GAMEPLAY.pistolOnCopKill && _copsKilled === 1 && !G.player.weapons.pistol) {
+  G.copsKilled++;
+  if (GAMEPLAY.pistolOnCopKill && G.copsKilled === 1 && !G.player.weapons.pistol) {
     G.player.weapons.pistol = true;
     G.player.pistolAmmo = G.player.pistolMag;
     updateAmmoHud();
     G.hud.showNotif('Picked up a 9mm');
   }
   // sustained cop-killing brings out the unmarked Crime Suppression units (3★)
-  if (_copsKilled >= 3 && G.wanted.stars < 3) {
+  if (G.copsKilled >= 3 && G.wanted.stars < 3) {
     raiseWanted(3);
     G.hud.showNotif('Crime Suppression deployed ★★★');
   }
-  if (_copsKilled >= 6 && G.wanted.stars < 4) {
+  if (G.copsKilled >= 6 && G.wanted.stars < 4) {
     raiseWanted(4);
     G.hud.showNotif('SWAT deployed ★★★★');
   }
@@ -150,7 +151,7 @@ export function saveGame() {
     const p = G.player;
     if (!p) return;
     localStorage.setItem(slotKey(), JSON.stringify({
-      cash: G.cash, armor: p.armor, dayT: G.time.dayT, day: G.time.day | 0, copsKilled: _copsKilled,
+      cash: G.cash, armor: p.armor, dayT: G.time.dayT, day: G.time.day | 0, copsKilled: G.copsKilled,
       weapons: { pistol: !!p.weapons.pistol, smg: !!p.weapons.smg, shotgun: !!p.weapons.shotgun },
       pistolAmmo: p.pistolAmmo, pistolReserve: p.pistolReserve,
       smgAmmo: p.smgAmmo, smgReserve: p.smgReserve,
@@ -193,7 +194,7 @@ export function loadGame() {
   if (typeof s.armor === 'number') p.armor = s.armor;
   if (typeof s.dayT === 'number') G.time.dayT = s.dayT;
   if (typeof s.day === 'number') G.time.day = s.day;
-  if (typeof s.copsKilled === 'number') _copsKilled = s.copsKilled;
+  if (typeof s.copsKilled === 'number') G.copsKilled = s.copsKilled;
   if (s.weapons) {
     p.weapons.pistol = !!s.weapons.pistol;
     p.weapons.smg = !!s.weapons.smg;
@@ -591,7 +592,23 @@ export function drawFullMap() {
   if (poi.terminal21) {
     const tx = to(poi.terminal21.x), ty = to(poi.terminal21.z);
     drawMallGlyph(ctx, tx, ty, 7, MALL_COLOR);
-    ctx.fillStyle = MALL_COLOR; ctx.fillText('Terminal 21', tx, ty - 15);
+    ctx.fillStyle = MALL_COLOR; ctx.textAlign = 'center'; ctx.fillText('Terminal 21 · Arcade', tx, ty - 15);
+  }
+  // 7-Elevens (orange squares)
+  ctx.fillStyle = SEVEN_COLOR;
+  for (const e of (G.world.sevenElevens || [])) ctx.fillRect(to(e.pos.x) - 3, to(e.pos.z) - 3, 6, 6);
+  // BTS station
+  if (G.world.bts) {
+    const bx = to(G.world.bts.x), bz = to(G.world.bts.z || 0);
+    drawBtsGlyph(ctx, bx, bz, 6, BTS_COLOR);
+    ctx.fillStyle = BTS_COLOR; ctx.textAlign = 'center'; ctx.fillText('BTS Asok', bx, bz - 13);
+  }
+  // buyable businesses (diamonds; filled once owned)
+  for (const b of BUSINESSES) {
+    if (!b.pos) continue;
+    const bx = to(b.pos.x), bz = to(b.pos.z), owned = !!(G.econ.businesses[b.id] && G.econ.businesses[b.id].owned);
+    drawBizGlyph(ctx, bx, bz, 6, BIZ_COLOR, owned);
+    ctx.fillStyle = BIZ_COLOR; ctx.textAlign = 'center'; ctx.fillText(owned ? b.name : b.name + ' (buy)', bx, bz - 13);
   }
   ctx.fillStyle = '#cfe3e0'; ctx.textAlign = 'left';
   if (G.world.collectibles) {
@@ -627,7 +644,10 @@ export function drawFullMap() {
   const items = [
     ['home',   HOME_COLOR,   'Home'],
     ['garage', GARAGE_COLOR, 'Garage'],
-    ['mall',   MALL_COLOR,   'Mall'],
+    ['mall',   MALL_COLOR,   'Mall / Arcade'],
+    ['biz',    BIZ_COLOR,    'Business'],
+    ['bts',    BTS_COLOR,    'BTS'],
+    ['seven',  SEVEN_COLOR,  '7-Eleven'],
     ['dot',    '#ff2a86',    'Objective'],
     ['dot',    '#ff3333',    'Cops'],
     ['dot',    '#ffcf4a',    'Amulet'],
@@ -641,6 +661,9 @@ export function drawFullMap() {
     if (kind === 'home') drawHouseGlyph(ctx, lx + 8, yy, 6, color, true);
     else if (kind === 'garage') drawGarageGlyph(ctx, lx + 8, yy, 5, color, true);
     else if (kind === 'mall') drawMallGlyph(ctx, lx + 8, yy, 5, color, true);
+    else if (kind === 'biz') drawBizGlyph(ctx, lx + 8, yy, 5, color, true);
+    else if (kind === 'bts') drawBtsGlyph(ctx, lx + 8, yy, 5, color);
+    else if (kind === 'seven') { ctx.fillStyle = color; ctx.fillRect(lx + 4, yy - 4, 8, 8); }
     else { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(lx + 8, yy, 5, 0, TAU); ctx.fill(); }
     ctx.fillStyle = '#dfeee9'; ctx.fillText(text, lx + 24, yy + 4);
   }
