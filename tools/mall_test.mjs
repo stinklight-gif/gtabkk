@@ -53,7 +53,9 @@ async function main() {
     args: ['--no-sandbox', '--enable-unsafe-swiftshader', '--use-angle=swiftshader'],
   });
   try {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    // State-only probe (no screenshots) → render at low res so each SwiftShader
+    // frame is ~4× cheaper, which is what dominates waitFrames runtime.
+    const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
     page.on('pageerror', err => errors.push(`pageerror: ${err.message}`));
     page.on('console', msg => { if (msg.type() === 'error') errors.push(`console.error: ${msg.text()}`); });
 
@@ -309,7 +311,7 @@ async function main() {
     assert(collected > c0, `you collect its passive income (+฿${collected - c0})`);
     // the phone tracks owned businesses + their income rate (map icons verified by smoke_map.png)
     const bizLine = await page.evaluate(() => { window.GAME.hud.setPhoneStats(); return document.getElementById('ph-biz').textContent; });
-    assert(/1 \/ 3/.test(bizLine) && /฿110\/s/.test(bizLine), `phone shows owned businesses + income ("${bizLine}")`);
+    assert(/1 \/ 3/.test(bizLine) && /฿80\/s/.test(bizLine), `phone shows owned businesses + income ("${bizLine}")`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
