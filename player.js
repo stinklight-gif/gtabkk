@@ -214,7 +214,7 @@ export function updateBusinesses(dt) {
         if (G.input.pressed('KeyE')) {
           if (G.cash < b.price) G.hud.showNotif('Not enough cash');
           else {
-            G.cash -= b.price; s.owned = true; s.tier = 1; G.hud.setCash(G.cash);
+            G.cash -= b.price; s.owned = true; s.tier = 1; G.hud.setCash(G.cash); G.hud.cashPop(-b.price);
             G.hud.showNotif(`Bought ${b.name} — earns ฿${bizRate(b, s)}/s`);
             if (G.audio && G.audio.chime) G.audio.chime();
             saveGame();
@@ -225,13 +225,13 @@ export function updateBusinesses(dt) {
         const upCost = canUp ? bizUpgradeCost(b, tier) : 0;
         G.hud.showPrompt(`${b.name} (Tier ${tier}) — <b>E</b>: collect ฿${amt.toLocaleString()}` + (canUp ? ` · <b>U</b>: upgrade ฿${upCost.toLocaleString()}` : ' · MAX'), 0.4);
         if (G.input.pressed('KeyE') && amt > 0) {
-          G.cash += amt; s.pending -= amt; G.hud.setCash(G.cash);
+          G.cash += amt; s.pending -= amt; G.hud.setCash(G.cash); G.hud.cashPop(amt);
           G.hud.showNotif(`Collected ฿${amt.toLocaleString()}`);
           if (G.audio && G.audio.chime) G.audio.chime();
         } else if (canUp && G.input.pressed('KeyU')) {
           if (G.cash < upCost) G.hud.showNotif('Not enough cash to upgrade');
           else {
-            G.cash -= upCost; s.tier = tier + 1; G.hud.setCash(G.cash);
+            G.cash -= upCost; s.tier = tier + 1; G.hud.setCash(G.cash); G.hud.cashPop(-upCost);
             G.hud.showNotif(`${b.name} → Tier ${s.tier} (฿${bizRate(b, s)}/s)`);
             if (G.audio && G.audio.chime) G.audio.chime();
             saveGame();
@@ -273,6 +273,7 @@ export function updateBank(dt) {
         if (h.crackT <= 0) {
           h.stage = 2; raiseWanted(5);          // alarm! max heat + the chopper
           if (G.audio && G.audio.siren) G.audio.siren();
+          G.hud.flashScreen('#ff2a2a');         // red alarm wash
           h.markerPos = HEIST_DROP.clone(); heistBeam(h.markerPos, 0x39ff7a);
           G.hud.showNotif('Vault open! Grab the loot and RUN to the drop!');
           G.hud.showSubtitle('Loot secured — get to the green drop!', 'รีบไปจุดส่ง');
@@ -284,7 +285,7 @@ export function updateBank(dt) {
     } else if (h.stage === 2) {
       G.hud.showPrompt('BANK HEIST &nbsp;→&nbsp; reach the green drop', 0.4);
       if (dist2(p.group.position, HEIST_DROP) < 9 * 9) {
-        G.cash += HEIST_REWARD; G.hud.setCash(G.cash); G._bankDone = true;
+        G.cash += HEIST_REWARD; G.hud.setCash(G.cash); G.hud.cashPop(HEIST_REWARD); G._bankDone = true;
         h.active = false; h.stage = 0; h.markerPos = null; heistBeam(null);
         h.cooldownUntil = performance.now() + HEIST_COOLDOWN;
         G.hud.setMissionText('Free Roam · Sukhumvit');

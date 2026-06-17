@@ -353,6 +353,8 @@ async function main() {
     await waitFrames(page, 8);
     const alarm = await page.evaluate(() => ({ stage: window.GAME.heist.stage, stars: window.GAME.wanted.stars }));
     assert(alarm.stage === 2 && alarm.stars >= 5, `cracking the vault trips a max-heat alarm (stage ${alarm.stage}, ${alarm.stars}★)`);
+    const flashed = await page.evaluate(() => document.getElementById('screen-flash').classList.contains('on'));
+    assert(flashed, 'the vault alarm flashes the screen red');
     const heistCash0 = await page.evaluate(() => { const d = window.GAME.heist.markerPos; window.GAME.player.group.position.set(d.x, 0, d.z); return window.GAME.cash; });
     await waitFrames(page, 5);
     const heistDone = await page.evaluate(() => ({ active: window.GAME.heist.active, cash: window.GAME.cash, cd: window.GAME.heist.cooldownUntil > 0 }));

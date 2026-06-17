@@ -139,6 +139,22 @@ export function bindHud() {
     document.getElementById('cash').textContent = Math.floor(c).toLocaleString();
     document.getElementById('ph-cash').textContent = Math.floor(c).toLocaleString();
   }
+  let _cashPopN = 0;
+  function cashPop(delta) {                 // floating +฿/-฿ over the cash readout (discrete rewards/buys)
+    const d = Math.round(delta); if (!d) return;
+    const box = document.getElementById('cash-pops'); if (!box) return;
+    const el = document.createElement('div');
+    el.className = 'cash-pop ' + (d > 0 ? 'pos' : 'neg');
+    el.textContent = (d > 0 ? '+฿' : '-฿') + Math.abs(d).toLocaleString();
+    el.style.top = (-(_cashPopN++ % 3) * 6) + 'px';     // stagger if several land at once
+    box.appendChild(el);
+    setTimeout(() => el.remove(), 3000);
+  }
+  function flashScreen(color) {             // brief full-screen colour wash (alarm, big claim)
+    const el = document.getElementById('screen-flash'); if (!el) return;
+    el.style.background = color;
+    el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+  }
   function setBars(hp, ar, st) {
     document.getElementById('hp-fill').style.width = Math.max(0, hp) + '%';
     document.getElementById('ar-fill').style.width = Math.max(0, ar) + '%';
@@ -365,7 +381,7 @@ export function bindHud() {
   }
 
   return {
-    setStars, flashWanted, setCash, setBars, setAmmo, setMissionText, setClock, setWeather, setCrosshair, setPhoneStats, setVehicle,
+    setStars, flashWanted, setCash, cashPop, flashScreen, setBars, setAmmo, setMissionText, setClock, setWeather, setCrosshair, setPhoneStats, setVehicle,
     showSubtitle, showPrompt, showNotif, togglePhone, update, drawMinimap, drawWaypoint, setRadioChip
   };
 }

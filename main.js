@@ -780,7 +780,7 @@ export function updateArcade(dt) {
       if (a.lockT <= 0) {
         a.round++;
         if (a.round >= 3) {
-          a.done = true; a.payout = a.score * 2; G.cash += a.payout; G.hud.setCash(G.cash);
+          a.done = true; a.payout = a.score * 2; G.cash += a.payout; G.hud.setCash(G.cash); if (a.payout > 0) G.hud.cashPop(a.payout);
           if (a.payout > 0 && G.audio && G.audio.chime) G.audio.chime();
         } else { a.locked = false; a.marker = 0; a.dir = 1; a.speed = 1.0 + a.round * 0.45; }
       }

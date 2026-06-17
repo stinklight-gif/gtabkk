@@ -313,6 +313,12 @@ async function main() {
     await page.keyboard.down('KeyE'); await waitFrames(page, 3); await page.keyboard.up('KeyE'); await waitFrames(page, 3);
     const collected = await page.evaluate(() => window.GAME.cash);
     assert(collected > c0, `you collect its passive income (+฿${collected - c0})`);
+    const pop = await page.evaluate(() => {       // collect/buy call hud.cashPop; verify it renders a floating popup
+      const t = typeof window.GAME.hud.cashPop;
+      window.GAME.hud.cashPop(12345);
+      return { t, n: document.querySelectorAll('.cash-pop').length, txt: [...document.querySelectorAll('.cash-pop')].pop()?.textContent };
+    });
+    assert(pop.t === 'function' && pop.n > 0, `cash rewards show a floating popup ("${pop.txt}")`);
     const bizLine = await page.evaluate(() => { window.GAME.hud.setPhoneStats(); return document.getElementById('ph-biz').textContent + ' || ' + document.getElementById('ph-biz-list').textContent; });
     assert(/1 \/ 6/.test(bizLine) && /฿152\/s/.test(bizLine), `phone holdings show the upgraded Tier-2 rate ("${bizLine}")`);
   } catch (err) {

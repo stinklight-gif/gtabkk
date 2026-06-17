@@ -368,7 +368,7 @@ export function updateTurf(dt) {
     if (!turfOwned.has(t.id) && (turfGang[t.id] || []).length) {
       if (aliveTurfGang(t.id) === 0) {                                 // gang wiped → claim
         turfOwned.add(t.id); s.owned = true; turfGang[t.id] = [];
-        G.cash += TURF_BONUS; G.hud.setCash(G.cash);
+        G.cash += TURF_BONUS; G.hud.setCash(G.cash); G.hud.cashPop(TURF_BONUS); G.hud.flashScreen('#ffcf4a');
         G.hud.showNotif(`Took over ${t.name}! +฿${TURF_BONUS.toLocaleString()} + passive income.`);
         if (G.audio && G.audio.chime) G.audio.chime();
         saveGame();
