@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, bizRate, bizCap, bizUpgradeCost, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, bizRate, bizCap, bizUpgradeCost, BANK_INTEREST, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { tip, resolvePlayerVsBuildings, resolvePlayerVsVehicles, resolvePlayerVsPlatforms, worldSupportY, saveGame, startArcade, applyUpgrades, raiseWanted, updateAmmoHud, updateCombat, updatePlayerInVehicle } from './main.js';
 
@@ -262,9 +262,73 @@ function heistBeam(pos, color) {
   h.beam.position.set(pos.x, 40, pos.z);
 }
 
+// ---- Bank account: deposit/withdraw at the teller; the balance earns daily
+// interest (compounded each in-game day). A safe place to grow money. ----
+function updateBankInterest() {
+  const acc = G.econ.bank;
+  if (acc.lastDay == null) { acc.lastDay = G.time.day; return; }
+  if (G.time.day > acc.lastDay) {
+    const days = G.time.day - acc.lastDay;
+    acc.lastDay = G.time.day;
+    if (acc.balance > 0) {
+      const interest = Math.floor(acc.balance * (Math.pow(1 + BANK_INTEREST, days) - 1));
+      if (interest > 0) {
+        acc.balance += interest; acc.lastInterest = interest;
+        G.hud.showNotif(`Bank interest: +฿${interest.toLocaleString()}`);
+        if (G.audio && G.audio.chime) G.audio.chime();
+      }
+    }
+  }
+}
+function bankRender() {
+  const acc = G.econ.bank;
+  const info = document.getElementById('bank-info');
+  if (info) info.innerHTML = `Balance <b>฿${Math.floor(acc.balance).toLocaleString()}</b> · ${Math.round(BANK_INTEREST * 100)}%/day &nbsp;|&nbsp; Cash on hand ฿${Math.floor(G.cash).toLocaleString()}`;
+  const box = document.getElementById('bank-items'); if (!box) return;
+  box.innerHTML = '';
+  const mk = (label, fn, ok) => { const b = document.createElement('button'); b.textContent = label; b.disabled = !ok; b.addEventListener('click', fn); box.appendChild(b); };
+  mk('Deposit ฿1,000', () => bankDeposit(1000), G.cash >= 1000);
+  mk('Withdraw ฿1,000', () => bankWithdraw(1000), acc.balance >= 1000);
+  mk('Deposit ฿10,000', () => bankDeposit(10000), G.cash >= 10000);
+  mk('Withdraw ฿10,000', () => bankWithdraw(10000), acc.balance >= 10000);
+  mk('Deposit all', () => bankDeposit(G.cash), G.cash >= 1);
+  mk('Withdraw all', () => bankWithdraw(acc.balance), acc.balance >= 1);
+}
+function bankDeposit(amt) {
+  amt = Math.min(Math.floor(amt), Math.floor(G.cash)); if (amt <= 0) return;
+  G.cash -= amt; G.econ.bank.balance += amt; G.hud.setCash(G.cash); G.hud.cashPop(-amt);
+  if (G.audio && G.audio.blip) G.audio.blip({ freq: 520, dur: 0.06, gain: 0.08 });
+  saveGame(); bankRender();
+}
+function bankWithdraw(amt) {
+  amt = Math.min(Math.floor(amt), Math.floor(G.econ.bank.balance)); if (amt <= 0) return;
+  G.econ.bank.balance -= amt; G.cash += amt; G.hud.setCash(G.cash); G.hud.cashPop(amt);
+  if (G.audio && G.audio.blip) G.audio.blip({ freq: 520, dur: 0.06, gain: 0.08 });
+  saveGame(); bankRender();
+}
+export function openBank() {
+  bankRender();
+  G.state = 'store';
+  document.getElementById('bank').classList.add('show');
+  document.exitPointerLock();
+}
+export function closeBank() {
+  document.getElementById('bank').classList.remove('show');
+  G.state = 'playing';
+  if (G.input.requestLock) G.input.requestLock();
+}
+
 export function updateBank(dt) {
+  updateBankInterest();
   const bank = G.world.bank; if (!bank) return;
   const p = G.player, h = G.heist;
+  // bank teller (deposit / withdraw) — when not mid-heist and on foot at the counter
+  if (!h.active && !p.inVehicle && bank.teller && dist2(p.group.position, bank.teller) < 3.5 * 3.5) {
+    tip('teller', 'Bank teller: deposit cash here to keep it safe — your balance earns daily interest.', 'ฝากเงิน');
+    G.hud.showPrompt('Press <b>E</b> for the <b>bank teller</b> (deposit / withdraw)', 0.4);
+    if (G.input.pressed('KeyE')) openBank();
+    return;
+  }
   if (h.active) {                              // in progress — runs anywhere (incl. while driving the loot out)
     if (h.stage === 1) {
       if (!p.inVehicle && dist2(p.group.position, bank.vault) < 5.5 * 5.5) {

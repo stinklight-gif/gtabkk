@@ -385,6 +385,37 @@ async function main() {
     await waitFrames(page, 22);
     const c2 = await page.evaluate(() => window.GAME.cash);
     assert(c2 > c1, `held turf pays passive income (+฿${(c2 - c1).toFixed(0)})`);
+
+    // ---- 12. Bank account (deposit / withdraw / interest) --------------------
+    console.log('\n[12] bank account');
+    await page.evaluate(() => {
+      const G = window.GAME;
+      G.state = 'playing'; G.player.inVehicle = null; G.heist.active = false; G.wanted.stars = 0;
+      document.getElementById('bank').classList.remove('show');
+      const t = G.world.bank.teller;
+      G.player.group.position.set(t.x, 0, t.z); G.player.velocity.set(0, 0, 0);
+      G.cash = 25000; G.hud.setCash(25000); G.econ.bank.balance = 0; G.econ.bank.lastDay = G.time.day;
+    });
+    await page.keyboard.down('KeyE'); await waitFrames(page, 3); await page.keyboard.up('KeyE'); await waitFrames(page, 3);
+    const bankOpened = await page.evaluate(() => ({ shown: document.getElementById('bank').classList.contains('show'), state: window.GAME.state }));
+    assert(bankOpened.shown && bankOpened.state === 'store', 'E at the teller opens the bank');
+    await page.evaluate(() => { [...document.querySelectorAll('#bank-items button')].find(b => /Deposit.*10,000/.test(b.textContent)).click(); });
+    await waitFrames(page, 2);
+    const dep = await page.evaluate(() => ({ bal: window.GAME.econ.bank.balance, cash: window.GAME.cash }));
+    assert(dep.bal === 10000 && Math.abs(dep.cash - 15000) < 10, `depositing moves cash into the balance (bal ฿${dep.bal}, cash ฿${dep.cash.toFixed(1)})`);   // cash ±trickle
+    await page.evaluate(() => { [...document.querySelectorAll('#bank-items button')].find(b => /Withdraw all/.test(b.textContent)).click(); });
+    await waitFrames(page, 2);
+    const wd = await page.evaluate(() => ({ bal: window.GAME.econ.bank.balance, cash: window.GAME.cash }));
+    assert(wd.bal === 0 && Math.abs(wd.cash - 25000) < 15, `withdraw-all returns it to cash (bal ฿${wd.bal}, cash ฿${wd.cash.toFixed(1)})`);
+    await page.evaluate(() => document.getElementById('bank-leave').click());
+    await waitFrames(page, 3);
+    const bankLeft = await page.evaluate(() => window.GAME.state);
+    assert(bankLeft === 'playing', 'leaving the bank returns to the game');
+    // interest: a day elapses → the balance grows
+    await page.evaluate(() => { const G = window.GAME; G.econ.bank.balance = 10000; G.econ.bank.lastDay = G.time.day; G.time.day += 1; });
+    await waitFrames(page, 3);
+    const interest = await page.evaluate(() => window.GAME.econ.bank.balance);
+    assert(interest > 10000, `the balance earns daily interest (฿10,000 → ฿${interest})`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

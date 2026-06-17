@@ -189,6 +189,8 @@ export function bindHud() {
     const pct = Math.round((G.collected || 0) / Math.max(1, total) * 70 + mm.done / mm.total * 30);
     document.getElementById('ph-complete').textContent = pct + '%';
     document.getElementById('ph-food').textContent = `${G.foodVisited || 0} / ${(G.world.foodStalls || []).length}`;
+    const bankEl = document.getElementById('ph-bank');
+    if (bankEl) bankEl.textContent = Math.floor((G.econ.bank && G.econ.bank.balance) || 0).toLocaleString();
     const bizEl = document.getElementById('ph-biz');
     if (bizEl) {
       let owned = 0, rate = 0, pending = 0; const lines = [];

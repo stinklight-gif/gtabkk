@@ -96,8 +96,11 @@ export const G = {
     garage: { rented: false, stored: [], capacity: 4, retrieveIdx: 0 }, // stored: [{kind,color,plate,hp}]
     businesses: {},                                   // id -> { owned, pending } passive-income holdings
     upgrades: { engine: 0, nitro: 0, armor: 0 },      // account-wide vehicle tuning (levels 0..3)
+    bank: { balance: 0, lastDay: null, lastInterest: 0 },  // savings account at Krung Thep Bank (earns daily interest)
   },
 };
+
+export const BANK_INTEREST = 0.04;   // daily interest on the bank balance (compounded per in-game day)
 
 // Garage vehicle upgrades: account-wide tuning levels you buy at the U-Spray,
 // applied to whatever car you drive (see vehicles.js applyUpgrades). A money
