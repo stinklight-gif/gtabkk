@@ -53,7 +53,9 @@ async function main() {
     args: ['--no-sandbox', '--enable-unsafe-swiftshader', '--use-angle=swiftshader'],
   });
   try {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    // State-only probe (no screenshots) → render at low res so each SwiftShader
+    // frame is ~4× cheaper, which is what dominates waitFrames runtime.
+    const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
     page.on('pageerror', err => errors.push(`pageerror: ${err.message}`));
     page.on('console', msg => { if (msg.type() === 'error') errors.push(`console.error: ${msg.text()}`); });
 
