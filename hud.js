@@ -19,6 +19,17 @@ export const BIZ_COLOR = '#39ff7a';      // Buyable businesses (green); filled =
 export const BTS_COLOR = '#3fd0ff';      // BTS Skytrain station (cyan)
 export const SEVEN_COLOR = '#ff7a2a';    // 7-Eleven (orange)
 export const BOAT_COLOR = '#7fd0a0';     // Riverside pier / boats (sea green)
+export const BANK_COLOR = '#e0b020';     // Krung Thep Bank (gold)
+
+export function drawBankGlyph(ctx, x, y, s, color) {
+  ctx.fillStyle = color;                 // a classical bank: pediment roof + columns
+  ctx.beginPath();
+  ctx.moveTo(x - s, y - s * 0.2); ctx.lineTo(x, y - s); ctx.lineTo(x + s, y - s * 0.2);
+  ctx.closePath(); ctx.fill();
+  ctx.fillRect(x - s, y - s * 0.1, s * 2, s * 0.25);
+  for (let i = -1; i <= 1; i++) ctx.fillRect(x + i * s * 0.6 - s * 0.12, y + s * 0.2, s * 0.24, s * 0.7);
+  ctx.fillRect(x - s, y + s * 0.9, s * 2, s * 0.2);
+}
 
 export function drawBoatGlyph(ctx, x, y, s, color) {
   ctx.fillStyle = color;                 // a little boat hull + mast
@@ -208,6 +219,13 @@ export function bindHud() {
       mctx.fillStyle = G.taxi.stage === 'toDropoff' ? '#39ff7a' : '#ffcf4a';
       mctx.beginPath(); mctx.arc(tx - ppx, ty - ppy, 4, 0, TAU); mctx.fill();
     }
+    // bank-heist marker (vault / loot drop)
+    if (G.heist && G.heist.active && G.heist.markerPos) {
+      const hx = (G.heist.markerPos.x + HALF) * (256 / (HALF*2));
+      const hy = (G.heist.markerPos.z + HALF) * (256 / (HALF*2));
+      mctx.fillStyle = G.heist.stage === 2 ? '#39ff7a' : '#ffcf4a';
+      mctx.beginPath(); mctx.arc(hx - ppx, hy - ppy, 5, 0, TAU); mctx.fill();
+    }
     // uncollected amulets (small gold dots)
     if (G.world.collectibles) {
       mctx.fillStyle = '#ffd24a';
@@ -245,6 +263,8 @@ export function bindHud() {
     if (G.world.bts) { const [x, y] = mm({ x: G.world.bts.x, z: G.world.bts.z || 0 }); drawBtsGlyph(mctx, x, y, 4, BTS_COLOR); }
     // riverside pier (boats)
     if (G.world.poi && G.world.poi.pier) { const [x, y] = mm(G.world.poi.pier); drawBoatGlyph(mctx, x, y, 4, BOAT_COLOR); }
+    // Krung Thep Bank
+    if (G.world.poi && G.world.poi.bank) { const [x, y] = mm(G.world.poi.bank); drawBankGlyph(mctx, x, y, 4.5, BANK_COLOR); }
     // buyable businesses (diamonds; filled once owned)
     for (const b of BUSINESSES) { if (!b.pos) continue; const [x, y] = mm(b.pos); drawBizGlyph(mctx, x, y, 4, BIZ_COLOR, !!(G.econ.businesses[b.id] && G.econ.businesses[b.id].owned)); }
     mctx.restore();
@@ -269,10 +289,12 @@ export function bindHud() {
   function drawWaypoint() {
     if (!waypoint) return;
     if (G.state !== 'playing') { waypoint.classList.remove('show'); return; }
-    // Target priority: the active mission marker, then an active taxi fare.
+    // Target priority: an active bank heist, then the mission marker, then a taxi fare.
     let target = null, color = '#ff2a86', label = 'Objective';
     const m = G.mission && G.mission.active;
-    if (m && m.markerPos) { target = m.markerPos; color = '#ff2a86'; label = m.name || 'Objective'; }
+    if (G.heist && G.heist.active && G.heist.markerPos) {
+      target = G.heist.markerPos; color = G.heist.stage === 2 ? '#39ff7a' : '#ffcf4a'; label = G.heist.stage === 2 ? 'Loot drop' : 'Vault';
+    } else if (m && m.markerPos) { target = m.markerPos; color = '#ff2a86'; label = m.name || 'Objective'; }
     else if (G.taxi && G.taxi.stage && G.taxi.stage !== 'idle' && G.taxi.markerPos) {
       target = G.taxi.markerPos; color = '#39ff7a'; label = G.taxi.stage === 'toDropoff' ? 'Drop-off' : 'Pick-up';
     }

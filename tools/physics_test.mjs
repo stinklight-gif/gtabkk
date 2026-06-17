@@ -334,6 +334,30 @@ async function main() {
     const moved = Math.hypot(boatAfter.x - boatBefore.x, boatAfter.z - boatBefore.z);
     assert(moved > 3, `the boat drives on the river (moved ${moved.toFixed(1)} m)`);
     assert(boatAfter.x >= -248 && boatAfter.x <= -210 && boatAfter.z >= -246 && boatAfter.z <= 246, `the boat stays in the channel (x ${boatAfter.x.toFixed(0)}, z ${boatAfter.z.toFixed(0)})`);
+
+    // ---- 10. Bank heist ------------------------------------------------------
+    console.log('\n[10] bank heist');
+    const bankInfo = await page.evaluate(() => {
+      const G = window.GAME;
+      G.state = 'playing'; G.player.inVehicle = null; G.wanted.stars = 0;
+      G.heist.active = false; G.heist.stage = 0; G.heist.cooldownUntil = 0;
+      const v = G.world.bank.vault;
+      G.player.group.position.set(v.x, 0, v.z); G.player.velocity.set(0, 0, 0);
+      return { hasVault: !!(G.world.bank && G.world.bank.vault), hasPoi: !!(G.world.poi && G.world.poi.bank) };
+    });
+    assert(bankInfo.hasVault && bankInfo.hasPoi, 'the bank has a vault + a map POI');
+    await page.keyboard.down('KeyE'); await waitFrames(page, 3); await page.keyboard.up('KeyE'); await waitFrames(page, 3);
+    const cracking = await page.evaluate(() => ({ active: window.GAME.heist.active, stage: window.GAME.heist.stage }));
+    assert(cracking.active && cracking.stage === 1, 'E at the vault starts the heist (cracking)');
+    await page.evaluate(() => { window.GAME.heist.crackT = 0.2; });   // shortcut the drill timer
+    await waitFrames(page, 8);
+    const alarm = await page.evaluate(() => ({ stage: window.GAME.heist.stage, stars: window.GAME.wanted.stars }));
+    assert(alarm.stage === 2 && alarm.stars >= 5, `cracking the vault trips a max-heat alarm (stage ${alarm.stage}, ${alarm.stars}★)`);
+    const heistCash0 = await page.evaluate(() => { const d = window.GAME.heist.markerPos; window.GAME.player.group.position.set(d.x, 0, d.z); return window.GAME.cash; });
+    await waitFrames(page, 5);
+    const heistDone = await page.evaluate(() => ({ active: window.GAME.heist.active, cash: window.GAME.cash, cd: window.GAME.heist.cooldownUntil > 0 }));
+    assert(!heistDone.active && heistDone.cash > heistCash0, `delivering the loot pays out (+฿${heistDone.cash - heistCash0})`);
+    assert(heistDone.cd, 'the vault goes on cooldown after a heist');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

@@ -8,7 +8,7 @@ import { makeAudio } from './audio.js';
 import { makeInput } from './input.js';
 export * from './player.js';
 import {
-  markSafehouseOwned, applyCosmetics, update7Eleven, updateBTS, updateCollectibles, updateDistrict, updateGunShop, updateInteraction, updatePlayer, updateSafehouse, vehicleName
+  markSafehouseOwned, applyCosmetics, update7Eleven, updateBank, updateBTS, updateCollectibles, updateDistrict, updateGunShop, updateInteraction, updatePlayer, updateSafehouse, vehicleName
 } from './player.js';
 export * from './vehicles.js';
 import {
@@ -40,8 +40,8 @@ import {
 } from './combat.js';
 export * from './hud.js';
 import {
-  bindHud, drawHouseGlyph, drawGarageGlyph, drawMallGlyph, drawBizGlyph, drawBtsGlyph, drawBoatGlyph,
-  HOME_COLOR, GARAGE_COLOR, MALL_COLOR, BIZ_COLOR, BTS_COLOR, SEVEN_COLOR, BOAT_COLOR
+  bindHud, drawHouseGlyph, drawGarageGlyph, drawMallGlyph, drawBizGlyph, drawBtsGlyph, drawBoatGlyph, drawBankGlyph,
+  HOME_COLOR, GARAGE_COLOR, MALL_COLOR, BIZ_COLOR, BTS_COLOR, SEVEN_COLOR, BOAT_COLOR, BANK_COLOR
 } from './hud.js';
 export * from './missions.js';
 import {
@@ -619,6 +619,12 @@ export function drawFullMap() {
     drawBoatGlyph(ctx, rx, rz, 6, BOAT_COLOR);
     ctx.fillStyle = BOAT_COLOR; ctx.textAlign = 'center'; ctx.fillText('Pier · Boats', rx, rz - 13);
   }
+  // Krung Thep Bank
+  if (poi.bank) {
+    const kx = to(poi.bank.x), kz = to(poi.bank.z);
+    drawBankGlyph(ctx, kx, kz, 7, BANK_COLOR);
+    ctx.fillStyle = BANK_COLOR; ctx.textAlign = 'center'; ctx.fillText('Bank', kx, kz - 14);
+  }
   // buyable businesses (diamonds; filled once owned)
   for (const b of BUSINESSES) {
     if (!b.pos) continue;
@@ -647,6 +653,13 @@ export function drawFullMap() {
     ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.arc(tx, tz, 12, 0, TAU); ctx.stroke();
   }
+  if (G.heist && G.heist.active && G.heist.markerPos) {
+    const hx = to(G.heist.markerPos.x), hz = to(G.heist.markerPos.z);
+    ctx.fillStyle = G.heist.stage === 2 ? '#39ff7a' : '#ffcf4a';
+    ctx.beginPath(); ctx.arc(hx, hz, 7, 0, TAU); ctx.fill();
+    ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(hx, hz, 13, 0, TAU); ctx.stroke();
+  }
   ctx.fillStyle = '#ff3333';
   for (const v of G.vehicles) if (v.isCop && v.driver) { ctx.beginPath(); ctx.arc(to(v.pos.x), to(v.pos.z), 3.5, 0, TAU); ctx.fill(); }
   const px = to(G.player.group.position.x), py = to(G.player.group.position.z);
@@ -662,6 +675,7 @@ export function drawFullMap() {
     ['garage', GARAGE_COLOR, 'Garage'],
     ['mall',   MALL_COLOR,   'Mall / Arcade'],
     ['biz',    BIZ_COLOR,    'Business'],
+    ['bank',   BANK_COLOR,   'Bank'],
     ['bts',    BTS_COLOR,    'BTS'],
     ['boat',   BOAT_COLOR,   'Pier'],
     ['seven',  SEVEN_COLOR,  '7-Eleven'],
@@ -680,6 +694,7 @@ export function drawFullMap() {
     else if (kind === 'mall') drawMallGlyph(ctx, lx + 8, yy, 5, color, true);
     else if (kind === 'biz') drawBizGlyph(ctx, lx + 8, yy, 5, color, true);
     else if (kind === 'bts') drawBtsGlyph(ctx, lx + 8, yy, 5, color);
+    else if (kind === 'bank') drawBankGlyph(ctx, lx + 8, yy, 5, color);
     else if (kind === 'boat') drawBoatGlyph(ctx, lx + 8, yy, 5, color);
     else if (kind === 'seven') { ctx.fillStyle = color; ctx.fillRect(lx + 4, yy - 4, 8, 8); }
     else { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(lx + 8, yy, 5, 0, TAU); ctx.fill(); }
@@ -688,7 +703,8 @@ export function drawFullMap() {
 
   // Objective line (bottom center): the active target name + live distance.
   let objText = 'No active objective — free roam', op = null, on = null;
-  if (G.mission && G.mission.active && G.mission.active.markerPos) { op = G.mission.active.markerPos; on = G.mission.active.name || 'Objective'; }
+  if (G.heist && G.heist.active && G.heist.markerPos) { op = G.heist.markerPos; on = G.heist.stage === 2 ? 'Bank Heist — loot drop' : 'Bank Heist — crack the vault'; }
+  else if (G.mission && G.mission.active && G.mission.active.markerPos) { op = G.mission.active.markerPos; on = G.mission.active.name || 'Objective'; }
   else if (G.taxi && G.taxi.stage && G.taxi.stage !== 'idle' && G.taxi.markerPos) { op = G.taxi.markerPos; on = G.taxi.stage === 'toDropoff' ? 'Taxi drop-off' : 'Taxi pick-up'; }
   if (op) {
     const pp = (G.player.inVehicle && G.player.inVehicle.pos) || G.player.group.position;
@@ -909,6 +925,7 @@ export function loop() {
     if (G.player.regenLockT > 0) G.player.regenLockT -= dt;
     else if (G.player.hp < G.player.hpMax) G.player.hp = Math.min(G.player.hpMax, G.player.hp + 5 * dt);
     if (G.mission) G.mission.update(dt);
+    updateBank(dt);   // bank-heist set-piece (runs every frame: cracking on foot, escape while driving)
     G.hud.update(dt);
     G.hud.setBars(G.player.hp, G.player.armor, G.player.stam);
     G.hud.setVehicle(G.player.inVehicle ? G.player.inVehicle.hp : 0, !!G.player.inVehicle);

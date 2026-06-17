@@ -45,6 +45,7 @@ const SHOTS = [
   { name: 'smoke_bts.png',      dayT: 0.5, bts: true      },  // up on the Asok BTS platform (walk-up)
   { name: 'smoke_heli.png',     dayT: 0.88, heli: true    },  // night 4★ chase: police helicopter + searchlight
   { name: 'smoke_river.png',    dayT: 0.45, river: true   },  // the Chao Phraya pier + driveable boats
+  { name: 'smoke_bank.png',     dayT: 0.55, bank: true    },  // Krung Thep Bank facade (robbable vault inside)
 ];
 // Extra one-off shots for tuning, e.g. SMOKE_SHOTS="dawn=0.30,dusk=0.78"
 // (these don't run in CI — only the two standard shots above are asserted).
@@ -85,7 +86,9 @@ async function main() {
     args: ['--no-sandbox', '--enable-unsafe-swiftshader', '--use-angle=swiftshader'],
   });
   try {
-    const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    // 1024×576 keeps the screenshots clear while cutting ~40% of the per-frame
+    // SwiftShader render cost — needed now that the suite has 10 shots.
+    const page = await browser.newPage({ viewport: { width: 1024, height: 576 } });
     page.on('pageerror', err => errors.push(`pageerror: ${err.message}`));
     page.on('console', msg => {
       if (msg.type() !== 'error') return;
@@ -105,7 +108,7 @@ async function main() {
     console.log('game started');
 
     for (const shot of SHOTS) {
-      await page.evaluate(({ dayT, festival, songkran, waypoint, tabmap, mall, bts, heli, river }) => {
+      await page.evaluate(({ dayT, festival, songkran, waypoint, tabmap, mall, bts, heli, river, bank }) => {
         const GAME = window.GAME;
         GAME.state = 'playing';                                  // force-resume if pointer lock dropped
         document.getElementById('pause').classList.remove('show');
@@ -170,6 +173,14 @@ async function main() {
           GAME.camRig.yaw = Math.PI / 2; GAME.camRig.pitch = -0.08;   // yaw +PI/2 → look due west
           GAME.time.day = 1; GAME.festival.type = null; GAME.wanted.stars = 0;   // day%4≠0 → no Songkran; clear heat
           document.getElementById('subtitle').classList.remove('show');
+        } else if (bank) {
+          // outside Krung Thep Bank, looking south at the columned facade
+          GAME.player.inVehicle = null; GAME.player.group.visible = true;
+          const b = GAME.world.poi.bank;
+          GAME.player.group.position.set(b.x, 1.6, b.z + 9);
+          GAME.camRig.yaw = 0; GAME.camRig.pitch = -0.04;                        // look south (-z) at the facade
+          GAME.time.day = 1; GAME.festival.type = null; GAME.wanted.stars = 0;
+          document.getElementById('subtitle').classList.remove('show');
         } else {
           GAME.player.group.position.set(0, 0, -130);            // street level, mid-map
           GAME.camRig.yaw = Math.PI; GAME.camRig.pitch = -0.02;  // aim down the street
@@ -177,7 +188,7 @@ async function main() {
         GAME.camRig.shake = 0;
         if (GAME.resyncCrowd) GAME.resyncCrowd();                // snap crowd to this hour (busy noon vs dead 3am)
       }, shot);
-      await waitFrames(page, (shot.festival || shot.songkran || shot.waypoint || shot.tabmap || shot.mall || shot.bts || shot.heli || shot.river) ? 24 : 14);  // let day/night + camera (+ festival/map/heli/river) settle
+      await waitFrames(page, (shot.festival || shot.songkran || shot.waypoint || shot.tabmap || shot.mall || shot.bts || shot.heli || shot.river || shot.bank) ? 24 : 14);  // let day/night + camera settle
       await page.screenshot({ path: path.join(ROOT, shot.name), timeout: 120_000 });
       const size = fs.statSync(path.join(ROOT, shot.name)).size;
       const calls = await page.evaluate(() => window.GAME.renderer.info.render.calls);

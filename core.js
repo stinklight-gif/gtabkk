@@ -81,6 +81,7 @@ export const G = {
   // Festivals — Loy Krathong (night, floats/lanterns) and Songkran (day, water fight)
   festival: { type: null, floats: [], lanterns: [], watchers: [], announcedDay: -1, krathongFloated: 0 },
   wanted: { stars: 0, lastSeenAt: 0, lastSeenPos: new THREE.Vector3() },
+  heist: { active: false, stage: 0, crackT: 0, markerPos: null, beam: null, cooldownUntil: 0 }, // bank-heist set-piece
   cash: 100,
   copsKilled: 0,         // lifetime cop takedowns (drives pistol/heat unlocks + phone stat)
   notifQueue: [],
