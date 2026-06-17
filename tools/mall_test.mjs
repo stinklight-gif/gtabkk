@@ -292,26 +292,29 @@ async function main() {
     const arcLeft = await page.evaluate(() => window.GAME.state);
     assert(arcLeft === 'playing', 'finishing the arcade returns you to the game');
 
-    // ---- 8. Buyable business (passive income) --------------------------------
-    console.log('\n[8] buyable business');
+    // ---- 8. Property empire (buy + tier upgrade + holdings) ------------------
+    console.log('\n[8] property empire');
     await page.evaluate(() => {
       const GAME = window.GAME;
       document.getElementById('arcade').classList.remove('show'); document.getElementById('store').classList.remove('show');
       GAME.state = 'playing'; GAME.player.inVehicle = null;
       GAME.player.group.position.set(-25, 0, 18);            // the Terminal 21 retail-unit podium
-      GAME.player.velocity.set(0, 0, 0); GAME.cash = 50000; GAME.hud.setCash(50000);
+      GAME.player.velocity.set(0, 0, 0); GAME.cash = 100000; GAME.hud.setCash(100000);
+      for (const id in GAME.econ.businesses) GAME.econ.businesses[id].owned = false;   // start with none owned
     });
     await waitFrames(page, 2);
     await page.keyboard.down('KeyE'); await waitFrames(page, 3); await page.keyboard.up('KeyE'); await waitFrames(page, 3);
-    const bizBought = await page.evaluate(() => ({ owned: !!(window.GAME.econ.businesses.t21unit && window.GAME.econ.businesses.t21unit.owned), cash: window.GAME.cash }));
-    assert(bizBought.owned && bizBought.cash < 50000, `you can buy a business (Terminal 21 unit, cash now ${bizBought.cash})`);
+    const bizBought = await page.evaluate(() => ({ owned: !!(window.GAME.econ.businesses.t21unit && window.GAME.econ.businesses.t21unit.owned), tier: window.GAME.econ.businesses.t21unit.tier, cash: window.GAME.cash }));
+    assert(bizBought.owned && bizBought.tier === 1 && bizBought.cash < 100000, `you can buy a property (Tier 1, cash ${bizBought.cash})`);
+    await page.keyboard.down('KeyU'); await waitFrames(page, 3); await page.keyboard.up('KeyU'); await waitFrames(page, 3);   // upgrade a tier
+    const upg = await page.evaluate(() => ({ tier: window.GAME.econ.businesses.t21unit.tier, cash: window.GAME.cash }));
+    assert(upg.tier === 2 && upg.cash < bizBought.cash, `upgrading raises its tier (Tier ${upg.tier}, -฿${bizBought.cash - upg.cash})`);
     const c0 = await page.evaluate(() => { window.GAME.econ.businesses.t21unit.pending = 2000; return window.GAME.cash; });
     await page.keyboard.down('KeyE'); await waitFrames(page, 3); await page.keyboard.up('KeyE'); await waitFrames(page, 3);
     const collected = await page.evaluate(() => window.GAME.cash);
     assert(collected > c0, `you collect its passive income (+฿${collected - c0})`);
-    // the phone tracks owned businesses + their income rate (map icons verified by smoke_map.png)
-    const bizLine = await page.evaluate(() => { window.GAME.hud.setPhoneStats(); return document.getElementById('ph-biz').textContent; });
-    assert(/1 \/ 3/.test(bizLine) && /฿80\/s/.test(bizLine), `phone shows owned businesses + income ("${bizLine}")`);
+    const bizLine = await page.evaluate(() => { window.GAME.hud.setPhoneStats(); return document.getElementById('ph-biz').textContent + ' || ' + document.getElementById('ph-biz-list').textContent; });
+    assert(/1 \/ 6/.test(bizLine) && /฿152\/s/.test(bizLine), `phone holdings show the upgraded Tier-2 rate ("${bizLine}")`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

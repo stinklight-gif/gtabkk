@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, bizRate, bizCap, bizUpgradeCost, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { tip, resolvePlayerVsBuildings, resolvePlayerVsVehicles, resolvePlayerVsPlatforms, worldSupportY, saveGame, startArcade, applyUpgrades, raiseWanted, updateAmmoHud, updateCombat, updatePlayerInVehicle } from './main.js';
 
@@ -204,29 +204,38 @@ export function updateInteraction(dt) {
 export function updateBusinesses(dt) {
   const p = G.player, st = G.econ.businesses || (G.econ.businesses = {});
   for (const b of BUSINESSES) {
-    const s = st[b.id] || (st[b.id] = { owned: false, pending: 0 });
-    if (s.owned) s.pending = Math.min(b.cap, (s.pending || 0) + b.rate * dt);
+    const s = st[b.id] || (st[b.id] = { owned: false, pending: 0, tier: 1 });
+    if (s.owned) { if (!s.tier) s.tier = 1; s.pending = Math.min(bizCap(b, s), (s.pending || 0) + bizRate(b, s) * dt); }
     if (!b.pos) continue;
     if (dist2(p.group.position, b.pos) < 4.5 * 4.5 && Math.abs(p.group.position.y - b.pos.y) < 2.5) {
       if (!s.owned) {
-        tip('biz', 'Businesses earn passive income — buy one and come back to collect the takings.', 'ซื้อกิจการ');
+        tip('biz', 'Buy a property for passive income — come back to collect, or upgrade it (U) for a higher rate.', 'ซื้อกิจการ');
         G.hud.showPrompt(`${b.name} for sale — <b>E</b>: buy (฿${b.price.toLocaleString()})`, 0.4);
         if (G.input.pressed('KeyE')) {
           if (G.cash < b.price) G.hud.showNotif('Not enough cash');
           else {
-            G.cash -= b.price; s.owned = true; G.hud.setCash(G.cash);
-            G.hud.showNotif(`Bought ${b.name} — earns ฿${b.rate}/s`);
+            G.cash -= b.price; s.owned = true; s.tier = 1; G.hud.setCash(G.cash);
+            G.hud.showNotif(`Bought ${b.name} — earns ฿${bizRate(b, s)}/s`);
             if (G.audio && G.audio.chime) G.audio.chime();
             saveGame();
           }
         }
       } else {
-        const amt = Math.floor(s.pending || 0);
-        G.hud.showPrompt(`${b.name} — <b>E</b>: collect ฿${amt.toLocaleString()}`, 0.4);
+        const tier = s.tier || 1, amt = Math.floor(s.pending || 0), canUp = tier < 3;
+        const upCost = canUp ? bizUpgradeCost(b, tier) : 0;
+        G.hud.showPrompt(`${b.name} (Tier ${tier}) — <b>E</b>: collect ฿${amt.toLocaleString()}` + (canUp ? ` · <b>U</b>: upgrade ฿${upCost.toLocaleString()}` : ' · MAX'), 0.4);
         if (G.input.pressed('KeyE') && amt > 0) {
           G.cash += amt; s.pending -= amt; G.hud.setCash(G.cash);
           G.hud.showNotif(`Collected ฿${amt.toLocaleString()}`);
           if (G.audio && G.audio.chime) G.audio.chime();
+        } else if (canUp && G.input.pressed('KeyU')) {
+          if (G.cash < upCost) G.hud.showNotif('Not enough cash to upgrade');
+          else {
+            G.cash -= upCost; s.tier = tier + 1; G.hud.setCash(G.cash);
+            G.hud.showNotif(`${b.name} → Tier ${s.tier} (฿${bizRate(b, s)}/s)`);
+            if (G.audio && G.audio.chime) G.audio.chime();
+            saveGame();
+          }
         }
       }
       return;
