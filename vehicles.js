@@ -80,10 +80,11 @@ export function updatePlayerInVehicle(dt) {
   // apply motion
   v.pos.x += Math.sin(v.heading) * v.vel * dt;
   v.pos.z += Math.cos(v.heading) * v.vel * dt;
-  if (v.spec.kind === 'boat') {            // keep the boat in the river channel
+  if (v.spec.kind === 'boat') {            // keep the boat in the river channel + ride the swell
     v.pos.x = clamp(v.pos.x, -248, -210);
     v.pos.z = clamp(v.pos.z, -246, 246);
-    v.pos.y = 0.3;
+    v.pos.y = 0.3 + Math.sin(performance.now() * 0.002 + v.pos.z * 0.15) * 0.06;
+    v.mesh.rotation.z = Math.sin(performance.now() * 0.0016 + v.pos.z * 0.1) * 0.03;
   }
   v.mesh.position.copy(v.pos);
   v.mesh.rotation.y = v.heading;

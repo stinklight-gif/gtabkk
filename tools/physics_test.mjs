@@ -307,6 +307,33 @@ async function main() {
     await page.click('#garageup-leave'); await waitFrames(page, 3);
     const left = await page.evaluate(() => window.GAME.state);
     assert(left === 'playing', 'leaving the upgrades menu returns to the game');
+
+    // ---- 9. River + boats ----------------------------------------------------
+    console.log('\n[9] river + boats');
+    const boatInfo = await page.evaluate(() => {
+      const G = window.GAME;
+      G.state = 'playing'; document.getElementById('garageup').classList.remove('show');
+      G.player.inVehicle = null; G.wanted.stars = 0; G.econ.upgrades = { engine: 0, nitro: 0, armor: 0 };
+      const boats = G.vehicles.filter(v => v.spec && v.spec.kind === 'boat');
+      const b = boats[0];
+      G.player.group.position.set(b.pos.x + 1.5, 0.3, b.pos.z + 1.5);   // alongside the pier boat
+      return { pier: !!(G.world.poi && G.world.poi.pier), nBoats: boats.length, bz: b.pos.z };
+    });
+    assert(boatInfo.pier && boatInfo.nBoats >= 3, `the river has a pier POI + a boat fleet (${boatInfo.nBoats} boats)`);
+    await page.keyboard.down('KeyE'); await waitFrames(page, 3); await page.keyboard.up('KeyE'); await waitFrames(page, 3);
+    const inBoat = await page.evaluate(() => ({ inV: !!window.GAME.player.inVehicle, kind: window.GAME.player.inVehicle && window.GAME.player.inVehicle.spec.kind }));
+    assert(inBoat.inV && inBoat.kind === 'boat', 'you can board the boat (E)');
+    const boatBefore = await page.evaluate(() => ({ x: window.GAME.player.inVehicle.pos.x, z: window.GAME.player.inVehicle.pos.z }));
+    await page.keyboard.down('KeyW');
+    let boatAfter = boatBefore;
+    for (let k = 0; k < 14 && Math.hypot(boatAfter.x - boatBefore.x, boatAfter.z - boatBefore.z) < 3; k++) {
+      await waitFrames(page, 8);
+      boatAfter = await page.evaluate(() => ({ x: window.GAME.player.inVehicle.pos.x, z: window.GAME.player.inVehicle.pos.z }));
+    }
+    await page.keyboard.up('KeyW'); await waitFrames(page, 3);
+    const moved = Math.hypot(boatAfter.x - boatBefore.x, boatAfter.z - boatBefore.z);
+    assert(moved > 3, `the boat drives on the river (moved ${moved.toFixed(1)} m)`);
+    assert(boatAfter.x >= -248 && boatAfter.x <= -210 && boatAfter.z >= -246 && boatAfter.z <= 246, `the boat stays in the channel (x ${boatAfter.x.toFixed(0)}, z ${boatAfter.z.toFixed(0)})`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

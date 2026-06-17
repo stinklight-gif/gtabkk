@@ -668,6 +668,8 @@ export function buildLandmarks(env) {
       }
     }
 
+    world.poi.pier = new THREE.Vector3(RIVER_E - 4, 0, PIER_Z);   // boarding point for the drivable boats (map marker)
+
     // longtail boats — a long thin hull + a raised stern motor pole
     for (let n = 0; n < 4; n++) {
       const boat = new THREE.Group();
