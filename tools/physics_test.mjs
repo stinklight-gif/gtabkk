@@ -358,6 +358,31 @@ async function main() {
     const heistDone = await page.evaluate(() => ({ active: window.GAME.heist.active, cash: window.GAME.cash, cd: window.GAME.heist.cooldownUntil > 0 }));
     assert(!heistDone.active && heistDone.cash > heistCash0, `delivering the loot pays out (+฿${heistDone.cash - heistCash0})`);
     assert(heistDone.cd, 'the vault goes on cooldown after a heist');
+
+    // ---- 11. Gang turf takeover ----------------------------------------------
+    console.log('\n[11] gang turf takeover');
+    await page.evaluate(() => {
+      const G = window.GAME;
+      G.state = 'playing'; G.player.inVehicle = null; G.wanted.stars = 0;
+      G.turfs = {}; G._turfRetal = 100;
+      G.player.hp = G.player.hpMax; G.player.armor = 100;   // survive the fight during the test
+      G.player.group.position.set(-150, 0, 150);   // Khlong Toei turf centre
+      G.cash = 1000; G.hud.setCash(1000);
+    });
+    await waitFrames(page, 5);
+    const gang = await page.evaluate(() => ({
+      n: window.GAME.peds.filter(p => p.gang && p.turfId === 'khlong' && !p.dead).length,
+      owned: !!(window.GAME.turfs.khlong && window.GAME.turfs.khlong.owned),
+    }));
+    assert(gang.n >= 3 && gang.n <= 5 && !gang.owned, `entering a turf spawns a hostile gang (${gang.n} members)`);
+    await page.evaluate(() => window.GAME.peds.forEach(p => { if (p.gang && p.turfId === 'khlong') p.dead = true; }));   // wipe them (as combat would)
+    await waitFrames(page, 3);
+    const claimed = await page.evaluate(() => ({ owned: !!(window.GAME.turfs.khlong && window.GAME.turfs.khlong.owned), cash: window.GAME.cash }));
+    assert(claimed.owned && claimed.cash > 1000, `clearing the gang claims the turf (+฿${claimed.cash - 1000} bonus)`);
+    const c1 = await page.evaluate(() => window.GAME.cash);
+    await waitFrames(page, 22);
+    const c2 = await page.evaluate(() => window.GAME.cash);
+    assert(c2 > c1, `held turf pays passive income (+฿${(c2 - c1).toFixed(0)})`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

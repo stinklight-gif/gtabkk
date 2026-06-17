@@ -32,7 +32,7 @@ import {
 } from './physics.js';
 export * from './npcs.js';
 import {
-  CROWD_CURVE, buildClusterAnchors, crowdFactor, crowdTarget, makeBarkSprite, resyncCrowd, spawnAnchoredPed, spawnBark, spawnSpikeStrip, updateArmorPickups, updateBarks, updateClusters, updateDogs, updateFoodStalls, updateMuggings, updatePeds, updateSpikes, updateVigilante, vigilanteEnd, vigilanteSpawnTarget
+  CROWD_CURVE, buildClusterAnchors, crowdFactor, crowdTarget, makeBarkSprite, resyncCrowd, spawnAnchoredPed, spawnBark, spawnSpikeStrip, updateArmorPickups, updateBarks, updateClusters, updateDogs, updateFoodStalls, updateMuggings, updatePeds, updateSpikes, updateTurf, updateVigilante, vigilanteEnd, vigilanteSpawnTarget
 } from './npcs.js';
 export * from './combat.js';
 import {
@@ -40,8 +40,8 @@ import {
 } from './combat.js';
 export * from './hud.js';
 import {
-  bindHud, drawHouseGlyph, drawGarageGlyph, drawMallGlyph, drawBizGlyph, drawBtsGlyph, drawBoatGlyph, drawBankGlyph,
-  HOME_COLOR, GARAGE_COLOR, MALL_COLOR, BIZ_COLOR, BTS_COLOR, SEVEN_COLOR, BOAT_COLOR, BANK_COLOR
+  bindHud, drawHouseGlyph, drawGarageGlyph, drawMallGlyph, drawBizGlyph, drawBtsGlyph, drawBoatGlyph, drawBankGlyph, drawTurfGlyph,
+  HOME_COLOR, GARAGE_COLOR, MALL_COLOR, BIZ_COLOR, BTS_COLOR, SEVEN_COLOR, BOAT_COLOR, BANK_COLOR, TURF_COLOR
 } from './hud.js';
 export * from './missions.js';
 import {
@@ -53,7 +53,7 @@ import {
 } from './daynight.js';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G,
-  PRICE, PAINT_COLORS, BUSINESSES, missionMilestones, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir,
+  PRICE, PAINT_COLORS, BUSINESSES, TURFS, missionMilestones, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir,
   _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 
@@ -169,6 +169,7 @@ export function saveGame() {
       garageStored: G.econ.garage.stored,
       businesses: G.econ.businesses,
       upgrades: G.econ.upgrades,
+      turfs: Object.fromEntries(TURFS.map(t => [t.id, !!(G.turfs && G.turfs[t.id] && G.turfs[t.id].owned)])),
       cosmetics: { shirt: G._shirtColor, hat: G._hat, jacket: G._jacketColor },
       owned: G._owned || [],
     }));
@@ -243,6 +244,10 @@ export function loadGame() {
   }
   if (s.upgrades && typeof s.upgrades === 'object') {               // restore vehicle upgrade levels
     for (const k of ['engine', 'nitro', 'armor']) G.econ.upgrades[k] = Math.max(0, Math.min(3, +s.upgrades[k] || 0));
+  }
+  if (s.turfs && typeof s.turfs === 'object') {                     // restore held gang turf
+    G.turfs = G.turfs || {};
+    for (const t of TURFS) { G.turfs[t.id] = G.turfs[t.id] || { owned: false, gang: [], spawned: false }; G.turfs[t.id].owned = !!s.turfs[t.id]; }
   }
   if (Array.isArray(s.owned)) G._owned = s.owned.slice();           // restore bought cosmetics
   if (s.cosmetics) applyCosmetics(s.cosmetics);
@@ -625,6 +630,12 @@ export function drawFullMap() {
     drawBankGlyph(ctx, kx, kz, 7, BANK_COLOR);
     ctx.fillStyle = BANK_COLOR; ctx.textAlign = 'center'; ctx.fillText('Bank', kx, kz - 14);
   }
+  // gang turf (flag; filled when held)
+  for (const t of TURFS) {
+    const gx = to(t.center.x), gz = to(t.center.z), held = !!(G.turfs && G.turfs[t.id] && G.turfs[t.id].owned);
+    drawTurfGlyph(ctx, gx, gz, 7, TURF_COLOR, held);
+    ctx.fillStyle = TURF_COLOR; ctx.textAlign = 'center'; ctx.fillText(held ? t.name : t.name + ' (gang)', gx, gz - 14);
+  }
   // buyable businesses (diamonds; filled once owned)
   for (const b of BUSINESSES) {
     if (!b.pos) continue;
@@ -676,6 +687,7 @@ export function drawFullMap() {
     ['mall',   MALL_COLOR,   'Mall / Arcade'],
     ['biz',    BIZ_COLOR,    'Business'],
     ['bank',   BANK_COLOR,   'Bank'],
+    ['turf',   TURF_COLOR,   'Gang turf'],
     ['bts',    BTS_COLOR,    'BTS'],
     ['boat',   BOAT_COLOR,   'Pier'],
     ['seven',  SEVEN_COLOR,  '7-Eleven'],
@@ -695,6 +707,7 @@ export function drawFullMap() {
     else if (kind === 'biz') drawBizGlyph(ctx, lx + 8, yy, 5, color, true);
     else if (kind === 'bts') drawBtsGlyph(ctx, lx + 8, yy, 5, color);
     else if (kind === 'bank') drawBankGlyph(ctx, lx + 8, yy, 5, color);
+    else if (kind === 'turf') drawTurfGlyph(ctx, lx + 8, yy, 5, color, true);
     else if (kind === 'boat') drawBoatGlyph(ctx, lx + 8, yy, 5, color);
     else if (kind === 'seven') { ctx.fillStyle = color; ctx.fillRect(lx + 4, yy - 4, 8, 8); }
     else { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(lx + 8, yy, 5, 0, TAU); ctx.fill(); }
@@ -895,6 +908,7 @@ export function loop() {
     updateMuggings(dt);
     updateSpikes(dt);
     updateVigilante(dt);
+    updateTurf(dt);
     updateDogs(dt);
     updateFootCops(dt);
     updateBullets(dt);

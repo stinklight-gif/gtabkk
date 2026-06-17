@@ -122,6 +122,14 @@ export const BUSINESSES = [
   { id: 't21unit',  name: 'Terminal 21 Retail Unit', price: 26000, rate: 80, cap: 4800, pos: new THREE.Vector3(-25, 0, 18) },
 ];
 
+// Gang turf: clear the gang in a zone to claim it; held turf pays passive income
+// but rival gangs periodically try to retake it. Logic in npcs.js updateTurf.
+export const TURFS = [
+  { id: 'khlong', name: 'Khlong Toei',  center: new THREE.Vector3(-150, 0,  150), radius: 28 },
+  { id: 'din',    name: 'Din Daeng',    center: new THREE.Vector3( 150, 0,  150), radius: 28 },
+  { id: 'phra',   name: 'Phra Khanong', center: new THREE.Vector3( 150, 0, -150), radius: 28 },
+];
+
 // Story-mission milestones, in chain order — single source of truth for the
 // completion % (phone + 100% celebration) so it tracks the whole 6-job chain.
 export function missionMilestones() {
