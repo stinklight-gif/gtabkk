@@ -141,6 +141,14 @@
   #garageup button:hover:not(:disabled) { background: #21344a; }
   #garageup button:disabled { opacity: 0.5; cursor: default; }
   #garageup #garageup-leave { border-color: #555; margin-top: 6px; text-align: center; }
+  #cash-pops { position: relative; height: 0; }
+  .cash-pop { position: absolute; left: 2px; top: 0; font-weight: 700; font-size: 17px; white-space: nowrap; pointer-events: none; text-shadow: 0 1px 3px #000; animation: cashpop 1.15s ease-out forwards; }
+  .cash-pop.pos { color: #4dff9a; }
+  .cash-pop.neg { color: #ff7a6a; }
+  @keyframes cashpop { 0% { opacity: 0; transform: translateY(8px); } 14% { opacity: 1; } 100% { opacity: 0; transform: translateY(-24px); } }
+  #screen-flash { position: fixed; inset: 0; pointer-events: none; opacity: 0; z-index: 60; mix-blend-mode: screen; }
+  #screen-flash.on { animation: flashfade 0.55s ease-out; }
+  @keyframes flashfade { 0% { opacity: 0.45; } 100% { opacity: 0; } }
   #arcade { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 12px; background: rgba(6,4,14,0.9); z-index: 76; }
   #arcade.show { display: flex; }
   #arcade h3 { color: #ff2a86; letter-spacing: 4px; margin: 0; text-shadow: 0 0 10px #ff2a86; }
@@ -282,7 +290,9 @@
   <div class="hud-corner top-left">
     <div id="stars" aria-label="wanted">★★★★★</div>
     <div id="cash">0</div>
+    <div id="cash-pops"></div>
   </div>
+  <div id="screen-flash"></div>
 
   <div class="hud-corner top-right">
     <div id="minimap-wrap"><canvas id="minimap" width="256" height="256"></canvas></div>

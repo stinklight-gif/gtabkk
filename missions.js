@@ -148,7 +148,7 @@ export function makeMissionSystem() {
       },
       win() {
         G.cash += this.reward;
-        G.hud.setCash(G.cash);
+        G.hud.setCash(G.cash); G.hud.cashPop(this.reward);
         G._soiRunWon = true;
         G.hud.showNotif(`Soi Run complete: +฿${this.reward.toLocaleString()}`);
         G.hud.showSubtitle("Uncle Seng: \"Fast hands, fast wheels. There's other work...\"", "ลุงเซ้ง: \"เร็วดีนี่ มีงานอีก\"");
@@ -232,7 +232,7 @@ export function makeMissionSystem() {
         this.stage = 5;
         this.armed = false;
         G.cash += this.reward;
-        G.hud.setCash(G.cash);
+        G.hud.setCash(G.cash); G.hud.cashPop(this.reward);
         G._hitDone = true;
         this.nextJob = 'delivery';   // winning the Hit unlocks Hot Delivery
         G.hud.showNotif(`Hit complete: +฿${this.reward.toLocaleString()}`);
@@ -281,7 +281,7 @@ export function makeMissionSystem() {
       win() {
         this.stage = 5; this.armed = false;
         G._deliveryDone = true;
-        G.cash += this.reward; G.hud.setCash(G.cash);
+        G.cash += this.reward; G.hud.setCash(G.cash); G.hud.cashPop(this.reward);
         G.hud.showNotif(`Delivery complete: +฿${this.reward.toLocaleString()}`);
         G.hud.showSubtitle("Uncle Seng: \"Made it. You're solid, kid.\"", "ลุงเซ้ง: \"เก่งมาก\"");
         G.hud.setMissionText('Free Roam · Sukhumvit');
@@ -355,7 +355,7 @@ export function makeMissionSystem() {
         this.stage = 5; this.armed = false;
         this.nextJob = 'getaway';        // the heist unlocks the wheel-man capstone
         G._mallJobDone = true;
-        G.cash += this.reward; G.hud.setCash(G.cash);
+        G.cash += this.reward; G.hud.setCash(G.cash); G.hud.cashPop(this.reward);
         G.hud.showNotif(`Mall Job complete: +฿${this.reward.toLocaleString()}`);
         G.hud.showSubtitle("Uncle Seng: \"Clean grab. One more — a getaway needs a wheel man.\"", "ลุงเซ้ง: \"งานสะอาด มีงานคนขับรถหนีอีกงาน\"");
         G.hud.setMissionText('Free Roam · Sukhumvit');
@@ -431,7 +431,7 @@ export function makeMissionSystem() {
       },
       win() {
         this.stage = 5; this.armed = false;
-        G.cash += this.reward; G.hud.setCash(G.cash);
+        G.cash += this.reward; G.hud.setCash(G.cash); G.hud.cashPop(this.reward);
         G._getawayDone = true;
         G.hud.showNotif(`Getaway done: +฿${this.reward.toLocaleString()}`);
         G.hud.showSubtitle("Uncle Seng: \"Best wheel-man in Krung Thep. That's all I've got — for now.\"", "ลุงเซ้ง: \"คนขับเก่งที่สุด\"");
