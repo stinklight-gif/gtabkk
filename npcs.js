@@ -3,9 +3,9 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, TURFS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
-import { animateWalk, sidewalkPos, spawnPed } from './main.js';
+import { animateWalk, damagePlayer, saveGame, sidewalkPos, spawnPed } from './main.js';
 
 // 13. PEDESTRIANS + DOGS
 // =============================================================================
@@ -73,14 +73,14 @@ export function resyncCrowd() {
   // pull stray wanderers onto nearby sidewalks so the count near the camera
   // reflects the hour immediately (harness-only; gameplay distributes gradually)
   for (const ped of G.peds) {
-    if (ped.isMugger || ped.isTarget || ped.anchor) continue;
+    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang) continue;
     if (dist2(ped.mesh.position, pp) > 95 * 95) ped.mesh.position.copy(sidewalkPos(pp.x, pp.z, 88));
   }
   for (let guard = 0; G.peds.length > target && guard < 500; guard++) {
     let fi = -1, fd = -1;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang) continue;
       const d = dist2(ped.mesh.position, pp);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -98,6 +98,16 @@ export function updatePeds(dt) {
   const playerPos = G.player.group.position;
   for (const ped of G.peds) {
     if (ped.dead) continue;
+    // gang member: chase the player and swing on contact (set heading/speed; the
+    // shared move + animate code below applies it)
+    if (ped.gang) {
+      const dx = playerPos.x - ped.mesh.position.x, dz = playerPos.z - ped.mesh.position.z;
+      const d = Math.hypot(dx, dz) || 1;
+      ped.heading = Math.atan2(dx, dz);
+      ped.speed = d > 1.5 ? 2.7 : 0;
+      ped._atkCD = (ped._atkCD || 0) - dt;
+      if (d < 1.9 && ped._atkCD <= 0) { damagePlayer(6); ped._atkCD = 1.0; }
+    } else
     // panic if loud near
     if (ped.panicT > 0) {
       ped.panicT -= dt;
@@ -160,7 +170,7 @@ export function updatePeds(dt) {
     let fi = -1, fd = 60 * 60;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang) continue;
       const d = dist2(ped.mesh.position, playerPos);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -313,6 +323,84 @@ export function updateMuggings(dt) {
   marker.position.set(0, 2.5, 0); ped.mesh.add(marker);
   G.mugging = { ped, t: 0, marker };
   G.hud.showNotif('Bag-snatcher! Run them down.');
+}
+
+// ---- Gang turf: a local encounter. Walk into a zone and its gang spawns; clear
+// them to claim it (a bonus + passive income). Walk out mid-fight and the gang
+// melts away (turfs don't trail you across the map). Held turf is periodically
+// retaken by rivals. Gang refs + ownership live in module state so the count is
+// authoritative regardless of crowd churn / save-load. ----
+const TURF_INCOME = 6, TURF_BONUS = 2500;   // per held turf: baht/s, and the claim bonus
+const turfGang = {};                        // tid -> spawned gang ped refs
+const turfOwned = new Set();                // tid you hold (runtime truth; mirrored to G.turfs for the save)
+
+function aliveTurfGang(tid) { let n = 0; for (const p of (turfGang[tid] || [])) if (!p.dead && G.peds.includes(p)) n++; return n; }
+function clearTurfGang(tid) {
+  for (const p of (turfGang[tid] || [])) {
+    if (p.dead) continue;
+    p.dead = true; G.scene.remove(p.mesh); disposeObject(p.mesh);
+    const i = G.peds.indexOf(p); if (i >= 0) G.peds.splice(i, 1);
+  }
+  turfGang[tid] = [];
+}
+function spawnTurfGang(t, n) {
+  const arr = [];
+  for (let i = 0; i < n; i++) {
+    const ang = (i / n) * TAU, r = t.radius * 0.3;
+    const ped = spawnPed(G.scene, new THREE.Vector3(t.center.x + Math.cos(ang) * r, 0, t.center.z + Math.sin(ang) * r));
+    if (!ped) continue;
+    ped.gang = true; ped.turfId = t.id; ped.hp = 40; ped.speed = 2.6; ped._notedAggression = true;   // hostile → not civilian heat
+    const parts = ped.mesh.userData.parts;
+    if (parts && parts.torso) parts.torso.material = new THREE.MeshStandardMaterial({ color: 0x24222c, roughness: 0.8 });
+    arr.push(ped);
+  }
+  turfGang[t.id] = arr;
+}
+
+export function updateTurf(dt) {
+  const pp = G.player.group.position;
+  const st = G.turfs || (G.turfs = {});
+  let owned = 0;
+  for (const t of TURFS) {
+    const s = st[t.id] || (st[t.id] = { owned: false });
+    if (s.owned) turfOwned.add(t.id);          // adopt ownership loaded from a save
+    s.owned = turfOwned.has(t.id);             // ...then keep G.turfs mirrored to the runtime truth
+    if (!turfOwned.has(t.id) && (turfGang[t.id] || []).length) {
+      if (aliveTurfGang(t.id) === 0) {                                 // gang wiped → claim
+        turfOwned.add(t.id); s.owned = true; turfGang[t.id] = [];
+        G.cash += TURF_BONUS; G.hud.setCash(G.cash);
+        G.hud.showNotif(`Took over ${t.name}! +฿${TURF_BONUS.toLocaleString()} + passive income.`);
+        if (G.audio && G.audio.chime) G.audio.chime();
+        saveGame();
+      } else if (dist2(pp, t.center) > t.radius * t.radius) {          // walked out mid-fight → gang melts away
+        clearTurfGang(t.id);
+      }
+    }
+    if (turfOwned.has(t.id)) owned++;
+  }
+  if (owned > 0) { G.cash += TURF_INCOME * owned * dt; G.hud.setCash(G.cash); }   // passive income from held turf
+  // rival takeover: every ~100 s a held turf may flip back, forcing you to retake it
+  G._turfRetal = (G._turfRetal == null ? 100 : G._turfRetal - dt);
+  if (G._turfRetal <= 0) {
+    G._turfRetal = 100;
+    const held = [...turfOwned];
+    if (held.length && Math.random() < 0.6) {
+      const id = pick(held); turfOwned.delete(id); if (st[id]) st[id].owned = false;
+      const t = TURFS.find(x => x.id === id);
+      G.hud.showNotif(`Rival gang seized ${t ? t.name : 'a turf'} — take it back.`);
+    }
+  }
+  // the turf the player is standing in: spawn a gang on entry, else prompt
+  for (const t of TURFS) {
+    if (dist2(pp, t.center) > t.radius * t.radius) continue;
+    if (turfOwned.has(t.id)) { G.hud.showPrompt(`${t.name} — your turf`, 0.4); break; }
+    if (!(turfGang[t.id] || []).length) {
+      spawnTurfGang(t, 4);
+      G.hud.showNotif(`${t.name}: gang territory — clear them out to take it.`);
+    }
+    G.hud.showPrompt(`${t.name} turf — defeat the gang (${aliveTurfGang(t.id)} left)`, 0.4);
+    break;
+  }
 }
 
 // Spike strips at 3★ — deployed ahead of a fleeing driver; running one over blows

@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, missionMilestones, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, TURFS, missionMilestones, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 
 // -----------------------------------------------------------------------------
@@ -20,6 +20,16 @@ export const BTS_COLOR = '#3fd0ff';      // BTS Skytrain station (cyan)
 export const SEVEN_COLOR = '#ff7a2a';    // 7-Eleven (orange)
 export const BOAT_COLOR = '#7fd0a0';     // Riverside pier / boats (sea green)
 export const BANK_COLOR = '#e0b020';     // Krung Thep Bank (gold)
+export const TURF_COLOR = '#ff5a8a';     // Gang turf (pink); filled flag = yours
+
+export function drawTurfGlyph(ctx, x, y, s, color, owned) {
+  ctx.strokeStyle = color; ctx.lineWidth = Math.max(1, s * 0.22);
+  ctx.beginPath(); ctx.moveTo(x - s * 0.5, y + s); ctx.lineTo(x - s * 0.5, y - s); ctx.stroke();   // pole
+  ctx.beginPath();                       // pennant
+  ctx.moveTo(x - s * 0.5, y - s); ctx.lineTo(x + s, y - s * 0.45); ctx.lineTo(x - s * 0.5, y + s * 0.1);
+  ctx.closePath();
+  if (owned) { ctx.fillStyle = color; ctx.fill(); } else ctx.stroke();
+}
 
 export function drawBankGlyph(ctx, x, y, s, color) {
   ctx.fillStyle = color;                 // a classical bank: pediment roof + columns
@@ -265,6 +275,8 @@ export function bindHud() {
     if (G.world.poi && G.world.poi.pier) { const [x, y] = mm(G.world.poi.pier); drawBoatGlyph(mctx, x, y, 4, BOAT_COLOR); }
     // Krung Thep Bank
     if (G.world.poi && G.world.poi.bank) { const [x, y] = mm(G.world.poi.bank); drawBankGlyph(mctx, x, y, 4.5, BANK_COLOR); }
+    // gang turf (flag; filled once it's yours)
+    for (const t of TURFS) { const [x, y] = mm(t.center); drawTurfGlyph(mctx, x, y, 4.5, TURF_COLOR, !!(G.turfs && G.turfs[t.id] && G.turfs[t.id].owned)); }
     // buyable businesses (diamonds; filled once owned)
     for (const b of BUSINESSES) { if (!b.pos) continue; const [x, y] = mm(b.pos); drawBizGlyph(mctx, x, y, 4, BIZ_COLOR, !!(G.econ.businesses[b.id] && G.econ.businesses[b.id].owned)); }
     mctx.restore();
