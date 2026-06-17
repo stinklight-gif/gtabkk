@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
-import { tip, resolvePlayerVsBuildings, resolvePlayerVsVehicles, resolvePlayerVsPlatforms, worldSupportY, saveGame, startArcade, applyUpgrades, updateAmmoHud, updateCombat, updatePlayerInVehicle } from './main.js';
+import { tip, resolvePlayerVsBuildings, resolvePlayerVsVehicles, resolvePlayerVsPlatforms, worldSupportY, saveGame, startArcade, applyUpgrades, raiseWanted, updateAmmoHud, updateCombat, updatePlayerInVehicle } from './main.js';
 
 export function updatePlayer(dt) {
   const p = G.player;
@@ -235,6 +235,71 @@ export function updateBusinesses(dt) {
 }
 
 // Enter a 7-Eleven (on foot) to open the store overlay.
+// ---- Bank Heist (standalone set-piece): walk into Krung Thep Bank, hold the
+// vault while the drill cracks it, then the alarm maxes the heat (5★ + chopper)
+// and you run the loot to a drop for a big payout. 2-minute cooldown after. ----
+const HEIST_REWARD = 18000, HEIST_CRACK = 6, HEIST_COOLDOWN = 120000;
+const HEIST_DROP = new THREE.Vector3(150, 0, 65);
+
+function heistBeam(pos, color) {
+  const h = G.heist;
+  if (!pos) { if (h.beam) { G.scene.remove(h.beam); h.beam = null; } return; }
+  if (!h.beam) {
+    h.beam = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 80, 16, 1, true),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false }));
+    G.scene.add(h.beam);
+  }
+  h.beam.material.color.setHex(color);
+  h.beam.position.set(pos.x, 40, pos.z);
+}
+
+export function updateBank(dt) {
+  const bank = G.world.bank; if (!bank) return;
+  const p = G.player, h = G.heist;
+  if (h.active) {                              // in progress — runs anywhere (incl. while driving the loot out)
+    if (h.stage === 1) {
+      if (!p.inVehicle && dist2(p.group.position, bank.vault) < 5.5 * 5.5) {
+        h.crackT -= dt;
+        G.hud.showPrompt(`CRACKING VAULT &nbsp; ${Math.max(0, h.crackT).toFixed(1)}s — hold position`, 0.4);
+        if (h.crackT <= 0) {
+          h.stage = 2; raiseWanted(5);          // alarm! max heat + the chopper
+          if (G.audio && G.audio.siren) G.audio.siren();
+          h.markerPos = HEIST_DROP.clone(); heistBeam(h.markerPos, 0x39ff7a);
+          G.hud.showNotif('Vault open! Grab the loot and RUN to the drop!');
+          G.hud.showSubtitle('Loot secured — get to the green drop!', 'รีบไปจุดส่ง');
+        }
+      } else if (!p.inVehicle) {
+        G.hud.showPrompt('Return to the <b>vault</b> to keep cracking', 0.4);
+        h.crackT = Math.min(HEIST_CRACK, h.crackT + dt * 0.6);   // drifts back if you wander off
+      }
+    } else if (h.stage === 2) {
+      G.hud.showPrompt('BANK HEIST &nbsp;→&nbsp; reach the green drop', 0.4);
+      if (dist2(p.group.position, HEIST_DROP) < 9 * 9) {
+        G.cash += HEIST_REWARD; G.hud.setCash(G.cash); G._bankDone = true;
+        h.active = false; h.stage = 0; h.markerPos = null; heistBeam(null);
+        h.cooldownUntil = performance.now() + HEIST_COOLDOWN;
+        G.hud.setMissionText('Free Roam · Sukhumvit');
+        G.hud.showNotif(`Bank Heist: +฿${HEIST_REWARD.toLocaleString()}!`);
+        G.hud.showSubtitle('Big score. Lie low for a while.', 'ได้เงินก้อนใหญ่ หลบไว้ก่อน');
+        if (G.audio && G.audio.chime) G.audio.chime();
+        saveGame();
+      }
+    }
+    return;
+  }
+  // not started — offer it at the vault, on foot, when off cooldown
+  if (p.inVehicle || dist2(p.group.position, bank.vault) > 5 * 5) return;
+  if (performance.now() < h.cooldownUntil) { G.hud.showPrompt('Vault sealed — come back later', 0.4); return; }
+  tip('bank', 'The bank vault: hold position to crack it, then run the loot to the drop before the cops box you in.', 'ปล้นธนาคาร');
+  G.hud.showPrompt('Press <b>E</b> to crack the <b>vault</b> (Bank Heist)', 0.4);
+  if (G.input.pressed('KeyE')) {
+    h.active = true; h.stage = 1; h.crackT = HEIST_CRACK;
+    h.markerPos = bank.vault.clone(); heistBeam(h.markerPos, 0xffcf4a);
+    G.hud.setMissionText('Bank Heist');
+    G.hud.showSubtitle('Cracking the vault — stay close while the drill works.', 'กำลังเจาะตู้เซฟ');
+  }
+}
+
 export function update7Eleven(dt) {
   const p = G.player;
   for (const e of G.world.sevenElevens) {

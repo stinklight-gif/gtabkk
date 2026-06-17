@@ -11,7 +11,7 @@ import {
 import { makePedMesh } from './entities.js';
 
 export function buildLandmarks(env) {
-  const { scene, world, _m, _m2, _p, _q, _s, _e, addInstanced, bakeGroup, TEMPLE_I, TEMPLE_J, GARAGE_I, GARAGE_J, SAFE_I, SAFE_J, RIVER_I, YAO_I, YAO_J0, YAO_J1, GUN_I, GUN_J, MALL_I, MALL_J, SIDEWALK_EDGE } = env;
+  const { scene, world, _m, _m2, _p, _q, _s, _e, addInstanced, bakeGroup, TEMPLE_I, TEMPLE_J, GARAGE_I, GARAGE_J, SAFE_I, SAFE_J, RIVER_I, YAO_I, YAO_J0, YAO_J1, GUN_I, GUN_J, MALL_I, MALL_J, BANK_I, BANK_J, SIDEWALK_EDGE } = env;
   // Walkable structures shared by the floor-support physics (mall + BTS platforms).
   world.walk = { platforms: [], ramps: [], solids: [] };
 
@@ -344,6 +344,41 @@ export function buildLandmarks(env) {
     const board = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.5), new THREE.MeshBasicMaterial({ color: 0x39ff7a })); board.position.set(0, 1.55, 0.72); cart.add(board);
     const gl = new THREE.PointLight(0xffd27a, 0.5, 9, 2); gl.position.set(0, 2, 0); cart.add(gl);
     cart.position.copy(b.pos); scene.add(cart);
+  }
+
+  // ---- Krung Thep Bank (robbable: walk in, crack the vault, run the loot) ----
+  {
+    const bx = (BANK_I + 0.5) * BLOCK, bz = (BANK_J + 0.5) * BLOCK;   // reserved block centre (75, -75)
+    const HW = 11, HD = 8, H = 5, DOOR = 2.2, segW = HW - DOOR;
+    const bank = new THREE.Group();
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0xe6e0cf, roughness: 0.7 });   // pale stone
+    const addB = (px, py, pz, sx, sy, sz, mat = wallMat) => { const m = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), mat); m.position.set(px, py, pz); m.castShadow = true; m.receiveShadow = true; bank.add(m); };
+    addB(-(DOOR + segW / 2), H / 2, HD, segW, H, 0.4);               // front, split around the door
+    addB( (DOOR + segW / 2), H / 2, HD, segW, H, 0.4);
+    addB(0, H / 2, -HD, HW * 2, H, 0.4);                             // back
+    addB(-HW, H / 2, 0, 0.4, H, HD * 2); addB(HW, H / 2, 0, 0.4, H, HD * 2);   // sides
+    addB(0, H + 0.15, 0, HW * 2 + 1, 0.3, HD * 2 + 1, new THREE.MeshStandardMaterial({ color: 0xcfc7b0, roughness: 0.8 }));   // roof
+    addB(0, 0.06, 0, HW * 2 - 0.5, 0.12, HD * 2 - 0.5, new THREE.MeshStandardMaterial({ color: 0x9a8f78, roughness: 0.9 }));  // marble floor
+    const colMat = new THREE.MeshStandardMaterial({ color: 0xf0ead8, roughness: 0.7 });
+    for (const cxo of [-7, -2.6, 2.6, 7]) { const col = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, H + 0.6, 10), colMat); col.position.set(cxo, (H + 0.6) / 2, HD + 1.6); col.castShadow = true; bank.add(col); }
+    addB(0, H + 0.7, HD + 1.6, HW * 2 + 1, 1.2, 1.4, colMat);        // portico pediment
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(8, 1.1), new THREE.MeshBasicMaterial({ color: 0xe0b020 })); sign.position.set(0, H + 0.7, HD + 2.35); bank.add(sign);
+    addB(0, 0.6, 1.5, HW * 1.4, 1.2, 1.0, new THREE.MeshStandardMaterial({ color: 0x6a5a3a, roughness: 0.8 }));   // teller counter
+    const vaultMat = new THREE.MeshStandardMaterial({ color: 0x556070, roughness: 0.4, metalness: 0.6 });
+    const vaultBody = new THREE.Mesh(new THREE.BoxGeometry(6, 4, 3), vaultMat); vaultBody.position.set(0, 2, -HD + 2); vaultBody.castShadow = true; bank.add(vaultBody);
+    const vd = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 0.5, 20), new THREE.MeshStandardMaterial({ color: 0x8a929c, roughness: 0.35, metalness: 0.7 }));
+    vd.rotation.x = PI / 2; vd.position.set(0, 2, -HD + 3.65); bank.add(vd);
+    const vdHub = new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.12, 8, 16), new THREE.MeshStandardMaterial({ color: 0x3a3f48, metalness: 0.8, roughness: 0.3 })); vdHub.rotation.x = PI / 2; vdHub.position.set(0, 2, -HD + 3.95); bank.add(vdHub);
+    const pl = new THREE.PointLight(0xfff0d0, 0.8, 26, 2); pl.position.set(0, H - 0.6, 0); bank.add(pl);
+    bank.position.set(bx, 0, bz); scene.add(bank);
+    world.buildings.push({ pos: new THREE.Vector3(bx - (DOOR + segW / 2), H / 2, bz + HD), size: new THREE.Vector3(segW, H, 0.5) });
+    world.buildings.push({ pos: new THREE.Vector3(bx + (DOOR + segW / 2), H / 2, bz + HD), size: new THREE.Vector3(segW, H, 0.5) });
+    world.buildings.push({ pos: new THREE.Vector3(bx, H / 2, bz - HD), size: new THREE.Vector3(HW * 2, H, 0.5) });
+    world.buildings.push({ pos: new THREE.Vector3(bx - HW, H / 2, bz), size: new THREE.Vector3(0.5, H, HD * 2) });
+    world.buildings.push({ pos: new THREE.Vector3(bx + HW, H / 2, bz), size: new THREE.Vector3(0.5, H, HD * 2) });
+    world.buildings.push({ pos: new THREE.Vector3(bx, 2, bz - HD + 2), size: new THREE.Vector3(6, 4, 3) });          // vault body (solid)
+    world.bank = { vault: new THREE.Vector3(bx, 0, bz - HD + 5.2) };   // stand-here spot in front of the vault door
+    world.poi.bank = new THREE.Vector3(bx, 0, bz + HD + 2);            // entrance (map marker)
   }
 
   // ---- Shrines (spirit houses) — small gold structures ----

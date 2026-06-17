@@ -37,4 +37,5 @@ jobs:
             smoke_bts.png
             smoke_heli.png
             smoke_river.png
+            smoke_bank.png
           if-no-files-found: ignore
