@@ -305,6 +305,7 @@ export function makeMissionSystem() {
       markerPos: null,
       stage: 0,
       armed: false,
+      nextJob: null,
       drop: new THREE.Vector3(120, 0, -60),
       reward: 8000,
       onStart() {
@@ -343,7 +344,85 @@ export function makeMissionSystem() {
           const d2 = dist2(pp, this.markerPos);
           if (!this.armed && d2 > 18 * 18) this.armed = true;
           if (this.armed) {
-            G.hud.showPrompt('Return to the <b>marker</b> to run the <b>Mall Job</b> again', 0.4);
+            const label = this.nextJob ? 'start the <b>Getaway</b>' : 'run the <b>Mall Job</b> again';
+            G.hud.showPrompt('Return to the <b>marker</b> to ' + label, 0.4);
+            if (d2 < 8 * 8) { this.armed = false; if (this.nextJob) sys.start(this.nextJob); else this.onStart(); }
+          }
+        }
+      },
+      win() {
+        this.stage = 5; this.armed = false;
+        this.nextJob = 'getaway';        // the heist unlocks the wheel-man capstone
+        G.cash += this.reward; G.hud.setCash(G.cash);
+        G.hud.showNotif(`Mall Job complete: +฿${this.reward.toLocaleString()}`);
+        G.hud.showSubtitle("Uncle Seng: \"Clean grab. One more — a getaway needs a wheel man.\"", "ลุงเซ้ง: \"งานสะอาด มีงานคนขับรถหนีอีกงาน\"");
+        G.hud.setMissionText('Free Roam · Sukhumvit');
+        this.markerPos = this.drop.clone();
+        setBeam(this.markerPos, 0xff2a86);
+      },
+    },
+
+    // Mission 6 (capstone) — Getaway Driver: grab the crew by car, then string
+    // together drops under a timer with the heat maxed (4★ → the police chopper
+    // is on you). Showcases the cop-chase depth + driving. Escalates to ฿12,000.
+    getaway: {
+      name: 'Getaway Driver',
+      markerPos: null,
+      stage: 0,
+      armed: false,
+      dropIdx: 0,
+      timeLeft: 0,
+      pickup: new THREE.Vector3(-120, 0, -120),
+      drops: [
+        new THREE.Vector3( 140, 0,  120),
+        new THREE.Vector3(-150, 0,  140),
+        new THREE.Vector3( 150, 0, -140),
+      ],
+      startTime: 50,    // seconds once the crew's aboard
+      dropBonus: 22,    // seconds added per drop reached
+      reward: 12000,
+      onStart() {
+        this.stage = 1; this.dropIdx = 0; this.timeLeft = 0;
+        this.markerPos = this.pickup.clone();
+        setBeam(this.markerPos, 0x39ff7a);   // green = pickup
+        G.hud.setMissionText('Getaway Driver');
+        G.hud.showSubtitle("Uncle Seng: \"Wheel-man job. Grab the crew by car, lose the cops, hit every drop.\"", "ลุงเซ้ง: \"งานคนขับรถหนี\"");
+        G.hud.showPrompt('Get a <b>car</b> and reach the green pickup', 3);
+      },
+      update(dt) {
+        const pp = G.player.group.position;
+        if (this.stage === 1) {
+          const atPickup = dist2(pp, this.markerPos) < 9 * 9;
+          if (atPickup && G.player.inVehicle) {
+            this.stage = 2;
+            this.timeLeft = this.startTime;
+            raiseWanted(4);                  // crew aboard → full heat + the chopper
+            if (G.audio && G.audio.siren) G.audio.siren();
+            this.dropIdx = 0;
+            this.markerPos = this.drops[0].clone();
+            setBeam(this.markerPos, 0x21f0ff);
+            G.hud.showNotif('Crew aboard! Lose the heat — hit the drops!');
+          } else if (atPickup) {
+            G.hud.showPrompt('Bring a <b>car</b> to the pickup', 0.4);
+          }
+        } else if (this.stage === 2) {
+          this.timeLeft -= dt;
+          if (this.timeLeft <= 0) { this.fail(); return; }
+          G.hud.showPrompt(`GETAWAY &nbsp; ⏱ ${this.timeLeft.toFixed(0)}s &nbsp;·&nbsp; drop ${this.dropIdx + 1}/${this.drops.length}`, 0.4);
+          if (dist2(pp, this.markerPos) < 10 * 10) {
+            this.dropIdx++;
+            if (this.dropIdx >= this.drops.length) { this.win(); return; }
+            this.timeLeft += this.dropBonus;
+            this.markerPos = this.drops[this.dropIdx].clone();
+            setBeam(this.markerPos, 0x21f0ff);
+            G.hud.showNotif(`Drop ${this.dropIdx}/${this.drops.length} · +${this.dropBonus}s`);
+            G.audio.blip({ freq: 720, dur: 0.08, gain: 0.12 });
+          }
+        } else if (this.stage === 5) {
+          const d2 = dist2(pp, this.markerPos);
+          if (!this.armed && d2 > 18 * 18) this.armed = true;
+          if (this.armed) {
+            G.hud.showPrompt('Return to the <b>marker</b> to drive the <b>Getaway</b> again', 0.4);
             if (d2 < 8 * 8) { this.armed = false; this.onStart(); }
           }
         }
@@ -351,10 +430,19 @@ export function makeMissionSystem() {
       win() {
         this.stage = 5; this.armed = false;
         G.cash += this.reward; G.hud.setCash(G.cash);
-        G.hud.showNotif(`Mall Job complete: +฿${this.reward.toLocaleString()}`);
-        G.hud.showSubtitle("Uncle Seng: \"Clean grab. That's a payday.\"", "ลุงเซ้ง: \"งานสะอาด ได้เงินก้อน\"");
+        G._getawayDone = true;
+        G.hud.showNotif(`Getaway done: +฿${this.reward.toLocaleString()}`);
+        G.hud.showSubtitle("Uncle Seng: \"Best wheel-man in Krung Thep. That's all I've got — for now.\"", "ลุงเซ้ง: \"คนขับเก่งที่สุด\"");
         G.hud.setMissionText('Free Roam · Sukhumvit');
-        this.markerPos = this.drop.clone();
+        this.markerPos = this.pickup.clone();
+        setBeam(this.markerPos, 0xff2a86);
+      },
+      fail() {
+        this.stage = 5; this.armed = false;
+        G.hud.showNotif('Getaway failed — crew bailed.');
+        G.hud.showSubtitle("Uncle Seng: \"You blew it. Regroup and try again.\"", "ลุงเซ้ง: \"พลาดแล้ว ลองใหม่\"");
+        G.hud.setMissionText('Free Roam · Sukhumvit');
+        this.markerPos = this.pickup.clone();
         setBeam(this.markerPos, 0xff2a86);
       },
     },
