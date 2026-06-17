@@ -224,6 +224,41 @@ async function main() {
     await page.keyboard.down('KeyE'); await waitFrames(page, 3); await page.keyboard.up('KeyE'); await waitFrames(page, 3);
     const shop = await page.evaluate(() => ({ state: window.GAME.state, title: document.querySelector('#store h3').textContent }));
     assert(shop.state === 'store' && /7-ELEVEN/.test(shop.title), 'the shop opens from inside the 7-Eleven');
+
+    // ---- 7. Getaway Driver capstone mission ----------------------------------
+    console.log('\n[7] Getaway Driver capstone');
+    const gw = await page.evaluate(() => {
+      const G = window.GAME;
+      G.state = 'playing'; document.getElementById('store').classList.remove('show');
+      G.wanted.stars = 0; G.mission.start('getaway');
+      const m = G.mission.active;
+      return { name: m.name, stage: m.stage, mx: m.markerPos.x, mz: m.markerPos.z, px: m.pickup.x, pz: m.pickup.z, drops: m.drops.map(d => ({ x: d.x, z: d.z })) };
+    });
+    assert(gw.name === 'Getaway Driver' && gw.stage === 1, 'the Mall Job unlocks the Getaway Driver capstone');
+    assert(Math.hypot(gw.mx - gw.px, gw.mz - gw.pz) < 1, 'it points at the green pickup');
+    // arrive by car → crew aboard, heat maxed (helicopter)
+    await page.evaluate(g => {
+      const G = window.GAME;
+      const car = G.vehicles.find(v => v.spec && !v.dead) || G.vehicles[0];
+      car.pos.set(g.px, 0, g.pz); if (car.group) car.group.position.copy(car.pos);
+      car.driver = 'player'; car.npc = null; G.player.inVehicle = car;
+      G.player.group.position.set(g.px, 0, g.pz);
+    }, gw);
+    await waitFrames(page, 6);
+    const aboard = await page.evaluate(() => ({ stage: window.GAME.mission.active.stage, stars: window.GAME.wanted.stars }));
+    assert(aboard.stage === 2 && aboard.stars >= 4, `crew aboard maxes the heat (stage ${aboard.stage}, ${aboard.stars}★)`);
+    const gwCash0 = await page.evaluate(() => window.GAME.cash);
+    for (let i = 0; i < gw.drops.length; i++) {
+      await page.evaluate(d => {
+        const G = window.GAME;
+        G.player.group.position.set(d.x, 0, d.z);
+        if (G.player.inVehicle) { G.player.inVehicle.pos.set(d.x, 0, d.z); if (G.player.inVehicle.group) G.player.inVehicle.group.position.copy(G.player.inVehicle.pos); }
+      }, gw.drops[i]);
+      await waitFrames(page, 5);
+    }
+    const gwDone = await page.evaluate(() => ({ stage: window.GAME.mission.active.stage, done: !!window.GAME._getawayDone, cash: window.GAME.cash }));
+    assert(gwDone.done && gwDone.stage === 5, `hitting all drops completes the Getaway (stage ${gwDone.stage})`);
+    assert(gwDone.cash > gwCash0, `the Getaway pays out (+฿${gwDone.cash - gwCash0})`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
