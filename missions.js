@@ -280,6 +280,7 @@ export function makeMissionSystem() {
       },
       win() {
         this.stage = 5; this.armed = false;
+        G._deliveryDone = true;
         G.cash += this.reward; G.hud.setCash(G.cash);
         G.hud.showNotif(`Delivery complete: +฿${this.reward.toLocaleString()}`);
         G.hud.showSubtitle("Uncle Seng: \"Made it. You're solid, kid.\"", "ลุงเซ้ง: \"เก่งมาก\"");
@@ -353,6 +354,7 @@ export function makeMissionSystem() {
       win() {
         this.stage = 5; this.armed = false;
         this.nextJob = 'getaway';        // the heist unlocks the wheel-man capstone
+        G._mallJobDone = true;
         G.cash += this.reward; G.hud.setCash(G.cash);
         G.hud.showNotif(`Mall Job complete: +฿${this.reward.toLocaleString()}`);
         G.hud.showSubtitle("Uncle Seng: \"Clean grab. One more — a getaway needs a wheel man.\"", "ลุงเซ้ง: \"งานสะอาด มีงานคนขับรถหนีอีกงาน\"");
