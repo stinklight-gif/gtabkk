@@ -567,10 +567,15 @@ export function spawnParkedCars(scene) {
 
 // One drivable longtail at the river pier gap (z=-50) — step through the embankment to board.
 export function spawnBoat(scene) {
-  const v = makeVehicle('boat', scene);
-  v.pos.set(-212, 0.3, -50); v.mesh.position.copy(v.pos);
-  v.heading = 0; v.mesh.rotation.y = 0;
-  v.driver = null; v.vel = 0;
+  // A small fleet of driveable longtails along the channel (the one by the pier
+  // at z=-50 plus two more) so the river is a real traversal option, not a
+  // single boat you can lose.
+  for (const [x, z] of [[-212, -50], [-228, 60], [-222, -150]]) {
+    const v = makeVehicle('boat', scene);
+    v.pos.set(x, 0.3, z); v.mesh.position.copy(v.pos);
+    v.heading = 0; v.mesh.rotation.y = 0;
+    v.driver = null; v.vel = 0;
+  }
 }
 
 export function spawnPeds(scene, n) {

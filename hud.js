@@ -18,6 +18,16 @@ export const MALL_COLOR = '#c98bff';     // Terminal 21 mall (purple)
 export const BIZ_COLOR = '#39ff7a';      // Buyable businesses (green); filled = owned
 export const BTS_COLOR = '#3fd0ff';      // BTS Skytrain station (cyan)
 export const SEVEN_COLOR = '#ff7a2a';    // 7-Eleven (orange)
+export const BOAT_COLOR = '#7fd0a0';     // Riverside pier / boats (sea green)
+
+export function drawBoatGlyph(ctx, x, y, s, color) {
+  ctx.fillStyle = color;                 // a little boat hull + mast
+  ctx.beginPath();
+  ctx.moveTo(x - s, y - s * 0.25); ctx.lineTo(x + s, y - s * 0.25);
+  ctx.lineTo(x + s * 0.5, y + s * 0.6); ctx.lineTo(x - s * 0.5, y + s * 0.6);
+  ctx.closePath(); ctx.fill();
+  ctx.fillRect(x - s * 0.09, y - s, s * 0.18, s * 0.75);
+}
 
 export function drawBizGlyph(ctx, x, y, s, color, filled) {
   ctx.beginPath();                       // a diamond ("฿" stand-in); hollow = for sale
@@ -233,6 +243,8 @@ export function bindHud() {
     if (G.world.sevenElevens) { mctx.fillStyle = SEVEN_COLOR; for (const e of G.world.sevenElevens) { const [x, y] = mm(e.pos); mctx.fillRect(x - 2, y - 2, 4, 4); } }
     // BTS station
     if (G.world.bts) { const [x, y] = mm({ x: G.world.bts.x, z: G.world.bts.z || 0 }); drawBtsGlyph(mctx, x, y, 4, BTS_COLOR); }
+    // riverside pier (boats)
+    if (G.world.poi && G.world.poi.pier) { const [x, y] = mm(G.world.poi.pier); drawBoatGlyph(mctx, x, y, 4, BOAT_COLOR); }
     // buyable businesses (diamonds; filled once owned)
     for (const b of BUSINESSES) { if (!b.pos) continue; const [x, y] = mm(b.pos); drawBizGlyph(mctx, x, y, 4, BIZ_COLOR, !!(G.econ.businesses[b.id] && G.econ.businesses[b.id].owned)); }
     mctx.restore();

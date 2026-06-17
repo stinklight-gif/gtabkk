@@ -40,8 +40,8 @@ import {
 } from './combat.js';
 export * from './hud.js';
 import {
-  bindHud, drawHouseGlyph, drawGarageGlyph, drawMallGlyph, drawBizGlyph, drawBtsGlyph,
-  HOME_COLOR, GARAGE_COLOR, MALL_COLOR, BIZ_COLOR, BTS_COLOR, SEVEN_COLOR
+  bindHud, drawHouseGlyph, drawGarageGlyph, drawMallGlyph, drawBizGlyph, drawBtsGlyph, drawBoatGlyph,
+  HOME_COLOR, GARAGE_COLOR, MALL_COLOR, BIZ_COLOR, BTS_COLOR, SEVEN_COLOR, BOAT_COLOR
 } from './hud.js';
 export * from './missions.js';
 import {
@@ -613,6 +613,12 @@ export function drawFullMap() {
     drawBtsGlyph(ctx, bx, bz, 6, BTS_COLOR);
     ctx.fillStyle = BTS_COLOR; ctx.textAlign = 'center'; ctx.fillText('BTS Asok', bx, bz - 13);
   }
+  // riverside pier (boats)
+  if (poi.pier) {
+    const rx = to(poi.pier.x), rz = to(poi.pier.z);
+    drawBoatGlyph(ctx, rx, rz, 6, BOAT_COLOR);
+    ctx.fillStyle = BOAT_COLOR; ctx.textAlign = 'center'; ctx.fillText('Pier · Boats', rx, rz - 13);
+  }
   // buyable businesses (diamonds; filled once owned)
   for (const b of BUSINESSES) {
     if (!b.pos) continue;
@@ -657,6 +663,7 @@ export function drawFullMap() {
     ['mall',   MALL_COLOR,   'Mall / Arcade'],
     ['biz',    BIZ_COLOR,    'Business'],
     ['bts',    BTS_COLOR,    'BTS'],
+    ['boat',   BOAT_COLOR,   'Pier'],
     ['seven',  SEVEN_COLOR,  '7-Eleven'],
     ['dot',    '#ff2a86',    'Objective'],
     ['dot',    '#ff3333',    'Cops'],
@@ -673,6 +680,7 @@ export function drawFullMap() {
     else if (kind === 'mall') drawMallGlyph(ctx, lx + 8, yy, 5, color, true);
     else if (kind === 'biz') drawBizGlyph(ctx, lx + 8, yy, 5, color, true);
     else if (kind === 'bts') drawBtsGlyph(ctx, lx + 8, yy, 5, color);
+    else if (kind === 'boat') drawBoatGlyph(ctx, lx + 8, yy, 5, color);
     else if (kind === 'seven') { ctx.fillStyle = color; ctx.fillRect(lx + 4, yy - 4, 8, 8); }
     else { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(lx + 8, yy, 5, 0, TAU); ctx.fill(); }
     ctx.fillStyle = '#dfeee9'; ctx.fillText(text, lx + 24, yy + 4);

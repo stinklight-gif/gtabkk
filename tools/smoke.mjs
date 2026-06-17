@@ -44,6 +44,7 @@ const SHOTS = [
   { name: 'smoke_mall.png',     dayT: 0.5, mall: true     },  // inside Terminal 21: atrium, shops, directory
   { name: 'smoke_bts.png',      dayT: 0.5, bts: true      },  // up on the Asok BTS platform (walk-up)
   { name: 'smoke_heli.png',     dayT: 0.88, heli: true    },  // night 4★ chase: police helicopter + searchlight
+  { name: 'smoke_river.png',    dayT: 0.45, river: true   },  // the Chao Phraya pier + driveable boats
 ];
 // Extra one-off shots for tuning, e.g. SMOKE_SHOTS="dawn=0.30,dusk=0.78"
 // (these don't run in CI — only the two standard shots above are asserted).
@@ -104,7 +105,7 @@ async function main() {
     console.log('game started');
 
     for (const shot of SHOTS) {
-      await page.evaluate(({ dayT, festival, songkran, waypoint, tabmap, mall, bts, heli }) => {
+      await page.evaluate(({ dayT, festival, songkran, waypoint, tabmap, mall, bts, heli, river }) => {
         const GAME = window.GAME;
         GAME.state = 'playing';                                  // force-resume if pointer lock dropped
         document.getElementById('pause').classList.remove('show');
@@ -162,6 +163,13 @@ async function main() {
           GAME.player.group.position.set(0, 0, -130); GAME._inMall = false;
           GAME.wanted.stars = 4; GAME.wanted.lastSeenAt = performance.now();
           GAME.camRig.yaw = Math.PI; GAME.camRig.pitch = 0.28;   // look up at the chopper
+        } else if (river) {
+          // riverside pier looking west over the Chao Phraya at the longtail boats
+          GAME.player.inVehicle = null; GAME.player.group.visible = true;
+          GAME.player.group.position.set(-204, 1.4, -50);
+          GAME.camRig.yaw = Math.PI / 2; GAME.camRig.pitch = -0.08;   // yaw +PI/2 → look due west
+          GAME.time.day = 1; GAME.festival.type = null; GAME.wanted.stars = 0;   // day%4≠0 → no Songkran; clear heat
+          document.getElementById('subtitle').classList.remove('show');
         } else {
           GAME.player.group.position.set(0, 0, -130);            // street level, mid-map
           GAME.camRig.yaw = Math.PI; GAME.camRig.pitch = -0.02;  // aim down the street
@@ -169,7 +177,7 @@ async function main() {
         GAME.camRig.shake = 0;
         if (GAME.resyncCrowd) GAME.resyncCrowd();                // snap crowd to this hour (busy noon vs dead 3am)
       }, shot);
-      await waitFrames(page, (shot.festival || shot.songkran || shot.waypoint || shot.tabmap || shot.mall || shot.bts || shot.heli) ? 24 : 14);  // let day/night + camera (+ festival/map/heli) settle
+      await waitFrames(page, (shot.festival || shot.songkran || shot.waypoint || shot.tabmap || shot.mall || shot.bts || shot.heli || shot.river) ? 24 : 14);  // let day/night + camera (+ festival/map/heli/river) settle
       await page.screenshot({ path: path.join(ROOT, shot.name), timeout: 120_000 });
       const size = fs.statSync(path.join(ROOT, shot.name)).size;
       const calls = await page.evaluate(() => window.GAME.renderer.info.render.calls);
