@@ -118,9 +118,19 @@ export const UPGRADES = [
 // you can't idle-hoard. Tuned so active jobs stay worthwhile vs. passive income.
 export const BUSINESSES = [
   { id: 'noodle',   name: 'Noodle Cart',          price: 5000,  rate: 20, cap: 1200, pos: new THREE.Vector3(8, 0, 30) },
-  { id: 'tukstand', name: 'Tuk-Tuk Stand',        price: 12000, rate: 40, cap: 2400, pos: new THREE.Vector3(8, 0, -44) },
+  { id: 'market',   name: 'Market Stall',         price: 7000,  rate: 28, cap: 1700, pos: new THREE.Vector3(-8, 0, -44) },
+  { id: 'wash',     name: 'Car Wash',             price: 9000,  rate: 35, cap: 2100, pos: new THREE.Vector3(44, 0, 8) },
+  { id: 'tukstand', name: 'Tuk-Tuk Stand',        price: 12000, rate: 40, cap: 2400, pos: new THREE.Vector3(8, 0, -90) },
+  { id: 'bar',      name: 'Soi Cowboy Bar',       price: 18000, rate: 65, cap: 4000, pos: new THREE.Vector3(44, 0, 90) },
   { id: 't21unit',  name: 'Terminal 21 Retail Unit', price: 26000, rate: 80, cap: 4800, pos: new THREE.Vector3(-25, 0, 18) },
 ];
+// Property tiers: buy at Tier 1, upgrade to 3 for scaling income (a late-game
+// money sink). One place so player.js (collect/upgrade) and hud.js (holdings)
+// agree on the numbers.
+export const BIZ_TIER_MUL = [0, 1, 1.9, 3.2];   // income + cap multiplier, indexed by tier (1..3)
+export function bizRate(b, s) { return Math.round(b.rate * BIZ_TIER_MUL[(s && s.tier) || 1]); }
+export function bizCap(b, s) { return Math.round(b.cap * BIZ_TIER_MUL[(s && s.tier) || 1]); }
+export function bizUpgradeCost(b, tier) { return Math.round(b.price * (tier === 1 ? 1.3 : 2.2)); }   // cost tier → tier+1
 
 // Gang turf: clear the gang in a zone to claim it; held turf pays passive income
 // but rival gangs periodically try to retake it. Logic in npcs.js updateTurf.

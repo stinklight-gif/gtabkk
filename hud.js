@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, TURFS, missionMilestones, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, bizRate, TURFS, missionMilestones, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 
 // -----------------------------------------------------------------------------
@@ -175,9 +175,14 @@ export function bindHud() {
     document.getElementById('ph-food').textContent = `${G.foodVisited || 0} / ${(G.world.foodStalls || []).length}`;
     const bizEl = document.getElementById('ph-biz');
     if (bizEl) {
-      let owned = 0, rate = 0, pending = 0;
-      for (const b of BUSINESSES) { const s = G.econ.businesses[b.id]; if (s && s.owned) { owned++; rate += b.rate; pending += Math.floor(s.pending || 0); } }
+      let owned = 0, rate = 0, pending = 0; const lines = [];
+      for (const b of BUSINESSES) {
+        const s = G.econ.businesses[b.id];
+        if (s && s.owned) { owned++; const r = bizRate(b, s); rate += r; pending += Math.floor(s.pending || 0); lines.push(`• ${b.name} <span style="opacity:.55">T${s.tier || 1}</span> ฿${r}/s`); }
+      }
       bizEl.textContent = `${owned} / ${BUSINESSES.length} · ฿${rate}/s` + (pending > 0 ? ` · ฿${pending.toLocaleString()} ready` : '');
+      const list = document.getElementById('ph-biz-list');
+      if (list) list.innerHTML = lines.join('<br>');
     }
   }
   function setVehicle(hp, show) {
