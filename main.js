@@ -12,7 +12,7 @@ import {
 } from './player.js';
 export * from './vehicles.js';
 import {
-  STORABLE, collectPaintMats, currentBodyColor, isNearGridLine, killPed, randomPlate, repaintVehicle, respawnTraffic, retrieveVehicle, setVehicleColor, storeVehicle, storedLabel, updateCamera, updateGarage, updateGarageOwnership, updatePlayerInVehicle, updateTrafficCar, updateVehicles
+  STORABLE, collectPaintMats, currentBodyColor, isNearGridLine, killPed, randomPlate, repaintVehicle, respawnTraffic, retrieveVehicle, setVehicleColor, storeVehicle, storedLabel, updateCamera, updateGarage, updateGarageOwnership, updatePlayerInVehicle, updateTrafficCar, updateVehicles, closeUpgrades, applyUpgrades
 } from './vehicles.js';
 export * from './world.js';
 import {
@@ -168,6 +168,7 @@ export function saveGame() {
       garageRented: !!G.econ.garage.rented,
       garageStored: G.econ.garage.stored,
       businesses: G.econ.businesses,
+      upgrades: G.econ.upgrades,
       cosmetics: { shirt: G._shirtColor, hat: G._hat, jacket: G._jacketColor },
       owned: G._owned || [],
     }));
@@ -239,6 +240,9 @@ export function loadGame() {
       const b = s.businesses[id];
       if (b && typeof b === 'object') G.econ.businesses[id] = { owned: !!b.owned, pending: Math.max(0, +b.pending || 0) };
     }
+  }
+  if (s.upgrades && typeof s.upgrades === 'object') {               // restore vehicle upgrade levels
+    for (const k of ['engine', 'nitro', 'armor']) G.econ.upgrades[k] = Math.max(0, Math.min(3, +s.upgrades[k] || 0));
   }
   if (Array.isArray(s.owned)) G._owned = s.owned.slice();           // restore bought cosmetics
   if (s.cosmetics) applyCosmetics(s.cosmetics);
@@ -451,6 +455,8 @@ async function init() {
   if (leaveBtn) leaveBtn.addEventListener('click', () => { document.getElementById('store').classList.remove('show'); G.state = 'playing'; G.input.requestLock(); });
   const arcadeLeave = document.getElementById('arcade-leave');
   if (arcadeLeave) arcadeLeave.addEventListener('click', () => closeArcade());
+  const upLeave = document.getElementById('garageup-leave');
+  if (upLeave) upLeave.addEventListener('click', () => closeUpgrades());
 
   // Restore saved progress, then autosave on unload
   // (loadGame is deferred until a slot is chosen in the menu)

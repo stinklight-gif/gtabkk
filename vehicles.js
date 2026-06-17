@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, UPGRADES, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { tip, cycleWeapon, damagePlayer, firePistol, fireSMG, fireShotgun, makeExplosion, makeSmokeEmitter, makeVehicle, onCopKilled, raiseWanted, resolveVehicleVsBuildings, saveGame, spawnSkid, updateAmmoHud, updateCop, vehicleName } from './main.js';
 
@@ -46,7 +46,7 @@ export function updatePlayerInVehicle(dt) {
 
   const spec = v.spec;
   // accel
-  if (forward > 0) v.vel += spec.accel * (boost ? 1.3 : 1) * dt;
+  if (forward > 0) v.vel += spec.accel * (boost ? (spec.nitroAcc || 1.3) : 1) * dt;
   else if (forward < 0) {
     if (v.vel > 0.2) v.vel -= spec.brake * dt;
     else v.vel -= spec.accel * 0.6 * dt; // reverse
@@ -55,7 +55,7 @@ export function updatePlayerInVehicle(dt) {
   }
   if (handbrake) v.vel *= Math.pow(0.94, dt*60);
   const speedMul = v.tiresBlown ? 0.5 : 1;   // spike strips halve your top speed
-  v.vel = clamp(v.vel, -spec.topSpeed * 0.4 * speedMul, spec.topSpeed * (boost ? 1.15 : 1) * speedMul);
+  v.vel = clamp(v.vel, -spec.topSpeed * 0.4 * speedMul, spec.topSpeed * (boost ? (spec.nitroTop || 1.15) : 1) * speedMul);
   // steering — speed dependent
   const steerRate = spec.turn * (1 - Math.min(1, Math.abs(v.vel)/spec.topSpeed) * 0.4);
   v.heading += steer * steerRate * dt * (v.vel >= 0 ? 1 : -1) * (Math.abs(v.vel)>0.3 ? 1 : 0);
@@ -442,6 +442,65 @@ export function repaintVehicle(v) {
   saveGame();
 }
 
+// ---- Vehicle upgrades: account-wide tuning applied to whatever car you drive.
+// Snapshots each vehicle's factory spec once, then recomputes from it so levels
+// never compound. nitroAcc/nitroTop default to the stock boost (1.3 / 1.15) so
+// an un-upgraded car behaves exactly as before. ----
+export function applyUpgrades(v) {
+  if (!v || !v.spec) return;
+  const u = G.econ.upgrades || {};
+  const b = v._baseSpec || (v._baseSpec = { topSpeed: v.spec.topSpeed, accel: v.spec.accel, turn: v.spec.turn });
+  const e = u.engine || 0, n = u.nitro || 0, a = u.armor || 0;
+  v.spec.topSpeed = b.topSpeed * (1 + 0.09 * e);
+  v.spec.accel = b.accel * (1 + 0.12 * e);
+  v.spec.turn = b.turn * (1 + 0.05 * e);
+  v.spec.nitroAcc = 1.3 + 0.22 * n;    // SHIFT accel multiplier (1.3 → 1.96)
+  v.spec.nitroTop = 1.15 + 0.06 * n;   // SHIFT top-speed multiplier (1.15 → 1.33)
+  v.spec.armorMul = 1 - 0.18 * a;      // crash-damage multiplier (1 → 0.46)
+}
+
+function upgradeRows() {
+  const box = document.getElementById('garageup-items');
+  if (!box) return;
+  box.innerHTML = '';
+  const u = G.econ.upgrades;
+  for (const up of UPGRADES) {
+    const lvl = u[up.id] || 0;
+    const maxed = lvl >= up.max;
+    const price = maxed ? 0 : up.prices[lvl];
+    const dots = '●'.repeat(lvl) + '○'.repeat(up.max - lvl);
+    const btn = document.createElement('button');
+    btn.innerHTML = `<b>${up.label}</b> ${dots} — ${up.desc}<br>` + (maxed ? '<span style="opacity:.7">MAX</span>' : `Lv ${lvl + 1}: ฿${price.toLocaleString()}`);
+    btn.disabled = maxed || G.cash < price;
+    btn.addEventListener('click', () => buyUpgrade(up.id));
+    box.appendChild(btn);
+  }
+}
+export function openUpgrades() {
+  upgradeRows();
+  G.state = 'store';                                  // reuse the paused-overlay state
+  document.getElementById('garageup').classList.add('show');
+  document.exitPointerLock();
+}
+export function closeUpgrades() {
+  document.getElementById('garageup').classList.remove('show');
+  G.state = 'playing';
+  if (G.input.requestLock) G.input.requestLock();
+}
+export function buyUpgrade(id) {
+  const up = UPGRADES.find(u => u.id === id); if (!up) return;
+  const u = G.econ.upgrades, lvl = u[id] || 0;
+  if (lvl >= up.max) return;
+  const price = up.prices[lvl];
+  if (G.cash < price) { G.hud.showNotif('Not enough cash'); return; }
+  G.cash -= price; u[id] = lvl + 1; G.hud.setCash(G.cash);
+  if (G.player.inVehicle) applyUpgrades(G.player.inVehicle);   // take effect immediately
+  G.hud.showNotif(`${up.label} upgraded to Lv ${lvl + 1}`);
+  if (G.audio && G.audio.chime) G.audio.chime();
+  saveGame();
+  upgradeRows();
+}
+
 export function updateGarageOwnership(dt) {
   const p = G.player;
   if (!G.world.garages || !G.world.garages.length) return;
@@ -450,17 +509,19 @@ export function updateGarageOwnership(dt) {
     const v = p.inVehicle;
     if (dist2(v.pos, g.pos) >= (g.r + 1) * (g.r + 1)) return;
     if (!garage.rented) { G.hud.showPrompt('Garage — step out and rent it to store cars here', 0.4); return; }
-    if (!STORABLE.has(v.kind)) return;                      // cop cars / boats aren't storable
     // only claim the prompt line when U-Spray isn't already offering a repair
     const servicing = v.hp < 100 || G.wanted.stars > 0;
+    const storable = STORABLE.has(v.kind);                  // cop cars / boats can't be stored/repainted
     const full = garage.stored.length >= garage.capacity;
     if (!servicing) {
-      G.hud.showPrompt(full
-        ? `Garage full — <b>C</b>: repaint (฿${PRICE.repaint})`
-        : `Garage — <b>K</b>: store this ${vehicleName(v.kind)} · <b>C</b>: repaint (฿${PRICE.repaint})`, 0.4);
+      if (storable) G.hud.showPrompt(full
+        ? `Garage full — <b>C</b>: repaint · <b>U</b>: upgrades`
+        : `Garage — <b>K</b>: store · <b>C</b>: repaint · <b>U</b>: upgrades`, 0.4);
+      else G.hud.showPrompt('Garage — <b>U</b>: vehicle upgrades', 0.4);
     }
-    if (G.input.pressed('KeyK') && !full) storeVehicle(v);
-    else if (G.input.pressed('KeyC')) repaintVehicle(v);
+    if (G.input.pressed('KeyU')) openUpgrades();
+    else if (storable && G.input.pressed('KeyK') && !full) storeVehicle(v);
+    else if (storable && G.input.pressed('KeyC')) repaintVehicle(v);
   } else {
     if (dist2(p.group.position, g.pos) >= g.r * g.r) return;
     tip('garage', 'Your garage: rent it (E), then drive a car in to store (K) or repaint (C) it; on foot, E brings one back out.', 'อู่รถ');

@@ -111,7 +111,7 @@ export function resolveVehicleVsBuildings(v) {
   }
   if (hit) {
     if (Math.abs(v.vel) > 6) {
-      v.hp -= Math.abs(v.vel) * 0.6;
+      v.hp -= Math.abs(v.vel) * 0.6 * (v.spec.armorMul != null ? v.spec.armorMul : 1);   // Armor upgrade softens crashes
       G.camRig.shake = Math.min(0.4, Math.abs(v.vel) * 0.02);
       G.audio.hit();
       spawnDust(p.x, p.z, 16);                 // impact puff
