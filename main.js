@@ -8,7 +8,7 @@ import { makeAudio } from './audio.js';
 import { makeInput } from './input.js';
 export * from './player.js';
 import {
-  markSafehouseOwned, applyCosmetics, update7Eleven, updateBank, updateBTS, updateCollectibles, updateDistrict, updateGunShop, updateInteraction, updatePlayer, updateSafehouse, vehicleName
+  markSafehouseOwned, applyCosmetics, closeBank, update7Eleven, updateBank, updateBTS, updateCollectibles, updateDistrict, updateGunShop, updateInteraction, updatePlayer, updateSafehouse, vehicleName
 } from './player.js';
 export * from './vehicles.js';
 import {
@@ -169,6 +169,7 @@ export function saveGame() {
       garageStored: G.econ.garage.stored,
       businesses: G.econ.businesses,
       upgrades: G.econ.upgrades,
+      bank: { balance: Math.max(0, Math.floor(G.econ.bank.balance) || 0), lastDay: G.econ.bank.lastDay },
       turfs: Object.fromEntries(TURFS.map(t => [t.id, !!(G.turfs && G.turfs[t.id] && G.turfs[t.id].owned)])),
       cosmetics: { shirt: G._shirtColor, hat: G._hat, jacket: G._jacketColor },
       owned: G._owned || [],
@@ -244,6 +245,10 @@ export function loadGame() {
   }
   if (s.upgrades && typeof s.upgrades === 'object') {               // restore vehicle upgrade levels
     for (const k of ['engine', 'nitro', 'armor']) G.econ.upgrades[k] = Math.max(0, Math.min(3, +s.upgrades[k] || 0));
+  }
+  if (s.bank && typeof s.bank === 'object') {                       // restore the bank balance
+    G.econ.bank.balance = Math.max(0, Math.floor(+s.bank.balance) || 0);
+    G.econ.bank.lastDay = (typeof s.bank.lastDay === 'number') ? s.bank.lastDay : null;
   }
   if (s.turfs && typeof s.turfs === 'object') {                     // restore held gang turf
     G.turfs = G.turfs || {};
@@ -462,6 +467,8 @@ async function init() {
   if (arcadeLeave) arcadeLeave.addEventListener('click', () => closeArcade());
   const upLeave = document.getElementById('garageup-leave');
   if (upLeave) upLeave.addEventListener('click', () => closeUpgrades());
+  const bankLeave = document.getElementById('bank-leave');
+  if (bankLeave) bankLeave.addEventListener('click', () => closeBank());
 
   // Restore saved progress, then autosave on unload
   // (loadGame is deferred until a slot is chosen in the menu)

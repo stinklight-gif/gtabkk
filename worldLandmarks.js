@@ -377,7 +377,10 @@ export function buildLandmarks(env) {
     world.buildings.push({ pos: new THREE.Vector3(bx - HW, H / 2, bz), size: new THREE.Vector3(0.5, H, HD * 2) });
     world.buildings.push({ pos: new THREE.Vector3(bx + HW, H / 2, bz), size: new THREE.Vector3(0.5, H, HD * 2) });
     world.buildings.push({ pos: new THREE.Vector3(bx, 2, bz - HD + 2), size: new THREE.Vector3(6, 4, 3) });          // vault body (solid)
-    world.bank = { vault: new THREE.Vector3(bx, 0, bz - HD + 5.2) };   // stand-here spot in front of the vault door
+    world.bank = {
+      vault: new THREE.Vector3(bx, 0, bz - HD + 5.2),   // stand-here spot in front of the vault door (heist)
+      teller: new THREE.Vector3(bx, 0, bz - HD + 13),    // in front of the teller counter (bank account)
+    };
     world.poi.bank = new THREE.Vector3(bx, 0, bz + HD + 2);            // entrance (map marker)
   }
 
