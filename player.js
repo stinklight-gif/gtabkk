@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, bizRate, bizCap, bizUpgradeCost, BANK_INTEREST, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, bizRate, bizCap, bizUpgradeCost, bizManagerCost, BANK_INTEREST, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { tip, resolvePlayerVsBuildings, resolvePlayerVsVehicles, resolvePlayerVsPlatforms, worldSupportY, saveGame, startArcade, applyUpgrades, raiseWanted, updateAmmoHud, updateCombat, updatePlayerInVehicle } from './main.js';
 
@@ -205,7 +205,11 @@ export function updateBusinesses(dt) {
   const p = G.player, st = G.econ.businesses || (G.econ.businesses = {});
   for (const b of BUSINESSES) {
     const s = st[b.id] || (st[b.id] = { owned: false, pending: 0, tier: 1 });
-    if (s.owned) { if (!s.tier) s.tier = 1; s.pending = Math.min(bizCap(b, s), (s.pending || 0) + bizRate(b, s) * dt); }
+    if (s.owned) {
+      if (!s.tier) s.tier = 1;
+      if (s.manager) G.econ.bank.balance += bizRate(b, s) * dt;                              // managed → income auto-banks
+      else s.pending = Math.min(bizCap(b, s), (s.pending || 0) + bizRate(b, s) * dt);        // else accrue for pickup
+    }
     if (!b.pos) continue;
     if (dist2(p.group.position, b.pos) < 4.5 * 4.5 && Math.abs(p.group.position.y - b.pos.y) < 2.5) {
       if (!s.owned) {
@@ -293,6 +297,35 @@ function bankRender() {
   mk('Withdraw ฿10,000', () => bankWithdraw(10000), acc.balance >= 10000);
   mk('Deposit all', () => bankDeposit(G.cash), G.cash >= 1);
   mk('Withdraw all', () => bankWithdraw(acc.balance), acc.balance >= 1);
+  // property accounts: collect all takings into the bank + hire managers (auto-bank)
+  const props = document.getElementById('bank-props'); if (!props) return;
+  props.innerHTML = '';
+  const owned = []; let totalPending = 0, totalRate = 0;
+  for (const b of BUSINESSES) { const s = G.econ.businesses[b.id]; if (s && s.owned) { owned.push([b, s]); totalPending += Math.floor(s.pending || 0); totalRate += bizRate(b, s); } }
+  if (!owned.length) return;
+  const hdr = document.createElement('div'); hdr.className = 'bank-sub'; hdr.textContent = `PROPERTY ACCOUNTS · ฿${totalRate}/s`; props.appendChild(hdr);
+  const mkc = (label, fn, ok) => { const b = document.createElement('button'); b.textContent = label; b.disabled = !ok; b.addEventListener('click', fn); props.appendChild(b); };
+  mkc(`Collect all takings — ฿${totalPending.toLocaleString()}`, () => bankCollectAll(), totalPending > 0);
+  for (const [b, s] of owned) if (!s.manager) mkc(`Hire manager · ${b.name} (฿${bizManagerCost(b).toLocaleString()})`, () => hireManager(b.id), G.cash >= bizManagerCost(b));
+}
+function bankCollectAll() {
+  let total = 0;
+  for (const b of BUSINESSES) { const s = G.econ.businesses[b.id]; if (s && s.owned) { const amt = Math.floor(s.pending || 0); if (amt > 0) { s.pending -= amt; total += amt; } } }
+  if (total > 0) {
+    G.econ.bank.balance += total; G.hud.cashPop(total);
+    G.hud.showNotif(`Collected ฿${total.toLocaleString()} in takings → bank`);
+    if (G.audio && G.audio.chime) G.audio.chime(); saveGame();
+  }
+  bankRender();
+}
+function hireManager(id) {
+  const b = BUSINESSES.find(x => x.id === id), s = G.econ.businesses[id];
+  if (!b || !s || !s.owned || s.manager) return;
+  const cost = bizManagerCost(b);
+  if (G.cash < cost) { G.hud.showNotif('Not enough cash for a manager'); return; }
+  G.cash -= cost; s.manager = true; G.hud.setCash(G.cash); G.hud.cashPop(-cost);
+  G.hud.showNotif(`${b.name}: hired a manager — its income now auto-banks`);
+  if (G.audio && G.audio.chime) G.audio.chime(); saveGame(); bankRender();
 }
 function bankDeposit(amt) {
   amt = Math.min(Math.floor(amt), Math.floor(G.cash)); if (amt <= 0) return;

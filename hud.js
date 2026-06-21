@@ -196,7 +196,7 @@ export function bindHud() {
       let owned = 0, rate = 0, pending = 0; const lines = [];
       for (const b of BUSINESSES) {
         const s = G.econ.businesses[b.id];
-        if (s && s.owned) { owned++; const r = bizRate(b, s); rate += r; pending += Math.floor(s.pending || 0); lines.push(`• ${b.name} <span style="opacity:.55">T${s.tier || 1}</span> ฿${r}/s`); }
+        if (s && s.owned) { owned++; const r = bizRate(b, s); rate += r; pending += Math.floor(s.pending || 0); lines.push(`• ${b.name} <span style="opacity:.55">T${s.tier || 1}</span> ฿${r}/s` + (s.manager ? ' <span style="color:#7fd0a0;opacity:.85">mgr</span>' : '')); }
       }
       bizEl.textContent = `${owned} / ${BUSINESSES.length} · ฿${rate}/s` + (pending > 0 ? ` · ฿${pending.toLocaleString()} ready` : '');
       const list = document.getElementById('ph-biz-list');
