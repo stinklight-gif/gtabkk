@@ -339,6 +339,25 @@ async function main() {
     await page.keyboard.down('KeyE'); await waitFrames(page, 3); await page.keyboard.up('KeyE'); await waitFrames(page, 3);
     const unlocked = await page.evaluate(() => ({ owned: !!(window.GAME.econ.businesses.condo && window.GAME.econ.businesses.condo.owned), rank: window.GAME._wealthRank }));
     assert(unlocked.owned && unlocked.rank >= 2, `reaching the rank unlocks it (rank ${unlocked.rank})`);
+
+    // property events: boom doubles income, trouble halts it until you pay to fix
+    await page.evaluate(() => {
+      const G = window.GAME;
+      G.state = 'playing'; G.player.inVehicle = null; G._bizEventCD = 9999;   // suppress random events during the test
+      G.econ.businesses.noodle = { owned: true, pending: 0, tier: 1, manager: false };
+      G.player.group.position.set(8, 0, 30);   // the Noodle Cart
+    });
+    await page.evaluate(() => { window.GAME.econ.businesses.noodle.event = { type: 'boom', until: performance.now() + 60000 }; window.GAME.econ.businesses.noodle.pending = 0; });
+    await waitFrames(page, 16);
+    const boom = await page.evaluate(() => window.GAME.econ.businesses.noodle.pending);
+    await page.evaluate(() => { window.GAME.econ.businesses.noodle.event = { type: 'trouble', until: performance.now() + 60000, fee: 750 }; window.GAME.econ.businesses.noodle.pending = 0; });
+    await waitFrames(page, 16);
+    const trouble = await page.evaluate(() => window.GAME.econ.businesses.noodle.pending);
+    assert(boom > trouble + 5, `boom doubles income while trouble halts it (boom +${boom.toFixed(0)}, trouble +${trouble.toFixed(0)})`);
+    await page.evaluate(() => { window.GAME.cash = 5000; window.GAME.hud.setCash(5000); });
+    await page.keyboard.down('KeyE'); await waitFrames(page, 3); await page.keyboard.up('KeyE'); await waitFrames(page, 3);
+    const fixed = await page.evaluate(() => ({ event: window.GAME.econ.businesses.noodle.event, cash: window.GAME.cash }));
+    assert(!fixed.event && fixed.cash < 5000, `paying at the kiosk clears the trouble (cash ฿${fixed.cash.toFixed(0)})`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
