@@ -149,6 +149,11 @@
   #bank button { font: inherit; color: #eaf6f2; background: #221c10; border: 1px solid #6a5520; padding: 9px 16px; min-width: 170px; border-radius: 6px; cursor: pointer; letter-spacing: 1px; }
   #bank button:hover:not(:disabled) { background: #34290f; }
   #bank button:disabled { opacity: 0.45; cursor: default; }
+  #bank-props { display: flex; flex-direction: column; gap: 6px; max-width: 380px; }
+  #bank-props .bank-sub { color: #e0b020; letter-spacing: 2px; font-size: 12px; margin: 6px 0 1px; text-align: center; }
+  #bank-props button { font: inherit; color: #eaf6f2; background: #221c10; border: 1px solid #6a5520; padding: 7px 14px; border-radius: 6px; cursor: pointer; letter-spacing: 1px; font-size: 13px; }
+  #bank-props button:hover:not(:disabled) { background: #34290f; }
+  #bank-props button:disabled { opacity: 0.45; cursor: default; }
   #bank #bank-leave { grid-column: 1 / 3; border-color: #555; margin-top: 6px; text-align: center; min-width: 0; }
   #cash-pops { position: relative; height: 0; }
   .cash-pop { position: absolute; left: 2px; top: 0; font-weight: 700; font-size: 17px; white-space: nowrap; pointer-events: none; text-shadow: 0 1px 3px #000; animation: cashpop 1.15s ease-out forwards; }
@@ -406,6 +411,7 @@
   <h3>KRUNG THEP BANK</h3>
   <div id="bank-info"></div>
   <div id="bank-items"></div>
+  <div id="bank-props"></div>
   <button id="bank-leave">Leave</button>
 </div>
 

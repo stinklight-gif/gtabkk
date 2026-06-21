@@ -416,6 +416,30 @@ async function main() {
     await waitFrames(page, 3);
     const interest = await page.evaluate(() => window.GAME.econ.bank.balance);
     assert(interest > 10000, `the balance earns daily interest (฿10,000 → ฿${interest})`);
+
+    // property management at the bank: collect-all + hire a manager
+    await page.evaluate(() => {
+      const G = window.GAME;
+      G.state = 'playing'; G.heist.active = false;
+      G.econ.businesses.noodle = { owned: true, pending: 500, tier: 1, manager: false };
+      G.econ.bank.balance = 0; G.cash = 20000; G.hud.setCash(20000);
+      const t = G.world.bank.teller; G.player.group.position.set(t.x, 0, t.z);
+    });
+    await page.keyboard.down('KeyE'); await waitFrames(page, 3); await page.keyboard.up('KeyE'); await waitFrames(page, 3);
+    await page.evaluate(() => { [...document.querySelectorAll('#bank-props button')].find(b => /Collect all/.test(b.textContent)).click(); });
+    await waitFrames(page, 2);
+    const coll = await page.evaluate(() => ({ pending: window.GAME.econ.businesses.noodle.pending, bal: window.GAME.econ.bank.balance }));
+    assert(coll.pending < 1 && coll.bal >= 500, `collect-all sweeps property takings into the bank (bal ฿${coll.bal})`);
+    await page.evaluate(() => { [...document.querySelectorAll('#bank-props button')].find(b => /Hire manager.*Noodle/.test(b.textContent)).click(); });
+    await waitFrames(page, 2);
+    const mgr = await page.evaluate(() => ({ manager: window.GAME.econ.businesses.noodle.manager, cash: window.GAME.cash }));
+    assert(mgr.manager === true && mgr.cash < 20000, `you can hire a manager (cash ฿${mgr.cash})`);
+    await page.evaluate(() => document.getElementById('bank-leave').click());
+    await waitFrames(page, 3);
+    const b0 = await page.evaluate(() => window.GAME.econ.bank.balance);
+    await waitFrames(page, 22);
+    const b1 = await page.evaluate(() => window.GAME.econ.bank.balance);
+    assert(b1 > b0, `a managed property auto-banks its income (฿${b0.toFixed(0)} → ฿${b1.toFixed(0)})`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

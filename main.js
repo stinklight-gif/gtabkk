@@ -240,7 +240,7 @@ export function loadGame() {
   if (s.businesses && typeof s.businesses === 'object') {           // restore owned businesses + pending takings
     for (const id in s.businesses) {
       const b = s.businesses[id];
-      if (b && typeof b === 'object') G.econ.businesses[id] = { owned: !!b.owned, pending: Math.max(0, +b.pending || 0), tier: Math.max(1, Math.min(3, +b.tier || 1)) };
+      if (b && typeof b === 'object') G.econ.businesses[id] = { owned: !!b.owned, pending: Math.max(0, +b.pending || 0), tier: Math.max(1, Math.min(3, +b.tier || 1)), manager: !!b.manager };
     }
   }
   if (s.upgrades && typeof s.upgrades === 'object') {               // restore vehicle upgrade levels
