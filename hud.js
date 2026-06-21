@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, bizRate, TURFS, missionMilestones, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, bizRate, WEALTH_TIERS, netWorth, TURFS, missionMilestones, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 
 // -----------------------------------------------------------------------------
@@ -191,6 +191,8 @@ export function bindHud() {
     document.getElementById('ph-food').textContent = `${G.foodVisited || 0} / ${(G.world.foodStalls || []).length}`;
     const bankEl = document.getElementById('ph-bank');
     if (bankEl) bankEl.textContent = Math.floor((G.econ.bank && G.econ.bank.balance) || 0).toLocaleString();
+    const rankEl = document.getElementById('ph-rank');
+    if (rankEl) rankEl.textContent = `${WEALTH_TIERS[G._wealthRank || 0].name} · ฿${netWorth().toLocaleString()} net worth`;
     const bizEl = document.getElementById('ph-biz');
     if (bizEl) {
       let owned = 0, rate = 0, pending = 0; const lines = [];
