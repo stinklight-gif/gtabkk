@@ -320,7 +320,25 @@ async function main() {
     });
     assert(pop.t === 'function' && pop.n > 0, `cash rewards show a floating popup ("${pop.txt}")`);
     const bizLine = await page.evaluate(() => { window.GAME.hud.setPhoneStats(); return document.getElementById('ph-biz').textContent + ' || ' + document.getElementById('ph-biz-list').textContent; });
-    assert(/1 \/ 6/.test(bizLine) && /฿152\/s/.test(bizLine), `phone holdings show the upgraded Tier-2 rate ("${bizLine}")`);
+    assert(/1 \/ 8/.test(bizLine) && /฿152\/s/.test(bizLine), `phone holdings show the upgraded Tier-2 rate ("${bizLine}")`);
+
+    // premium properties are gated behind a wealth rank
+    await page.evaluate(() => {
+      const GAME = window.GAME;
+      GAME.state = 'playing'; GAME.player.inVehicle = null;
+      for (const id in GAME.econ.businesses) GAME.econ.businesses[id].owned = false;
+      GAME.econ.bank.balance = 0; GAME.cash = 5000; GAME.hud.setCash(5000); GAME._wealthRank = 0;
+      GAME.player.group.position.set(54, 0, 90);   // the Condo Tower (premium, requires Boss rank)
+    });
+    await waitFrames(page, 3);
+    await page.keyboard.down('KeyE'); await waitFrames(page, 3); await page.keyboard.up('KeyE'); await waitFrames(page, 3);
+    const locked = await page.evaluate(() => !!(window.GAME.econ.businesses.condo && window.GAME.econ.businesses.condo.owned));
+    assert(!locked, 'a premium property stays locked below its wealth rank');
+    await page.evaluate(() => { window.GAME.cash = 300000; window.GAME.hud.setCash(300000); });   // net worth → Boss rank
+    await waitFrames(page, 3);
+    await page.keyboard.down('KeyE'); await waitFrames(page, 3); await page.keyboard.up('KeyE'); await waitFrames(page, 3);
+    const unlocked = await page.evaluate(() => ({ owned: !!(window.GAME.econ.businesses.condo && window.GAME.econ.businesses.condo.owned), rank: window.GAME._wealthRank }));
+    assert(unlocked.owned && unlocked.rank >= 2, `reaching the rank unlocks it (rank ${unlocked.rank})`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

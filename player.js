@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, bizRate, bizCap, bizUpgradeCost, bizManagerCost, BANK_INTEREST, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, bizRate, bizCap, bizUpgradeCost, bizManagerCost, BANK_INTEREST, WEALTH_TIERS, netWorth, wealthRank, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { tip, resolvePlayerVsBuildings, resolvePlayerVsVehicles, resolvePlayerVsPlatforms, worldSupportY, saveGame, startArcade, applyUpgrades, raiseWanted, updateAmmoHud, updateCombat, updatePlayerInVehicle } from './main.js';
 
@@ -203,6 +203,15 @@ export function updateInteraction(dt) {
 // income (capped) that you return to collect. Persisted in the save.
 export function updateBusinesses(dt) {
   const p = G.player, st = G.econ.businesses || (G.econ.businesses = {});
+  // wealth rank (highest achieved) — drives the rank-up toast + premium gating
+  const rank = wealthRank(netWorth());
+  if (G._wealthRank == null) G._wealthRank = rank;
+  else if (rank > G._wealthRank) {
+    G._wealthRank = rank;
+    G.hud.showNotif(`Rank up — you're now a ${WEALTH_TIERS[rank].name}!`);
+    G.hud.showSubtitle(WEALTH_TIERS[rank].name, '');
+    if (G.audio && G.audio.chime) G.audio.chime();
+  }
   for (const b of BUSINESSES) {
     const s = st[b.id] || (st[b.id] = { owned: false, pending: 0, tier: 1 });
     if (s.owned) {
@@ -214,6 +223,10 @@ export function updateBusinesses(dt) {
     if (dist2(p.group.position, b.pos) < 4.5 * 4.5 && Math.abs(p.group.position.y - b.pos.y) < 2.5) {
       if (!s.owned) {
         tip('biz', 'Buy a property for passive income — come back to collect, or upgrade it (U) for a higher rate.', 'ซื้อกิจการ');
+        if ((b.minRank || 0) > (G._wealthRank || 0)) {       // premium property locked behind a wealth rank
+          G.hud.showPrompt(`${b.name} — requires rank <b>${WEALTH_TIERS[b.minRank].name}</b> (฿${WEALTH_TIERS[b.minRank].min.toLocaleString()} net worth)`, 0.4);
+          return;
+        }
         G.hud.showPrompt(`${b.name} for sale — <b>E</b>: buy (฿${b.price.toLocaleString()})`, 0.4);
         if (G.input.pressed('KeyE')) {
           if (G.cash < b.price) G.hud.showNotif('Not enough cash');

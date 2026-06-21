@@ -126,7 +126,29 @@ export const BUSINESSES = [
   { id: 'tukstand', name: 'Tuk-Tuk Stand',        price: 12000, rate: 40, cap: 2400, pos: new THREE.Vector3(8, 0, -90) },
   { id: 'bar',      name: 'Soi Cowboy Bar',       price: 18000, rate: 65, cap: 4000, pos: new THREE.Vector3(44, 0, 90) },
   { id: 't21unit',  name: 'Terminal 21 Retail Unit', price: 26000, rate: 80, cap: 4800, pos: new THREE.Vector3(-25, 0, 18) },
+  { id: 'club',     name: 'Nightclub',            price: 70000,  rate: 180, cap: 9000,  minRank: 1, pos: new THREE.Vector3(-8, 0, 60) },
+  { id: 'condo',    name: 'Condo Tower',          price: 150000, rate: 360, cap: 18000, minRank: 2, pos: new THREE.Vector3(54, 0, 90) },
 ];
+
+// Wealth ladder: net worth (cash + bank + property value) sets your rank, which
+// in turn gates the premium properties above (minRank). A goal to chase.
+export const WEALTH_TIERS = [
+  { name: 'Street Hustler', min: 0 },
+  { name: 'Operator',       min: 75000 },
+  { name: 'Boss',           min: 250000 },
+  { name: 'Kingpin',        min: 600000 },
+  { name: 'Tycoon',         min: 1500000 },
+];
+export function netWorth() {
+  let nw = (G.cash || 0) + ((G.econ.bank && G.econ.bank.balance) || 0);
+  for (const b of BUSINESSES) { const s = G.econ.businesses[b.id]; if (s && s.owned) nw += Math.round(b.price * BIZ_TIER_MUL[s.tier || 1]); }
+  return Math.floor(nw);
+}
+export function wealthRank(nw) {
+  let r = 0;
+  for (let i = 0; i < WEALTH_TIERS.length; i++) if (nw >= WEALTH_TIERS[i].min) r = i;
+  return r;
+}
 // Property tiers: buy at Tier 1, upgrade to 3 for scaling income (a late-game
 // money sink). One place so player.js (collect/upgrade) and hud.js (holdings)
 // agree on the numbers.
