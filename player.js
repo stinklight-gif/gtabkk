@@ -201,8 +201,31 @@ export function updateInteraction(dt) {
 
 // Buyable businesses: walk up and E to buy; while owned they accrue passive
 // income (capped) that you return to collect. Persisted in the save.
+// Dynamic property events: an owned property occasionally booms (double income
+// for a while) or hits trouble (income stops until you drop by and pay to sort
+// it). Managers head off trouble — managed properties only ever boom.
+function updateBizEvents(dt) {
+  const now = performance.now();
+  for (const b of BUSINESSES) {
+    const s = G.econ.businesses[b.id];
+    if (s && s.event && now >= s.event.until) { if (s.event.type === 'boom') G.hud.showNotif(`${b.name}: the boom is over.`); s.event = null; }
+  }
+  G._bizEventCD = (G._bizEventCD == null ? 50 : G._bizEventCD - dt);
+  if (G._bizEventCD <= 0) {
+    G._bizEventCD = 70 + Math.random() * 40;                          // ~70-110 s between events
+    const cand = BUSINESSES.filter(b => { const s = G.econ.businesses[b.id]; return s && s.owned && !s.event; });
+    if (cand.length && Math.random() < 0.75) {
+      const b = pick(cand), s = G.econ.businesses[b.id];
+      if (s.manager || Math.random() < 0.55) { s.event = { type: 'boom', until: now + 50000 }; G.hud.showNotif(`📈 ${b.name} is booming — double income for a while!`); }
+      else { s.event = { type: 'trouble', until: now + 100000, fee: Math.round(b.price * 0.15) }; G.hud.showNotif(`⚠️ ${b.name} has trouble — drop by to sort it out.`); }
+      if (G.audio && G.audio.blip) G.audio.blip({ freq: 600, dur: 0.12, gain: 0.1 });
+    }
+  }
+}
+
 export function updateBusinesses(dt) {
   const p = G.player, st = G.econ.businesses || (G.econ.businesses = {});
+  updateBizEvents(dt);
   // wealth rank (highest achieved) — drives the rank-up toast + premium gating
   const rank = wealthRank(netWorth());
   if (G._wealthRank == null) G._wealthRank = rank;
@@ -216,8 +239,9 @@ export function updateBusinesses(dt) {
     const s = st[b.id] || (st[b.id] = { owned: false, pending: 0, tier: 1 });
     if (s.owned) {
       if (!s.tier) s.tier = 1;
-      if (s.manager) G.econ.bank.balance += bizRate(b, s) * dt;                              // managed → income auto-banks
-      else s.pending = Math.min(bizCap(b, s), (s.pending || 0) + bizRate(b, s) * dt);        // else accrue for pickup
+      const mul = s.event ? (s.event.type === 'boom' ? 2 : 0) : 1;                           // boom doubles, trouble halts
+      if (s.manager) G.econ.bank.balance += bizRate(b, s) * mul * dt;                        // managed → income auto-banks
+      else s.pending = Math.min(bizCap(b, s), (s.pending || 0) + bizRate(b, s) * mul * dt);  // else accrue for pickup
     }
     if (!b.pos) continue;
     if (dist2(p.group.position, b.pos) < 4.5 * 4.5 && Math.abs(p.group.position.y - b.pos.y) < 2.5) {
@@ -235,6 +259,16 @@ export function updateBusinesses(dt) {
             G.hud.showNotif(`Bought ${b.name} — earns ฿${bizRate(b, s)}/s`);
             if (G.audio && G.audio.chime) G.audio.chime();
             saveGame();
+          }
+        }
+      } else if (s.event && s.event.type === 'trouble') {
+        G.hud.showPrompt(`${b.name} — ⚠️ TROUBLE · <b>E</b>: pay ฿${s.event.fee.toLocaleString()} to sort it out`, 0.4);
+        if (G.input.pressed('KeyE')) {
+          if (G.cash < s.event.fee) G.hud.showNotif('Not enough cash to fix it');
+          else {
+            G.cash -= s.event.fee; G.hud.setCash(G.cash); G.hud.cashPop(-s.event.fee); s.event = null;
+            G.hud.showNotif(`${b.name}: sorted — income restored`);
+            if (G.audio && G.audio.chime) G.audio.chime(); saveGame();
           }
         }
       } else {

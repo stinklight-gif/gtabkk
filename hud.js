@@ -198,7 +198,11 @@ export function bindHud() {
       let owned = 0, rate = 0, pending = 0; const lines = [];
       for (const b of BUSINESSES) {
         const s = G.econ.businesses[b.id];
-        if (s && s.owned) { owned++; const r = bizRate(b, s); rate += r; pending += Math.floor(s.pending || 0); lines.push(`• ${b.name} <span style="opacity:.55">T${s.tier || 1}</span> ฿${r}/s` + (s.manager ? ' <span style="color:#7fd0a0;opacity:.85">mgr</span>' : '')); }
+        if (s && s.owned) {
+          owned++; const r = bizRate(b, s); rate += r; pending += Math.floor(s.pending || 0);
+          const ev = s.event ? (s.event.type === 'boom' ? ' <span style="color:#4dff9a">BOOM</span>' : ' <span style="color:#ff7a6a">⚠ TROUBLE</span>') : '';
+          lines.push(`• ${b.name} <span style="opacity:.55">T${s.tier || 1}</span> ฿${r}/s` + (s.manager ? ' <span style="color:#7fd0a0;opacity:.85">mgr</span>' : '') + ev);
+        }
       }
       bizEl.textContent = `${owned} / ${BUSINESSES.length} · ฿${rate}/s` + (pending > 0 ? ` · ฿${pending.toLocaleString()} ready` : '');
       const list = document.getElementById('ph-biz-list');
