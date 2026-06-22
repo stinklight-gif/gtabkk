@@ -353,6 +353,30 @@ async function init() {
   scene.add(sun.target);   // target must be in the scene graph so per-frame re-anchoring takes effect
   G.sun = sun;
 
+  // ---- Reflection environment: a procedural sky env map, applied only to the
+  // reflective materials that benefit (glass facades, car paint) via their own
+  // .envMap. Targeting just those keeps it cheap (vs. global scene.environment,
+  // which samples the env on every fragment) and doesn't wash out the night. ----
+  {
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const skyScene = new THREE.Scene();
+    const dome = new THREE.Mesh(
+      new THREE.SphereGeometry(10, 24, 16),
+      new THREE.ShaderMaterial({
+        side: THREE.BackSide, depthWrite: false,
+        uniforms: { top: { value: new THREE.Color(0x3a5a88) }, horizon: { value: new THREE.Color(0x9aa6b8) }, ground: { value: new THREE.Color(0x4a463d) } },
+        vertexShader: 'varying vec3 vd; void main(){ vd = normalize(position); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+        fragmentShader: 'varying vec3 vd; uniform vec3 top; uniform vec3 horizon; uniform vec3 ground; void main(){ float h = vd.y; vec3 c = h>0.0 ? mix(horizon, top, pow(h,0.55)) : mix(horizon, ground, pow(-h,0.5)); gl_FragColor = vec4(c,1.0); }',
+      })
+    );
+    skyScene.add(dome);
+    const sunBall = new THREE.Mesh(new THREE.SphereGeometry(0.8, 12, 12), new THREE.MeshBasicMaterial({ color: 0xfff0d0 }));
+    sunBall.position.set(5, 6, 3); skyScene.add(sunBall);
+    const rt = pmrem.fromScene(skyScene, 0.08);
+    G.envMap = rt.texture;   // glass + car materials opt in via .envMap (see world.js / entities.js)
+    dome.geometry.dispose(); dome.material.dispose(); sunBall.geometry.dispose(); sunBall.material.dispose(); pmrem.dispose();
+  }
+
   // Hemisphere fill — ground color is warm concrete bounce, not dark soil
   const hemi = new THREE.HemisphereLight(0xa8c7ff, 0x8a7f72, 0.55);
   scene.add(hemi);
