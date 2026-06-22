@@ -180,7 +180,35 @@ export function bindHud() {
     notifT = dur;
   }
   function setMissionText(t) { document.getElementById('ph-mission').textContent = t; }
+  function phoneActivities() {                 // a directory of what to do, with live status + distance
+    const p = G.player.group.position;
+    const d = loc => loc ? Math.round(Math.hypot(loc.x - p.x, loc.z - p.z)) : null;
+    const poi = (G.world && G.world.poi) || {};
+    const out = [];
+    const m = G.mission && G.mission.active;
+    out.push({ name: 'Jobs · Uncle Seng', status: (m && m.markerPos) ? `active: ${m.name}` : 'available', dist: d(poi.goldShop) });
+    if (G.world && G.world.bank) {
+      const h = G.heist;
+      const st = (h && h.active) ? 'in progress' : (h && performance.now() < h.cooldownUntil) ? `cooldown ${Math.ceil((h.cooldownUntil - performance.now()) / 1000)}s` : 'ready';
+      out.push({ name: 'Bank Heist', status: st, dist: d(G.world.bank.vault) });
+      out.push({ name: 'Bank account', status: `฿${Math.floor(G.econ.bank.balance).toLocaleString()}`, dist: d(G.world.bank.teller) });
+    }
+    let owned = 0, rate = 0;
+    for (const b of BUSINESSES) { const s = G.econ.businesses[b.id]; if (s && s.owned) { owned++; rate += bizRate(b, s); } }
+    out.push({ name: 'Properties', status: `${owned}/${BUSINESSES.length} · ฿${rate}/s`, dist: null });
+    let held = 0; for (const t of TURFS) if (G.turfs && G.turfs[t.id] && G.turfs[t.id].owned) held++;
+    const nt = TURFS.map(t => d(t.center)).filter(x => x != null).sort((a, b) => a - b)[0];
+    out.push({ name: 'Gang turf', status: `${held}/${TURFS.length} held`, dist: nt == null ? null : nt });
+    out.push({ name: 'Arcade · Tuk-Tuk Dash', status: 'mall floor 1', dist: d(poi.terminal) });
+    out.push({ name: 'Riverside boats', status: 'longtails', dist: d(poi.pier) });
+    out.push({ name: 'Taxi · press J', status: (G.taxi && G.taxi.stage && G.taxi.stage !== 'idle') ? 'fare active' : 'available', dist: null });
+    out.sort((a, b) => (a.dist == null ? 1e9 : a.dist) - (b.dist == null ? 1e9 : b.dist));
+    return out;
+  }
   function setPhoneStats() {
+    const actEl = document.getElementById('ph-activities');
+    if (actEl) actEl.innerHTML = phoneActivities().map(a =>
+      `<div class="act"><span class="a-name">${a.name}</span><span class="a-meta">${a.status}${a.dist != null ? ` · ${a.dist}m` : ''}</span></div>`).join('');
     const total = (G.world && G.world.collectibles) ? G.world.collectibles.length : 0;
     document.getElementById('ph-amulets').textContent = `${G.collected || 0} / ${total}`;
     document.getElementById('ph-fares').textContent = (G.taxi && G.taxi.fares) || 0;

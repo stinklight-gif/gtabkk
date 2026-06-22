@@ -358,6 +358,14 @@ async function main() {
     await page.keyboard.down('KeyE'); await waitFrames(page, 3); await page.keyboard.up('KeyE'); await waitFrames(page, 3);
     const fixed = await page.evaluate(() => ({ event: window.GAME.econ.businesses.noodle.event, cash: window.GAME.cash }));
     assert(!fixed.event && fixed.cash < 5000, `paying at the kiosk clears the trouble (cash ฿${fixed.cash.toFixed(0)})`);
+
+    // the phone Activities hub lists what to do, with live status + distances
+    const acts = await page.evaluate(() => {
+      window.GAME.hud.setPhoneStats();
+      const els = [...document.querySelectorAll('#ph-activities .act')];
+      return { n: els.length, txt: document.getElementById('ph-activities').textContent };
+    });
+    assert(acts.n >= 6 && /Bank Heist/.test(acts.txt) && /Gang turf/.test(acts.txt) && /\dm/.test(acts.txt), `the phone Activities hub lists what to do with distances (${acts.n} entries)`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
