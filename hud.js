@@ -246,6 +246,9 @@ export function bindHud() {
   function setClock(s) { document.getElementById('clock').textContent = s; document.getElementById('ph-time').textContent = s; }
   function setWeather(t) { document.getElementById('weather-tag').textContent = t; }
   function setCrosshair(show) { crosshair.classList.toggle('show', !!show); }
+  // Hitmarker — a brief red pop on the crosshair when a shot connects.
+  let hitMarkT = 0;
+  function hitMarker() { crosshair.classList.add('hit'); hitMarkT = 0.18; }
   function togglePhone(open) {
     if (open == null) phone.classList.toggle('open');
     else phone.classList.toggle('open', open);
@@ -254,6 +257,7 @@ export function bindHud() {
     if (subT > 0) { subT -= dt; if (subT <= 0) subtitle.classList.remove('show'); }
     if (promptT > 0) { promptT -= dt; if (promptT <= 0) promptEl.classList.remove('show'); }
     if (notifT > 0) { notifT -= dt; if (notifT <= 0) notif.classList.remove('show'); }
+    if (hitMarkT > 0) { hitMarkT -= dt; if (hitMarkT <= 0) crosshair.classList.remove('hit'); }
   }
   function drawMinimap(player) {
     // draw base
@@ -417,7 +421,7 @@ export function bindHud() {
   }
 
   return {
-    setStars, flashWanted, setCash, cashPop, flashScreen, setBars, setAmmo, setMissionText, setClock, setWeather, setCrosshair, setPhoneStats, setVehicle,
+    setStars, flashWanted, setCash, cashPop, flashScreen, setBars, setAmmo, setMissionText, setClock, setWeather, setCrosshair, hitMarker, setPhoneStats, setVehicle,
     showSubtitle, showPrompt, showNotif, togglePhone, update, drawMinimap, drawWaypoint, setRadioChip
   };
 }
