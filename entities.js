@@ -339,6 +339,8 @@ export function makeVehicle(kind, scene) {
 // rig in userData.parts {torso, head, legL, legR, armL, armR}. `torso` stays one
 // mesh so the mugger/target/kill recolor sites keep working; forearms are bare
 // skin (Bangkok heat) so recoloring the torso never leaves mismatched sleeves.
+// Shoes parent to the legs and hands to the arms, so they ride the walk swing for
+// free; a short neck bridges shoulders to head so it doesn't float.
 export function makePedMesh() {
   const g = new THREE.Group();
   const roll = Math.random();
@@ -377,9 +379,13 @@ export function makePedMesh() {
   const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.4, 3, 8), shirtMat);
   torso.position.y = 1.18; torso.scale.set(1.18, 1, 0.72); torso.castShadow = true; g.add(torso);
 
+  // neck — short skin stub so the head doesn't float on the shoulders
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.075, 0.1, 6), skinMat);
+  neck.position.y = 1.42; g.add(neck);
+
   // head + hair/hat
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.135, 10, 8), skinMat);
-  head.position.y = 1.5; head.castShadow = true; g.add(head);
+  head.position.y = 1.5; head.scale.set(0.92, 1.06, 0.96); head.castShadow = true; g.add(head);
   if (kind === 'vendor' || kind === 'laborer') {
     const hat = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.2, 10), new THREE.MeshStandardMaterial({ color: 0xcba76a, roughness: 0.9 }));
     hat.position.y = 1.6; g.add(hat);                                   // conical straw hat
@@ -398,19 +404,35 @@ export function makePedMesh() {
     const m = new THREE.Mesh(geo, mat); m.castShadow = !!cast; return m;
   }
   const hipY = 0.92, shoulderY = 1.42;
+  // shoe — box parented to a leg so it swings with the stride; own material so the
+  // cop/recolor leg-swaps never repaint footwear. Sits just past the leg's foot end.
+  const shoeMat = kind === 'monk'
+    ? new THREE.MeshStandardMaterial({ color: 0x6a4a30, roughness: 0.8 })   // sandals
+    : new THREE.MeshStandardMaterial({ color: pick([0x141414, 0x2a2118, 0x3a3a3a, 0x5a3a2a]), roughness: 0.6 });
+  function shoe(legMesh, footY) {
+    const s = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.07, 0.2), shoeMat);
+    s.position.set(0, footY, 0.04); s.castShadow = true; legMesh.add(s);
+  }
   let legL, legR;
   if (skirt) {
     const sk = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.5, 10), pantsMat);
     sk.position.y = 0.7; sk.castShadow = true; g.add(sk);
     legL = limb(0.3, 0.07, skinMat, false); legL.position.set(-0.08, 0.42, 0);
     legR = limb(0.3, 0.07, skinMat, false); legR.position.set( 0.08, 0.42, 0);
+    shoe(legL, -0.42); shoe(legR, -0.42);
   } else {
     legL = limb(0.62, 0.085, pantsMat, true); legL.position.set(-0.09, hipY, 0);
     legR = limb(0.62, 0.085, pantsMat, true); legR.position.set( 0.09, hipY, 0);
+    shoe(legL, -0.76); shoe(legR, -0.76);
   }
   g.add(legL); g.add(legR);
+  // hand — small skin sphere at each arm's end, parented so it swings with the arm
   const armL = limb(0.5, 0.06, armMat, false); armL.position.set(-0.25, shoulderY, 0); g.add(armL);
   const armR = limb(0.5, 0.06, armMat, false); armR.position.set( 0.25, shoulderY, 0); g.add(armR);
+  for (const arm of [armL, armR]) {
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.062, 6, 5), skinMat);
+    hand.position.y = -0.6; arm.add(hand);
+  }
 
   // archetype props
   if (kind === 'tourist') {

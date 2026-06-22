@@ -69,6 +69,7 @@ import {
 // Bump wanted level and refresh the "last seen" tracker. Replaces the same
 // three-line pattern that was copy-pasted across combat/cop code.
 export function raiseWanted(n) {
+  if (G.policeOff) return;                      // police disabled — heist/turf/crime can't re-trigger stars
   const prev = G.wanted.stars;
   G.wanted.stars = Math.max(G.wanted.stars, n);
   G.wanted.lastSeenAt = performance.now();
@@ -314,6 +315,13 @@ export function tip(id, en, th) {
   if (G.hud && G.hud.showSubtitle) G.hud.showSubtitle(en, th || '', 5.5);
 }
 
+// ---- Police on/off toggle — persisted globally (like tips), read on boot ----
+function loadPoliceOff() { try { return localStorage.getItem('gtabkk_policeOff') === '1'; } catch (e) { return false; } }
+export function setPoliceOff(off) {
+  G.policeOff = !!off;
+  try { localStorage.setItem('gtabkk_policeOff', off ? '1' : '0'); } catch (e) {}
+}
+
 async function init() {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x1a1a26);
@@ -447,6 +455,19 @@ async function init() {
     G.state = 'playing';
     G.input.requestLock();
   });
+
+  // Police on/off toggle (pause menu) — restore saved state, then bind the button
+  G.policeOff = loadPoliceOff();
+  const policeBtn = document.getElementById('pause-police');
+  if (policeBtn) {
+    const sync = () => { policeBtn.textContent = 'Police: ' + (G.policeOff ? 'OFF' : 'ON'); };
+    sync();
+    policeBtn.addEventListener('click', e => {   // stop the overlay's click-to-resume from firing
+      e.stopPropagation();
+      setPoliceOff(!G.policeOff);
+      sync();
+    });
+  }
 
   // Game-over overlay: click to respawn and resume
   const goEl = document.getElementById('gameover');

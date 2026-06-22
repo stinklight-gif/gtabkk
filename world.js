@@ -146,9 +146,36 @@ export function buildWorld(scene) {
   // Buildings flank the road on all 4 sides of each block, forming a street canyon.
   // Each block: 4 corner buildings + a row of shop-houses marching along each side
   // between the corners. The block interior becomes a small courtyard / alley gap.
-  const buildingMatPool = COLORS.building.map(c => new THREE.MeshStandardMaterial({
-    color: c, roughness: 0.85,
+  // Facade material families — three readable looks instead of one flat pool.
+  // Each is a small fixed set of shared materials, so the baker still merges every
+  // facade into a handful of draw calls (one per material). placeBuilding picks a
+  // family per building so towers read as glass, mid-rises as painted/concrete.
+  //  - concrete: matte grey-beige, no metalness (weathered slabs)
+  //  - painted:  warmer tinted renders, slightly rougher
+  //  - glass:    cooler blue-grey, lower roughness + a touch of metalness so it
+  //              catches the sky differently from the matte boxes
+  const concreteMat = COLORS.building.map(c => new THREE.MeshStandardMaterial({
+    color: c, roughness: 0.9, metalness: 0.0,
   }));
+  const PAINTED_COLORS = [0xb7a98c, 0xc9b89a, 0xa89a8e, 0xbfa6a0, 0x9fb0a6, 0xc6b0a0];
+  const paintedMat = PAINTED_COLORS.map(c => new THREE.MeshStandardMaterial({
+    color: c, roughness: 0.82, metalness: 0.0,
+  }));
+  const GLASS_COLORS = [0x8a96a6, 0x7f8c9e, 0x93a0ad, 0x6f8092, 0x9aa6b2];
+  const glassMat = GLASS_COLORS.map(c => new THREE.MeshStandardMaterial({
+    color: c, roughness: 0.42, metalness: 0.35,
+  }));
+  // Pick a body material for a building of height h: tall ones lean glass, the
+  // rest split between concrete and painted. Returns one of the shared materials.
+  function pickBodyMat(h) {
+    const r = Math.random();
+    if (h > 34) return r < 0.6 ? pick(glassMat) : (r < 0.8 ? pick(concreteMat) : pick(paintedMat));
+    return r < 0.5 ? pick(concreteMat) : (r < 0.85 ? pick(paintedMat) : pick(glassMat));
+  }
+  // Thin parapet/roof-cap band — one shared dark-concrete material so every cap
+  // merges into a single draw call. Caps the box silhouette so roofs don't look
+  // like bare cut cubes.
+  const capMat = new THREE.MeshStandardMaterial({ color: 0x4a4a50, roughness: 0.9 });
   // Shop-level (ground floor) palette — Bangkok shophouse fronts: cream, terracotta,
   // faded pink, dirty white, gray-blue. Different from upper-floor colors so each
   // building reads as having a distinct "shop band" at street level.
@@ -162,9 +189,25 @@ export function buildWorld(scene) {
   // material for all window planes (instances cheaply, one nightEmissive entry).
   const winTex = makeWindowTexture();
   const winMat = new THREE.MeshStandardMaterial({
-    map: winTex.map, emissiveMap: winTex.emissiveMap, emissive: 0xffe6a8, emissiveIntensity: 0.0, roughness: 0.6,
+    map: winTex.map, emissiveMap: winTex.emissiveMap, emissive: 0xffe6a8, emissiveIntensity: 0.0, roughness: 0.45, metalness: 0.25,
   });
   G.nightEmissive.push({ mat: winMat, dayIntensity: 0.0, nightIntensity: 1.0 });
+
+  // All window planes share winMat, so we can't set per-face texture .repeat on the
+  // material. Instead we bake the tiling into each plane's UVs: a window-grid tile
+  // is ~WIN_TILE metres, so a face of (w×h) gets round(w/TILE)×round(h/TILE) tiles.
+  // This makes panes a consistent physical size on every building (so a wide tower
+  // shows more columns, a tall one more rows) while still merging into one mesh.
+  const WIN_TILE = 3.2;
+  function winPlane(w, h) {
+    const g = new THREE.PlaneGeometry(w, h);
+    const uv = g.attributes.uv;
+    const rx = Math.max(1, Math.round(w / WIN_TILE));
+    const ry = Math.max(1, Math.round(h / WIN_TILE));
+    for (let k = 0; k < uv.count; k++) uv.setXY(k, uv.getX(k) * rx, uv.getY(k) * ry);
+    uv.needsUpdate = true;
+    return g;
+  }
 
   const SIDEWALK_EDGE = BLOCK/2 - ROAD_W/2 - SIDEWALK_W*2; // 13: distance from block center to inner sidewalk edge
   const SHOP_LEVEL_H = 4; // height of ground-floor shop band
@@ -212,7 +255,7 @@ export function buildWorld(scene) {
   // frontFaces: array of {ax: 'x'|'z', sign: +1|-1} for each road-facing face.
   function placeBuilding(bx, bz, dimX, dimZ, h, frontFaces) {
     const upperH = Math.max(0.1, h - SHOP_LEVEL_H);
-    const upperMat = buildingMatPool[irand(0, buildingMatPool.length - 1)];
+    const upperMat = pickBodyMat(h);
     const upperGeo = new THREE.BoxGeometry(dimX, upperH, dimZ);
     bake(baker, upperGeo, upperMat, bx, SHOP_LEVEL_H + upperH/2, bz, 0, 0, 0, true, true);
     upperGeo.dispose();
@@ -222,6 +265,25 @@ export function buildWorld(scene) {
     bake(baker, shopGeo, shopMat, bx, SHOP_LEVEL_H/2, bz, 0, 0, 0, true, true);
     shopGeo.dispose();
 
+    // Parapet/roof cap — a thin slab slightly wider than the body that crowns the
+    // roof, so the silhouette reads as a finished building rather than a cut cube.
+    // Shared material → merges into one draw call across the whole city.
+    if (h > 8) {
+      const capH = 0.6, capOver = 0.25;
+      const capGeo = new THREE.BoxGeometry(dimX + capOver, capH, dimZ + capOver);
+      bake(baker, capGeo, capMat, bx, h - capH/2, bz, 0, 0, 0, true, true);
+      capGeo.dispose();
+    }
+
+    // Cornice ledge: a thin protruding band at the top of the shop podium that
+    // separates the ground floor from the tower above (a near-universal real
+    // facade cue). Reuses capMat → no extra draw call. Skipped on tiny buildings.
+    if (dimX > 3 && dimZ > 3 && h > 10) {
+      const ledgeGeo = new THREE.BoxGeometry(dimX + 0.2, 0.35, dimZ + 0.2);
+      bake(baker, ledgeGeo, capMat, bx, SHOP_LEVEL_H + 0.1, bz, 0, 0, 0, true, false);
+      ledgeGeo.dispose();
+    }
+
     // Collision AABB only — no mesh ref needed; bullet raycasts test pos/size
     // directly (doBulletRaycast), and the resolvers always used pos/size anyway.
     world.buildings.push({
@@ -229,20 +291,22 @@ export function buildWorld(scene) {
       size: new THREE.Vector3(dimX, h, dimZ),
     });
 
-    // window strip on tall buildings — emissive panels on each road-facing face
-    if (h > 22) {
+    // window strip on mid/tall buildings — emissive panels on each road-facing
+    // face. Lowered the threshold from 22 to 16 so mid-rises get windows too; the
+    // UV-tiled winPlane keeps panes a constant size whatever the floor count.
+    if (h > 16) {
       const winH = upperH - 2;
       for (const face of frontFaces) {
         if (face.ax === 'z') {
           const winW = dimX - 1.5;
           if (winW <= 0.5) continue;
-          const g = new THREE.PlaneGeometry(winW, winH);
+          const g = winPlane(winW, winH);
           bake(baker, g, winMat, bx, SHOP_LEVEL_H + upperH/2, bz + face.sign * (dimZ/2 + 0.02), face.sign < 0 ? PI : 0, 0, 0, false, false);
           g.dispose();
         } else {
           const winW = dimZ - 1.5;
           if (winW <= 0.5) continue;
-          const g = new THREE.PlaneGeometry(winW, winH);
+          const g = winPlane(winW, winH);
           bake(baker, g, winMat, bx + face.sign * (dimX/2 + 0.02), SHOP_LEVEL_H + upperH/2, bz, face.sign > 0 ? PI/2 : -PI/2, 0, 0, false, false);
           g.dispose();
         }
@@ -306,14 +370,18 @@ export function buildWorld(scene) {
         const setH = rand(6, 14);
         const setX = Math.max(2, dimX * rand(0.55, 0.78));
         const setZ = Math.max(2, dimZ * rand(0.55, 0.78));
-        const setMat = buildingMatPool[irand(0, buildingMatPool.length - 1)];
+        const setMat = pickBodyMat(h);
         const setGeo = new THREE.BoxGeometry(setX, setH, setZ);
         bake(baker, setGeo, setMat, bx, roofY + setH/2, bz, 0, 0, 0, true, true);
         setGeo.dispose();
+        // parapet on the setback too
+        const scapGeo = new THREE.BoxGeometry(setX + 0.25, 0.5, setZ + 0.25);
+        bake(baker, scapGeo, capMat, bx, roofY + setH - 0.25, bz, 0, 0, 0, true, true);
+        scapGeo.dispose();
         // window strip on the setback's main face
         if (frontFaces.length > 0 && setH > 5) {
           const face = frontFaces[0];
-          const g = new THREE.PlaneGeometry(face.ax === 'z' ? setX - 1 : setZ - 1, setH - 1.5);
+          const g = winPlane(face.ax === 'z' ? setX - 1 : setZ - 1, setH - 1.5);
           if (face.ax === 'z') {
             bake(baker, g, winMat, bx, roofY + setH/2, bz + face.sign * (setZ/2 + 0.02), face.sign < 0 ? PI : 0, 0, 0, false, false);
           } else {
@@ -656,24 +724,36 @@ export function buildWorld(scene) {
 }
 
 export function makeWindowTexture() {
-  // Two canvases, one cell layout. Albedo: blue-grey mullions + glass cells that
+  // Two canvases, one cell layout. Albedo: dark mullion grid + glass cells that
   // read as a daytime curtain wall. Emissive: black except the "lit" cells, so
-  // only those glow when the night ramp raises emissiveIntensity.
+  // only those glow when the night ramp raises emissiveIntensity. The grid is
+  // drawn as a regular 6×12 array of panes so the facade reads as clear rows and
+  // columns of windows rather than noise — and the mullion frame between cells is
+  // darkened on the albedo to make each pane pop.
   const ca = document.createElement('canvas'); ca.width = 64; ca.height = 128;
   const ce = document.createElement('canvas'); ce.width = 64; ce.height = 128;
   const ga = ca.getContext('2d');
   const ge = ce.getContext('2d');
-  // emissive base/unlit values match the pre-split texture exactly, so the
-  // night look (bright cells + faint plane sheen) is byte-identical to before.
-  ga.fillStyle = '#454b55'; ga.fillRect(0,0,64,128);
+  // mullion/spandrel base: a darker frame colour so the lit/glass cells read as
+  // inset panes. Emissive base stays near-black so unlit facade barely glows.
+  ga.fillStyle = '#34373f'; ga.fillRect(0,0,64,128);
   ge.fillStyle = '#1a1d22'; ge.fillRect(0,0,64,128);
+  // faint horizontal floor-slab lines on the albedo every row → strong "floors" cue
+  ga.fillStyle = '#2a2c33';
+  for (let y = 4; y < 128; y += 10) ga.fillRect(0, y - 1, 64, 1);
   for (let y = 6; y < 128; y += 10) {
+    // per-floor lit bias: whole floors tend to be lit or dark together, which is
+    // how real towers look at night, instead of salt-and-pepper randomness.
+    const floorLit = Math.random();
     for (let x = 4; x < 64; x += 10) {
-      const lit = Math.random() < 0.55;
+      const lit = Math.random() < (0.25 + floorLit * 0.55);
       // day glass: sky-tinted panes with slight variance, regardless of lit state
       const v = 90 + Math.random() * 50 | 0;
       ga.fillStyle = `rgb(${v-20},${v},${v+25|0})`;
       ga.fillRect(x, y, 6, 6);
+      // subtle top-edge highlight on each pane → a bit of glass sheen
+      ga.fillStyle = `rgba(${v+30},${v+40},${v+55},0.5)`;
+      ga.fillRect(x, y, 6, 1);
       ge.fillStyle = lit ? `rgb(${200+Math.random()*55|0},${180+Math.random()*60|0},${120+Math.random()*80|0})` : '#0e1014';
       ge.fillRect(x, y, 6, 6);
     }

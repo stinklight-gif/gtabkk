@@ -487,6 +487,19 @@ async function main() {
     await waitFrames(page, 4);
     const kp = await page.evaluate(() => ({ rank: window.GAME._wealthRank, flag: !!window.GAME._kingpinCar, car: window.GAME.vehicles.some(v => v.plate === 'KINGPIN') }));
     assert(kp.rank >= 3 && kp.flag && kp.car, `reaching Kingpin delivers a personal supercar (rank ${kp.rank}, car ${kp.car})`);
+
+    // ---- 13. Police toggle (disable cops) ------------------------------------
+    console.log('\n[13] police toggle');
+    await page.evaluate(() => {
+      const G = window.GAME;
+      G.state = 'playing'; G.player.inVehicle = null;
+      G.policeOff = true; G.wanted.stars = 3; G.hud.setStars(3);   // simulate heat, then disable
+    });
+    await waitFrames(page, 5);
+    const off = await page.evaluate(() => ({ stars: window.GAME.wanted.stars, heli: !!window.GAME.heli, cops: window.GAME.cops.filter(c => !c.dead).length, btn: document.getElementById('pause-police') ? document.getElementById('pause-police').textContent : null }));
+    assert(off.stars === 0 && !off.heli && off.cops === 0, `disabling police clears the heat (stars ${off.stars}, cops ${off.cops})`);
+    assert(off.btn != null, `a pause-menu police toggle exists ("${off.btn}")`);
+    await page.evaluate(() => { window.GAME.policeOff = false; });   // re-enable so nothing leaks past the test
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

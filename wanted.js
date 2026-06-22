@@ -83,6 +83,17 @@ export function killCop(cop) {
 
 export function updateWanted(dt) {
   const p = G.player.group.position;
+  // police disabled (pause-menu toggle): force 0★, clear the streets, spawn nothing
+  if (G.policeOff) {
+    if (G.wanted.stars !== 0) G.wanted.stars = 0;
+    // despawn any live foot cops + driven cop vehicles + the chopper so it clears at once
+    // (only cop-driven cars; leaves the parked, enterable Vigilante prop alone)
+    for (let i = G.cops.length - 1; i >= 0; i--) { G.scene.remove(G.cops[i].mesh); disposeObject(G.cops[i].mesh); G.cops.splice(i, 1); }
+    for (let i = G.vehicles.length - 1; i >= 0; i--) { const v = G.vehicles[i]; if (v.isCop && v.driver === 'cop') { G.scene.remove(v.mesh); disposeObject(v.mesh); G.vehicles.splice(i, 1); } }
+    if (G.heli) despawnHelicopter();
+    G.hud.setStars(0);
+    return;
+  }
   // visual: blink active cop-car light bars
   const t = performance.now() * 0.012;
   for (const v of G.vehicles) {
