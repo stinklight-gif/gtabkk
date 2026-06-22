@@ -6,9 +6,24 @@ import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { raiseWanted, spawnPed } from './main.js';
+import { makeVehicle } from './entities.js';   // fleeing target car (Repo Run chase)
+import { killPed } from './vehicles.js';        // ragdoll a courier / wave hostile on death
 
 // 10. MISSION SYSTEM
 // =============================================================================
+
+// Snap a desired heading to the nearest grid cardinal (matches updateTrafficCar's
+// DH = [0, PI/2, PI, -PI/2]). Used to point the Repo Run target car's traffic
+// driver away from the player so it actually flees on the road network.
+const _FLEE_DH = [0, PI / 2, PI, -PI / 2];
+function inferFleeDir(h) {
+  let best = 0, bd = 9;
+  for (let d = 0; d < 4; d++) {
+    const dd = Math.abs(Math.atan2(Math.sin(h - _FLEE_DH[d]), Math.cos(h - _FLEE_DH[d])));
+    if (dd < bd) { bd = dd; best = d; }
+  }
+  return best;
+}
 
 export function makeMissionSystem() {
   const sys = { active: null };
@@ -372,6 +387,7 @@ export function makeMissionSystem() {
       markerPos: null,
       stage: 0,
       armed: false,
+      nextJob: null,    // set to 'repoRun' on first clear → opens Nong's side-arc
       dropIdx: 0,
       timeLeft: 0,
       pickup: new THREE.Vector3(-120, 0, -120),
@@ -424,8 +440,10 @@ export function makeMissionSystem() {
           const d2 = dist2(pp, this.markerPos);
           if (!this.armed && d2 > 18 * 18) this.armed = true;
           if (this.armed) {
-            G.hud.showPrompt('Return to the <b>marker</b> to drive the <b>Getaway</b> again', 0.4);
-            if (d2 < 8 * 8) { this.armed = false; this.onStart(); }
+            // first clear unlocks Nong's side-arc (repoRun); after that, replay the Getaway
+            const label = this.nextJob ? 'start <b>Repo Run</b>' : 'drive the <b>Getaway</b> again';
+            G.hud.showPrompt('Return to the <b>marker</b> to ' + label, 0.4);
+            if (d2 < 8 * 8) { this.armed = false; if (this.nextJob) sys.start(this.nextJob); else this.onStart(); }
           }
         }
       },
@@ -433,8 +451,9 @@ export function makeMissionSystem() {
         this.stage = 5; this.armed = false;
         G.cash += this.reward; G.hud.setCash(G.cash); G.hud.cashPop(this.reward);
         G._getawayDone = true;
+        this.nextJob = 'repoRun';        // capstone clear opens the escalating side-arc
         G.hud.showNotif(`Getaway done: +฿${this.reward.toLocaleString()}`);
-        G.hud.showSubtitle("Uncle Seng: \"Best wheel-man in Krung Thep. That's all I've got — for now.\"", "ลุงเซ้ง: \"คนขับเก่งที่สุด\"");
+        G.hud.showSubtitle("Uncle Seng: \"Best wheel-man in Krung Thep. My niece Nong's got hotter work — go see her.\"", "ลุงเซ้ง: \"ไปหาน้องนงสิ มีงานเด็ดกว่านี้\"");
         G.hud.setMissionText('Free Roam · Sukhumvit');
         this.markerPos = this.pickup.clone();
         setBeam(this.markerPos, 0xff2a86);
@@ -445,6 +464,329 @@ export function makeMissionSystem() {
         G.hud.showSubtitle("Uncle Seng: \"You blew it. Regroup and try again.\"", "ลุงเซ้ง: \"พลาดแล้ว ลองใหม่\"");
         G.hud.setMissionText('Free Roam · Sukhumvit');
         this.markerPos = this.pickup.clone();
+        setBeam(this.markerPos, 0xff2a86);
+      },
+    },
+
+    // =========================================================================
+    // NONG'S SIDE-ARC — three escalating jobs with NEW objective types, opened by
+    // clearing the Getaway capstone. Each chains to the next via `nextJob` using
+    // the same leave-then-return stage-5 handshake as the main line, so they reuse
+    // the marker/beam/HUD plumbing unchanged. Payouts climb 9k → 11k → 14k.
+    // =========================================================================
+
+    // Side-arc 1 — Repo Run (CHASE): a debtor's car bolts; catch it and wreck it
+    // (ram it down or shoot it out) before it escapes the cordon or the clock dies.
+    // The target drives on the existing traffic AI; we just steer its flee target
+    // away from the player and bleed its HP on a hard ram.
+    repoRun: {
+      name: 'Repo Run',
+      markerPos: null,
+      stage: 0,
+      armed: false,
+      nextJob: null,
+      car: null,
+      timeLeft: 0,
+      spawn: new THREE.Vector3(-160, 0, -40),
+      startTime: 60,    // catch-it clock once the chase is live
+      escapeDist: 170,  // if it gets this far from you, it's gone
+      ramCD: 0,
+      reward: 9000,
+      onStart() {
+        this.stage = 1; this.timeLeft = 0; this.ramCD = 0;
+        this.clearCar();
+        this.markerPos = this.spawn.clone();
+        setBeam(this.markerPos, 0x39ff7a);   // green = go to the rendezvous
+        G.hud.setMissionText('Repo Run');
+        G.hud.showSubtitle("Nong: \"That silver car owes the boss. Box it in and total it.\"", "นง: \"รถคันนั้นติดหนี้ จัดการให้พัง\"");
+        G.hud.showPrompt('Get a <b>car</b> and reach the green marker', 3);
+      },
+      update(dt) {
+        const pp = G.player.group.position;
+        if (this.stage === 1) {
+          if (dist2(pp, this.markerPos) < 11 * 11) {
+            // spawn the fleeing car and arm it with a runaway traffic driver
+            const v = makeVehicle('luxsedan', G.scene);
+            v.pos.copy(this.spawn); v.pos.y = 0; v.heading = 0;
+            v.mesh.position.copy(v.pos); v.mesh.rotation.y = v.heading;
+            v.npc = { kind: 'flee', dir: 0, turnCD: 0, cruiseSpeed: 16, honkCooldown: 99 };
+            v.vel = 8; v.hp = 70;   // a few good rams / a clip of SMG ends it
+            this.car = v;
+            this.stage = 2; this.timeLeft = this.startTime;
+            G.hud.showNotif('There it goes — RAM IT DOWN!');
+            G.audio.honk();
+          }
+        } else if (this.stage === 2) {
+          const v = this.car;
+          if (!v || v.dead || v.hp <= 0) { this.win(); return; }
+          this.timeLeft -= dt;
+          if (this.timeLeft <= 0) { this.fail('it slipped the clock'); return; }
+          // steer its flee target directly away from the player so it actually runs
+          const dx = v.pos.x - pp.x, dz = v.pos.z - pp.z;
+          const away = Math.atan2(dx, dz);
+          v.npc.dir = inferFleeDir(away);
+          const d = Math.hypot(dx, dz);
+          if (d > this.escapeDist) { this.fail('it got away'); return; }
+          // hard ram: close + fast → bleed its HP (combat handles shooting it)
+          this.ramCD = Math.max(0, this.ramCD - dt);
+          if (G.player.inVehicle && d < 4 && Math.abs(G.player.inVehicle.vel) > 7 && this.ramCD === 0) {
+            v.hp -= 24; this.ramCD = 0.5; G.audio.hit();
+            if (G.camRig) G.camRig.shake = Math.max(G.camRig.shake || 0, 0.5);
+          }
+          this.markerPos = v.pos; setBeam(v.pos, 0xff2a86);
+          G.hud.showPrompt(`REPO RUN &nbsp; ⏱ ${this.timeLeft.toFixed(0)}s &nbsp;·&nbsp; HP ${Math.max(0, v.hp | 0)} &nbsp;·&nbsp; ${(d | 0)}m`, 0.4);
+        } else if (this.stage === 5) {
+          const d2 = dist2(pp, this.markerPos);
+          if (!this.armed && d2 > 18 * 18) this.armed = true;
+          if (this.armed) {
+            const label = this.nextJob ? 'start <b>Cover the Courier</b>' : 'run <b>Repo Run</b> again';
+            G.hud.showPrompt('Return to the <b>marker</b> to ' + label, 0.4);
+            if (d2 < 8 * 8) { this.armed = false; if (this.nextJob) sys.start(this.nextJob); else this.onStart(); }
+          }
+        }
+      },
+      clearCar() {
+        const v = this.car;
+        if (v && !v.dead) {
+          const i = G.vehicles.indexOf(v); if (i >= 0) G.vehicles.splice(i, 1);
+          G.scene.remove(v.mesh); disposeObject(v.mesh);
+        }
+        this.car = null;
+      },
+      win() {
+        this.clearCar();
+        this.stage = 5; this.armed = false;
+        this.nextJob = 'courier';
+        G._repoRunDone = true;
+        G.cash += this.reward; G.hud.setCash(G.cash); G.hud.cashPop(this.reward);
+        G.hud.showNotif(`Repo Run complete: +฿${this.reward.toLocaleString()}`);
+        G.hud.showSubtitle("Nong: \"Scrap metal now. There's a courier who needs cover — come back.\"", "นง: \"พังเรียบร้อย มีงานคุ้มกันคนส่งของ\"");
+        G.hud.setMissionText('Free Roam · Sukhumvit');
+        this.markerPos = this.spawn.clone();
+        setBeam(this.markerPos, 0xff2a86);
+      },
+      fail(why) {
+        this.clearCar();
+        this.stage = 5; this.armed = false;
+        G.hud.showNotif(`Repo Run failed — ${why}.`);
+        G.hud.showSubtitle("Nong: \"You let it go. Try again.\"", "นง: \"ปล่อยหลุดอีกแล้ว ลองใหม่\"");
+        G.hud.setMissionText('Free Roam · Sukhumvit');
+        this.markerPos = this.spawn.clone();
+        setBeam(this.markerPos, 0xff2a86);
+      },
+    },
+
+    // Side-arc 2 — Cover the Courier (ESCORT / PROTECT): an on-foot courier walks a
+    // fixed route to the drop while gang hitters spawn in and chase him. Keep him
+    // alive — clear the heat off him. Fail if he dies. Reuses the gang ped AI: gang
+    // peds normally chase the player, so we re-aim the nearest few at the courier.
+    courier: {
+      name: 'Cover the Courier',
+      markerPos: null,
+      stage: 0,
+      armed: false,
+      nextJob: null,
+      courier: null,
+      foes: [],
+      spawnT: 0,
+      legIdx: 0,
+      start: new THREE.Vector3(60, 0, 60),
+      route: [
+        new THREE.Vector3(  0, 0,  20),
+        new THREE.Vector3(-80, 0, -10),
+        new THREE.Vector3(-140, 0, -90),
+      ],
+      reward: 11000,
+      onStart() {
+        this.stage = 1; this.legIdx = 0; this.spawnT = 0; this.foes = [];
+        this.clearAll();
+        this.markerPos = this.start.clone();
+        setBeam(this.markerPos, 0x39ff7a);
+        G.hud.setMissionText('Cover the Courier');
+        G.hud.showSubtitle("Nong: \"Walk my courier to the drop. Hitters will come — keep him breathing.\"", "นง: \"พาคนส่งของไปให้ถึง อย่าให้ตาย\"");
+        G.hud.showPrompt('Meet the <b>courier</b> at the green marker', 3);
+      },
+      update(dt) {
+        const pp = G.player.group.position;
+        if (this.stage === 1) {
+          if (dist2(pp, this.markerPos) < 9 * 9) {
+            const c = spawnPed(G.scene, this.start.clone());
+            c.isCourier = true; c.isTarget = true;   // isTarget → crowd thinning skips him
+            c.state = 'escort';                       // non-'walking' → skip the wander jitter so he holds the route
+            c.hp = 120; c.speed = 2.4; c.panicT = 0;
+            const parts = c.mesh.userData.parts;
+            if (parts && parts.torso) parts.torso.material = new THREE.MeshStandardMaterial({ color: 0xf0c040, roughness: 0.7 });   // hi-vis
+            this.courier = c;
+            this.stage = 2; this.legIdx = 0; this.spawnT = 3;
+            G.hud.showNotif('Courier moving — cover him to the drop!');
+            G.audio.whistle();
+          }
+        } else if (this.stage === 2) {
+          const c = this.courier;
+          if (!c || c.dead) { this.fail('courier down'); return; }
+          // walk the courier leg by leg toward the drop (drive heading/speed; the
+          // shared ped move/animate code in updatePeds applies it)
+          const goal = this.route[this.legIdx];
+          const dx = goal.x - c.mesh.position.x, dz = goal.z - c.mesh.position.z;
+          const d = Math.hypot(dx, dz) || 1;
+          c.heading = Math.atan2(dx, dz);
+          c.speed = 2.4; c.panicT = 0;   // override panic so he keeps walking the route, not fleeing
+          if (d < 4) {
+            if (++this.legIdx >= this.route.length) { this.win(); return; }
+          }
+          // spawn waves of hitters that target the courier
+          this.spawnT -= dt;
+          if (this.spawnT <= 0 && this.foes.filter(f => !f.dead).length < 4) {
+            this.spawnT = 5;
+            const ang = rand(0, TAU), r = 22;
+            const f = spawnPed(G.scene, new THREE.Vector3(c.mesh.position.x + Math.cos(ang) * r, 0, c.mesh.position.z + Math.sin(ang) * r));
+            f.gang = true; f.hp = 30; f.speed = 2.8; f._notedAggression = true; f.chaseCourier = c;
+            const fp = f.mesh.userData.parts;
+            if (fp && fp.torso) fp.torso.material = new THREE.MeshStandardMaterial({ color: 0x3a1020, roughness: 0.8 });
+            this.foes.push(f);
+            G.hud.showNotif('Hitters incoming!');
+          }
+          // re-aim hitters at the courier each frame (their default gang AI chases the
+          // player; chaseCourier flips the heading + does contact damage to him)
+          for (const f of this.foes) {
+            if (f.dead || !c || c.dead) continue;
+            const hx = c.mesh.position.x - f.mesh.position.x, hz = c.mesh.position.z - f.mesh.position.z;
+            const hd = Math.hypot(hx, hz) || 1;
+            f.heading = Math.atan2(hx, hz);
+            f.speed = hd > 1.5 ? 2.8 : 0;
+            f._atkCD = (f._atkCD || 0) - dt;
+            if (hd < 1.9 && f._atkCD <= 0) { c.hp -= 12; f._atkCD = 1.0; G.audio.hit(); }
+            if (c.hp <= 0 && !c.dead) { killPed(c); }
+          }
+          this.markerPos = c.mesh.position; setBeam(c.mesh.position, 0xf0c040);
+          const alive = this.foes.filter(f => !f.dead).length;
+          G.hud.showPrompt(`COURIER &nbsp; ❤ ${Math.max(0, c.hp | 0)} &nbsp;·&nbsp; leg ${this.legIdx + 1}/${this.route.length} &nbsp;·&nbsp; hitters ${alive}`, 0.4);
+        } else if (this.stage === 5) {
+          const d2 = dist2(pp, this.markerPos);
+          if (!this.armed && d2 > 18 * 18) this.armed = true;
+          if (this.armed) {
+            const label = this.nextJob ? 'start <b>Hold the Yard</b>' : 'run <b>Cover the Courier</b> again';
+            G.hud.showPrompt('Return to the <b>marker</b> to ' + label, 0.4);
+            if (d2 < 8 * 8) { this.armed = false; if (this.nextJob) sys.start(this.nextJob); else this.onStart(); }
+          }
+        }
+      },
+      clearAll() {
+        // dispose any leftover courier + hitters so a retry/abort never strands them
+        const c = this.courier;
+        if (c && !c.dead) { c.dead = true; G.scene.remove(c.mesh); disposeObject(c.mesh); const i = G.peds.indexOf(c); if (i >= 0) G.peds.splice(i, 1); }
+        this.courier = null;
+        for (const f of this.foes) {
+          if (f.dead) continue;
+          f.dead = true; G.scene.remove(f.mesh); disposeObject(f.mesh);
+          const i = G.peds.indexOf(f); if (i >= 0) G.peds.splice(i, 1);
+        }
+        this.foes = [];
+      },
+      win() {
+        this.clearAll();
+        this.stage = 5; this.armed = false;
+        this.nextJob = 'holdYard';
+        G._courierDone = true;
+        G.cash += this.reward; G.hud.setCash(G.cash); G.hud.cashPop(this.reward);
+        G.hud.showNotif(`Courier delivered: +฿${this.reward.toLocaleString()}`);
+        G.hud.showSubtitle("Nong: \"He made it — clean work. One more, and it's the big one.\"", "นง: \"ส่งถึงแล้ว งานใหญ่รออยู่\"");
+        G.hud.setMissionText('Free Roam · Sukhumvit');
+        this.markerPos = this.start.clone();
+        setBeam(this.markerPos, 0xff2a86);
+      },
+      fail(why) {
+        this.clearAll();
+        this.stage = 5; this.armed = false;
+        G.hud.showNotif(`Escort failed — ${why}.`);
+        G.hud.showSubtitle("Nong: \"He's gone. Damn it — try again.\"", "นง: \"เขาตายแล้ว ลองใหม่\"");
+        G.hud.setMissionText('Free Roam · Sukhumvit');
+        this.markerPos = this.start.clone();
+        setBeam(this.markerPos, 0xff2a86);
+      },
+    },
+
+    // Side-arc 3 (capstone) — Hold the Yard (DEFEND / SURVIVE): stand in the yard and
+    // hold it against rolling waves of gang hostiles for the duration. Leave the ring
+    // and the clock pauses (so you can't cheese it from afar). Reuses the gang ped AI
+    // wholesale: gang peds chase + swing on the player on their own.
+    holdYard: {
+      name: 'Hold the Yard',
+      markerPos: null,
+      stage: 0,
+      armed: false,
+      foes: [],
+      holdT: 0,
+      spawnT: 0,
+      center: new THREE.Vector3(150, 0, 150),
+      ringR: 16,          // you must be inside this to bank hold time
+      holdTime: 90,       // seconds of holding to win
+      maxLive: 7,
+      reward: 14000,
+      onStart() {
+        this.stage = 1; this.holdT = 0; this.spawnT = 0; this.foes = [];
+        this.clearFoes();
+        this.markerPos = this.center.clone();
+        setBeam(this.markerPos, 0x39ff7a);
+        G.hud.setMissionText('Hold the Yard');
+        G.hud.showSubtitle("Nong: \"Rivals want this yard. Stand in it and hold — don't let them push you out.\"", "นง: \"ยึดลานนี้ไว้ อย่าให้มันไล่\"");
+        G.hud.showPrompt('Reach the green <b>yard</b> and hold it', 3);
+      },
+      update(dt) {
+        const pp = G.player.group.position;
+        if (this.stage === 1) {
+          if (dist2(pp, this.markerPos) < this.ringR * this.ringR) {
+            this.stage = 2; this.holdT = 0; this.spawnT = 0.5;
+            setBeam(this.center, 0xff2a86);
+            G.hud.showNotif('Hold the yard! Waves incoming!');
+            G.audio.siren();
+          }
+        } else if (this.stage === 2) {
+          const inRing = dist2(pp, this.center) < this.ringR * this.ringR;
+          if (inRing) this.holdT += dt;   // only bank time while you're standing in it
+          if (this.holdT >= this.holdTime) { this.win(); return; }
+          // roll waves toward the player (gang AI does the chasing/attacking)
+          this.spawnT -= dt;
+          const alive = this.foes.filter(f => !f.dead).length;
+          if (this.spawnT <= 0 && alive < this.maxLive) {
+            this.spawnT = rand(1.5, 3.0);
+            const ang = rand(0, TAU), r = this.ringR + rand(8, 18);
+            const f = spawnPed(G.scene, new THREE.Vector3(this.center.x + Math.cos(ang) * r, 0, this.center.z + Math.sin(ang) * r));
+            f.gang = true; f.hp = 35; f.speed = 2.7; f._notedAggression = true;
+            const fp = f.mesh.userData.parts;
+            if (fp && fp.torso) fp.torso.material = new THREE.MeshStandardMaterial({ color: 0x101a30, roughness: 0.8 });
+            this.foes.push(f);
+          }
+          const left = Math.max(0, this.holdTime - this.holdT);
+          G.hud.showPrompt(inRing
+            ? `HOLD THE YARD &nbsp; ⏱ ${left.toFixed(0)}s &nbsp;·&nbsp; hostiles ${alive}`
+            : `GET BACK IN THE YARD! &nbsp; (${left.toFixed(0)}s left)`, 0.4);
+        } else if (this.stage === 5) {
+          const d2 = dist2(pp, this.markerPos);
+          if (!this.armed && d2 > 18 * 18) this.armed = true;
+          if (this.armed) {
+            G.hud.showPrompt('Return to the <b>marker</b> to hold the <b>yard</b> again', 0.4);
+            if (d2 < 8 * 8) { this.armed = false; this.onStart(); }
+          }
+        }
+      },
+      clearFoes() {
+        for (const f of this.foes) {
+          if (f.dead) continue;
+          f.dead = true; G.scene.remove(f.mesh); disposeObject(f.mesh);
+          const i = G.peds.indexOf(f); if (i >= 0) G.peds.splice(i, 1);
+        }
+        this.foes = [];
+      },
+      win() {
+        this.clearFoes();
+        this.stage = 5; this.armed = false;
+        G._holdYardDone = true;
+        G.cash += this.reward; G.hud.setCash(G.cash); G.hud.cashPop(this.reward);
+        G.hud.showNotif(`Yard held: +฿${this.reward.toLocaleString()}`);
+        G.hud.showSubtitle("Nong: \"The yard's ours. You're the real deal — that's the lot for now.\"", "นง: \"ลานนี้ของเราแล้ว เก่งจริง\"");
+        G.hud.setMissionText('Free Roam · Sukhumvit');
+        this.markerPos = this.center.clone();
         setBeam(this.markerPos, 0xff2a86);
       },
     },
