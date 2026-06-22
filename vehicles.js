@@ -16,6 +16,8 @@ export function updatePlayerInVehicle(dt) {
     p.inVehicle = null; p.group.visible = true;
     p.group.position.set(v.pos.x + Math.cos(v.heading) * 1.8, 0, v.pos.z - Math.sin(v.heading) * 1.8);
     v.mesh.children.forEach(c => { if (c.material && c.material.color) c.material.color.lerp(_blackColor, 0.6); });
+    if (v.smoke) v.smoke.life = 0;                       // stop the damage smoke (NPC path does this too)
+    if (v.audio) { v.audio.kill(); v.audio = null; }     // stop the engine oscillators
     makeExplosion(v.pos);
     damagePlayer(20);
     setTimeout(() => {
@@ -28,7 +30,7 @@ export function updatePlayerInVehicle(dt) {
   if (G.input.pressed('KeyE')) {
     p.inVehicle = null;
     v.driver = null;
-    if (v.audio) { v.audio.set(0, false); }
+    if (v.audio) { v.audio.kill(); v.audio = null; }   // stop the engine oscillators (recreated on re-entry)
     // place player next to vehicle on left
     const ox = Math.cos(v.heading) * 1.4;
     const oz = -Math.sin(v.heading) * 1.4;
@@ -58,7 +60,9 @@ export function updatePlayerInVehicle(dt) {
   v.vel = clamp(v.vel, -spec.topSpeed * 0.4 * speedMul, spec.topSpeed * (boost ? (spec.nitroTop || 1.15) : 1) * speedMul);
   // steering — speed dependent
   const steerRate = spec.turn * (1 - Math.min(1, Math.abs(v.vel)/spec.topSpeed) * 0.4);
-  v.heading += steer * steerRate * dt * (v.vel >= 0 ? 1 : -1) * (Math.abs(v.vel)>0.3 ? 1 : 0);
+  // ramp steering in with speed (0 at a dead stop, full by ~0.6) so slow reverse
+  // and creeping forward still turn instead of hitting a hard dead zone.
+  v.heading += steer * steerRate * dt * (v.vel >= 0 ? 1 : -1) * Math.min(1, Math.abs(v.vel) / 0.6);
   // arcade handbrake drift: extra oversteer + lay rubber while sliding
   if (handbrake && Math.abs(v.vel) > 6 && Math.abs(steer) > 0.15 && spec.kind !== 'boat' && spec.kind !== 'bike') {
     v.heading += steer * 1.5 * dt * (v.vel >= 0 ? 1 : -1);
@@ -356,7 +360,7 @@ export function updateGarage(dt) {
       G.scene.remove(G.cops[i].mesh); disposeObject(G.cops[i].mesh); G.cops.splice(i, 1);
     }
     for (let i = G.vehicles.length - 1; i >= 0; i--) {
-      if (G.vehicles[i].isCop) { G.scene.remove(G.vehicles[i].mesh); disposeObject(G.vehicles[i].mesh); G.vehicles.splice(i, 1); }
+      if (G.vehicles[i].isCop) { const cv = G.vehicles[i]; if (cv.smoke) { cv.smoke.life = 0; cv.smoke = null; } G.scene.remove(cv.mesh); disposeObject(cv.mesh); G.vehicles.splice(i, 1); }
     }
     G.hud.setCash(G.cash);
     G.hud.setStars(0);
@@ -409,6 +413,7 @@ export function storeVehicle(v) {
   // step the player out at the garage, then despawn the stored car
   p.inVehicle = null; v.driver = null; p.group.visible = true;
   p.group.position.set(g.pos.x, 0, g.pos.z - 5);
+  if (v.audio) { v.audio.kill(); v.audio = null; }   // stop the engine oscillators
   G.scene.remove(v.mesh); disposeObject(v.mesh);
   const vi = G.vehicles.indexOf(v); if (vi >= 0) G.vehicles.splice(vi, 1);
   G.hud.showNotif(`Stored ${storedLabel(entry)} (${garage.stored.length}/${garage.capacity})`);

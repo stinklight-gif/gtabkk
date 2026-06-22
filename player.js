@@ -149,7 +149,7 @@ export function updateCollectibles(dt) {
       G.audio.blip({ freq: 880, dur: 0.1, gain: 0.12 });
       if (G.collected >= cs.length) {
         G.cash += 3000; G.hud.setCash(G.cash);
-        G.hud.showNotif(`All ${cs.length} amulets found! +฿2,000`);
+        G.hud.showNotif(`All ${cs.length} amulets found! +฿3,000`);
       } else {
         G.hud.showNotif(`Amulet ${G.collected}/${cs.length} (+฿100)`);
       }
@@ -179,7 +179,7 @@ export function updateInteraction(dt) {
   for (const v of G.vehicles) {
     if (v.driver || v.dead) continue; // occupied/cop/player, or a wreck about to despawn
     const d2 = dist2(v.pos, p.group.position);
-    if (d2 < 8 && d2 < nd) { nd = d2; near = v; }
+    if (d2 < 8 * 8 && d2 < nd) { nd = d2; near = v; }   // dist2 is squared → compare against radius²
   }
   if (near) {
     G.hud.showPrompt('Press <b>E</b> to enter ' + vehicleName(near.kind), 0.5);
@@ -207,7 +207,10 @@ function deliverKingpinCar() {
   const at = G.world.garageDoor || (g && g.pos) || G.player.group.position;
   const v = makeVehicle('supercar', G.scene);
   if (!v) return;
-  v.pos.set(at.x, 0.5, at.z + 3); v.mesh.position.copy(v.pos);
+  // Park it in front of the door on the open side (−z), clear of the garage
+  // trigger radius — otherwise updateInteraction's garage early-return owns E
+  // and the car can't be entered.
+  v.pos.set(at.x, 0.5, at.z - 3); v.mesh.position.copy(v.pos);
   v.heading = 0; v.mesh.rotation.y = 0; v.driver = null; v.vel = 0; v.plate = 'KINGPIN';
   G.hud.showNotif('👑 Kingpin perk — a supercar is waiting at your garage.');
 }
@@ -331,6 +334,14 @@ function heistBeam(pos, color) {
   }
   h.beam.material.color.setHex(color);
   h.beam.position.set(pos.x, 40, pos.z);
+}
+
+// Cancel an in-progress bank heist (no payout) and tear down its beam/marker.
+// Called on death/respawn so a heist you died during can't still be cashed in.
+export function abortHeist() {
+  const h = G.heist; if (!h || !h.active) return;
+  h.active = false; h.stage = 0; h.crackT = 0; h.markerPos = null;
+  heistBeam(null);
 }
 
 // ---- Bank account: deposit/withdraw at the teller; the balance earns daily
@@ -651,6 +662,13 @@ export function openStore(title) {
 
 export function buyItem(it) {
   const p = G.player;
+  // already-owned cosmetic: re-equip for free instead of charging again
+  if (it.own && (G._owned || []).includes(it.own)) {
+    it.effect();
+    G.hud.showNotif('Already owned — equipped');
+    if (G.audio && G.audio.blip) G.audio.blip({ freq: 520, dur: 0.06, gain: 0.08 });
+    return;
+  }
   if (G.cash < it.cost) { G.hud.showNotif('Not enough cash'); return; }
   G.cash -= it.cost; G.hud.setCash(G.cash);
   it.effect();
