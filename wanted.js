@@ -26,6 +26,7 @@ export function spawnCop(scene, pos) {
     mesh: m, heading: rand(0, TAU), speed: 3.5, hp: 60, dead: false,
     state: 'seeking',  // seeking | engaging | bribed
     shootCooldown: 0, idleT: 0, panicT: 0,
+    flinchT: 0, strafeT: 0, strafeDir: 1,   // tactical: hit-stagger + strafe juke
   };
   G.cops.push(cop);
   return cop;
@@ -305,6 +306,8 @@ export function updateCop(v, dt) {
 
 export function updateFootCops(dt) {
   const p = G.player;
+  // is the player aiming a gun? cops armed with guns back off / juke when targeted
+  const aiming = !p.inVehicle && p.activeWeapon !== 'fists' && (G.input.rightDown || G.input.mouseDown);
   for (let ci = G.cops.length - 1; ci >= 0; ci--) {
     const c = G.cops[ci];
     if (c.dead) continue;
@@ -321,22 +324,41 @@ export function updateFootCops(dt) {
       if (c.idleT > 6) { G.scene.remove(c.mesh); disposeObject(c.mesh); G.cops.splice(ci, 1); }
       continue;
     }
+    // flinch: a hit briefly staggers them (set in combat.js doBulletRaycast/doMeleeHit)
+    if (c.flinchT > 0) { c.flinchT -= dt; animateWalk(c.mesh, 0, dt, false); continue; }
     const dx = p.group.position.x - c.mesh.position.x;
     const dz = p.group.position.z - c.mesh.position.z;
     const d = Math.hypot(dx, dz);
-    c.heading = Math.atan2(dx, dz);
-    if (d > 2.5) {
+    c.heading = Math.atan2(dx, dz);          // always face the player
+    const armed = GAMEPLAY.vulnerableOnFoot && G.wanted.stars >= 2;
+    // pick a strafe direction occasionally so a group doesn't bunch into one line
+    c.strafeT = (c.strafeT || 0) - dt;
+    if (c.strafeT <= 0) { c.strafeDir = Math.random() < 0.5 ? -1 : 1; c.strafeT = rand(0.8, 1.8); }
+    if (armed && d < 22) {
+      // hold a firing line: close to ~12 m, then stop and strafe-shoot; back off if crowded
+      const want = aiming ? 16 : 12;          // give ground when aimed at
+      let mv = 0;
+      if (d > want + 2) mv = c.speed;         // advance into range
+      else if (d < want - 2) mv = -c.speed * 0.8;   // too close — back off
+      c.mesh.position.x += Math.sin(c.heading) * mv * dt;
+      c.mesh.position.z += Math.cos(c.heading) * mv * dt;
+      // strafe perpendicular to the player (faster while being aimed at = juking)
+      const sx = Math.cos(c.heading) * c.strafeDir, sz = -Math.sin(c.heading) * c.strafeDir;
+      const strafeSpd = (aiming ? 2.6 : 1.4);
+      c.mesh.position.x += sx * strafeSpd * dt;
+      c.mesh.position.z += sz * strafeSpd * dt;
+      c.shootCooldown -= dt;
+      if (c.shootCooldown <= 0) {
+        c.shootCooldown = rand(1.4, 2.6);
+        G.audio.shot();
+        if (Math.random() < 0.5) { damagePlayer(8); G.camRig.shake = Math.max(G.camRig.shake, 0.08); }
+      }
+      animateWalk(c.mesh, c.speed, dt, mv !== 0 || true);
+    } else if (d > 2.5) {
+      // unarmed (or out of gun range): close the distance to melee
       c.mesh.position.x += Math.sin(c.heading) * c.speed * dt;
       c.mesh.position.z += Math.cos(c.heading) * c.speed * dt;
-      // at 2★ cops draw and fire from range
-      if (GAMEPLAY.vulnerableOnFoot && G.wanted.stars >= 2 && d < 22) {
-        c.shootCooldown -= dt;
-        if (c.shootCooldown <= 0) {
-          c.shootCooldown = rand(1.4, 2.6);
-          G.audio.shot();
-          if (Math.random() < 0.5) { damagePlayer(8); G.camRig.shake = Math.max(G.camRig.shake, 0.08); }
-        }
-      }
+      animateWalk(c.mesh, c.speed, dt, true);
     } else {
       // melee attack
       c.shootCooldown -= dt;
@@ -345,9 +367,9 @@ export function updateFootCops(dt) {
         G.audio.punch();
         damagePlayer(6);
       }
+      animateWalk(c.mesh, c.speed, dt, false);
     }
     c.mesh.rotation.y = c.heading;
-    animateWalk(c.mesh, c.speed || 2.0, dt, true);
   }
 }
 

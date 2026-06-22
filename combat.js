@@ -9,6 +9,41 @@ import { killCop, killPed, raiseWanted } from './main.js';
 
 // pooled fire FX lights (combat-local mutable state)
 let _muzzleLight = null, _sparkLight = null, _muzzleT = 0, _sparkT = 0;
+// pooled muzzle-flash sprite parented to the held gun (reused every shot)
+let _muzzleFlash = null, _muzzleFlashT = 0;
+
+// Brief expanding spark/puff at a bullet's hit point — reuses the G.dust pool
+// (updateDust fades + frees it) so we add no new per-frame system. Cheap: ~6 pts.
+export function spawnImpactSpark(point) {
+  const n = 6;
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(n * 3), vel = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    pos[i * 3] = point.x; pos[i * 3 + 1] = point.y; pos[i * 3 + 2] = point.z;
+    const a = Math.random() * TAU, sp = rand(2, 6);
+    vel[i * 3] = Math.cos(a) * sp; vel[i * 3 + 1] = rand(0.5, 3); vel[i * 3 + 2] = Math.sin(a) * sp;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.PointsMaterial({ color: 0xffd070, size: 0.32, transparent: true, opacity: 0.95, depthWrite: false });
+  const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; G.scene.add(pts);
+  G.dust.push({ pts, vel, life: 0.6 });
+}
+
+// Flash the held gun's muzzle (own pooled sprite) and pop the crosshair as a
+// hitmarker when a shot connects. Both are faded in updateBullets.
+function flashMuzzle() {
+  const gun = G.player.pistol;
+  if (!_muzzleFlash) {
+    const mat = new THREE.SpriteMaterial({ color: 0xfff0b0, transparent: true, opacity: 0, depthWrite: false, depthTest: false });
+    _muzzleFlash = new THREE.Sprite(mat);
+    _muzzleFlash.scale.set(0.6, 0.6, 1);
+  }
+  if (_muzzleFlash.parent !== gun) { gun.add(_muzzleFlash); }
+  _muzzleFlash.position.set(0, 0, 0.32);          // out past the barrel
+  _muzzleFlash.material.opacity = 0.95;
+  _muzzleFlashT = 0.05;
+}
+function hitMarker() { if (G.hud && G.hud.hitMarker) G.hud.hitMarker(); }
 
 // 14. COMBAT — melee + pistol
 // =============================================================================
@@ -65,18 +100,26 @@ export function updateCombat(dt) {
 
   // attack — F (melee) or LMB / F for pistol
   if (p.activeWeapon === 'fists') {
+    // combo window ticks down between swings; let it lapse and the chain resets
+    if (p.comboWindow > 0) { p.comboWindow -= dt; if (p.comboWindow <= 0) p.comboStep = 0; }
     if (G.input.pressed('KeyF') && p.attackCooldown <= 0 && p.stam > 8) {
-      const kinds = ['jab', 'cross', 'kick'];
-      const kind = pick(kinds);
+      // chain jab -> jab -> cross finisher; press in rhythm to advance the step
+      const combo = ['jab', 'jab', 'cross'];
+      const step = p.comboStep % combo.length;
+      const kind = step === 2 ? pick(['cross', 'kick']) : combo[step];   // finisher: cross or kick
+      const finisher = step === 2;
       p.attackKind = kind;
-      p.attackTimer = 0.25;
-      p.attackCooldown = 0.32;
+      p.attackTimer = p.attackDur = finisher ? 0.28 : 0.22;
+      p.attackCooldown = finisher ? 0.4 : 0.26;    // snappier mid-combo, longer recovery on the finisher
       p.stam = Math.max(0, p.stam - 8);
-      doMeleeHit(kind);
+      // advance the chain; the finisher loops back to a fresh jab
+      p.comboStep = finisher ? 0 : p.comboStep + 1;
+      p.comboWindow = 0.55;                          // time to keep the rhythm going
+      doMeleeHit(kind, finisher);
     }
     if (p.attackTimer > 0) {
-      // animate
-      const t = 1 - p.attackTimer / 0.25;
+      // animate (normalize against this swing's duration so the phase reads 0->1)
+      const t = 1 - p.attackTimer / (p.attackDur || 0.25);
       if (p.attackKind === 'jab') {
         p.armL.rotation.x = -Math.sin(t * PI) * 1.4;
       } else if (p.attackKind === 'cross') {
@@ -149,7 +192,7 @@ export function updateAmmoHud() {
 
 export function triggerHitStop(s) { G.hitStop = Math.max(G.hitStop || 0, s); }
 
-export function doMeleeHit(kind) {
+export function doMeleeHit(kind, finisher = false) {
   const p = G.player;
   const fx = -Math.sin(p.yaw), fz = -Math.cos(p.yaw);
   // search nearby peds/cops/dogs in front
@@ -163,11 +206,21 @@ export function doMeleeHit(kind) {
       const side = -tx*fz + tz*fx;
       const d2 = tx*tx + tz*tz;
       if (fwd > 0 && fwd < 1.7 && Math.abs(side) < 1.0 && d2 < 4) {
-        target.hp -= (kind === 'kick' ? 22 : kind === 'cross' ? 18 : 12);
+        // finisher hits harder; kick/cross outdamage the jab
+        let dmg = (kind === 'kick' ? 22 : kind === 'cross' ? 18 : 12);
+        if (finisher) dmg = Math.round(dmg * 1.6);
+        target.hp -= dmg;
         target.panicT = 6;
+        target.flinchT = 0.18;                              // stagger on the AI side
         hitSomething = true;
-        triggerHitStop(kind === 'kick' ? 0.07 : 0.05);     // freeze-frame the impact
-        G.camRig.shake = Math.max(G.camRig.shake, kind === 'kick' ? 0.16 : 0.1);
+        // finisher knocks the target back (peds decay knockX/knockZ in updatePeds;
+        // cops have no knock field so nudge their mesh directly)
+        if (finisher) {
+          if (list === G.peds) { target.knockX = fx * 7; target.knockZ = fz * 7; }
+          else { target.mesh.position.x += fx * 0.6; target.mesh.position.z += fz * 0.6; }
+        }
+        triggerHitStop(finisher ? 0.09 : kind === 'kick' ? 0.07 : 0.05);   // freeze-frame the impact
+        G.camRig.shake = Math.max(G.camRig.shake, finisher ? 0.22 : kind === 'kick' ? 0.16 : 0.1);
         if (target.hp <= 0) {
           if (G.cops.includes(target)) killCop(target);
           else killPed(target);
@@ -185,7 +238,7 @@ export function doMeleeHit(kind) {
     }
   }
   if (kind === 'kick') G.audio.kick(); else G.audio.punch();
-  if (hitSomething) G.audio.hit();
+  if (hitSomething) { G.audio.hit(); hitMarker(); }   // crosshair pop confirms the connect
 }
 
 // Scatter nearby pedestrians (gunfire / explosions) — reuses the flee/panic AI.
@@ -200,37 +253,44 @@ export function scarePeds(pos, radius) {
 export function firePistol() {
   const origin = G.camera.position;          // used synchronously below; copied where stored
   G.camera.getWorldDirection(_fireDir);
+  // pistol stays accurate — only a whisper of spread so it's not laser-perfect
+  _fireDir.x += rand(-0.006, 0.006);
+  _fireDir.y += rand(-0.006, 0.006);
+  _fireDir.normalize();
   // pooled muzzle flash — reused every shot, faded out in updateBullets
   if (!_muzzleLight) { _muzzleLight = new THREE.PointLight(0xffd577, 0, 6, 2); G.scene.add(_muzzleLight); }
   _muzzleLight.position.copy(origin);
   _muzzleLight.intensity = 2.5; _muzzleT = 0.06;
+  flashMuzzle();                              // visible flash at the gun barrel
+  G.player.gunRecoil = 1;                     // arm/gun kick (decays in updateCombat)
   // spawn tracer bullet (visual only; the hit is the raycast below)
   const bullet = new THREE.Mesh(G.bulletGeom, G.bulletMat);
   bullet.position.copy(origin); G.scene.add(bullet);
   G.bullets.push({ mesh: bullet, vel: _fireDir.clone().multiplyScalar(80), life: 1.0 });
   G.audio.shot();
-  G.camRig.shake = Math.max(G.camRig.shake, 0.06);
-  doBulletRaycast(origin, _fireDir);
+  G.camRig.shake = Math.max(G.camRig.shake, 0.07);
+  if (doBulletRaycast(origin, _fireDir)) { hitMarker(); G.audio.hit(); }
   scarePeds(origin, 14);
 }
 
 export function fireSMG() {
   const origin = G.camera.position;
   G.camera.getWorldDirection(_fireDir);
-  // less accurate than the pistol — add a little spread
-  _fireDir.x += rand(-0.03, 0.03);
-  _fireDir.y += rand(-0.03, 0.03);
-  _fireDir.z += rand(-0.03, 0.03);
+  // sprayier than the pistol — a wide, full-auto cone you have to fight
+  _fireDir.x += rand(-0.045, 0.045);
+  _fireDir.y += rand(-0.045, 0.045);
+  _fireDir.z += rand(-0.045, 0.045);
   _fireDir.normalize();
   if (!_muzzleLight) { _muzzleLight = new THREE.PointLight(0xffd577, 0, 6, 2); G.scene.add(_muzzleLight); }
   _muzzleLight.position.copy(origin);
   _muzzleLight.intensity = 2.0; _muzzleT = 0.05;
+  flashMuzzle();
   const bullet = new THREE.Mesh(G.bulletGeom, G.bulletMat);
   bullet.position.copy(origin); G.scene.add(bullet);
   G.bullets.push({ mesh: bullet, vel: _fireDir.clone().multiplyScalar(90), life: 0.8 });
   G.audio.shot();
   G.camRig.shake = Math.max(G.camRig.shake, 0.05);
-  doBulletRaycast(origin, _fireDir, 22);
+  if (doBulletRaycast(origin, _fireDir, 20)) { hitMarker(); G.audio.hit(); }
   scarePeds(origin, 14);
 }
 
@@ -239,20 +299,23 @@ export function fireShotgun() {
   if (!_muzzleLight) { _muzzleLight = new THREE.PointLight(0xffd577, 0, 6, 2); G.scene.add(_muzzleLight); }
   _muzzleLight.position.copy(origin);
   _muzzleLight.intensity = 3.2; _muzzleT = 0.07;
+  flashMuzzle();
   G.audio.shot();
   G.camRig.shake = Math.max(G.camRig.shake, 0.12);
-  // a spread of pellets — devastating up close, weak at range
-  for (let i = 0; i < 8; i++) {
+  // a tight cone of pellets — devastating up close (all 9 land), falls off at range
+  let connected = false;
+  for (let i = 0; i < 9; i++) {
     G.camera.getWorldDirection(_fireDir);
-    _fireDir.x += rand(-0.08, 0.08);
-    _fireDir.y += rand(-0.08, 0.08);
-    _fireDir.z += rand(-0.08, 0.08);
+    _fireDir.x += rand(-0.05, 0.05);
+    _fireDir.y += rand(-0.05, 0.05);
+    _fireDir.z += rand(-0.05, 0.05);
     _fireDir.normalize();
     const pellet = new THREE.Mesh(G.bulletGeom, G.bulletMat);
     pellet.position.copy(origin); G.scene.add(pellet);
     G.bullets.push({ mesh: pellet, vel: _fireDir.clone().multiplyScalar(80), life: 0.5 });
-    doBulletRaycast(origin, _fireDir, 11);
+    if (doBulletRaycast(origin, _fireDir, 12)) connected = true;
   }
+  if (connected) { hitMarker(); G.audio.hit(); }   // one marker per blast, not per pellet
   scarePeds(origin, 16);
 }
 
@@ -285,13 +348,16 @@ export function doBulletRaycast(origin, dir, dmg = 35) {
       if (dist <= _ray.far && (!best || dist < best.dist)) best = { dist, point: hit.clone(), target: { obj: b } };
     }
   }
+  let connected = false;                     // true if we hit an actor/cop-car (drives the hitmarker)
   if (best) {
     G.audio.ricochet();
     const t = best.target;
     if (t.actor) {
       t.obj.hp -= dmg;
       t.obj.panicT = 6;
+      t.obj.flinchT = 0.18;                  // brief stagger (read by the AI updates)
       triggerHitStop(0.035);                 // tiny freeze so a connecting shot reads
+      connected = true;
       if (t.obj.hp <= 0) {
         if (G.cops.includes(t.obj)) killCop(t.obj);
         else killPed(t.obj);
@@ -300,19 +366,22 @@ export function doBulletRaycast(origin, dir, dmg = 35) {
     } else if (t.vehicle) {
       // cop cars take real damage and die through updateVehicles' explosion path
       t.obj.hp -= t.obj.isCop ? dmg : Math.round(dmg * 0.5);
-      if (t.obj.isCop) raiseWanted(2);
+      if (t.obj.isCop) { connected = true; raiseWanted(2); }
     }
-    // pooled impact spark — reused, faded out in updateBullets
+    // impact spark/puff at the hit point (reuses the dust pool) + pooled light
+    spawnImpactSpark(best.point);
     if (!_sparkLight) { _sparkLight = new THREE.PointLight(0xffeebb, 0, 4, 2); G.scene.add(_sparkLight); }
     _sparkLight.position.copy(best.point);
     _sparkLight.intensity = 1.5; _sparkT = 0.08;
   }
+  return connected;
 }
 
 export function updateBullets(dt) {
-  // fade the pooled muzzle/spark lights
+  // fade the pooled muzzle/spark lights + the muzzle-flash sprite
   if (_muzzleT > 0) { _muzzleT -= dt; if (_muzzleLight) _muzzleLight.intensity = Math.max(0, _muzzleT / 0.06 * 2.5); }
   if (_sparkT  > 0) { _sparkT  -= dt; if (_sparkLight)  _sparkLight.intensity  = Math.max(0, _sparkT  / 0.08 * 1.5); }
+  if (_muzzleFlashT > 0) { _muzzleFlashT -= dt; if (_muzzleFlash) _muzzleFlash.material.opacity = Math.max(0, _muzzleFlashT / 0.05 * 0.95); }
   for (let i = G.bullets.length - 1; i >= 0; i--) {
     const b = G.bullets[i];
     b.mesh.position.addScaledVector(b.vel, dt);

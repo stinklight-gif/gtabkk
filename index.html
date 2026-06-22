@@ -272,6 +272,11 @@
   }
   #crosshair::before { left: 7px; top: 0; width: 2px; height: 16px; }
   #crosshair::after  { left: 0; top: 7px; width: 16px; height: 2px; }
+  /* hitmarker: a quick red pop on the crosshair when a shot connects */
+  #crosshair.hit { opacity: 1; }
+  #crosshair.hit::before, #crosshair.hit::after { background: #ff5a3c; box-shadow: 0 0 5px #ff2200; }
+  #crosshair.hit { animation: hitpop .18s ease-out; }
+  @keyframes hitpop { 0% { transform: translate(-50%,-50%) scale(1.6); } 100% { transform: translate(-50%,-50%) scale(1); } }
 
   #help {
     position: fixed; right: 18px; bottom: 220px;

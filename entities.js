@@ -61,7 +61,10 @@ export function makePlayer(scene) {
     shotgunAmmo: 0, shotgunMag: 6, shotgunReserve: 24,
     inVehicle: null,
     // combat anim state
-    attackTimer: 0, attackKind: null, attackCooldown: 0,
+    attackTimer: 0, attackDur: 0.25, attackKind: null, attackCooldown: 0,
+    // melee combo: step rises 0->1->2 while you keep swinging in rhythm; comboWindow
+    // is the time left to continue the chain before it resets to a fresh jab.
+    comboStep: 0, comboWindow: 0,
     blocking: false,
     // hit recovery
     hitFlashT: 0,

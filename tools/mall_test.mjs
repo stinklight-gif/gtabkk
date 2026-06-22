@@ -329,12 +329,17 @@ async function main() {
       for (const id in GAME.econ.businesses) GAME.econ.businesses[id].owned = false;
       GAME.econ.bank.balance = 0; GAME.cash = 5000; GAME.hud.setCash(5000); GAME._wealthRank = 0;
       GAME.player.group.position.set(54, 0, 90);   // the Condo Tower (premium, requires Boss rank)
+      // clear vehicles near the kiosk so E buys the property (the enter radius is 8 m)
+      for (const v of GAME.vehicles) if (Math.hypot(v.pos.x - 54, v.pos.z - 90) < 14) { v.pos.set(9000, 0, 9000); v.mesh.position.copy(v.pos); }
     });
     await waitFrames(page, 3);
     await page.keyboard.down('KeyE'); await waitFrames(page, 3); await page.keyboard.up('KeyE'); await waitFrames(page, 3);
     const locked = await page.evaluate(() => !!(window.GAME.econ.businesses.condo && window.GAME.econ.businesses.condo.owned));
     assert(!locked, 'a premium property stays locked below its wealth rank');
-    await page.evaluate(() => { window.GAME.cash = 300000; window.GAME.hud.setCash(300000); });   // net worth → Boss rank
+    await page.evaluate(() => {
+      const GAME = window.GAME; GAME.cash = 300000; GAME.hud.setCash(300000);   // net worth → Boss rank
+      for (const v of GAME.vehicles) if (Math.hypot(v.pos.x - 54, v.pos.z - 90) < 14) { v.pos.set(9000, 0, 9000); v.mesh.position.copy(v.pos); }
+    });
     await waitFrames(page, 3);
     await page.keyboard.down('KeyE'); await waitFrames(page, 3); await page.keyboard.up('KeyE'); await waitFrames(page, 3);
     const unlocked = await page.evaluate(() => ({ owned: !!(window.GAME.econ.businesses.condo && window.GAME.econ.businesses.condo.owned), rank: window.GAME._wealthRank }));

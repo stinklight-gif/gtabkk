@@ -104,9 +104,20 @@ export function updatePeds(dt) {
       const dx = playerPos.x - ped.mesh.position.x, dz = playerPos.z - ped.mesh.position.z;
       const d = Math.hypot(dx, dz) || 1;
       ped.heading = Math.atan2(dx, dz);
-      ped.speed = d > 1.5 ? 2.7 : 0;
-      ped._atkCD = (ped._atkCD || 0) - dt;
-      if (d < 1.9 && ped._atkCD <= 0) { damagePlayer(6); ped._atkCD = 1.0; }
+      // flinch: a hit briefly halts the rush (set in combat.js)
+      if (ped.flinchT > 0) { ped.flinchT -= dt; ped.speed = 0; }
+      else {
+        ped.speed = d > 1.5 ? 2.7 : 0;
+        // dodge: when the player aims a gun at close range, occasionally juke aside
+        const aiming = !G.player.inVehicle && G.player.activeWeapon !== 'fists' && (G.input.rightDown || G.input.mouseDown);
+        ped._dodgeCD = (ped._dodgeCD || 0) - dt;
+        if (aiming && d < 12 && ped._dodgeCD <= 0 && Math.random() < 0.04) {
+          ped.heading += (Math.random() < 0.5 ? -1 : 1) * 1.2;   // strafe off the line of fire
+          ped.speed = 3.4; ped._dodgeCD = 1.5;
+        }
+        ped._atkCD = (ped._atkCD || 0) - dt;
+        if (d < 1.9 && ped._atkCD <= 0) { damagePlayer(6); ped._atkCD = 1.0; }
+      }
     } else
     // panic if loud near
     if (ped.panicT > 0) {
