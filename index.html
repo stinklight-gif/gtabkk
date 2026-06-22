@@ -120,6 +120,8 @@
   #pause.show { display: flex; }
   #pause h2 { color: var(--neon-cyan); letter-spacing: 6px; font-size: 30px; margin: 0 0 6px; }
   #pause p { color: #9ffbe0; letter-spacing: 2px; font-size: 14px; margin: 0; }
+  #pause-police { font: inherit; color: #eaf6f2; background: #14242a; border: 1px solid #2f6a5a; padding: 9px 18px; min-width: 180px; border-radius: 6px; cursor: pointer; letter-spacing: 1px; margin: 4px 0 14px; }
+  #pause-police:hover { background: #1b3038; }
   #options { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 14px; background: rgba(8,10,14,0.85); z-index: 75; }
   #options.show { display: flex; }
   #options h3 { color: var(--neon-cyan); letter-spacing: 4px; margin: 0 0 4px; }
@@ -388,7 +390,7 @@
   <div class="map-hint">KRUNG THEP — press TAB to close</div>
 </div>
 
-<div id="pause"><h2>PAUSED</h2><p>click to resume</p></div>
+<div id="pause"><h2>PAUSED</h2><button id="pause-police">Police: ON</button><p>click to resume</p></div>
 
 <div id="options">
   <h3>OPTIONS</h3>
