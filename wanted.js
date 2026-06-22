@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
-import { animateWalk, damagePlayer, makePedMesh, makeVehicle, onCopKilled, raiseWanted } from './main.js';
+import { abortHeist, animateWalk, damagePlayer, makePedMesh, makeVehicle, onCopKilled, raiseWanted } from './main.js';
 
 // 15. COPS + WANTED SYSTEM
 // =============================================================================
@@ -98,7 +98,7 @@ export function updateWanted(dt) {
   const nightBonus = (G.nightK > 0.5 && G.wanted.stars > 0) ? 1 : 0;  // hotter at night
   const desiredCops = (G.wanted.stars >= 4 ? 8 : G.wanted.stars >= 3 ? 6 : G.wanted.stars >= 2 ? 4 : G.wanted.stars >= 1 ? 2 : 0) + nightBonus;
   let alive = 0;
-  for (const c of G.cops) if (!c.dead) alive++;
+  for (const c of G.cops) if (!c.dead && c.state !== 'bribed') alive++;   // bribed cops aren't pursuers
   for (const v of G.vehicles) if (v.isCop && !v.dead && v.driver) alive++;
   if (alive < desiredCops && Math.random() < 0.01 + G.wanted.stars * 0.01) {
     // spawn just outside view
@@ -126,7 +126,7 @@ export function updateWanted(dt) {
   if (GAMEPLAY.wantedLOS && G.wanted.stars > 0) {
     const seeR = 30 * 30;
     let seen = false;
-    for (const c of G.cops) if (!c.dead && dist2(c.mesh.position, p) < seeR) { seen = true; break; }
+    for (const c of G.cops) if (!c.dead && c.state !== 'bribed' && dist2(c.mesh.position, p) < seeR) { seen = true; break; }
     if (!seen) for (const v of G.vehicles) if (v.isCop && !v.dead && v.driver && dist2(v.pos, p) < seeR) { seen = true; break; }
     if (seen) G.wanted.lastSeenAt = performance.now();
   }
@@ -219,16 +219,22 @@ function maybeAmbush() {
   const p = G.player;
   if (G.wanted.stars < 3 || !p.inVehicle) return;
   if (performance.now() < (G._ambushCD || 0)) return;
+  // don't pile cop cars onto the road indefinitely — respect a population cap
+  let copCars = 0;
+  for (const cv of G.vehicles) if (cv.isCop && !cv.dead) copCars++;
+  const cap = G.wanted.stars >= 4 ? 8 : 6;
+  if (copCars >= cap) return;
   G._ambushCD = performance.now() + 20000;   // ~20 s between roadblocks
   const v = p.inVehicle;
   const fx = Math.sin(v.heading), fz = Math.cos(v.heading);
   const rx = fz, rz = -fx, bx = v.pos.x + fx * 55, bz = v.pos.z + fz * 55;
   let n = 0;
   for (let i = -1; i <= 1; i++) {
+    if (copCars >= cap) break;
     const cx = clamp(bx + rx * i * 3.6, -HALF + 6, HALF - 6);
     const cz = clamp(bz + rz * i * 3.6, -HALF + 6, HALF - 6);
     const car = spawnCopCar(G.scene, new THREE.Vector3(cx, 0, cz));
-    if (car) { car.heading = v.heading + PI / 2; car.vel = 0; n++; }
+    car.heading = v.heading + PI / 2; car.vel = 0; n++; copCars++;
   }
   if (n) G.hud.showNotif('🚧 Roadblock ahead!');
 }
@@ -288,9 +294,22 @@ export function updateCop(v, dt) {
 
 export function updateFootCops(dt) {
   const p = G.player;
-  for (const c of G.cops) {
+  for (let ci = G.cops.length - 1; ci >= 0; ci--) {
+    const c = G.cops[ci];
     if (c.dead) continue;
-    if (c.state === 'bribed') { c.idleT += dt; continue; }
+    if (c.state === 'bribed') {
+      // bribed: turn and stroll away from the player, then vanish — don't linger
+      // as a frozen ped that refreshes line-of-sight or occupies a cop slot.
+      c.idleT = (c.idleT || 0) + dt;
+      const aw = Math.atan2(c.mesh.position.x - p.group.position.x, c.mesh.position.z - p.group.position.z);
+      c.heading = aw;
+      c.mesh.position.x += Math.sin(aw) * (c.speed || 2.0) * dt;
+      c.mesh.position.z += Math.cos(aw) * (c.speed || 2.0) * dt;
+      c.mesh.rotation.y = aw;
+      animateWalk(c.mesh, c.speed || 2.0, dt, true);
+      if (c.idleT > 6) { G.scene.remove(c.mesh); disposeObject(c.mesh); G.cops.splice(ci, 1); }
+      continue;
+    }
     const dx = p.group.position.x - c.mesh.position.x;
     const dz = p.group.position.z - c.mesh.position.z;
     const d = Math.hypot(dx, dz);
@@ -344,9 +363,10 @@ export function respawnPlayer() {
   G.hud.setCash(G.cash);
   G.wanted.stars = 0;
   G.hud.setStars(0);
+  abortHeist();   // a heist you died during is over — no lingering beam or payout
   // clear any active cops — clean slate on respawn
   for (let i = G.cops.length - 1; i >= 0; i--) { G.scene.remove(G.cops[i].mesh); disposeObject(G.cops[i].mesh); G.cops.splice(i, 1); }
-  for (let i = G.vehicles.length - 1; i >= 0; i--) { if (G.vehicles[i].isCop) { G.scene.remove(G.vehicles[i].mesh); disposeObject(G.vehicles[i].mesh); G.vehicles.splice(i, 1); } }
+  for (let i = G.vehicles.length - 1; i >= 0; i--) { if (G.vehicles[i].isCop) { const cv = G.vehicles[i]; if (cv.smoke) { cv.smoke.life = 0; cv.smoke = null; } G.scene.remove(cv.mesh); disposeObject(cv.mesh); G.vehicles.splice(i, 1); } }
   const home = G.econ.safehouse.owned && G.econ.safehouse.pos;
   const sp = (home ? G.econ.safehouse.pos : G.world.spawns.player).clone();
   p.group.position.copy(sp);

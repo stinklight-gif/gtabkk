@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
-import { raiseWanted, spawnPed } from './main.js';
+import { raiseWanted, recolorTorso, spawnPed } from './main.js';
 
 // 10. MISSION SYSTEM
 // =============================================================================
@@ -52,7 +52,7 @@ export function makeMissionSystem() {
             G.cash += 1200;
             G.hud.setCash(G.cash);
             if (GAMEPLAY.armor) G.player.armor = Math.min(G.player.armorMax, G.player.armor + 50);
-            G.hud.showNotif('Mission complete: +฿800, +Armor');
+            G.hud.showNotif('Mission complete: +฿1,200, +Armor');
             // remove pillar
             const beam = G.world.poi.goldShopBeam;
             if (beam) { G.scene.remove(beam); G.world.poi.goldShopBeam = null; }
@@ -193,8 +193,7 @@ export function makeMissionSystem() {
           const ped = spawnPed(G.scene, new THREE.Vector3(this.base.x + rand(-7, 7), 0, this.base.z + rand(-7, 7)));
           ped.isTarget = true;
           ped.speed = rand(2.2, 3.0);
-          const parts = ped.mesh.userData.parts;
-          if (parts) parts.torso.material = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.7 });
+          recolorTorso(ped.mesh.userData.parts, 0x1a1a1a, 0.7);
           // own material per marker so disposing one dead target can't break the others
           const mk = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8),
             new THREE.MeshStandardMaterial({ color: 0xff2a86, emissive: 0xff2a86, emissiveIntensity: 0.8, roughness: 0.5 }));
