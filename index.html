@@ -228,10 +228,15 @@
     border: 2px solid #444; border-radius: 18px; color: var(--cream);
     box-shadow: 0 0 40px rgba(0,0,0,.8);
     opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s;
-    z-index: 20; font-size: 13px;
+    z-index: 20; font-size: 13px; max-height: 88vh; overflow-y: auto;
   }
   #phone.open { opacity: 1; pointer-events: auto; transform: translateY(-50%) scale(1); }
   #phone h3 { margin: 0 0 10px; font-size: 14px; color: var(--neon-cyan); letter-spacing: 3px; }
+  #phone .ph-head { color: #ffcf4a; letter-spacing: 2px; font-size: 11px; margin: 4px 0 3px; opacity: .9; }
+  #ph-activities { display: flex; flex-direction: column; gap: 3px; margin-bottom: 6px; }
+  #ph-activities .act { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; line-height: 1.45; }
+  #ph-activities .act .a-name { color: #eaf6f2; }
+  #ph-activities .act .a-meta { color: #9fe0ff; opacity: .85; white-space: nowrap; }
   #phone .row { padding: 6px 0; border-top: 1px solid #2a2d33; }
   #phone .row:first-of-type { border-top: 0; }
   #phone .k { color: var(--gold); }
@@ -350,6 +355,9 @@
 
   <div id="phone">
     <h3>PHONE</h3>
+    <div class="ph-head">ACTIVITIES</div>
+    <div id="ph-activities"></div>
+    <div class="ph-head">STATUS</div>
     <div class="row"><span class="k">[M]</span> Mission: <span id="ph-mission">—</span></div>
     <div class="row"><span class="k">[C]</span> Contacts: Uncle Seng</div>
     <div class="row"><span class="k">[$]</span> Cash: ฿<span id="ph-cash">0</span></div>

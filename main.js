@@ -951,6 +951,8 @@ export function loop() {
     else if (G.player.hp < G.player.hpMax) G.player.hp = Math.min(G.player.hpMax, G.player.hp + 5 * dt);
     if (G.mission) G.mission.update(dt);
     updateBank(dt);   // bank-heist set-piece (runs every frame: cracking on foot, escape while driving)
+    G._hubTipT = (G._hubTipT || 0) + dt;   // onboarding: point new players at the phone's activity directory
+    if (G._hubTipT > 6) tip('hub', 'Press T for your phone — it lists every activity (jobs, Bank Heist, gang turf, properties, arcade) with live distances.', 'กด T เปิดมือถือ — ดูกิจกรรมทั้งหมดพร้อมระยะทาง');
     G.hud.update(dt);
     G.hud.setBars(G.player.hp, G.player.armor, G.player.stam);
     G.hud.setVehicle(G.player.inVehicle ? G.player.inVehicle.hp : 0, !!G.player.inVehicle);
