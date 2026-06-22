@@ -440,6 +440,29 @@ async function main() {
     await waitFrames(page, 22);
     const b1 = await page.evaluate(() => window.GAME.econ.bank.balance);
     assert(b1 > b0, `a managed property auto-banks its income (฿${b0.toFixed(0)} → ฿${b1.toFixed(0)})`);
+
+    // selling/divesting: sell a property for cash; net worth drops → rank slips (two-way)
+    await page.evaluate(() => {
+      const G = window.GAME;
+      G.state = 'playing'; G.heist.active = false;
+      for (const id in G.econ.businesses) G.econ.businesses[id].owned = false;
+      G.econ.businesses.condo = { owned: true, pending: 0, tier: 1, manager: false };   // a premium holding
+      G.econ.bank.balance = 0; G.cash = 110000; G.hud.setCash(110000); G._wealthRank = 0;
+      const t = G.world.bank.teller; G.player.group.position.set(t.x, 0, t.z);
+    });
+    await waitFrames(page, 3);
+    const preRank = await page.evaluate(() => window.GAME._wealthRank);
+    assert(preRank >= 2, `cash + a premium property lifts you to Boss rank (rank ${preRank})`);
+    await page.keyboard.down('KeyE'); await waitFrames(page, 3); await page.keyboard.up('KeyE'); await waitFrames(page, 3);
+    const hasSell = await page.evaluate(() => { const b = [...document.querySelectorAll('#bank-props button')].find(b => /Sell.*Condo/.test(b.textContent)); if (b) { b.click(); return true; } return false; });
+    assert(hasSell, 'the bank offers a Sell button for an owned property');
+    await waitFrames(page, 2);
+    const sold = await page.evaluate(() => ({ owned: !!window.GAME.econ.businesses.condo.owned, cash: window.GAME.cash }));
+    assert(!sold.owned && sold.cash > 110000, `selling divests it for cash (cash ฿${sold.cash.toFixed(0)})`);
+    await page.evaluate(() => document.getElementById('bank-leave').click());
+    await waitFrames(page, 5);
+    const postRank = await page.evaluate(() => window.GAME._wealthRank);
+    assert(postRank < preRank, `selling down drops your rank (${preRank} → ${postRank})`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

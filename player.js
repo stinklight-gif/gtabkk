@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, bizRate, bizCap, bizUpgradeCost, bizManagerCost, BANK_INTEREST, WEALTH_TIERS, netWorth, wealthRank, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, bizRate, bizCap, bizUpgradeCost, bizManagerCost, bizSaleValue, BANK_INTEREST, WEALTH_TIERS, netWorth, wealthRank, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { tip, resolvePlayerVsBuildings, resolvePlayerVsVehicles, resolvePlayerVsPlatforms, worldSupportY, saveGame, startArcade, applyUpgrades, raiseWanted, updateAmmoHud, updateCombat, updatePlayerInVehicle } from './main.js';
 
@@ -226,14 +226,22 @@ function updateBizEvents(dt) {
 export function updateBusinesses(dt) {
   const p = G.player, st = G.econ.businesses || (G.econ.businesses = {});
   updateBizEvents(dt);
-  // wealth rank (highest achieved) — drives the rank-up toast + premium gating
-  const rank = wealthRank(netWorth());
+  // wealth rank tracks *current* net worth so selling/divesting can drop it too
+  // (two-way pressure). Hysteresis: a rank only slips once you're clearly below
+  // its threshold, so frame-to-frame trickle near a boundary doesn't flicker.
+  let rank = wealthRank(netWorth());
   if (G._wealthRank == null) G._wealthRank = rank;
-  else if (rank > G._wealthRank) {
-    G._wealthRank = rank;
-    G.hud.showNotif(`Rank up — you're now a ${WEALTH_TIERS[rank].name}!`);
-    G.hud.showSubtitle(WEALTH_TIERS[rank].name, '');
-    if (G.audio && G.audio.chime) G.audio.chime();
+  else if (rank !== G._wealthRank) {
+    if (rank < G._wealthRank && netWorth() >= WEALTH_TIERS[G._wealthRank].min * 0.95) rank = G._wealthRank;   // hold rank
+    if (rank > G._wealthRank) {
+      G._wealthRank = rank;
+      G.hud.showNotif(`Rank up — you're now a ${WEALTH_TIERS[rank].name}!`);
+      G.hud.showSubtitle(WEALTH_TIERS[rank].name, '');
+      if (G.audio && G.audio.chime) G.audio.chime();
+    } else if (rank < G._wealthRank) {
+      G._wealthRank = rank;
+      G.hud.showNotif(`Net worth down — back to ${WEALTH_TIERS[rank].name}.`);
+    }
   }
   for (const b of BUSINESSES) {
     const s = st[b.id] || (st[b.id] = { owned: false, pending: 0, tier: 1 });
@@ -354,6 +362,17 @@ function bankRender() {
   const mkc = (label, fn, ok) => { const b = document.createElement('button'); b.textContent = label; b.disabled = !ok; b.addEventListener('click', fn); props.appendChild(b); };
   mkc(`Collect all takings — ฿${totalPending.toLocaleString()}`, () => bankCollectAll(), totalPending > 0);
   for (const [b, s] of owned) if (!s.manager) mkc(`Hire manager · ${b.name} (฿${bizManagerCost(b).toLocaleString()})`, () => hireManager(b.id), G.cash >= bizManagerCost(b));
+  for (const [b, s] of owned) mkc(`Sell · ${b.name} (฿${bizSaleValue(b, s).toLocaleString()})`, () => bankSell(b.id), true);
+}
+function bankSell(id) {
+  const b = BUSINESSES.find(x => x.id === id), s = G.econ.businesses[id];
+  if (!b || !s || !s.owned) return;
+  const value = bizSaleValue(b, s);
+  G.cash += value; s.owned = false; s.tier = 1; s.manager = false; s.pending = 0; s.event = null;
+  G.hud.setCash(G.cash); G.hud.cashPop(value);
+  G.hud.showNotif(`Sold ${b.name} for ฿${value.toLocaleString()}`);
+  if (G.audio && G.audio.chime) G.audio.chime();
+  saveGame(); bankRender();
 }
 function bankCollectAll() {
   let total = 0;
