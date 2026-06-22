@@ -3,9 +3,9 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, bizRate, bizCap, bizUpgradeCost, bizManagerCost, bizSaleValue, BANK_INTEREST, WEALTH_TIERS, netWorth, wealthRank, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, bizRate, bizCap, bizUpgradeCost, bizManagerCost, bizSaleValue, BANK_INTEREST, WEALTH_TIERS, netWorth, wealthRank, rankDiscount, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
-import { tip, resolvePlayerVsBuildings, resolvePlayerVsVehicles, resolvePlayerVsPlatforms, worldSupportY, saveGame, startArcade, applyUpgrades, raiseWanted, updateAmmoHud, updateCombat, updatePlayerInVehicle } from './main.js';
+import { tip, resolvePlayerVsBuildings, resolvePlayerVsVehicles, resolvePlayerVsPlatforms, worldSupportY, saveGame, startArcade, applyUpgrades, raiseWanted, makeVehicle, updateAmmoHud, updateCombat, updatePlayerInVehicle } from './main.js';
 
 export function updatePlayer(dt) {
   const p = G.player;
@@ -201,6 +201,17 @@ export function updateInteraction(dt) {
 
 // Buyable businesses: walk up and E to buy; while owned they accrue passive
 // income (capped) that you return to collect. Persisted in the save.
+// Kingpin perk: a one-off personal supercar delivered to your garage.
+function deliverKingpinCar() {
+  const g = G.world.garages && G.world.garages[0];
+  const at = G.world.garageDoor || (g && g.pos) || G.player.group.position;
+  const v = makeVehicle('supercar', G.scene);
+  if (!v) return;
+  v.pos.set(at.x, 0.5, at.z + 3); v.mesh.position.copy(v.pos);
+  v.heading = 0; v.mesh.rotation.y = 0; v.driver = null; v.vel = 0; v.plate = 'KINGPIN';
+  G.hud.showNotif('👑 Kingpin perk — a supercar is waiting at your garage.');
+}
+
 // Dynamic property events: an owned property occasionally booms (double income
 // for a while) or hits trouble (income stops until you drop by and pay to sort
 // it). Managers head off trouble — managed properties only ever boom.
@@ -238,6 +249,7 @@ export function updateBusinesses(dt) {
       G.hud.showNotif(`Rank up — you're now a ${WEALTH_TIERS[rank].name}!`);
       G.hud.showSubtitle(WEALTH_TIERS[rank].name, '');
       if (G.audio && G.audio.chime) G.audio.chime();
+      if (rank >= 3 && !G._kingpinCar) { G._kingpinCar = true; deliverKingpinCar(); }   // Kingpin perk
     } else if (rank < G._wealthRank) {
       G._wealthRank = rank;
       G.hud.showNotif(`Net worth down — back to ${WEALTH_TIERS[rank].name}.`);
@@ -281,7 +293,7 @@ export function updateBusinesses(dt) {
         }
       } else {
         const tier = s.tier || 1, amt = Math.floor(s.pending || 0), canUp = tier < 3;
-        const upCost = canUp ? bizUpgradeCost(b, tier) : 0;
+        const upCost = canUp ? Math.round(bizUpgradeCost(b, tier) * (1 - rankDiscount())) : 0;   // rank perk: cheaper upgrades
         G.hud.showPrompt(`${b.name} (Tier ${tier}) — <b>E</b>: collect ฿${amt.toLocaleString()}` + (canUp ? ` · <b>U</b>: upgrade ฿${upCost.toLocaleString()}` : ' · MAX'), 0.4);
         if (G.input.pressed('KeyE') && amt > 0) {
           G.cash += amt; s.pending -= amt; G.hud.setCash(G.cash); G.hud.cashPop(amt);
