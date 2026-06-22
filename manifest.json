@@ -1,0 +1,14 @@
+{
+  "name": "Krung Thep — Bangkok 3D",
+  "short_name": "Krung Thep",
+  "description": "A stylized open-world Bangkok driving & action game, in the browser.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0c0e12",
+  "theme_color": "#0c0e12",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

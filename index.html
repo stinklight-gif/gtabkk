@@ -3,8 +3,16 @@
 <head>
 <meta charset="utf-8" />
 <title>Bangkok 3D — Krung Thep Prototype</title>
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<link rel="icon" href="data:," />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no,maximum-scale=1" />
+<link rel="icon" href="icon.svg" />
+<!-- PWA / iOS "Add to Home Screen" — installable, fullscreen, landscape -->
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#0c0e12" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Krung Thep" />
+<link rel="apple-touch-icon" href="icon.svg" />
 <style>
   :root {
     --cream: #f5e9c8;
@@ -287,6 +295,43 @@
     display: inline-block; padding: 1px 5px; border: 1px solid #888;
     border-radius: 2px; font-family: monospace; color: var(--cream);
   }
+
+  /* ---- On-screen touch controls (only on touch devices) ---- */
+  #touch { display: none; }
+  body.is-touch #touch { display: block; position: fixed; inset: 0; z-index: 30; pointer-events: none; touch-action: none;
+    /* keep clear of iPhone notch / home indicator */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  #touch-look { position: absolute; inset: 0; pointer-events: auto; touch-action: none; z-index: 1; }
+  #touch > *:not(#touch-look) { position: absolute; z-index: 2; }
+  #stick { left: max(18px, env(safe-area-inset-left)); bottom: max(20px, env(safe-area-inset-bottom)); pointer-events: auto; touch-action: none; }
+  #stick-base { width: 124px; height: 124px; border-radius: 50%; background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.22); position: relative; }
+  #stick-knob { width: 56px; height: 56px; border-radius: 50%; background: rgba(255,255,255,.30); border: 2px solid rgba(255,255,255,.5);
+    position: absolute; left: 50%; top: 50%; margin: -28px 0 0 -28px; will-change: transform; }
+  .tbtn { pointer-events: auto; touch-action: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+    font: 700 14px/1 system-ui, sans-serif; color: #eaf6f2; background: rgba(20,28,34,.62); border: 2px solid rgba(255,255,255,.28);
+    border-radius: 50%; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; letter-spacing: .5px; }
+  .tbtn.sm { width: 54px; height: 40px; border-radius: 20px; font-size: 12px; background: rgba(20,28,34,.55); }
+  .tbtn.on { background: rgba(255,210,90,.55); border-color: #ffcf4a; transform: scale(.94); }
+  .tbtn.act { width: 84px; height: 84px; font-size: 20px; background: rgba(45,120,90,.62); border-color: #5fd0a0; }
+  .tbtn.fire { background: rgba(150,50,50,.62); border-color: #ff7a6a; }
+  #touch-main { right: max(18px, env(safe-area-inset-right)); bottom: max(20px, env(safe-area-inset-bottom)); width: 188px; height: 150px; pointer-events: none; }
+  #touch-main .tbtn { position: absolute; }
+  #touch-main .act { right: 0; bottom: 0; }
+  #touch-main .fire { right: 92px; bottom: 8px; }
+  #touch-main .jump { right: 14px; bottom: 92px; }
+  #touch-main .run { right: 104px; bottom: 96px; width: 56px; height: 56px; }
+  #touch-aux { right: max(18px, env(safe-area-inset-right)); bottom: 180px; display: flex; gap: 8px; }
+  #touch-top { right: max(14px, env(safe-area-inset-right)); top: max(10px, env(safe-area-inset-top)); display: flex; gap: 8px; }
+
+  /* ---- Responsive: scale the HUD down on small / short screens ---- */
+  @media (max-width: 820px), (max-height: 540px) {
+    #minimap-wrap { transform: scale(.78); transform-origin: top right; }
+    .hud-corner { font-size: 12px; }
+    #help { display: none; }              /* keyboard hints are useless on touch */
+    #phone { width: 240px; font-size: 12px; right: 12px; }
+    #store h3, #bank h3, #garageup h3, #arcade h3 { font-size: 16px; }
+  }
+  body.is-touch #help { display: none; }
 </style>
 <script type="importmap">
 {
@@ -396,6 +441,29 @@
 </div>
 
 <div id="pause"><h2>PAUSED</h2><button id="pause-police">Police: ON</button><p>click to resume</p></div>
+
+<!-- On-screen touch controls (shown only on touch devices, while playing) -->
+<div id="touch" aria-hidden="true">
+  <div id="touch-look"></div>
+  <div id="stick"><div id="stick-base"><div id="stick-knob"></div></div></div>
+  <div id="touch-top">
+    <button class="tbtn sm" data-key="KeyT" title="Phone">PHONE</button>
+    <button class="tbtn sm" data-key="Tab" title="Map">MAP</button>
+    <button class="tbtn sm" id="touch-pause" title="Pause">II</button>
+  </div>
+  <div id="touch-aux">
+    <button class="tbtn sm" data-key="KeyQ" title="Switch weapon">GUN</button>
+    <button class="tbtn sm" data-key="KeyR" title="Reload">RLD</button>
+    <button class="tbtn sm" data-key="KeyB" title="Bribe">BRIBE</button>
+    <button class="tbtn sm" data-key="KeyJ" title="Taxi">TAXI</button>
+  </div>
+  <div id="touch-main">
+    <button class="tbtn run" data-key="ShiftLeft" title="Run / boost">RUN</button>
+    <button class="tbtn jump" data-key="Space" title="Jump / handbrake">JUMP</button>
+    <button class="tbtn fire" data-key="KeyF" title="Attack / fire">FIST</button>
+    <button class="tbtn act" data-key="KeyE" title="Enter / interact">E</button>
+  </div>
+</div>
 
 <div id="options">
   <h3>OPTIONS</h3>

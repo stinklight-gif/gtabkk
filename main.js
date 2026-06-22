@@ -869,6 +869,11 @@ export function updatePhotoCam(dt) {
 
 export function loop() {
   requestAnimationFrame(loop);
+  // touch controls: visible only while you're actually playing / on the phone / map
+  if (G.input && G.input.isTouch) {
+    const tc = document.getElementById('touch');
+    if (tc) { const show = (G.state === 'playing' || G.state === 'phone' || G.state === 'map' || G.state === 'photo'); if (tc.style.display !== (show ? 'block' : 'none')) tc.style.display = show ? 'block' : 'none'; }
+  }
   const realDt = Math.min(0.05, G.clock.getDelta());
   // hit-stop: a brief global slow-mo on a solid melee/gun connect so impacts land
   let dt = realDt;
