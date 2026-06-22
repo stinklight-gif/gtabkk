@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, TURFS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
-import { animateWalk, damagePlayer, saveGame, sidewalkPos, spawnPed } from './main.js';
+import { animateWalk, damagePlayer, recolorTorso, saveGame, sidewalkPos, spawnPed } from './main.js';
 
 // 13. PEDESTRIANS + DOGS
 // =============================================================================
@@ -327,8 +327,7 @@ export function updateMuggings(dt) {
     clamp(pp.z + Math.sin(ang) * r, -HALF + 6, HALF - 6));
   const ped = spawnPed(G.scene, pos);
   ped.isMugger = true; ped.panicT = 3;
-  const parts = ped.mesh.userData.parts;
-  if (parts) parts.torso.material = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.8 });
+  recolorTorso(ped.mesh.userData.parts, 0x2a2a2a, 0.8);
   const marker = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8),
     new THREE.MeshStandardMaterial({ color: 0xff7a2a, emissive: 0xff7a2a, emissiveIntensity: 0.8, roughness: 0.5 }));
   marker.position.set(0, 2.5, 0); ped.mesh.add(marker);
@@ -361,8 +360,7 @@ function spawnTurfGang(t, n) {
     const ped = spawnPed(G.scene, new THREE.Vector3(t.center.x + Math.cos(ang) * r, 0, t.center.z + Math.sin(ang) * r));
     if (!ped) continue;
     ped.gang = true; ped.turfId = t.id; ped.hp = 40; ped.speed = 2.6; ped._notedAggression = true;   // hostile → not civilian heat
-    const parts = ped.mesh.userData.parts;
-    if (parts && parts.torso) parts.torso.material = new THREE.MeshStandardMaterial({ color: 0x24222c, roughness: 0.8 });
+    recolorTorso(ped.mesh.userData.parts, 0x24222c, 0.8);
     arr.push(ped);
   }
   turfGang[t.id] = arr;
@@ -468,8 +466,7 @@ export function vigilanteSpawnTarget(vg) {
     clamp(pp.z + Math.sin(ang) * r, -HALF + 6, HALF - 6));
   const ped = spawnPed(G.scene, pos);
   ped.isTarget = true; ped.panicT = 3;   // reuse isTarget so night-thinning skips it
-  const parts = ped.mesh.userData.parts;
-  if (parts) parts.torso.material = new THREE.MeshStandardMaterial({ color: 0x6a1a1a, roughness: 0.8 });
+  recolorTorso(ped.mesh.userData.parts, 0x6a1a1a, 0.8);
   const mk = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 8),
     new THREE.MeshStandardMaterial({ color: 0xff2a2a, emissive: 0xff2a2a, emissiveIntensity: 0.8, roughness: 0.5 }));
   mk.position.set(0, 2.5, 0); ped.mesh.add(mk);

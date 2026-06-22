@@ -141,6 +141,7 @@ export function updateCombat(dt) {
     if (G.input.mouseDown && p.attackCooldown <= 0 && p.pistolAmmo > 0) {
       firePistol();
       p.pistolAmmo--; p.attackCooldown = 0.18;
+      p.gunRecoil = 1;
       updateAmmoHud();
     } else if (G.input.mouseDown && p.pistolAmmo === 0 && p.attackCooldown <= 0) {
       G.audio.blip({freq: 200, dur: 0.04, type:'square', gain: 0.05});

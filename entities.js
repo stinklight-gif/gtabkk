@@ -457,6 +457,19 @@ export function makePedMesh() {
   return g;
 }
 
+// Swap a ped's torso material (used by mugger/gang/vigilante/hit recoloring) and
+// dispose the one it replaces — but only when the arms don't share it. Clothed
+// peds reuse the shirt material for their arms (armMat = shirtMat), so disposing
+// it would break the arms; bare-armed peds use skinMat, so the torso material is
+// unique and would otherwise leak on the GPU once overwritten.
+export function recolorTorso(parts, color, roughness = 0.8) {
+  if (!parts || !parts.torso) return;
+  const old = parts.torso.material;
+  parts.torso.material = new THREE.MeshStandardMaterial({ color, roughness });
+  const armL = parts.armL && parts.armL.material, armR = parts.armR && parts.armR.material;
+  if (old && old !== armL && old !== armR) old.dispose();
+}
+
 // Shared limb animator for peds + foot cops: advances a per-mesh walk phase and
 // swings legs/arms (arms opposite the same-side leg). `moving` false → near-still
 // idle with a faint breathing bob.

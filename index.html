@@ -438,5 +438,20 @@
 </div>
 
 <script type="module" src="./main.js"></script>
+<script>
+  // Load watchdog: if the module graph (Three.js in ./vendor, then the game
+  // modules) fails to load or evaluate, init() never runs and core.js never
+  // sets window.GAME — leaving a forever-spinning "Loading the city…". Surface
+  // a helpful message instead.
+  setTimeout(function () {
+    if (!window.GAME) {
+      var hint = document.querySelector('#loading .hint');
+      if (hint) {
+        hint.style.color = '#ff2a86';
+        hint.textContent = 'Could not load the game files. Check your connection and reload.';
+      }
+    }
+  }, 12000);
+</script>
 </body>
 </html>
