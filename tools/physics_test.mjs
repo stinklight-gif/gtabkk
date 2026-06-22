@@ -500,6 +500,21 @@ async function main() {
     assert(off.stars === 0 && !off.heli && off.cops === 0, `disabling police clears the heat (stars ${off.stars}, cops ${off.cops})`);
     assert(off.btn != null, `a pause-menu police toggle exists ("${off.btn}")`);
     await page.evaluate(() => { window.GAME.policeOff = false; });   // re-enable so nothing leaks past the test
+
+    // ---- 14. Mission arc (chase / escort / defend) ---------------------------
+    console.log('\n[14] mission arc');
+    const arc = await page.evaluate(() => {
+      const G = window.GAME;
+      G.state = 'playing'; G.policeOff = true;   // keep cops out of the test
+      const r = {};
+      G.mission.start('repoRun');  const a = G.mission.active; r.repo = a && a.name; r.repoMarker = !!(a && a.markerPos);
+      G.mission.start('courier');  r.courier = G.mission.active && G.mission.active.name;
+      G.mission.start('holdYard'); r.yard = G.mission.active && G.mission.active.name;
+      G.policeOff = false;
+      return r;
+    });
+    assert(arc.repoMarker && /repo/i.test(arc.repo || ''), `Repo Run (chase) starts with an objective marker ("${arc.repo}")`);
+    assert(/courier/i.test(arc.courier || '') && /yard/i.test(arc.yard || ''), `escort + defend missions are registered ("${arc.courier}", "${arc.yard}")`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
