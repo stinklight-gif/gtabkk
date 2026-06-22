@@ -163,7 +163,9 @@ export function buildWorld(scene) {
   }));
   const GLASS_COLORS = [0x8a96a6, 0x7f8c9e, 0x93a0ad, 0x6f8092, 0x9aa6b2];
   const glassMat = GLASS_COLORS.map(c => new THREE.MeshStandardMaterial({
-    color: c, roughness: 0.42, metalness: 0.35,
+    // glassy facades reflect the sky env map — lower roughness + metalness so the
+    // reflection reads; envMap stays cheap (only these materials sample it)
+    color: c, roughness: 0.18, metalness: 0.6, envMap: G.envMap || null, envMapIntensity: 1.5,
   }));
   // Pick a body material for a building of height h: tall ones lean glass, the
   // rest split between concrete and painted. Returns one of the shared materials.

@@ -332,6 +332,10 @@
     #store h3, #bank h3, #garageup h3, #arcade h3 { font-size: 16px; }
   }
   body.is-touch #help { display: none; }
+
+  /* subtle cinematic vignette over the 3D view (under the HUD) */
+  #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 12;
+    background: radial-gradient(ellipse 75% 75% at 50% 48%, transparent 58%, rgba(0,0,0,0.30) 100%); }
 </style>
 <script type="importmap">
 {
@@ -345,6 +349,7 @@
 <body>
 
 <div id="app"></div>
+<div id="vignette"></div>
 
 <div id="loading">
   <h1>BANGKOK</h1>

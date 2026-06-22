@@ -300,6 +300,8 @@ export function makeVehicleMesh(kind) {
 export function makeVehicle(kind, scene) {
   const mesh = makeVehicleMesh(kind);
   scene.add(mesh);
+  // car paint catches the sky env map for a glossier, less-flat look
+  if (G.envMap) mesh.traverse(o => { if (o.material && o.material.isMeshStandardMaterial && o.material.metalness >= 0.2) { o.material.envMap = G.envMap; o.material.envMapIntensity = 0.7; } });
   const spec = mesh.userData.spec;
   // head/tail lights — per-vehicle materials that glow at night (driven from
   // G.nightK in updateVehicles; per-vehicle so disposeObject stays safe).
