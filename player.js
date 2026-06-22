@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, bizRate, bizCap, bizUpgradeCost, bizManagerCost, bizSaleValue, BANK_INTEREST, WEALTH_TIERS, netWorth, wealthRank, rankDiscount, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, bizRate, bizCap, bizUpgradeCost, bizManagerCost, bizSaleValue, BANK_INTEREST, BANK_INTEREST_CAP, WEALTH_TIERS, netWorth, wealthRank, rankDiscount, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { tip, resolvePlayerVsBuildings, resolvePlayerVsVehicles, resolvePlayerVsPlatforms, worldSupportY, saveGame, startArcade, applyUpgrades, raiseWanted, makeVehicle, updateAmmoHud, updateCombat, updatePlayerInVehicle } from './main.js';
 
@@ -342,7 +342,8 @@ function updateBankInterest() {
     const days = G.time.day - acc.lastDay;
     acc.lastDay = G.time.day;
     if (acc.balance > 0) {
-      const interest = Math.floor(acc.balance * (Math.pow(1 + BANK_INTEREST, days) - 1));
+      const principal = Math.min(acc.balance, BANK_INTEREST_CAP);   // capped — no runaway compounding
+      const interest = Math.floor(principal * (Math.pow(1 + BANK_INTEREST, days) - 1));
       if (interest > 0) {
         acc.balance += interest; acc.lastInterest = interest;
         G.hud.showNotif(`Bank interest: +฿${interest.toLocaleString()}`);
@@ -354,7 +355,7 @@ function updateBankInterest() {
 function bankRender() {
   const acc = G.econ.bank;
   const info = document.getElementById('bank-info');
-  if (info) info.innerHTML = `Balance <b>฿${Math.floor(acc.balance).toLocaleString()}</b> · ${Math.round(BANK_INTEREST * 100)}%/day &nbsp;|&nbsp; Cash on hand ฿${Math.floor(G.cash).toLocaleString()}`;
+  if (info) info.innerHTML = `Balance <b>฿${Math.floor(acc.balance).toLocaleString()}</b> · ${Math.round(BANK_INTEREST * 100)}%/day <span style="opacity:.6">(on first ฿${(BANK_INTEREST_CAP / 1000)}k)</span> &nbsp;|&nbsp; Cash on hand ฿${Math.floor(G.cash).toLocaleString()}`;
   const box = document.getElementById('bank-items'); if (!box) return;
   box.innerHTML = '';
   const mk = (label, fn, ok) => { const b = document.createElement('button'); b.textContent = label; b.disabled = !ok; b.addEventListener('click', fn); box.appendChild(b); };

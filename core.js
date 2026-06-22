@@ -100,7 +100,8 @@ export const G = {
   },
 };
 
-export const BANK_INTEREST = 0.04;   // daily interest on the bank balance (compounded per in-game day)
+export const BANK_INTEREST = 0.04;        // daily interest on the bank balance (compounded per in-game day)
+export const BANK_INTEREST_CAP = 500000;  // interest only accrues on the first ฿500k (no runaway compounding)
 
 // Garage vehicle upgrades: account-wide tuning levels you buy at the U-Spray,
 // applied to whatever car you drive (see vehicles.js applyUpgrades). A money

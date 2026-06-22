@@ -424,6 +424,11 @@ async function main() {
     await waitFrames(page, 3);
     const interest = await page.evaluate(() => window.GAME.econ.bank.balance);
     assert(interest > 10000, `the balance earns daily interest (฿10,000 → ฿${interest})`);
+    // interest is capped at the first ฿500k (no runaway compounding on huge balances)
+    await page.evaluate(() => { const G = window.GAME; G.econ.bank.balance = 2000000; G.econ.bank.lastDay = G.time.day; G.time.day += 1; });
+    await waitFrames(page, 3);
+    const capped = await page.evaluate(() => window.GAME.econ.bank.balance);
+    assert(Math.abs(capped - 2020000) < 50, `interest caps at ฿500k principal (฿2,000,000 +฿${capped - 2000000}, not +฿80,000)`);
 
     // property management at the bank: collect-all + hire a manager
     await page.evaluate(() => {
