@@ -157,6 +157,7 @@ export function bizRate(b, s) { return Math.round(b.rate * BIZ_TIER_MUL[(s && s.
 export function bizCap(b, s) { return Math.round(b.cap * BIZ_TIER_MUL[(s && s.tier) || 1]); }
 export function bizUpgradeCost(b, tier) { return Math.round(b.price * (tier === 1 ? 1.3 : 2.2)); }   // cost tier → tier+1
 export function bizManagerCost(b) { return Math.round(b.price * 0.6); }   // one-off: managed properties auto-bank their income
+export function bizSaleValue(b, s) { return Math.round(b.price * BIZ_TIER_MUL[(s && s.tier) || 1] * 0.7); }   // divest for 70% of current value
 
 // Gang turf: clear the gang in a zone to claim it; held turf pays passive income
 // but rival gangs periodically try to retake it. Logic in npcs.js updateTurf.
