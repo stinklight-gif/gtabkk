@@ -222,9 +222,12 @@ async function main() {
     // frame timing, so step and check rather than assume a fixed walk distance.
     await page.keyboard.down('KeyW');
     let ins = null;
-    for (let k = 0; k < 16 && !(ins && ins.in); k++) {
+    for (let k = 0; k < 20 && !(ins && ins.in); k++) {
+      // keep the player aligned with the door-gap centerline so a stray x-nudge
+      // can't wedge them on a wall segment (the door gap is only ~2 m clear).
+      ins = await page.evaluate(e => { const p = window.GAME.player.group.position; p.x = e.x; return { x: p.x, z: p.z, in: Math.abs(p.x - e.x) < 4.5 && p.z < e.z + 3.5 && p.z > e.z - 4 }; }, e);
+      if (ins.in) break;
       await waitFrames(page, 8);
-      ins = await page.evaluate(e => { const p = window.GAME.player.group.position; return { x: p.x, z: p.z, in: Math.abs(p.x - e.x) < 4.5 && p.z < e.z + 3.5 && p.z > e.z - 4 }; }, e);
     }
     await page.keyboard.up('KeyW'); await waitFrames(page, 3);
     assert(ins && ins.in, `you walk in through the 7-Eleven door (now at z ${ins && ins.z.toFixed(1)}, front was ${(e.z + 4).toFixed(1)})`);
