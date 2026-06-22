@@ -149,6 +149,9 @@ export function wealthRank(nw) {
   for (let i = 0; i < WEALTH_TIERS.length; i++) if (nw >= WEALTH_TIERS[i].min) r = i;
   return r;
 }
+// Higher-rank perk: a discount on vehicle + property upgrades (8% per rank, capped
+// at 30% for Tycoon). Kingpin (rank 3) also gets a one-off personal supercar.
+export function rankDiscount() { return Math.min(0.30, (G._wealthRank || 0) * 0.08); }
 // Property tiers: buy at Tier 1, upgrade to 3 for scaling income (a late-game
 // money sink). One place so player.js (collect/upgrade) and hud.js (holdings)
 // agree on the numbers.

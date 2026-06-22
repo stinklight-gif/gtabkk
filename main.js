@@ -171,6 +171,7 @@ export function saveGame() {
       upgrades: G.econ.upgrades,
       bank: { balance: Math.max(0, Math.floor(G.econ.bank.balance) || 0), lastDay: G.econ.bank.lastDay },
       wealthRank: G._wealthRank || 0,
+      kingpinCar: !!G._kingpinCar,
       turfs: Object.fromEntries(TURFS.map(t => [t.id, !!(G.turfs && G.turfs[t.id] && G.turfs[t.id].owned)])),
       cosmetics: { shirt: G._shirtColor, hat: G._hat, jacket: G._jacketColor },
       owned: G._owned || [],
@@ -252,6 +253,7 @@ export function loadGame() {
     G.econ.bank.lastDay = (typeof s.bank.lastDay === 'number') ? s.bank.lastDay : null;
   }
   if (typeof s.wealthRank === 'number') G._wealthRank = Math.max(0, Math.min(4, s.wealthRank | 0));   // restore achieved rank
+  if (s.kingpinCar) G._kingpinCar = true;                                                            // don't re-deliver the perk car
   if (s.turfs && typeof s.turfs === 'object') {                     // restore held gang turf
     G.turfs = G.turfs || {};
     for (const t of TURFS) { G.turfs[t.id] = G.turfs[t.id] || { owned: false, gang: [], spawned: false }; G.turfs[t.id].owned = !!s.turfs[t.id]; }

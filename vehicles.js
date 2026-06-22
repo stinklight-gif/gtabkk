@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, UPGRADES, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, UPGRADES, rankDiscount, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { tip, cycleWeapon, damagePlayer, firePistol, fireSMG, fireShotgun, makeExplosion, makeSmokeEmitter, makeVehicle, onCopKilled, raiseWanted, resolveVehicleVsBuildings, saveGame, spawnSkid, updateAmmoHud, updateCop, vehicleName } from './main.js';
 
@@ -468,10 +468,11 @@ function upgradeRows() {
   for (const up of UPGRADES) {
     const lvl = u[up.id] || 0;
     const maxed = lvl >= up.max;
-    const price = maxed ? 0 : up.prices[lvl];
+    const price = maxed ? 0 : Math.round(up.prices[lvl] * (1 - rankDiscount()));   // rank perk: cheaper upgrades
     const dots = '●'.repeat(lvl) + '○'.repeat(up.max - lvl);
     const btn = document.createElement('button');
-    btn.innerHTML = `<b>${up.label}</b> ${dots} — ${up.desc}<br>` + (maxed ? '<span style="opacity:.7">MAX</span>' : `Lv ${lvl + 1}: ฿${price.toLocaleString()}`);
+    const off = rankDiscount() > 0 && !maxed ? ` <span style="color:#7fd0a0;opacity:.8">(-${Math.round(rankDiscount() * 100)}%)</span>` : '';
+    btn.innerHTML = `<b>${up.label}</b> ${dots} — ${up.desc}<br>` + (maxed ? '<span style="opacity:.7">MAX</span>' : `Lv ${lvl + 1}: ฿${price.toLocaleString()}${off}`);
     btn.disabled = maxed || G.cash < price;
     btn.addEventListener('click', () => buyUpgrade(up.id));
     box.appendChild(btn);
@@ -492,9 +493,9 @@ export function buyUpgrade(id) {
   const up = UPGRADES.find(u => u.id === id); if (!up) return;
   const u = G.econ.upgrades, lvl = u[id] || 0;
   if (lvl >= up.max) return;
-  const price = up.prices[lvl];
+  const price = Math.round(up.prices[lvl] * (1 - rankDiscount()));   // rank perk: cheaper upgrades
   if (G.cash < price) { G.hud.showNotif('Not enough cash'); return; }
-  G.cash -= price; u[id] = lvl + 1; G.hud.setCash(G.cash);
+  G.cash -= price; u[id] = lvl + 1; G.hud.setCash(G.cash); G.hud.cashPop(-price);
   if (G.player.inVehicle) applyUpgrades(G.player.inVehicle);   // take effect immediately
   G.hud.showNotif(`${up.label} upgraded to Lv ${lvl + 1}`);
   if (G.audio && G.audio.chime) G.audio.chime();

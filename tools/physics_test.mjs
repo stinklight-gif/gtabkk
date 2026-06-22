@@ -304,6 +304,14 @@ async function main() {
     await waitFrames(page, 2);
     const arm = await page.evaluate(() => ({ lvl: window.GAME.econ.upgrades.armor, mul: window.GAME.player.inVehicle.spec.armorMul }));
     assert(arm.lvl === 1 && arm.mul < 1, `the Armor upgrade softens crashes (armorMul ${arm.mul})`);
+    // rank perk: upgrades get cheaper at higher wealth rank
+    await page.evaluate(() => { window.GAME._wealthRank = 4; window.GAME.cash = 50000; window.GAME.hud.setCash(50000); });   // Tycoon → 30% off
+    const cashPreNitro = await page.evaluate(() => window.GAME.cash);
+    await page.evaluate(() => document.querySelectorAll('#garageup-items button')[1].click());   // Nitro (base ฿3,500)
+    await waitFrames(page, 2);
+    const nitro = await page.evaluate(() => ({ lvl: window.GAME.econ.upgrades.nitro, cash: window.GAME.cash }));
+    const spentNitro = cashPreNitro - nitro.cash;
+    assert(nitro.lvl === 1 && spentNitro > 2300 && spentNitro < 2600, `wealth rank discounts upgrades (Nitro ฿3,500 → ฿${spentNitro.toFixed(0)})`);
     await page.click('#garageup-leave'); await waitFrames(page, 3);
     const left = await page.evaluate(() => window.GAME.state);
     assert(left === 'playing', 'leaving the upgrades menu returns to the game');
@@ -463,6 +471,17 @@ async function main() {
     await waitFrames(page, 5);
     const postRank = await page.evaluate(() => window.GAME._wealthRank);
     assert(postRank < preRank, `selling down drops your rank (${preRank} → ${postRank})`);
+
+    // Kingpin perk: reaching rank 3 delivers a personal supercar
+    await page.evaluate(() => {
+      const G = window.GAME;
+      G.state = 'playing'; G._wealthRank = 2; G._kingpinCar = false;
+      for (const id in G.econ.businesses) G.econ.businesses[id].owned = false;
+      G.econ.bank.balance = 0; G.cash = 650000; G.hud.setCash(650000);   // net worth → Kingpin (฿600k)
+    });
+    await waitFrames(page, 4);
+    const kp = await page.evaluate(() => ({ rank: window.GAME._wealthRank, flag: !!window.GAME._kingpinCar, car: window.GAME.vehicles.some(v => v.plate === 'KINGPIN') }));
+    assert(kp.rank >= 3 && kp.flag && kp.car, `reaching Kingpin delivers a personal supercar (rank ${kp.rank}, car ${kp.car})`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
