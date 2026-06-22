@@ -235,16 +235,164 @@ export function makeAudio() {
     setTimeout(()=>blip({freq:340, dur:0.08, type:'sawtooth', gain:0.16, freqEnd:200}),90);
   }
 
+  // ---- New SFX (procedural, same style) -------------------------------------
+  // Bank-vault drill spin-up + alarm wail — fired when the heist alarm trips.
+  function vaultAlarm() {
+    noise(0.5, 0.10, 1400);                                            // drill bite
+    blip({freq:90, dur:0.5, type:'sawtooth', gain:0.10, freqEnd:160}); // motor spin-up
+    // two-tone alarm wail, a few descending sweeps
+    for (let i = 0; i < 4; i++) setTimeout(() =>
+      blip({freq:760, dur:0.22, type:'square', gain:0.12, freqEnd:520}), 350 + i * 260);
+  }
+  // Outboard motor — continuous burble that tracks boat speed (set/kill like engineLoop).
+  function boatMotor() {
+    const o = ctx.createOscillator(); o.type = 'sawtooth'; o.frequency.value = 60;
+    const lfo = ctx.createOscillator(); lfo.type = 'sine'; lfo.frequency.value = 7;   // putt-putt chug
+    const lfog = ctx.createGain(); lfog.gain.value = 16;
+    lfo.connect(lfog).connect(o.frequency);
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 520;
+    const g = ctx.createGain(); g.gain.value = 0;
+    o.connect(lp).connect(g).connect(engineBus);
+    o.start(); lfo.start();
+    return {
+      set(speed01, on) {
+        const target = on ? 0.09 + speed01 * 0.14 : 0;
+        g.gain.setTargetAtTime(target, ctx.currentTime, 0.12);
+        o.frequency.setTargetAtTime(48 + speed01 * 70, ctx.currentTime, 0.1);
+        lfo.frequency.setTargetAtTime(6 + speed01 * 12, ctx.currentTime, 0.1); // chug faster under throttle
+      },
+      kill() { try { o.stop(); lfo.stop(); g.disconnect(); } catch {} }
+    };
+  }
+  // Gang-fight whack — meatier than punch(): a thud + crack for melee brawls.
+  function whack() {
+    noise(0.09, 0.30, 700);
+    blip({freq:160, dur:0.09, type:'triangle', gain:0.22, freqEnd:70});
+    blip({freq:520, dur:0.04, type:'square', gain:0.10, freqEnd:240});
+  }
+  // Property "boom" + cash jingle — big low hit, then a bright up-arpeggio (claim/cash).
+  function cashBoom() {
+    noise(0.3, 0.22, 300);
+    blip({freq:70, dur:0.35, type:'sine', gain:0.26, freqEnd:40});
+    [0, 4, 7, 12].forEach((s, i) => setTimeout(() =>
+      blip({freq:523.25 * Math.pow(2, s / 12), dur:0.16, type:'triangle', gain:0.16, release:0.18}),
+      120 + i * 90));
+  }
+
+  // ---- Dynamic music bed ----------------------------------------------------
+  // A procedural, looping musical layer (bassline + arp + light beat) on its own
+  // bus under the SFX. updateMusic(dt) is called every frame from the game loop;
+  // it WATCHES G state to (a) ramp intensity from G.wanted.stars and (b) fire a
+  // few one-shots/loops on transitions (heist alarm, boat motor) so all the
+  // event wiring stays inside audio.js. Lookahead step-sequencer like the radio.
+  // Reads the global game state (window.GAME) lazily so audio.js stays standalone.
+  function makeMusic() {
+    const bus = ctx.createGain(); bus.gain.value = 0; bus.connect(master);
+    const A = 220;                                  // A3 root
+    const nt = s => A * Math.pow(2, s / 12);
+    function tone(time, freq, dur, type, gain) {
+      const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(freq, time);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, time);
+      g.gain.linearRampToValueAtTime(gain, time + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0006, time + dur);
+      o.connect(g).connect(bus); o.start(time); o.stop(time + dur + 0.03);
+    }
+    function nz(time, dur, gain, lp) {
+      const len = Math.max(1, Math.floor(ctx.sampleRate * dur));
+      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const d = buf.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      const src = ctx.createBufferSource(); src.buffer = buf;
+      const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lp;
+      const g = ctx.createGain(); g.gain.setValueAtTime(gain, time); g.gain.exponentialRampToValueAtTime(0.0006, time + dur);
+      src.connect(f).connect(g).connect(bus); src.start(time); src.stop(time + dur + 0.02);
+    }
+    // A minor pentatonic — roots cycle Am F C G; arp picks notes from the scale.
+    const roots = [0, -4, 3, -2];                   // bar roots vs A (A F C G)
+    const arp   = [12, 15, 19, 24, 19, 15];         // pentatonic-ish arp degrees
+    let step = 0, nextTime = 0, intensity = 0;      // intensity 0..1, eased toward target
+
+    // one-shot / loop transition trackers (closure state — no edits elsewhere)
+    let prevStage = 0, boat = null;
+
+    function watch() {
+      const G = window.GAME; if (!G) return;
+      const stars = (G.wanted && G.wanted.stars) | 0;
+      // target intensity: calm at 0★, builds with heat; cap at 1.
+      const tgt = Math.min(1, stars / 4);
+      intensity += (tgt - intensity) * 0.05;        // ease ~1s
+
+      // heist alarm: fire once when the vault stage trips to 2.
+      const stage = (G.heist && G.heist.stage) | 0;
+      if (stage === 2 && prevStage !== 2) vaultAlarm();
+      prevStage = stage;
+
+      // boat outboard motor: run while in a boat, track speed, stop on exit.
+      const v = G.player && G.player.inVehicle;
+      const inBoat = !!(v && v.spec && v.spec.kind === 'boat');
+      if (inBoat) {
+        if (!boat) boat = boatMotor();
+        const top = (v.spec && v.spec.topSpeed) || 18;
+        boat.set(Math.min(1, Math.abs(v.vel || 0) / top), true);
+      } else if (boat) { boat.kill(); boat = null; }
+    }
+
+    function reset() { step = 0; nextTime = 0; }
+    return {
+      // active = G.state === 'playing'. Schedules the bed + does event watching.
+      update(active) {
+        if (active) watch();                        // watch G even at low intensity
+        // bus level: silent when not playing; modest, rising a touch with heat.
+        bus.gain.setTargetAtTime(active ? 0.16 + intensity * 0.10 : 0.0, ctx.currentTime, 0.4);
+        if (!active) { reset(); if (boat) { boat.kill(); boat = null; } return; }
+        // tempo: 84 bpm calm → ~128 bpm chase.
+        const bpm = 84 + intensity * 44;
+        const now = ctx.currentTime;
+        if (nextTime === 0) nextTime = now + 0.06;
+        const stepDur = (60 / bpm) / 4;             // 16th notes
+        let guard = 0;
+        while (nextTime < now + 0.2 && guard++ < 64) {
+          try { pattern(step, nextTime); } catch (e) { /* keep the loop alive */ }
+          step = (step + 1) % 64;                   // 4 bars (one per root: A F C G)
+          nextTime += stepDur;
+        }
+      },
+    };
+    // 64-step (4-bar) pattern; density/voices scale with `intensity`.
+    function pattern(s, t) {
+      const b = s % 16, bar = Math.floor(s / 16) % roots.length, root = roots[bar];
+      // bassline — root on the downbeats, an extra off-beat note when tense.
+      if (b === 0 || b === 8) tone(t, nt(root - 12), 0.26, 'triangle', 0.22);
+      if (intensity > 0.4 && (b === 4 || b === 12)) tone(t, nt(root - 12), 0.16, 'triangle', 0.14);
+      // pad — soft sustained fifth at the top of each bar (calm texture).
+      if (b === 0) tone(t, nt(root + 7), 0.9, 'sine', 0.05 + intensity * 0.03);
+      // light beat — kick on 1 & 3, hat eighths; snare backbeat only when tense.
+      if (b === 0 || b === 8) nz(t, 0.12, 0.16 + intensity * 0.10, 220);          // kick-ish
+      if (b % 2 === 0) nz(t, 0.02, 0.04 + intensity * 0.04, 8000);                // hats
+      if (intensity > 0.5 && (b === 4 || b === 12)) nz(t, 0.10, 0.12, 3000);      // snare
+      // arp — sparse when calm, busier (every 8th, octave up) under chase heat.
+      const every = intensity > 0.55 ? 2 : 4;
+      if (b % every === 1) tone(t, nt(root + arp[s % arp.length] + (intensity > 0.7 ? 12 : 0)),
+        0.12, 'square', 0.06 + intensity * 0.05);
+    }
+  }
+
   const audio = {
     ctx, master, chime, bell, step, punch, kick, hit, shot, ricochet, reload,
     whistle, siren, thunder, rumble, honk, bark,
+    // new SFX
+    vaultAlarm, boatMotor, whack, cashBoom,
     engineLoop, tukTukLoop, blip, rainBed: null, ambienceBed: null,
-    radio: null,
+    radio: null, music: null,
+    // dynamic-music tick — call once per frame from the loop's playing path.
+    // It self-gates on G.state and ducks under SFX via its own bus.
+    updateMusic: (dt) => { if (audio.music) audio.music.update((window.GAME && window.GAME.state) === 'playing'); },
     duckEngine: on => engineBus.gain.setTargetAtTime(on ? 0.4 : 1.0, ctx.currentTime, 0.2),
     setVolume: v => { master.gain.value = v; },
   };
   audio.rainBed = rainBed();
   audio.ambienceBed = ambienceBed();
   audio.radio = makeRadio();
+  audio.music = makeMusic();
   return audio;
 }

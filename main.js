@@ -932,6 +932,7 @@ export function loop() {
     updateGarage(dt);
     updateGarageOwnership(dt);
     updateRadio(dt);
+    if (G.audio && G.audio.updateMusic) G.audio.updateMusic(dt);   // dynamic music bed + G-watched audio events (alarm, boat motor)
     updateTaxi(dt);
     updateVehicles(dt);
     updatePeds(dt);
