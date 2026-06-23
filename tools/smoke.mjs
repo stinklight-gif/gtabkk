@@ -88,7 +88,7 @@ async function main() {
   try {
     // 1024×576 keeps the screenshots clear while cutting ~40% of the per-frame
     // SwiftShader render cost — needed now that the suite has 10 shots.
-    const page = await browser.newPage({ viewport: { width: 1024, height: 576 } });
+    const page = await browser.newPage({ viewport: { width: 854, height: 480 } });
     page.on('pageerror', err => errors.push(`pageerror: ${err.message}`));
     page.on('console', msg => {
       if (msg.type() !== 'error') return;
@@ -188,7 +188,7 @@ async function main() {
         GAME.camRig.shake = 0;
         if (GAME.resyncCrowd) GAME.resyncCrowd();                // snap crowd to this hour (busy noon vs dead 3am)
       }, shot);
-      await waitFrames(page, (shot.festival || shot.songkran || shot.waypoint || shot.tabmap || shot.mall || shot.bts || shot.heli || shot.river || shot.bank) ? 24 : 14);  // let day/night + camera settle
+      await waitFrames(page, (shot.festival || shot.songkran || shot.waypoint || shot.tabmap || shot.mall || shot.bts || shot.heli || shot.river || shot.bank) ? 20 : 12);  // let day/night + camera settle
       await page.screenshot({ path: path.join(ROOT, shot.name), timeout: 120_000 });
       const size = fs.statSync(path.join(ROOT, shot.name)).size;
       const calls = await page.evaluate(() => window.GAME.renderer.info.render.calls);

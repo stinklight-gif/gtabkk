@@ -67,6 +67,7 @@ async function main() {
       null, { timeout: 180_000 },
     );
     console.log('game started');
+    await page.evaluate(() => { window.GAME.noBloom = true; });   // probes test gameplay, not visuals — skip the costly bloom pass
 
     // ---- 1. Mall data exists --------------------------------------------------
     console.log('\n[1] mall exists');
