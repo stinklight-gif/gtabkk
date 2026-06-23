@@ -391,10 +391,44 @@ async function init() {
   const camRig = makeCamera();
   G.camera = camRig.cam;
   G.camRig = camRig;
+
+  // ---- Bloom post-process: neon, windows, headlights and bright sky bloom for a
+  // much more cinematic, less-flat look. Scene renders to an offscreen RT; bright
+  // pixels are extracted at half-res, blurred (separable Gaussian, two widths) and
+  // composited additively. Cheap — a few half-res fullscreen passes, no per-scene-
+  // fragment cost (unlike a global IBL env). ----
+  {
+    const w = window.innerWidth, h = window.innerHeight;
+    const sceneRT = new THREE.WebGLRenderTarget(w, h, { samples: 2, type: THREE.HalfFloatType });
+    sceneRT.texture.colorSpace = THREE.LinearSRGBColorSpace;   // linear HDR; tone-mapping happens in the composite
+    const hw = Math.max(1, w >> 2), hh = Math.max(1, h >> 2);
+    const mkRT = () => { const rt = new THREE.WebGLRenderTarget(hw, hh, { depthBuffer: false, type: THREE.HalfFloatType }); rt.texture.colorSpace = THREE.LinearSRGBColorSpace; return rt; };
+    const bloomA = mkRT(), bloomB = mkRT();
+    const vsrc = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
+    // bright-pass works in LINEAR HDR — bright emissive (neon/windows) exceeds ~0.9
+    const brightMat = new THREE.ShaderMaterial({ uniforms: { tDiffuse: { value: null }, threshold: { value: 0.85 } }, vertexShader: vsrc, fragmentShader:
+      'uniform sampler2D tDiffuse; uniform float threshold; varying vec2 vUv; void main(){ vec3 c = texture2D(tDiffuse, vUv).rgb; float l = dot(c, vec3(0.2126,0.7152,0.0722)); gl_FragColor = vec4(c * smoothstep(threshold, threshold + 0.7, l), 1.0); }' });
+    const blurMat = new THREE.ShaderMaterial({ uniforms: { tDiffuse: { value: null }, dir: { value: new THREE.Vector2() }, res: { value: new THREE.Vector2(hw, hh) } }, vertexShader: vsrc, fragmentShader:
+      'uniform sampler2D tDiffuse; uniform vec2 dir; uniform vec2 res; varying vec2 vUv; void main(){ vec2 o = dir / res; vec3 s = texture2D(tDiffuse, vUv).rgb * 0.2270; s += (texture2D(tDiffuse, vUv + o*1.3846).rgb + texture2D(tDiffuse, vUv - o*1.3846).rgb) * 0.3162; s += (texture2D(tDiffuse, vUv + o*3.2308).rgb + texture2D(tDiffuse, vUv - o*3.2308).rgb) * 0.0703; gl_FragColor = vec4(s, 1.0); }' });
+    // composite: add bloom in linear, apply exposure + ACES tone map + sRGB encode
+    const compMat = new THREE.ShaderMaterial({ uniforms: { tScene: { value: null }, tBloom: { value: null }, strength: { value: 0.7 }, exposure: { value: 1.0 } }, vertexShader: vsrc, fragmentShader:
+      'uniform sampler2D tScene; uniform sampler2D tBloom; uniform float strength; uniform float exposure; varying vec2 vUv; vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14), 0.0, 1.0); } void main(){ vec3 c = (texture2D(tScene, vUv).rgb + texture2D(tBloom, vUv).rgb * strength) * exposure; c = aces(c); c = pow(c, vec3(1.0/2.2)); gl_FragColor = vec4(c, 1.0); }' });
+    const quadScene = new THREE.Scene();
+    const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), brightMat);
+    quadScene.add(quad);
+    const quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    G.bloom = { sceneRT, bloomA, bloomB, brightMat, blurMat, compMat, quadScene, quad, quadCam };
+  }
+
   window.addEventListener('resize', () => {
     camRig.cam.aspect = window.innerWidth / window.innerHeight;
     camRig.cam.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+    if (G.bloom) {
+      const w = window.innerWidth, h = window.innerHeight, hw = Math.max(1, w >> 2), hh = Math.max(1, h >> 2);
+      G.bloom.sceneRT.setSize(w, h); G.bloom.bloomA.setSize(hw, hh); G.bloom.bloomB.setSize(hw, hh);
+      G.bloom.blurMat.uniforms.res.value.set(hw, hh);
+    }
   });
 
   // Audio
@@ -891,6 +925,28 @@ export function updatePhotoCam(dt) {
   G.camera.lookAt(pc.pos.clone().add(fwd));
 }
 
+// Multi-pass bloom render (see setup in init): scene → RT, bright-pass → blur ×2
+// widths → additive composite to the screen. Falls back to a direct render if
+// bloom failed to initialize.
+function renderBloom() {
+  const b = G.bloom, r = G.renderer;
+  // fallback / opt-out (G.noBloom is set by the headless gameplay probes, which
+  // don't need the effect and run far faster without it under SwiftShader)
+  if (!b || G.noBloom) { r.toneMapping = THREE.ACESFilmicToneMapping; r.setRenderTarget(null); r.render(G.scene, G.camera); return; }
+  r.toneMapping = THREE.NoToneMapping;   // sceneRT holds linear HDR; the composite applies ACES + sRGB
+  r.setRenderTarget(b.sceneRT); r.render(G.scene, G.camera);
+  b.quad.material = b.brightMat; b.brightMat.uniforms.tDiffuse.value = b.sceneRT.texture;
+  r.setRenderTarget(b.bloomA); r.render(b.quadScene, b.quadCam);
+  b.quad.material = b.blurMat;
+  for (const [src, dst, dx, dy] of [[b.bloomA, b.bloomB, 1, 0], [b.bloomB, b.bloomA, 0, 1], [b.bloomA, b.bloomB, 2.2, 0], [b.bloomB, b.bloomA, 0, 2.2]]) {
+    b.blurMat.uniforms.tDiffuse.value = src.texture; b.blurMat.uniforms.dir.value.set(dx, dy);
+    r.setRenderTarget(dst); r.render(b.quadScene, b.quadCam);
+  }
+  b.quad.material = b.compMat; b.compMat.uniforms.tScene.value = b.sceneRT.texture; b.compMat.uniforms.tBloom.value = b.bloomA.texture;
+  b.compMat.uniforms.exposure.value = r.toneMappingExposure;   // day/night exposure (set each frame by daynight.js)
+  r.setRenderTarget(null); r.render(b.quadScene, b.quadCam);
+}
+
 export function loop() {
   requestAnimationFrame(loop);
   // touch controls: visible only while you're actually playing / on the phone / map
@@ -1032,7 +1088,7 @@ export function loop() {
     if (G.input.endFrame) G.input.endFrame();
   }
 
-  G.renderer.render(G.scene, G.camera);
+  renderBloom();
   // On-screen objective waypoint — after render so the camera matrices are
   // current. Self-gates on G.state === 'playing' (hidden in map/photo/pause).
   if (G.hud && G.hud.drawWaypoint) G.hud.drawWaypoint();
