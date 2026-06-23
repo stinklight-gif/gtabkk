@@ -6,6 +6,7 @@ import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, UPGRADES, rankDiscount, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { tip, cycleWeapon, damagePlayer, firePistol, fireSMG, fireShotgun, makeExplosion, makeSmokeEmitter, makeVehicle, onCopKilled, raiseWanted, resolveVehicleVsBuildings, saveGame, spawnSkid, updateAmmoHud, updateCop, vehicleName } from './main.js';
+import { lightFor } from './traffic.js';
 
 export function updatePlayerInVehicle(dt) {
   const p = G.player;
@@ -249,10 +250,27 @@ export function updateTrafficCar(v, dt) {
   const pp = G.player.group.position;
   if (!G.player.inVehicle) consider(pp.x, pp.z, 1.6);   // yield to the player on foot
 
-  let target = npc.cruiseSpeed;
-  if (gap < 3.5) target = 0;
-  else if (gap < 10) target = npc.cruiseSpeed * (gap - 3.5) / 6.5;
-  if (G.wanted.stars > 0 && dist2(v.pos, pp) < 22 * 22) target = Math.min(target, npc.cruiseSpeed * 0.4); // cautious during a shootout
+  // obstacle-limited speed (cars / peds / player ahead) + shootout caution
+  let obstacleTarget = npc.cruiseSpeed;
+  if (gap < 3.5) obstacleTarget = 0;
+  else if (gap < 10) obstacleTarget = npc.cruiseSpeed * (gap - 3.5) / 6.5;
+  if (G.wanted.stars > 0 && dist2(v.pos, pp) < 22 * 22) obstacleTarget = Math.min(obstacleTarget, npc.cruiseSpeed * 0.4); // cautious during a shootout
+
+  // traffic signal: ease to a halt at the stop line on red/amber — unless already
+  // committed into the junction box (then clear it). Stop line is set back from
+  // the intersection centre by half a road + a margin; cars queue behind via gap.
+  let signalTarget = npc.cruiseSpeed;
+  const moveSign = even2 ? DVZ[dir] : DVX[dir];
+  const cellNow = Math.round((even2 ? v.pos.z : v.pos.x) / BLOCK) * BLOCK;
+  const fwdToLine = (cellNow - (even2 ? v.pos.z : v.pos.x)) * moveSign - (ROAD_WIDTH / 2 + 1.6);
+  const sig = lightFor(dir);
+  if (sig !== 'green' && fwdToLine > -1.0 && fwdToLine < 16) {
+    if (sig === 'amber' && fwdToLine < 2.5) { /* too close to stop safely — clear the box */ }
+    else if (fwdToLine <= 0.4) signalTarget = 0;
+    else signalTarget = npc.cruiseSpeed * clamp(fwdToLine / 6, 0, 1);
+  }
+
+  const target = Math.min(obstacleTarget, signalTarget);
   if (v.vel < target) v.vel = Math.min(target, v.vel + v.spec.accel * dt);
   else v.vel = Math.max(target, v.vel - v.spec.brake * 1.4 * dt);
 
@@ -267,7 +285,10 @@ export function updateTrafficCar(v, dt) {
   v.mesh.position.copy(v.pos);
   v.mesh.rotation.y = v.heading;
 
-  if (target < npc.cruiseSpeed * 0.3 && (npc.honkCooldown -= dt) <= 0) { G.audio.honk(); npc.honkCooldown = rand(2, 6); }
+  // honk only when something's actually blocking us while the light is green —
+  // not while we're simply waiting our turn at a red.
+  const blocked = obstacleTarget < npc.cruiseSpeed * 0.3 && signalTarget > npc.cruiseSpeed * 0.5;
+  if (blocked && (npc.honkCooldown -= dt) <= 0) { G.audio.honk(); npc.honkCooldown = rand(2, 6); }
   if (dist2(v.pos, pp) > 220 * 220) respawnTraffic(v, pp);
 }
 

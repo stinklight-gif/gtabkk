@@ -6,9 +6,23 @@ import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, TURFS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { animateWalk, damagePlayer, recolorTorso, saveGame, sidewalkPos, spawnPed } from './main.js';
+import { lightFor } from './traffic.js';
 
 // 13. PEDESTRIANS + DOGS
 // =============================================================================
+
+// A casual wanderer about to step off the kerb onto a carriageway whose vehicle
+// light is GREEN should wait for the cross rather than walk into moving traffic.
+// True only when the *next* step crosses from sidewalk into the live road; peds
+// already on the road (clearing it) and peds whose light is red are free to go.
+const _RW2 = ROAD_WIDTH / 2;
+function steppingIntoLiveRoad(cx, cz, nx, nz) {
+  const gx = Math.round(nx / BLOCK) * BLOCK;          // nearest N/S road (cars run N/S → dir 0)
+  if (Math.abs(cx - gx) >= _RW2 && Math.abs(nx - gx) < _RW2 + 0.3 && lightFor(0) === 'green') return true;
+  const gz = Math.round(nz / BLOCK) * BLOCK;          // nearest E/W road (cars run E/W → dir 1)
+  if (Math.abs(cz - gz) >= _RW2 && Math.abs(nz - gz) < _RW2 + 0.3 && lightFor(1) === 'green') return true;
+  return false;
+}
 
 // Floating reaction-bark sprites over panicking peds.
 export function makeBarkSprite(text) {
@@ -147,6 +161,14 @@ export function updatePeds(dt) {
         ped.heading += rand(-0.5, 0.5);
         ped.waitT = rand(1.5, 4);
       }
+    }
+    // signal-aware kerb hold: plain wanderers wait at the edge of a carriageway
+    // that currently has the green (panicked / gang / clustered / encounter peds
+    // are exempt — they keep their urgent paths). Only zeroes speed; never moves.
+    if (ped.state === 'walking' && ped.speed > 0.05 && !ped.gang && ped.panicT <= 0 && !ped.anchor && !ped.isMugger && !ped.isTarget) {
+      const nx = ped.mesh.position.x + Math.sin(ped.heading) * ped.speed * dt;
+      const nz = ped.mesh.position.z + Math.cos(ped.heading) * ped.speed * dt;
+      if (steppingIntoLiveRoad(ped.mesh.position.x, ped.mesh.position.z, nx, nz)) ped.speed = 0;
     }
     ped.mesh.position.x += Math.sin(ped.heading) * ped.speed * dt;
     ped.mesh.position.z += Math.cos(ped.heading) * ped.speed * dt;

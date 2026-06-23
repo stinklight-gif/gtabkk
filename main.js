@@ -18,6 +18,8 @@ export * from './world.js';
 import {
   buildWorld, makeMinimapBase, makeWindowTexture
 } from './world.js';
+export * from './traffic.js';
+import { buildTrafficLights, updateTrafficLights } from './traffic.js';
 export * from './entities.js';
 import {
   animateWalk, makeCamera, makeDogMesh, makePedMesh, makePlayer, makeRain, makeVehicle, makeVehicleMesh, sidewalkPos, spawnBoat, spawnDog, spawnDogs, spawnParkedCars, spawnPed, spawnPeds, spawnTraffic
@@ -439,6 +441,7 @@ async function init() {
 
   // World
   G.world = buildWorld(scene);
+  buildTrafficLights(scene);   // signals at every grid intersection
   setProgress(60);
 
   // Player
@@ -1019,6 +1022,7 @@ export function loop() {
     updateRadio(dt);
     if (G.audio && G.audio.updateMusic) G.audio.updateMusic(dt);   // dynamic music bed + G-watched audio events (alarm, boat motor)
     updateTaxi(dt);
+    updateTrafficLights(dt);   // advance the signal phase before cars/peds read it
     updateVehicles(dt);
     updatePeds(dt);
     updateClusters(dt);
