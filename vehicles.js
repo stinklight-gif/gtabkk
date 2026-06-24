@@ -8,6 +8,23 @@ import {
 import { tip, cycleWeapon, damagePlayer, firePistol, fireSMG, fireShotgun, makeExplosion, makeSmokeEmitter, makeVehicle, onCopKilled, raiseWanted, resolveVehicleVsBuildings, saveGame, spawnSkid, updateAmmoHud, updateCop, vehicleName } from './main.js';
 import { lightFor } from './traffic.js';
 
+export function updateVehicleVisuals(v, dt, opts={}) {
+  const visual = v.visual || (v.mesh && v.mesh.userData && v.mesh.userData.visual);
+  if (!visual) return;
+  v.wheelSpin = (v.wheelSpin || 0) + v.vel * dt;
+  const steer = v.steerAngle || 0;
+  for (const w of visual.wheels || []) {
+    if (w.spin) w.spin.rotation.x = -v.wheelSpin / Math.max(0.1, w.radius || 0.3);
+    if (w.front && w.mount) w.mount.rotation.y = lerp(w.mount.rotation.y || 0, steer, 0.3);
+  }
+  const headOpacity = (G.nightK || 0) > 0.25 || G.time.weather === 'rain' ? 0.95 : 0.58;
+  const brakeOpacity = opts.braking ? 1.0 : 0.48;
+  const reverseOpacity = opts.reverse || v.vel < -0.2 ? 0.95 : 0.24;
+  for (const l of visual.headlights || []) if (l.material && l.material.opacity != null) l.material.opacity = headOpacity;
+  for (const l of visual.brakeLights || []) if (l.material && l.material.opacity != null) l.material.opacity = brakeOpacity;
+  for (const l of visual.reverseLights || []) if (l.material && l.material.opacity != null) l.material.opacity = reverseOpacity;
+}
+
 export function updatePlayerInVehicle(dt) {
   const p = G.player;
   const v = p.inVehicle;
@@ -64,6 +81,7 @@ export function updatePlayerInVehicle(dt) {
   // ramp steering in with speed (0 at a dead stop, full by ~0.6) so slow reverse
   // and creeping forward still turn instead of hitting a hard dead zone.
   v.heading += steer * steerRate * dt * (v.vel >= 0 ? 1 : -1) * Math.min(1, Math.abs(v.vel) / 0.6);
+  v.steerAngle = lerp(v.steerAngle || 0, steer * 0.48, 0.22);
   // arcade handbrake drift: extra oversteer + lay rubber while sliding
   if (handbrake && Math.abs(v.vel) > 6 && Math.abs(steer) > 0.15 && spec.kind !== 'boat' && spec.kind !== 'bike') {
     v.heading += steer * 1.5 * dt * (v.vel >= 0 ? 1 : -1);
@@ -93,6 +111,10 @@ export function updatePlayerInVehicle(dt) {
   }
   v.mesh.position.copy(v.pos);
   v.mesh.rotation.y = v.heading;
+  updateVehicleVisuals(v, dt, {
+    braking: handbrake || (forward < 0 && v.vel > 0.5),
+    reverse: forward < 0 && v.vel < -0.1,
+  });
 
   if (v.spec.kind !== 'boat') resolveVehicleVsBuildings(v);
 
@@ -211,6 +233,7 @@ function inferDir(h) {
 
 export function updateTrafficCar(v, dt) {
   const npc = v.npc;
+  const prevHeading = v.heading;
   if (npc.dir === undefined) npc.dir = inferDir(v.heading);
   let dir = npc.dir;
 
@@ -282,8 +305,15 @@ export function updateTrafficCar(v, dt) {
   v.pos.x = clamp(v.pos.x, -HALF + 8, HALF - 2);   // out of the river, inside bounds
   v.pos.z = clamp(v.pos.z, -HALF + 2, HALF - 2);
   v.heading = lerpAngle(v.heading, DH[dir], Math.min(1, dt * 6));
+  let headingDelta = v.heading - prevHeading;
+  while (headingDelta > PI) headingDelta -= TAU;
+  while (headingDelta < -PI) headingDelta += TAU;
+  v.steerAngle = lerp(v.steerAngle || 0, clamp(headingDelta * 5, -0.5, 0.5), 0.24);
+  if (v.spec.kind === 'bike') v.mesh.rotation.z = lerp(v.mesh.rotation.z || 0, -v.steerAngle * 0.7, 0.18);
+  else if (v.spec.kind === 'tuktuk') v.mesh.rotation.z = lerp(v.mesh.rotation.z || 0, -v.steerAngle * 0.35, 0.18);
   v.mesh.position.copy(v.pos);
   v.mesh.rotation.y = v.heading;
+  updateVehicleVisuals(v, dt, { braking: target < v.vel, reverse: v.vel < -0.1 });
 
   // honk only when something's actually blocking us while the light is green —
   // not while we're simply waiting our turn at a red.

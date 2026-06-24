@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
-import { abortHeist, animateWalk, damagePlayer, makePedMesh, makeVehicle, onCopKilled, raiseWanted } from './main.js';
+import { abortHeist, animateWalk, damagePlayer, makePedMesh, makeVehicle, onCopKilled, raiseWanted, updateVehicleVisuals } from './main.js';
 
 // 15. COPS + WANTED SYSTEM
 // =============================================================================
@@ -258,6 +258,7 @@ export function updateCop(v, dt) {
   const tx0 = px - v.pos.x;
   const tz0 = pz - v.pos.z;
   const d = Math.hypot(tx0, tz0);
+  const prevHeading = v.heading;
 
   // Road-aware steering: at range, route along the 50 m road grid (roads sit on
   // x=k*BLOCK and z=k*BLOCK, ROAD_W wide) so chase cars don't grind the canyon
@@ -292,10 +293,15 @@ export function updateCop(v, dt) {
   const target = d > 8 ? v.spec.topSpeed * 0.7 : (d < 4 ? 0 : 4);
   if (v.vel < target) v.vel += v.spec.accel * dt;
   else v.vel -= v.spec.brake * dt;
+  let headingDelta = v.heading - prevHeading;
+  while (headingDelta > PI) headingDelta -= TAU;
+  while (headingDelta < -PI) headingDelta += TAU;
+  v.steerAngle = lerp(v.steerAngle || 0, clamp(headingDelta * 6, -0.5, 0.5), 0.28);
   v.pos.x += Math.sin(v.heading) * v.vel * dt;
   v.pos.z += Math.cos(v.heading) * v.vel * dt;
   v.mesh.position.copy(v.pos);
   v.mesh.rotation.y = v.heading;
+  updateVehicleVisuals(v, dt, { braking: target < v.vel, reverse: v.vel < -0.1 });
   // ram player vehicle, or run the player down on foot
   if (p.inVehicle && dist2(v.pos, p.inVehicle.pos) < 4*4) {
     p.inVehicle.hp -= 8 * dt;
