@@ -19,7 +19,7 @@ export function makeInput() {
 
   window.addEventListener('keydown', e => {
     keys.add(e.code);
-    if (['Tab','Space','KeyT','KeyB'].includes(e.code)) e.preventDefault();
+    if (['Tab','Space','KeyT','KeyB','F3','F8','Backquote'].includes(e.code)) e.preventDefault();
   });
   window.addEventListener('keyup',   e => keys.delete(e.code));
   window.addEventListener('blur',    ()=> keys.clear());
@@ -123,7 +123,12 @@ export function makeInput() {
     requestLock() {
       if (isTouch) return;                         // no pointer lock on touch — look is drag-driven
       const el = G.renderer.domElement;
-      if (document.pointerLockElement !== el) el.requestPointerLock();
+      if (document.pointerLockElement !== el) {
+        try {
+          const p = el.requestPointerLock();
+          if (p && p.catch) p.catch(() => {});
+        } catch (_) {}
+      }
     },
     endFrame() { prevKeys = new Set(keys); prevVkeys = new Set(vkeys); },
   };

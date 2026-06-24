@@ -198,6 +198,27 @@
   }
   #radio-chip.show { display: block; }
 
+  #perf {
+    display: none; position: fixed; left: 18px; top: 62px; min-width: 220px;
+    padding: 8px 10px; background: rgba(8,10,14,.72);
+    border: 1px solid rgba(33,240,255,.38); color: #dff7f1;
+    font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    letter-spacing: .2px; text-shadow: 0 1px 0 #000; z-index: 13;
+    white-space: pre; pointer-events: none;
+  }
+  #perf.show { display: block; }
+  #perf .ok { color: #7fd0a0; }
+  #perf .warn { color: #ffcf4a; }
+  #perf .bad { color: #ff7a6a; }
+
+  #showcase {
+    display: none; position: fixed; left: 50%; top: 16px; transform: translateX(-50%);
+    z-index: 22; padding: 8px 14px; background: rgba(8,10,14,.72);
+    border: 1px solid rgba(255,207,74,.42); color: #f5e9c8;
+    font-size: 12px; letter-spacing: 1px; pointer-events: none;
+  }
+  #showcase.show { display: block; }
+
   /* On-screen objective waypoint pill (positioned in JS over the canvas) */
   #waypoint {
     position: fixed; left: 0; top: 0; transform: translate(-50%, -50%);
@@ -403,6 +424,7 @@
 
   <div id="clock">06:00</div>
   <div id="weather-tag">CLEAR · 33°C</div>
+  <div id="perf"></div>
   <div id="crosshair"></div>
   <div id="waypoint"><span id="wp-arrow">▲</span><span id="wp-label"></span><span id="wp-dist"></span></div>
 
@@ -436,9 +458,12 @@
     <kbd>WASD</kbd> move · <kbd>SHIFT</kbd> sprint<br/>
     <kbd>SPACE</kbd> jump / handbrake · <kbd>E</kbd> enter/exit<br/>
     <kbd>F</kbd> attack · <kbd>Q</kbd> weapon · <kbd>R</kbd> reload<br/>
-    <kbd>B</kbd> bribe · <kbd>J</kbd> taxi · <kbd>T</kbd> phone · <kbd>TAB</kbd> map
+    <kbd>B</kbd> bribe · <kbd>J</kbd> taxi/drop · <kbd>Y</kbd> drop · <kbd>T</kbd> phone · <kbd>TAB</kbd> map<br/>
+    <kbd>~</kbd>/<kbd>F3</kbd> budget · <kbd>F8</kbd> showcase
   </div>
 </div>
+
+<div id="showcase">SHOWCASE · A/D rotate · F8 or ESC returns</div>
 
 <div id="fullmap-wrap">
   <canvas id="fullmap" width="760" height="760"></canvas>
