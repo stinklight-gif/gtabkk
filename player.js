@@ -65,17 +65,35 @@ export function updatePlayer(dt) {
 
   // animations: leg bob, arm swing
   const tnow = performance.now() * 0.005;
+  const parts = p.parts;
   if (moving) {
-    p.legs.rotation.x = Math.sin(tnow * speed * 0.5) * 0.5;
+    const stride = Math.sin(tnow * speed * 0.5);
+    if (parts && parts.legL && parts.legR) {
+      parts.legL.rotation.x = stride * 0.55;
+      parts.legR.rotation.x = -stride * 0.55;
+      parts.legL.rotation.z = Math.max(0, Math.cos(tnow * speed)) * 0.02;
+      parts.legR.rotation.z = -Math.max(0, -Math.cos(tnow * speed)) * 0.02;
+    } else {
+      p.legs.rotation.x = stride * 0.5;
+    }
     p.torso.rotation.x = Math.sin(tnow * speed * 0.5) * 0.05;
-    p.armL.rotation.x = -Math.sin(tnow * speed * 0.5) * 0.6;
-    p.armR.rotation.x =  Math.sin(tnow * speed * 0.5) * 0.6;
+    p.torso.rotation.z = stride * 0.025;
+    p.armL.rotation.x = -stride * 0.6;
+    p.armR.rotation.x =  stride * 0.6;
     // footstep audio
     p._stepPhase = (p._stepPhase||0) + dt * speed;
     if (p._stepPhase > 0.6) { p._stepPhase = 0; G.audio.step(G.time.rainStrength > 0.3); }
   } else {
-    p.legs.rotation.x *= 0.85;
+    if (parts && parts.legL && parts.legR) {
+      parts.legL.rotation.x *= 0.85;
+      parts.legR.rotation.x *= 0.85;
+      parts.legL.rotation.z *= 0.85;
+      parts.legR.rotation.z *= 0.85;
+    } else {
+      p.legs.rotation.x *= 0.85;
+    }
     p.torso.rotation.x *= 0.85;
+    p.torso.rotation.z *= 0.85;
     p.armL.rotation.x *= 0.85;
     p.armR.rotation.x *= 0.85;
   }

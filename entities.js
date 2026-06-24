@@ -11,27 +11,45 @@ import {
 
 export function makePlayer(scene) {
   const group = new THREE.Group();
-  // body capsule
   const bodyMat = new THREE.MeshStandardMaterial({ color: 0xd44b3b, roughness: 0.7 });
   const pantsMat = new THREE.MeshStandardMaterial({ color: 0x232a35, roughness: 0.8 });
   const skinMat = new THREE.MeshStandardMaterial({ color: 0xc69472, roughness: 0.8 });
+  const hairMat = new THREE.MeshStandardMaterial({ color: 0x17110e, roughness: 0.86 });
+  const shoeMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.7 });
 
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 0.6, 4, 8), bodyMat);
-  torso.position.y = 1.05; torso.castShadow = true; group.add(torso);
-  const legGeo = new THREE.CapsuleGeometry(0.28, 0.55, 4, 8);
-  legGeo.translate(0, -0.555, 0);   // origin at the hip so rotation pivots there, not mid-thigh
-  const legs = new THREE.Mesh(legGeo, pantsMat);
-  legs.position.y = 1.0; legs.castShadow = true; group.add(legs);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), skinMat);
-  head.position.y = 1.65; head.castShadow = true; group.add(head);
+  const pelvis = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.18, 0.24), pantsMat);
+  pelvis.position.y = 0.82; pelvis.castShadow = true; group.add(pelvis);
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.25, 0.5, 4, 9), bodyMat);
+  torso.position.y = 1.15; torso.scale.set(1.12, 1, 0.74); torso.castShadow = true; group.add(torso);
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.075, 0.1, 6), skinMat);
+  neck.position.y = 1.47; group.add(neck);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 10), skinMat);
+  head.position.y = 1.62; head.scale.set(0.92, 1.08, 0.9); head.castShadow = true; group.add(head);
+  const nose = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.045, 0.055), skinMat);
+  nose.position.set(0, 1.61, 0.18); group.add(nose);
+  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.205, 12, 6, 0, TAU, 0, PI * 0.56), hairMat);
+  hair.position.set(0, 1.73, -0.015); hair.scale.set(0.95, 0.58, 0.88); hair.castShadow = true; group.add(hair);
 
-  // arms (used for swinging while punching)
-  const armGeo = new THREE.CapsuleGeometry(0.1, 0.5, 4, 6);
-  armGeo.translate(0, -0.35, 0);    // origin at the shoulder so swings pivot there, not mid-arm
-  const armL = new THREE.Mesh(armGeo, bodyMat);
-  armL.position.set(-0.42, 1.5, 0); armL.castShadow = true; group.add(armL);
-  const armR = new THREE.Mesh(armGeo, bodyMat);
-  armR.position.set( 0.42, 1.5, 0); armR.castShadow = true; group.add(armR);
+  function limb(len, r, mat, cast=true) {
+    const geo = new THREE.CapsuleGeometry(r, len, 4, 7);
+    geo.translate(0, -(len / 2 + r), 0);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.castShadow = cast;
+    return mesh;
+  }
+  function shoe(parent, y) {
+    const s = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.08, 0.26), shoeMat);
+    s.position.set(0, y, 0.07); s.castShadow = true; parent.add(s);
+  }
+
+  const legL = limb(0.62, 0.075, pantsMat); legL.position.set(-0.13, 0.82, 0); group.add(legL); shoe(legL, -0.78);
+  const legR = limb(0.62, 0.075, pantsMat); legR.position.set( 0.13, 0.82, 0); group.add(legR); shoe(legR, -0.78);
+  const armL = limb(0.52, 0.058, bodyMat); armL.position.set(-0.33, 1.38, 0); armL.rotation.z = -0.12; group.add(armL);
+  const armR = limb(0.52, 0.058, bodyMat); armR.position.set( 0.33, 1.38, 0); armR.rotation.z =  0.12; group.add(armR);
+  for (const arm of [armL, armR]) {
+    const hand = new THREE.Mesh(new THREE.SphereGeometry(0.062, 7, 6), skinMat);
+    hand.position.y = -0.63; hand.castShadow = true; arm.add(hand);
+  }
 
   // pistol model (hidden by default)
   const pistol = new THREE.Group();
@@ -46,7 +64,8 @@ export function makePlayer(scene) {
   scene.add(group);
 
   return {
-    group, torso, legs, head, armL, armR, pistol,
+    group, torso, legs: legR, legL, legR, pelvis, head, neck, hair, armL, armR, pistol,
+    parts: { torso, pelvis, head, neck, hair, legL, legR, armL, armR },
     velocity: new THREE.Vector3(),
     yaw: 0, pitch: 0,
     grounded: true,
@@ -91,9 +110,118 @@ export function makeCamera() {
 // 5. VEHICLES
 // =============================================================================
 
+function vehicleMat(color, roughness=0.55, metalness=0.25) {
+  return new THREE.MeshStandardMaterial({ color, roughness, metalness });
+}
+
+function vehicleLightMat(color, opacity=0.72) {
+  return new THREE.MeshBasicMaterial({ color, transparent: true, opacity });
+}
+
+function addVehicleBox(parent, size, mat, pos, rot=null, cast=true) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(size[0], size[1], size[2]), mat);
+  mesh.position.set(pos[0], pos[1], pos[2]);
+  if (rot) mesh.rotation.set(rot[0], rot[1], rot[2]);
+  mesh.castShadow = cast;
+  parent.add(mesh);
+  return mesh;
+}
+
+function addVehiclePanel(parent, w, h, mat, pos, rot=null) {
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+  mesh.position.set(pos[0], pos[1], pos[2]);
+  if (rot) mesh.rotation.set(rot[0], rot[1], rot[2]);
+  parent.add(mesh);
+  return mesh;
+}
+
+function addVisualWheel(root, visual, x, z, radius, width, front=false) {
+  const mount = new THREE.Group();
+  mount.position.set(x, radius, z);
+  root.add(mount);
+  const spin = new THREE.Group();
+  mount.add(spin);
+
+  const tire = new THREE.Mesh(
+    new THREE.CylinderGeometry(radius, radius, width, 14),
+    new THREE.MeshStandardMaterial({ color: 0x080808, roughness: 0.9 })
+  );
+  tire.rotation.z = PI/2; tire.castShadow = true; spin.add(tire);
+  const rimMat = new THREE.MeshStandardMaterial({ color: 0x9a9a9a, roughness: 0.35, metalness: 0.75 });
+  const rim = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.43, radius * 0.43, width + 0.02, 10), rimMat);
+  rim.rotation.z = PI/2; spin.add(rim);
+  for (let i = 0; i < 4; i++) {
+    const spoke = addVehicleBox(spin, [0.025, radius * 0.82, 0.025], rimMat, [0, 0, 0], null, false);
+    spoke.rotation.z = PI/2 + i * PI/4;
+  }
+  visual.wheels.push({ mount, spin, radius, front });
+}
+
+function addWheelArch(root, x, z, radius, mat) {
+  const arch = new THREE.Mesh(new THREE.TorusGeometry(radius + 0.07, 0.026, 5, 12, PI), mat);
+  arch.position.set(x, radius + 0.1, z);
+  arch.rotation.set(0, PI/2, PI);
+  root.add(arch);
+}
+
+function addMirrors(root, dims, trim) {
+  if (dims.W < 1.2 || dims.L > 8) return;
+  const z = dims.L * 0.18;
+  const y = Math.min(dims.H * 0.62 + 0.35, dims.H - 0.15);
+  for (const sx of [-1, 1]) {
+    addVehicleBox(root, [0.18, 0.035, 0.035], trim, [sx * (dims.W * 0.48), y, z], [0, 0, sx * 0.12], true);
+    addVehicleBox(root, [0.08, 0.12, 0.035], trim, [sx * (dims.W * 0.56), y + 0.01, z + 0.03], [0, sx * 0.18, 0], true);
+  }
+}
+
+function enhanceVehicleVisual(g, kind) {
+  const dims = g.userData.dims;
+  if (!dims || kind === 'boat') return;
+  const visual = g.userData.visual || (g.userData.visual = { wheels: [], headlights: [], brakeLights: [], reverseLights: [] });
+  const trim = vehicleMat(0x0b0d10, 0.82, 0.12);
+  const plateMat = new THREE.MeshBasicMaterial({ color: 0xf2e6ba });
+  const headMat = vehicleLightMat(0xfff0aa, 0.78);
+  const tailMat = vehicleLightMat(0xff3030, 0.58);
+  const reverseMat = vehicleLightMat(0xe8f2ff, 0.25);
+  const frontZ = dims.L * 0.49, rearZ = -dims.L * 0.49;
+  const y = Math.max(0.5, dims.H * 0.34);
+
+  if (dims.W > 1.1) {
+    addVehicleBox(g, [dims.W * 0.78, 0.14, 0.08], trim, [0, y - 0.22, frontZ], null, false);
+    addVehicleBox(g, [dims.W * 0.72, 0.13, 0.08], trim, [0, y - 0.2, rearZ], null, false);
+    addVehicleBox(g, [0.42, 0.14, 0.035], plateMat, [0, y - 0.05, frontZ + 0.02], null, false);
+    addVehicleBox(g, [0.38, 0.13, 0.035], plateMat, [0, y - 0.05, rearZ - 0.02], null, false);
+    addVehicleBox(g, [dims.W * 0.48, 0.1, 0.05], trim, [0, y + 0.08, frontZ + 0.02], null, false);
+    for (const sx of [-1, 1]) {
+      const hx = sx * dims.W * 0.32;
+      visual.headlights.push(addVehicleBox(g, [0.26, 0.12, 0.04], headMat, [hx, y + 0.06, frontZ + 0.025], null, false));
+      visual.brakeLights.push(addVehicleBox(g, [0.22, 0.12, 0.04], tailMat, [sx * dims.W * 0.34, y + 0.04, rearZ - 0.025], null, false));
+      visual.reverseLights.push(addVehicleBox(g, [0.1, 0.08, 0.04], reverseMat, [sx * dims.W * 0.18, y + 0.02, rearZ - 0.03], null, false));
+    }
+    addMirrors(g, dims, trim);
+  }
+
+  const r = kind === 'bus' ? 0.55 : kind === 'swat' ? 0.5 : kind === 'bike' || kind === 'tuktuk' ? 0.32 : dims.H > 2.2 ? 0.42 : 0.34;
+  const w = kind === 'bus' || kind === 'swat' ? 0.36 : kind === 'bike' ? 0.13 : 0.24;
+  if (kind === 'bike') {
+    addVisualWheel(g, visual, 0, dims.L * 0.43, r, w, true);
+    addVisualWheel(g, visual, 0, -dims.L * 0.43, r, w, false);
+  } else if (kind === 'tuktuk') {
+    addVisualWheel(g, visual, 0, dims.L * 0.38, r, w, true);
+    for (const x of [-dims.W * 0.45, dims.W * 0.45]) addVisualWheel(g, visual, x, -dims.L * 0.35, r, w, false);
+  } else {
+    const zs = kind === 'bus' ? [-dims.L * 0.34, 0, dims.L * 0.3] : [-dims.L * 0.34, dims.L * 0.34];
+    for (const z of zs) for (const x of [-dims.W * 0.45, dims.W * 0.45]) {
+      addVisualWheel(g, visual, x, z, r, w, z > 0);
+      if (kind !== 'bus' && kind !== 'swat') addWheelArch(g, x, z, r, trim);
+    }
+  }
+}
+
 export function makeVehicleMesh(kind) {
   const g = new THREE.Group();
   g.userData.kind = kind;
+  g.userData.visual = { wheels: [], headlights: [], brakeLights: [], reverseLights: [] };
   if (kind === 'bike') {
     const frame = new THREE.Mesh(
       new THREE.BoxGeometry(0.5, 0.4, 1.6),
@@ -294,6 +422,7 @@ export function makeVehicleMesh(kind) {
     g.userData.dims = { L: 3.8, W: 1.8, H: 1.6 };
     g.userData.spec = { topSpeed: 24, accel: 11, brake: 16, turn: 1.7, mass: 1500, kind };
   }
+  enhanceVehicleVisual(g, kind);
   return g;
 }
 
@@ -321,6 +450,8 @@ export function makeVehicle(kind, scene) {
     pos: mesh.position,
     vel: 0,            // forward speed (m/s)
     heading: 0,        // yaw radians
+    steerAngle: 0,
+    wheelSpin: 0,
     hp: 100,
     smoke: null, fire: null,
     dead: false,
@@ -329,6 +460,7 @@ export function makeVehicle(kind, scene) {
     audio: null,
     isCop: kind === 'cop' || kind === 'fortuner' || kind === 'swat',
     lights: [headMat, tailMat],
+    visual: mesh.userData.visual,
     boundsHalf: { x: mesh.userData.dims.W * 0.5, z: mesh.userData.dims.L * 0.5 },
   };
   G.vehicles.push(veh);
