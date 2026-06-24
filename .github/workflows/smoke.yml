@@ -20,6 +20,8 @@ jobs:
           npx playwright install --with-deps chromium
       - name: Run smoke test
         run: node tools/smoke.mjs
+      - name: Run realism/performance test
+        run: node tools/realism_pass_test.mjs
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4

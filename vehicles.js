@@ -72,13 +72,15 @@ export function updatePlayerInVehicle(dt) {
   const mass = spec.mass || 1500;
   const weight = clamp(1500 / mass, 0.58, 1.25);
   const traction = slip ? 0.72 : 1;
+  const speedNow01 = Math.min(1, Math.abs(v.vel) / Math.max(1, spec.topSpeed));
   if (forward > 0) v.vel += spec.accel * v.throttle * (boost ? (spec.nitroAcc || 1.3) : 1) * weight * traction * dt;
   else if (forward < 0) {
-    if (v.vel > 0.25) v.vel -= spec.brake * v.brakeInput * dt;
+    if (v.vel > 0.25) v.vel -= spec.brake * (1 + speedNow01 * 0.35) * v.brakeInput * dt;
     else v.vel -= spec.accel * 0.55 * v.brakeInput * weight * dt; // reverse
   } else {
     const coast = spec.kind === 'boat' ? 0.992 : slip ? 0.996 : 0.982;
     v.vel *= Math.pow(coast, dt * 60);
+    if (Math.abs(v.vel) < 0.04) v.vel = 0;
   }
   if (handbrake) v.vel *= Math.pow(spec.kind === 'bike' ? 0.965 : 0.93, dt * 60);
   const speedMul = v.tiresBlown ? 0.5 : 1;   // spike strips halve your top speed
@@ -89,7 +91,10 @@ export function updatePlayerInVehicle(dt) {
   const lowSpeed = clamp(Math.abs(v.vel) / 1.2, 0.28, 1);
   const highSpeed = lerp(1, 0.58, speed01);
   const boatMul = spec.kind === 'boat' ? 0.55 : 1;
-  v.heading += v.steerAngle * spec.turn * lowSpeed * highSpeed * weight * boatMul * dt * (v.vel >= 0 ? 1 : -1);
+  const yawTarget = v.steerAngle * spec.turn * lowSpeed * highSpeed * weight * boatMul * (v.vel >= 0 ? 1 : -1);
+  v.yawRate = lerp(v.yawRate || 0, yawTarget, 1 - Math.pow(0.025, dt));
+  if (Math.abs(v.vel) < 0.08) v.yawRate *= Math.pow(0.35, dt * 60);
+  v.heading += v.yawRate * dt;
   // arcade handbrake drift: extra oversteer + lay rubber while sliding
   if (handbrake && Math.abs(v.vel) > 6 && Math.abs(v.steerInput) > 0.15 && spec.kind !== 'boat' && spec.kind !== 'bike') {
     v.heading += v.steerInput * 1.35 * dt * (v.vel >= 0 ? 1 : -1);
@@ -282,7 +287,8 @@ export function updateTrafficCar(v, dt) {
   for (const o of G.vehicles) if (o !== v) consider(o.pos.x, o.pos.z, 1.8);
   for (const ped of G.peds) if (!ped.dead) consider(ped.mesh.position.x, ped.mesh.position.z, 1.3);
   const pp = G.player.group.position;
-  if (!G.player.inVehicle) consider(pp.x, pp.z, 1.6);   // yield to the player on foot
+  if (G.player.inVehicle) consider(G.player.inVehicle.pos.x, G.player.inVehicle.pos.z, 2.6); // yield to the player's vehicle
+  else consider(pp.x, pp.z, 1.6);   // yield to the player on foot
 
   // obstacle-limited speed (cars / peds / player ahead) + shootout caution
   let obstacleTarget = npc.cruiseSpeed;
@@ -374,15 +380,16 @@ export function updateCamera(dt) {
     const followYaw = v.heading + PI; // behind
     rig.yaw = lerpAngle(rig.yaw, followYaw, dt * lerp(1.15, 2.45, speed01));
     rig.targetDistance = (v.spec.kind === 'bike' ? 4.8 : 6.4) + speed01 * (v.spec.kind === 'boat' ? 1.2 : 2.1);
-    rig.pitch = lerp(rig.pitch, -0.13 - speed01 * 0.07, 0.025);
+    rig.pitch = lerp(rig.pitch, -0.13 - speed01 * 0.07, 1 - Math.pow(0.975, dt * 60));
   } else {
     _camTarget.copy(p.group.position); _camTarget.y += 1.5;
     rig.targetDistance = 4.5;
   }
+  const targetEase = p.inVehicle ? (1 - Math.pow(0.82, dt * 60)) : (1 - Math.pow(0.65, dt * 60));
   if (!rig.targetSmooth) rig.targetSmooth = new THREE.Vector3().copy(_camTarget);
-  else rig.targetSmooth.lerp(_camTarget, p.inVehicle ? 0.18 : 0.35);
+  else rig.targetSmooth.lerp(_camTarget, targetEase);
   _camTarget.copy(rig.targetSmooth);
-  rig.distance = lerp(rig.distance, rig.targetDistance, 0.08);
+  rig.distance = lerp(rig.distance, rig.targetDistance, 1 - Math.pow(0.92, dt * 60));
   const cy = Math.cos(rig.yaw), sy = Math.sin(rig.yaw);
   const cp = Math.cos(rig.pitch), sp = Math.sin(rig.pitch);
   _camOffset.set(sy * cp, -sp, cy * cp);                 // unit direction target → camera
@@ -404,7 +411,7 @@ export function updateCamera(dt) {
   // speed-based FOV kick while driving — a little sense of velocity
   const sp01 = p.inVehicle ? Math.min(1, Math.abs(p.inVehicle.vel) / p.inVehicle.spec.topSpeed) : 0;
   const targetFov = 72 + sp01 * 14;
-  if (Math.abs(rig.cam.fov - targetFov) > 0.05) { rig.cam.fov = lerp(rig.cam.fov, targetFov, 0.06); rig.cam.updateProjectionMatrix(); }
+  if (Math.abs(rig.cam.fov - targetFov) > 0.05) { rig.cam.fov = lerp(rig.cam.fov, targetFov, 1 - Math.pow(0.94, dt * 60)); rig.cam.updateProjectionMatrix(); }
 }
 
 // =============================================================================

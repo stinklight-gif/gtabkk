@@ -265,6 +265,12 @@ sidewalks are full, landing the noon view around ~800; the small hours drop back
 toward the ~370 floor. If it still chugs, lower `PED_TARGET`, raise the
 pedestrian/traffic despawn radius, or drop pixel ratio.
 
+The in-game visual budget overlay (`~` / F3) now turns the live scene metrics
+into pass/warn/fail checks. Current targets are 55+ FPS, <=900 draw calls,
+<=450k triangles, <=850 visible meshes, <=180 active entities, <=95 high-detail
+near LOD entities, and at least 8 far low-detail LOD entities. The CI realism
+probe exercises the same thresholds through `tools/realism_pass_test.mjs`.
+
 Repeated props (rooftop tanks/AC/antennas, lamps, poles, wires, Yaowarat
 lanterns, parked bikes) use `InstancedMesh`; pooled materials with night-emissive
 ramps are shared, so the per-frame day/night loop touches ~a dozen materials,

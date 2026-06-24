@@ -202,7 +202,11 @@ export function bindHud() {
     out.push({ name: 'Arcade · Tuk-Tuk Dash', status: 'mall floor 1', dist: d(poi.terminal) });
     out.push({ name: 'Riverside boats', status: 'longtails', dist: d(poi.pier) });
     out.push({ name: 'Taxi · press J', status: (G.taxi && G.taxi.stage && G.taxi.stage !== 'idle') ? 'fare active' : 'available', dist: null });
-    out.push({ name: 'Moto Drop · Y/J', status: (G.quickDrop && G.quickDrop.stage !== 'idle') ? 'active' : 'bike/tuk delivery', dist: null });
+    const qd = G.quickDrop;
+    const qdStatus = qd && qd.stage !== 'idle'
+      ? (qd.stage === 'toPickup' ? 'pickup' : `drop-off · streak ${qd.streak || 0}`)
+      : 'bike/tuk delivery';
+    out.push({ name: 'Moto Drop · Y/J', status: qdStatus, dist: null });
     out.sort((a, b) => (a.dist == null ? 1e9 : a.dist) - (b.dist == null ? 1e9 : b.dist));
     return out;
   }
@@ -294,7 +298,7 @@ export function bindHud() {
     if (G.quickDrop && G.quickDrop.stage !== 'idle' && G.quickDrop.markerPos) {
       const qx = (G.quickDrop.markerPos.x + HALF) * (256 / (HALF*2));
       const qy = (G.quickDrop.markerPos.z + HALF) * (256 / (HALF*2));
-      mctx.fillStyle = '#21f0ff';
+      mctx.fillStyle = G.quickDrop.stage === 'toPickup' ? '#ffcf4a' : '#21f0ff';
       mctx.beginPath(); mctx.arc(qx - ppx, qy - ppy, 4.5, 0, TAU); mctx.fill();
     }
     // bank-heist marker (vault / loot drop)
@@ -375,7 +379,7 @@ export function bindHud() {
     if (G.heist && G.heist.active && G.heist.markerPos) {
       target = G.heist.markerPos; color = G.heist.stage === 2 ? '#39ff7a' : '#ffcf4a'; label = G.heist.stage === 2 ? 'Loot drop' : 'Vault';
     } else if (G.quickDrop && G.quickDrop.stage !== 'idle' && G.quickDrop.markerPos) {
-      target = G.quickDrop.markerPos; color = '#21f0ff'; label = G.quickDrop.stage === 'toDropoff' ? 'Moto drop' : 'Pickup';
+      target = G.quickDrop.markerPos; color = G.quickDrop.stage === 'toPickup' ? '#ffcf4a' : '#21f0ff'; label = G.quickDrop.stage === 'toDropoff' ? 'Moto drop' : 'Moto pickup';
     } else if (G.taxi && G.taxi.stage && G.taxi.stage !== 'idle' && G.taxi.markerPos) {
       target = G.taxi.markerPos; color = '#39ff7a'; label = G.taxi.stage === 'toDropoff' ? 'Drop-off' : 'Pick-up';
     } else if (m && m.markerPos) { target = m.markerPos; color = '#ff2a86'; label = m.name || 'Objective'; }

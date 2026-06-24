@@ -38,7 +38,7 @@ async function main() {
     const page = await ctx.newPage();
     page.on('pageerror', e => errors.push('pageerror: ' + e.message));
     page.on('console', m => { if (m.type() === 'error') errors.push('console.error: ' + m.text()); });
-    await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'commit', timeout: 60_000 });
     await page.click('#slots button', { timeout: 180_000 });
     await page.waitForFunction(() => window.GAME && window.GAME.state === 'playing', null, { timeout: 180_000 });
     await page.evaluate(() => { const G = window.GAME; G.player.inVehicle = null; G.wanted.stars = 0; });
