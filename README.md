@@ -55,11 +55,14 @@ CDN is blocked, point `CHROME_PATH` at any Chrome/Chromium binary.
 | H | Honk (in vehicle) |
 | M | Car radio — cycle stations (Luk Thung / Bangkok Bars / Talk Radio / off) |
 | J | Start a taxi fare (in a songthaew) |
+| Y / J | Start Moto Drop (on a motorbike or tuk-tuk) |
 | T | Phone — pauses pointer lock and shows menu |
 | P | Photo mode — free-fly camera + hidden HUD (WASD/Space/Ctrl to fly, Shift faster) |
 | V | Start Vigilante (while in a cop vehicle) |
 | N | Cycle minimap zoom |
 | O | Options — mouse sensitivity + master volume |
+| `~` / F3 | Toggle visual/performance budget overlay |
+| F8 | Open vehicle/pedestrian showcase mode (Esc to return) |
 | E | Buy/rest at the safehouse · rent/retrieve at the garage (on foot) |
 | K | Store the current vehicle (in a car, inside the rented garage) |
 | C | Repaint the current vehicle (฿250, at the garage) |

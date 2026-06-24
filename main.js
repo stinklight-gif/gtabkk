@@ -22,7 +22,7 @@ export * from './traffic.js';
 import { buildTrafficLights, updateTrafficLights } from './traffic.js';
 export * from './entities.js';
 import {
-  animateWalk, makeCamera, makeDogMesh, makePedMesh, makePlayer, makeRain, makeVehicle, makeVehicleMesh, sidewalkPos, spawnBoat, spawnDog, spawnDogs, spawnParkedCars, spawnPed, spawnPeds, spawnTraffic
+  animateWalk, makeCamera, makeDogMesh, makePedMesh, makePlayer, makeRain, makeVehicle, makeVehicleMesh, sidewalkPos, spawnBoat, spawnDog, spawnDogs, spawnParkedCars, spawnPed, spawnPeds, spawnTraffic, updateEntityLod
 } from './entities.js';
 export * from './wanted.js';
 import {
@@ -665,6 +665,198 @@ export function taxiClear(t) {
   if (t.beam) t.beam.visible = false;
 }
 
+function perfClass(value, ok, warn, higherIsBetter = false) {
+  const good = higherIsBetter ? value >= ok : value <= ok;
+  const weak = higherIsBetter ? value >= warn : value <= warn;
+  return good ? 'ok' : weak ? 'warn' : 'bad';
+}
+function perfLine(label, value, cls, budget) {
+  return `${label.padEnd(13)} <span class="${cls}">${value}</span>${budget ? `  ${budget}` : ''}`;
+}
+export function updatePerformanceBudget(realDt) {
+  const p = G.perf || (G.perf = {
+    enabled: new URLSearchParams(location.search).has('debug'),
+    acc: 0, frames: 0, fps: 0, meshCount: 0, visibleMeshes: 0,
+  });
+  const el = document.getElementById('perf');
+  if (G.input && G.input.pressed && (G.input.pressed('F3') || G.input.pressed('Backquote'))) p.enabled = !p.enabled;
+  if (!el) return;
+  el.classList.toggle('show', !!p.enabled);
+  if (!p.enabled) return;
+  p.acc += realDt; p.frames++;
+  if (p.acc < 0.45) return;
+  p.fps = p.frames / Math.max(0.001, p.acc);
+  p.acc = 0; p.frames = 0;
+  let meshes = 0, visible = 0, instanced = 0;
+  G.scene.traverse(o => {
+    if (o.isMesh || o.isInstancedMesh || o.isSkinnedMesh) {
+      meshes++;
+      if (o.visible) visible++;
+      if (o.isInstancedMesh) instanced++;
+    }
+  });
+  p.meshCount = meshes; p.visibleMeshes = visible;
+  const info = G.renderer.info;
+  const r = info.render || {};
+  const mem = info.memory || {};
+  const sceneCalls = p.sceneCalls != null ? p.sceneCalls : (r.calls || 0);
+  const sceneTriangles = p.sceneTriangles != null ? p.sceneTriangles : (r.triangles || 0);
+  const lod = G.lodStats || {};
+  const nearEntities = (lod.nearPeds || 0) + (lod.nearVehicles || 0);
+  p.snapshot = {
+    fps: p.fps,
+    drawCalls: sceneCalls,
+    triangles: sceneTriangles,
+    meshes,
+    visibleMeshes: visible,
+    geometries: mem.geometries || 0,
+    textures: mem.textures || 0,
+    lod,
+  };
+  const lines = [
+    'VISUAL BUDGET',
+    perfLine('FPS', p.fps.toFixed(0), perfClass(p.fps, 55, 45, true), 'target 55+'),
+    perfLine('draw calls', String(sceneCalls), perfClass(sceneCalls, 900, 1200), 'budget 900'),
+    perfLine('triangles', `${Math.round(sceneTriangles / 1000)}k`, perfClass(sceneTriangles, 450000, 650000), 'budget 450k'),
+    perfLine('meshes', `${visible}/${meshes}`, perfClass(visible, 850, 1150), `inst ${instanced}`),
+    perfLine('entities', `${G.peds.length} peds · ${G.vehicles.length} veh`, perfClass(nearEntities, 95, 125), `${nearEntities} near`),
+    perfLine('ped LOD', `${lod.pedHigh || 0} high · ${lod.pedLow || 0} low`, 'ok'),
+    perfLine('car LOD', `${lod.vehicleHigh || 0} high · ${lod.vehicleLow || 0} low`, 'ok'),
+  ];
+  el.innerHTML = lines.join('\n');
+}
+
+function quickDropClear(q) {
+  q.stage = 'idle'; q.markerPos = null; q.dest = null; q.timeLeft = 0; q.reward = 0; q.policeCalled = false;
+  if (q.beam) q.beam.visible = false;
+}
+function quickDropDest(from) {
+  for (let i = 0; i < 18; i++) {
+    const p = taxiRandPoint(from, 190);
+    const d2 = dist2(p, from);
+    if (d2 > 85 * 85) return p;
+  }
+  return taxiRandPoint(from, 170);
+}
+export function updateQuickDelivery(dt) {
+  const q = G.quickDrop || (G.quickDrop = { stage: 'idle', markerPos: null, dest: null, beam: null, timeLeft: 0, reward: 0, deliveries: 0, policeCalled: false });
+  const p = G.player;
+  const v = p.inVehicle;
+  const courierRide = v && (v.kind === 'bike' || v.kind === 'tuktuk');
+  if (q.stage === 'idle') {
+    if (v && !courierRide) G.hud.showPrompt('Moto Drop needs a <b>bike</b> or <b>tuk-tuk</b>', 0.35);
+    if (courierRide) {
+      G.hud.showPrompt('Press <b>Y</b>/<b>J</b> for Moto Drop', 0.4);
+      if (G.input.pressed('KeyY') || G.input.pressed('KeyJ')) {
+        q.stage = 'toDropoff';
+        q.dest = quickDropDest(v.pos);
+        q.markerPos = q.dest;
+        const d = Math.sqrt(dist2(v.pos, q.dest));
+        q.timeLeft = 34 + d / 9;
+        q.reward = Math.round(420 + d * 7);
+        q.policeCalled = false;
+        taxiBeam(q, q.markerPos, 0x21f0ff);
+        G.hud.showNotif('Moto Drop — cut across traffic to the blue marker');
+        if (G.audio && G.audio.blip) G.audio.blip({ freq: 680, dur: 0.09, gain: 0.12 });
+      }
+    }
+    return;
+  }
+  if (!courierRide) { G.hud.showNotif('Moto Drop cancelled — lost the bike.'); quickDropClear(q); return; }
+  q.timeLeft -= dt;
+  if (!q.policeCalled && q.timeLeft < 24) {
+    q.policeCalled = true;
+    raiseWanted(Math.max(1, G.wanted.stars));
+    G.hud.showNotif('Dispatch heard the package call-in — keep moving.');
+  }
+  if (q.timeLeft <= 0) { G.hud.showNotif('Moto Drop failed — too slow.'); quickDropClear(q); return; }
+  G.hud.showPrompt(`MOTO DROP &nbsp; ⏱ ${q.timeLeft.toFixed(0)}s &nbsp;→&nbsp; ฿${q.reward.toLocaleString()}`, 0.4);
+  if (dist2(v.pos, q.dest) < 8 * 8) {
+    G.cash += q.reward;
+    q.deliveries++;
+    G.hud.setCash(G.cash); G.hud.cashPop(q.reward);
+    G.hud.showNotif(`Moto Drop delivered: +฿${q.reward.toLocaleString()} (${q.deliveries})`);
+    if (G.audio && G.audio.chime) G.audio.chime();
+    quickDropClear(q);
+  }
+}
+
+const SHOWCASE_VEHICLES = ['bike', 'tuktuk', 'camry', 'sedan', 'hilux', 'songthaew', 'bus', 'luxsedan', 'supercar', 'cop', 'fortuner', 'swat', 'boat'];
+const SHOWCASE_PEDS = ['local', 'office', 'tourist', 'monk', 'vendor', 'laborer'];
+function makeLabelSprite(text) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 64;
+  const ctx = c.getContext('2d');
+  ctx.font = 'bold 24px system-ui, sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(0,0,0,.9)'; ctx.fillStyle = '#f5e9c8';
+  ctx.strokeText(text, 128, 32); ctx.fillText(text, 128, 32);
+  const tex = new THREE.CanvasTexture(c);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+  sp.scale.set(2.9, 0.72, 1);
+  return sp;
+}
+function buildDebugShowcase() {
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0b1016);
+  const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 220);
+  camera.position.set(0, 13, 34);
+  camera.lookAt(0, 1.1, 0);
+  scene.add(new THREE.HemisphereLight(0xbdd8ff, 0x806f58, 0.9));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.8);
+  sun.position.set(8, 18, 10); scene.add(sun);
+  const root = new THREE.Group(); scene.add(root);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(46, 32), new THREE.MeshStandardMaterial({ color: 0x30363d, roughness: 0.9 }));
+  ground.rotation.x = -PI / 2; root.add(ground);
+  let i = 0;
+  for (const kind of SHOWCASE_VEHICLES) {
+    const mesh = makeVehicleMesh(kind);
+    const row = Math.floor(i / 5), col = i % 5;
+    mesh.position.set((col - 2) * 8.2, 0, row * 6.3 - 8.2);
+    mesh.rotation.y = PI * 0.16;
+    root.add(mesh);
+    const label = makeLabelSprite(kind);
+    label.position.set(mesh.position.x, 3.8, mesh.position.z + 2.8);
+    root.add(label);
+    i++;
+  }
+  for (let p = 0; p < SHOWCASE_PEDS.length; p++) {
+    const ped = makePedMesh(SHOWCASE_PEDS[p]);
+    ped.position.set((p - 2.5) * 2.1, 0, 10.5);
+    ped.rotation.y = PI;
+    root.add(ped);
+    const label = makeLabelSprite(SHOWCASE_PEDS[p]);
+    label.scale.set(1.8, 0.45, 1);
+    label.position.set(ped.position.x, 2.35, ped.position.z + 0.55);
+    root.add(label);
+  }
+  G.showcase = { scene, camera, root, yaw: 0 };
+}
+export function startDebugShowcase() {
+  if (!G.showcase) buildDebugShowcase();
+  G.state = 'showcase';
+  G._showcaseSkipKey = true;
+  document.exitPointerLock();
+  const hud = document.getElementById('hud'); if (hud) hud.classList.add('hidden');
+  const el = document.getElementById('showcase'); if (el) el.classList.add('show');
+}
+export function closeDebugShowcase() {
+  const el = document.getElementById('showcase'); if (el) el.classList.remove('show');
+  const hud = document.getElementById('hud'); if (hud) hud.classList.remove('hidden');
+  G.state = 'playing';
+  if (G.input && G.input.requestLock) G.input.requestLock();
+}
+export function updateDebugShowcase(dt) {
+  const s = G.showcase;
+  if (!s) return;
+  if (G._showcaseSkipKey) G._showcaseSkipKey = false;
+  else if (G.input.pressed('F8') || G.input.pressed('Escape')) { closeDebugShowcase(); return; }
+  const turn = (G.input.down('KeyA') ? 1 : 0) - (G.input.down('KeyD') ? 1 : 0);
+  s.yaw += (turn * 1.7 + 0.12) * dt;
+  s.root.rotation.y = s.yaw;
+  s.camera.aspect = window.innerWidth / window.innerHeight;
+  s.camera.updateProjectionMatrix();
+}
+
 // Full-screen, north-up map overlay (TAB). Draws the minimap base scaled up plus
 // live markers (amulets, mission/taxi, cops, player heading).
 let _fullmapCtx = null;
@@ -757,6 +949,13 @@ export function drawFullMap() {
     ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.arc(tx, tz, 12, 0, TAU); ctx.stroke();
   }
+  if (G.quickDrop && G.quickDrop.stage !== 'idle' && G.quickDrop.markerPos) {
+    const qx = to(G.quickDrop.markerPos.x), qz = to(G.quickDrop.markerPos.z);
+    ctx.fillStyle = '#21f0ff';
+    ctx.beginPath(); ctx.arc(qx, qz, 7, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#21f0ff'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(qx, qz, 12, 0, TAU); ctx.stroke();
+  }
   if (G.heist && G.heist.active && G.heist.markerPos) {
     const hx = to(G.heist.markerPos.x), hz = to(G.heist.markerPos.z);
     ctx.fillStyle = G.heist.stage === 2 ? '#39ff7a' : '#ffcf4a';
@@ -810,8 +1009,9 @@ export function drawFullMap() {
   // Objective line (bottom center): the active target name + live distance.
   let objText = 'No active objective — free roam', op = null, on = null;
   if (G.heist && G.heist.active && G.heist.markerPos) { op = G.heist.markerPos; on = G.heist.stage === 2 ? 'Bank Heist — loot drop' : 'Bank Heist — crack the vault'; }
-  else if (G.mission && G.mission.active && G.mission.active.markerPos) { op = G.mission.active.markerPos; on = G.mission.active.name || 'Objective'; }
+  else if (G.quickDrop && G.quickDrop.stage !== 'idle' && G.quickDrop.markerPos) { op = G.quickDrop.markerPos; on = G.quickDrop.stage === 'toDropoff' ? 'Moto Drop' : 'Moto pickup'; }
   else if (G.taxi && G.taxi.stage && G.taxi.stage !== 'idle' && G.taxi.markerPos) { op = G.taxi.markerPos; on = G.taxi.stage === 'toDropoff' ? 'Taxi drop-off' : 'Taxi pick-up'; }
+  else if (G.mission && G.mission.active && G.mission.active.markerPos) { op = G.mission.active.markerPos; on = G.mission.active.name || 'Objective'; }
   if (op) {
     const pp = (G.player.inVehicle && G.player.inVehicle.pos) || G.player.group.position;
     objText = `Objective: ${on} — ${Math.round(Math.hypot(op.x - pp.x, op.z - pp.z))} m`;
@@ -935,9 +1135,14 @@ function renderBloom() {
   const b = G.bloom, r = G.renderer;
   // fallback / opt-out (G.noBloom is set by the headless gameplay probes, which
   // don't need the effect and run far faster without it under SwiftShader)
-  if (!b || G.noBloom) { r.toneMapping = THREE.ACESFilmicToneMapping; r.setRenderTarget(null); r.render(G.scene, G.camera); return; }
+  if (!b || G.noBloom) {
+    r.toneMapping = THREE.ACESFilmicToneMapping; r.setRenderTarget(null); r.render(G.scene, G.camera);
+    if (G.perf) { G.perf.sceneCalls = r.info.render.calls || 0; G.perf.sceneTriangles = r.info.render.triangles || 0; }
+    return;
+  }
   r.toneMapping = THREE.NoToneMapping;   // sceneRT holds linear HDR; the composite applies ACES + sRGB
   r.setRenderTarget(b.sceneRT); r.render(G.scene, G.camera);
+  if (G.perf) { G.perf.sceneCalls = r.info.render.calls || 0; G.perf.sceneTriangles = r.info.render.triangles || 0; }
   b.quad.material = b.brightMat; b.brightMat.uniforms.tDiffuse.value = b.sceneRT.texture;
   r.setRenderTarget(b.bloomA); r.render(b.quadScene, b.quadCam);
   b.quad.material = b.blurMat;
@@ -1010,6 +1215,21 @@ export function loop() {
     }
   }
 
+  if (G.input && G.input.pressed && G.input.pressed('F8') && G.state !== 'showcase' && G.state !== 'loading') {
+    startDebugShowcase();
+  }
+
+  if (G.input) updatePerformanceBudget(realDt);
+  if (G.state === 'showcase') {
+    updateDebugShowcase(realDt);
+    if (G.input.endFrame) G.input.endFrame();
+    if (G.showcase) {
+      G.renderer.setRenderTarget(null);
+      G.renderer.render(G.showcase.scene, G.showcase.camera);
+    }
+    return;
+  }
+
   if (G.state === 'playing') {
     updatePlayer(dt);
     updateDistrict();
@@ -1022,9 +1242,11 @@ export function loop() {
     updateRadio(dt);
     if (G.audio && G.audio.updateMusic) G.audio.updateMusic(dt);   // dynamic music bed + G-watched audio events (alarm, boat motor)
     updateTaxi(dt);
+    updateQuickDelivery(dt);
     updateTrafficLights(dt);   // advance the signal phase before cars/peds read it
     updateVehicles(dt);
     updatePeds(dt);
+    updateEntityLod();
     updateClusters(dt);
     updateBarks(dt);
     updateMuggings(dt);

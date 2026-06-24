@@ -112,6 +112,23 @@ export function updatePeds(dt) {
   const playerPos = G.player.group.position;
   for (const ped of G.peds) {
     if (ped.dead) continue;
+    if (!ped.gang && ped.panicT <= 0 && !ped.anchor) {
+      for (const v of G.vehicles) {
+        if (!v || v.dead || Math.abs(v.vel || 0) < 7) continue;
+        const dx = ped.mesh.position.x - v.pos.x, dz = ped.mesh.position.z - v.pos.z;
+        const d2 = dx * dx + dz * dz;
+        if (d2 > 5.5 * 5.5) continue;
+        const fwd = Math.sin(v.heading) * dx + Math.cos(v.heading) * dz;
+        if (fwd < -1.8) continue;
+        const d = Math.sqrt(d2) || 1;
+        ped.heading = Math.atan2(dx, dz);
+        ped.panicT = Math.max(ped.panicT, 2.8);
+        ped.knockX = (ped.knockX || 0) + dx / d * Math.min(2.6, Math.abs(v.vel) * 0.08);
+        ped.knockZ = (ped.knockZ || 0) + dz / d * Math.min(2.6, Math.abs(v.vel) * 0.08);
+        if ((!G.barks || G.barks.length < 8) && Math.random() < 0.08) spawnBark(ped);
+        break;
+      }
+    }
     // gang member: chase the player and swing on contact (set heading/speed; the
     // shared move + animate code below applies it)
     if (ped.gang) {
@@ -154,6 +171,29 @@ export function updatePeds(dt) {
       const d = Math.hypot(dx, dz);
       if (d > 0.5) { ped.heading = Math.atan2(dx, dz); ped.speed = 1.1; ped.state = 'returning'; }
       else { ped.speed = 0; ped.state = 'idle'; ped.heading = ped.anchor.facing; }
+    } else if (ped.social) {
+      const slot = ped.social.slot;
+      const dx = slot.x - ped.mesh.position.x, dz = slot.z - ped.mesh.position.z;
+      const d = Math.hypot(dx, dz);
+      if (d > 0.45) {
+        ped.heading = Math.atan2(dx, dz);
+        ped.speed = 0.85;
+        ped.state = 'social';
+      } else {
+        ped.speed = 0;
+        ped.state = 'social';
+        ped.heading = ped.social.facing + Math.sin((ped.social.idlePhase || 0) + performance.now() * 0.001) * 0.12;
+      }
+    } else if (ped.state === 'waitingCrossing') {
+      ped.speed = 0;
+      const probeSpeed = 1.1;
+      const nx = ped.mesh.position.x + Math.sin(ped.heading) * probeSpeed * dt;
+      const nz = ped.mesh.position.z + Math.cos(ped.heading) * probeSpeed * dt;
+      if (!steppingIntoLiveRoad(ped.mesh.position.x, ped.mesh.position.z, nx, nz)) {
+        ped.state = 'walking';
+        ped.speed = rand(0.9, 1.7);
+        ped.waitT = rand(1.0, 2.4);
+      }
     } else if (ped.state === 'walking') {
       // light wander, mostly on sidewalk side of block
       ped.waitT -= dt;
@@ -168,7 +208,27 @@ export function updatePeds(dt) {
     if (ped.state === 'walking' && ped.speed > 0.05 && !ped.gang && ped.panicT <= 0 && !ped.anchor && !ped.isMugger && !ped.isTarget) {
       const nx = ped.mesh.position.x + Math.sin(ped.heading) * ped.speed * dt;
       const nz = ped.mesh.position.z + Math.cos(ped.heading) * ped.speed * dt;
-      if (steppingIntoLiveRoad(ped.mesh.position.x, ped.mesh.position.z, nx, nz)) ped.speed = 0;
+      if (steppingIntoLiveRoad(ped.mesh.position.x, ped.mesh.position.z, nx, nz)) {
+        ped.speed = 0;
+        ped.state = 'waitingCrossing';
+      }
+    }
+    if (!ped.gang && ped.panicT <= 0 && !ped.anchor) {
+      let ax = 0, az = 0, n = 0;
+      for (const other of G.peds) {
+        if (other === ped || other.dead) continue;
+        const dx = ped.mesh.position.x - other.mesh.position.x, dz = ped.mesh.position.z - other.mesh.position.z;
+        const d2 = dx * dx + dz * dz;
+        if (d2 <= 0.0001 || d2 > 0.9 * 0.9) continue;
+        const d = Math.sqrt(d2);
+        const push = (0.9 - d) / 0.9;
+        ax += dx / d * push; az += dz / d * push; n++;
+        if (n >= 4) break;
+      }
+      if (n) {
+        ped.mesh.position.x += ax * dt * 0.7;
+        ped.mesh.position.z += az * dt * 0.7;
+      }
     }
     ped.mesh.position.x += Math.sin(ped.heading) * ped.speed * dt;
     ped.mesh.position.z += Math.cos(ped.heading) * ped.speed * dt;
@@ -191,6 +251,11 @@ export function updatePeds(dt) {
     // (anchored cluster peds stay put — they belong to a stall/store)
     if (!ped.anchor && dist2(ped.mesh.position, playerPos) > 170*170) {
       ped.mesh.position.copy(sidewalkPos(playerPos.x, playerPos.z, 75));
+      if (ped.social) {
+        ped.social = null;
+        ped.state = 'walking';
+        ped.speed = rand(0.9, 1.7);
+      }
     }
   }
   // keep the streets populated to the time-of-day target — busy at rush hour,

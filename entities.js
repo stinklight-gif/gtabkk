@@ -174,6 +174,81 @@ function addMirrors(root, dims, trim) {
   }
 }
 
+function configureLodGroup(group, low) {
+  const high = group.children.slice();
+  low.name = 'lod-low';
+  low.visible = false;
+  low.userData.lodProxy = true;
+  group.add(low);
+  group.userData.lod = { high, low, state: 'high' };
+}
+
+export function setGroupLod(group, mode) {
+  const lod = group && group.userData && group.userData.lod;
+  if (!lod || lod.state === mode) return;
+  const highVisible = mode !== 'low';
+  for (const child of lod.high) child.visible = highVisible;
+  lod.low.visible = !highVisible;
+  lod.state = mode;
+}
+
+function makePedLodProxy(shirtColor, pantsColor, skinColor, kind) {
+  const low = new THREE.Group();
+  const shirt = new THREE.MeshBasicMaterial({ color: shirtColor });
+  const pants = new THREE.MeshBasicMaterial({ color: pantsColor });
+  const skin = new THREE.MeshBasicMaterial({ color: skinColor });
+  const dark = new THREE.MeshBasicMaterial({ color: 0x171717 });
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.66, 0.22), shirt);
+  torso.position.y = 1.08; low.add(torso);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 6, 5), skin);
+  head.position.y = 1.52; low.add(head);
+  const legs = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.58, 0.18), pants);
+  legs.position.y = 0.5; low.add(legs);
+  const shoes = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.08, 0.22), dark);
+  shoes.position.y = 0.1; low.add(shoes);
+  if (kind === 'vendor' || kind === 'laborer') {
+    const hat = new THREE.Mesh(new THREE.ConeGeometry(0.23, 0.16, 7), new THREE.MeshBasicMaterial({ color: 0xcba76a }));
+    hat.position.y = 1.66; low.add(hat);
+  }
+  return low;
+}
+
+function vehicleBodyColor(group) {
+  let best = null, bestVol = -1;
+  group.traverse(o => {
+    if (!o.isMesh || !o.material || !o.material.color || !o.geometry) return;
+    if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+    const b = o.geometry.boundingBox;
+    const vol = (b.max.x - b.min.x) * (b.max.y - b.min.y) * (b.max.z - b.min.z);
+    if (vol > bestVol) { bestVol = vol; best = o.material.color.getHex(); }
+  });
+  return best == null ? 0x777777 : best;
+}
+
+function makeVehicleLodProxy(group, kind) {
+  const dims = group.userData.dims;
+  if (!dims) return null;
+  const low = new THREE.Group();
+  const paint = new THREE.MeshBasicMaterial({ color: vehicleBodyColor(group) });
+  const dark = new THREE.MeshBasicMaterial({ color: 0x111111 });
+  const glass = new THREE.MeshBasicMaterial({ color: 0x182331 });
+  if (kind === 'bike') {
+    addVehicleBox(low, [0.42, 0.32, 1.45], paint, [0, 0.52, 0], null, false);
+    addVehicleBox(low, [0.58, 0.08, 0.08], dark, [0, 0.95, 0.52], null, false);
+    for (const z of [-0.7, 0.7]) addVehicleBox(low, [0.12, 0.55, 0.55], dark, [0, 0.3, z], null, false);
+  } else if (kind === 'boat') {
+    addVehicleBox(low, [dims.W, 0.48, dims.L], paint, [0, 0.35, 0], null, false);
+    addVehicleBox(low, [0.12, 0.1, dims.L * 1.15], dark, [0, 0.76, -0.25], [0.25, 0, 0], false);
+  } else {
+    addVehicleBox(low, [dims.W * 0.94, Math.max(0.42, dims.H * 0.35), dims.L * 0.96], paint, [0, Math.max(0.55, dims.H * 0.3), 0], null, false);
+    addVehicleBox(low, [dims.W * 0.72, Math.max(0.28, dims.H * 0.25), dims.L * 0.34], glass, [0, Math.max(1.0, dims.H * 0.58), dims.L * 0.03], null, false);
+    for (const z of [-dims.L * 0.34, dims.L * 0.34]) for (const x of [-dims.W * 0.42, dims.W * 0.42]) {
+      addVehicleBox(low, [0.16, 0.34, 0.34], dark, [x, 0.32, z], null, false);
+    }
+  }
+  return low;
+}
+
 function enhanceVehicleVisual(g, kind) {
   const dims = g.userData.dims;
   if (!dims || kind === 'boat') return;
@@ -216,6 +291,40 @@ function enhanceVehicleVisual(g, kind) {
       if (kind !== 'bus' && kind !== 'swat') addWheelArch(g, x, z, r, trim);
     }
   }
+}
+
+export function updateEntityLod() {
+  if (!G.player) return;
+  const viewer = (G.player.inVehicle && G.player.inVehicle.pos) || G.player.group.position;
+  const pedNear = 46 * 46, pedFar = 62 * 62;
+  const vehNear = 72 * 72, vehFar = 96 * 96;
+  const stats = { pedHigh: 0, pedLow: 0, vehicleHigh: 0, vehicleLow: 0, nearPeds: 0, nearVehicles: 0 };
+
+  for (const ped of G.peds) {
+    if (!ped || ped.dead || !ped.mesh) continue;
+    const d2 = dist2(ped.mesh.position, viewer);
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor;
+    if (d2 < pedNear) stats.nearPeds++;
+    let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
+    if (special) mode = 'high';
+    else if (mode === 'high' && d2 > pedFar) mode = 'low';
+    else if (mode === 'low' && d2 < pedNear) mode = 'high';
+    setGroupLod(ped.mesh, mode);
+    if (mode === 'low') stats.pedLow++; else stats.pedHigh++;
+  }
+
+  for (const v of G.vehicles) {
+    if (!v || v.dead || !v.mesh) continue;
+    const d2 = dist2(v.pos, viewer);
+    if (d2 < vehNear) stats.nearVehicles++;
+    let mode = v.mesh.userData.lod && v.mesh.userData.lod.state || 'high';
+    if (v.driver === 'player') mode = 'high';
+    else if (mode === 'high' && d2 > vehFar) mode = 'low';
+    else if (mode === 'low' && d2 < vehNear) mode = 'high';
+    setGroupLod(v.mesh, mode);
+    if (mode === 'low') stats.vehicleLow++; else stats.vehicleHigh++;
+  }
+  G.lodStats = stats;
 }
 
 export function makeVehicleMesh(kind) {
@@ -423,6 +532,8 @@ export function makeVehicleMesh(kind) {
     g.userData.spec = { topSpeed: 24, accel: 11, brake: 16, turn: 1.7, mass: 1500, kind };
   }
   enhanceVehicleVisual(g, kind);
+  const low = makeVehicleLodProxy(g, kind);
+  if (low) configureLodGroup(g, low);
   return g;
 }
 
@@ -478,11 +589,12 @@ export function makeVehicle(kind, scene) {
 // skin (Bangkok heat) so recoloring the torso never leaves mismatched sleeves.
 // Shoes parent to the legs and hands to the arms, so they ride the walk swing for
 // free; a short neck bridges shoulders to head so it doesn't float.
-export function makePedMesh() {
+export function makePedMesh(forcedKind = null) {
   const g = new THREE.Group();
   const roll = Math.random();
   let kind;
-  if (roll < 0.07) kind = 'monk';
+  if (forcedKind) kind = forcedKind;
+  else if (roll < 0.07) kind = 'monk';
   else if (roll < 0.20) kind = 'tourist';
   else if (roll < 0.34) kind = 'office';
   else if (roll < 0.44) kind = 'vendor';
@@ -583,11 +695,37 @@ export function makePedMesh() {
     bowl.rotation.x = PI; bowl.position.set(0, 1.0, 0.2); g.add(bowl);
   }
 
+  const accessoryRoll = Math.random();
+  if (accessoryRoll < 0.18 && kind !== 'monk') {
+    const phone = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.09, 0.014), new THREE.MeshStandardMaterial({ color: 0x0b0d12, roughness: 0.45, metalness: 0.25 }));
+    phone.position.set(0.025, -0.51, 0.07);
+    phone.rotation.set(0.45, 0.15, -0.25);
+    armL.add(phone);
+    g.userData.accessory = 'phone';
+  } else if (accessoryRoll < 0.29 && kind !== 'monk') {
+    const bag = new THREE.Mesh(
+      new THREE.BoxGeometry(0.14, 0.22, 0.18),
+      new THREE.MeshStandardMaterial({ color: pick([0x8a6435, 0xe0d0a8, 0x314a66, 0xa33a3a]), roughness: 0.8 })
+    );
+    bag.position.set(0, -0.58, 0.04);
+    armL.add(bag);
+    g.userData.accessory = 'shopping-bag';
+  } else if (accessoryRoll < 0.36 && kind !== 'monk') {
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.78, 5), new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.5 }));
+    shaft.position.set(-0.23, 1.42, 0.02); g.add(shaft);
+    const canopy = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.22, 14), new THREE.MeshStandardMaterial({ color: pick([0xffcf4a, 0x2a8fc0, 0xc04a74, 0xf0f0f0]), roughness: 0.75 }));
+    canopy.position.set(-0.23, 1.88, 0.02);
+    canopy.rotation.x = PI;
+    g.add(canopy);
+    g.userData.accessory = 'umbrella';
+  }
+
   const build = rand(0.92, 1.08);
   g.scale.set(build, rand(0.94, 1.06), build);
   g.userData.parts = { torso, head, legL, legR, armL, armR };
   g.userData.kind = kind;
   g.userData.phase = rand(0, TAU);
+  configureLodGroup(g, makePedLodProxy(shirtColor, pantsColor, skin, kind));
   return g;
 }
 
@@ -666,6 +804,28 @@ export function spawnPed(scene, pos) {
   };
   G.peds.push(ped);
   return ped;
+}
+
+export function spawnPedGroup(scene, center, count = irand(2, 3)) {
+  const facing = rand(0, TAU);
+  const group = { center: center.clone(), facing, peds: [] };
+  for (let i = 0; i < count; i++) {
+    const a = facing + (i / count) * TAU + rand(-0.25, 0.25);
+    const r = rand(0.75, 1.35);
+    const pos = center.clone().add(new THREE.Vector3(Math.sin(a) * r, 0, Math.cos(a) * r));
+    const ped = spawnPed(scene, pos);
+    ped.social = {
+      group,
+      slot: pos.clone(),
+      facing: Math.atan2(center.x - pos.x, center.z - pos.z),
+      idlePhase: rand(0, TAU),
+    };
+    ped.state = 'social';
+    ped.speed = 0;
+    ped.mesh.rotation.y = ped.social.facing;
+    group.peds.push(ped);
+  }
+  return group;
 }
 
 export function spawnDog(scene, pos) {
@@ -752,7 +912,14 @@ export function spawnBoat(scene) {
 
 export function spawnPeds(scene, n) {
   for (let i = 0; i < n; i++) {
-    spawnPed(scene, sidewalkPos(rand(-HALF + 12, HALF - 12), rand(-HALF + 12, HALF - 12), 8));
+    const pos = sidewalkPos(rand(-HALF + 12, HALF - 12), rand(-HALF + 12, HALF - 12), 8);
+    if (i < n - 2 && Math.random() < 0.16) {
+      const count = irand(2, 3);
+      spawnPedGroup(scene, pos, count);
+      i += count - 1;
+    } else {
+      spawnPed(scene, pos);
+    }
   }
 }
 

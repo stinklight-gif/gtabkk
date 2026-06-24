@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
-import { killCop, killPed, raiseWanted } from './main.js';
+import { killCop, killPed, raiseWanted, spawnBark } from './main.js';
 
 // pooled fire FX lights (combat-local mutable state)
 let _muzzleLight = null, _sparkLight = null, _muzzleT = 0, _sparkT = 0;
@@ -246,7 +246,16 @@ export function scarePeds(pos, radius) {
   const r2 = radius * radius;
   for (const ped of G.peds) {
     if (ped.dead) continue;
-    if (dist2(ped.mesh.position, pos) < r2) ped.panicT = Math.max(ped.panicT, 4);
+    if (dist2(ped.mesh.position, pos) < r2) {
+      const dx = ped.mesh.position.x - pos.x, dz = ped.mesh.position.z - pos.z;
+      const d = Math.hypot(dx, dz) || 1;
+      ped.heading = Math.atan2(dx, dz);
+      ped.panicT = Math.max(ped.panicT, 5.5);
+      ped.knockX = (ped.knockX || 0) + dx / d * 1.2;
+      ped.knockZ = (ped.knockZ || 0) + dz / d * 1.2;
+      ped._barkCD = Math.min(ped._barkCD || 0, 0.2);
+      if ((!G.barks || G.barks.length < 8) && Math.random() < 0.18) spawnBark(ped);
+    }
   }
 }
 

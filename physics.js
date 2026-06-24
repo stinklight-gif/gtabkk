@@ -123,6 +123,51 @@ export function resolveVehicleVsBuildings(v) {
   p.z = clamp(p.z, -HALF + 1, HALF - 1);
 }
 
+export function resolveVehicleVsVehicles(v) {
+  if (!v || v.dead || !v.boundsHalf) return;
+  const vr = Math.max(v.boundsHalf.x, v.boundsHalf.z) * 0.82;
+  let moved = false;
+  for (const o of G.vehicles) {
+    if (o === v || o.dead || !o.boundsHalf) continue;
+    const or = Math.max(o.boundsHalf.x, o.boundsHalf.z) * 0.82;
+    const min = Math.max(1.05, vr + or);
+    const dx = v.pos.x - o.pos.x, dz = v.pos.z - o.pos.z;
+    const d2 = dx * dx + dz * dz;
+    if (d2 <= 0.0001 || d2 > min * min) continue;
+    const d = Math.sqrt(d2), nx = dx / d, nz = dz / d;
+    const overlap = min - d;
+    const oLocked = o.driver && o.driver !== 'player';
+    const vShare = oLocked ? 0.85 : 0.55;
+    const oShare = oLocked ? 0.15 : 0.45;
+    v.pos.x += nx * overlap * vShare;
+    v.pos.z += nz * overlap * vShare;
+    moved = true;
+    if (!oLocked) {
+      o.pos.x -= nx * overlap * oShare;
+      o.pos.z -= nz * overlap * oShare;
+      o.mesh.position.copy(o.pos);
+    }
+
+    const rel = Math.abs((v.vel || 0) - (o.vel || 0));
+    const playerHit = v.driver === 'player' || o.driver === 'player';
+    if (rel > 3.5 && performance.now() - (v._vehHitAt || 0) > 260) {
+      v._vehHitAt = performance.now();
+      const dmg = Math.max(1, (rel - 3.5) * 0.8) * (v.spec.armorMul != null ? v.spec.armorMul : 1);
+      v.hp -= dmg;
+      o.hp -= Math.max(0.5, dmg * 0.65);
+      spawnDust((v.pos.x + o.pos.x) * 0.5, (v.pos.z + o.pos.z) * 0.5, playerHit ? 18 : 9);
+      if (playerHit) {
+        G.camRig.shake = Math.max(G.camRig.shake || 0, Math.min(0.38, rel * 0.025));
+        if (G.audio && G.audio.hit) G.audio.hit();
+      }
+    }
+    const damp = rel > 2 ? 0.55 : 0.78;
+    v.vel *= damp;
+    if (!oLocked) o.vel *= 0.75;
+  }
+  if (moved && v.mesh) v.mesh.position.copy(v.pos);
+}
+
 // ---- Juice FX: tire-skid decals + impact dust puffs ----
 export const _skidGeo = new THREE.PlaneGeometry(0.34, 1.2); _skidGeo.rotateX(-PI / 2);  // lies flat, length along +Z
 export const _skidMat = new THREE.MeshBasicMaterial({ color: 0x0b0b0b, transparent: true, opacity: 0.5, depthWrite: false });

@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, UPGRADES, rankDiscount, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
-import { tip, cycleWeapon, damagePlayer, firePistol, fireSMG, fireShotgun, makeExplosion, makeSmokeEmitter, makeVehicle, onCopKilled, raiseWanted, resolveVehicleVsBuildings, saveGame, spawnSkid, updateAmmoHud, updateCop, vehicleName } from './main.js';
+import { tip, cycleWeapon, damagePlayer, firePistol, fireSMG, fireShotgun, makeExplosion, makeSmokeEmitter, makeVehicle, onCopKilled, raiseWanted, resolveVehicleVsBuildings, resolveVehicleVsVehicles, saveGame, spawnSkid, updateAmmoHud, updateCop, vehicleName } from './main.js';
 import { lightFor } from './traffic.js';
 
 export function updateVehicleVisuals(v, dt, opts={}) {
@@ -65,39 +65,47 @@ export function updatePlayerInVehicle(dt) {
   const boost = G.input.down('ShiftLeft');
 
   const spec = v.spec;
-  // accel
-  if (forward > 0) v.vel += spec.accel * (boost ? (spec.nitroAcc || 1.3) : 1) * dt;
+  const inputEase = 1 - Math.pow(0.035, dt);
+  v.throttle = lerp(v.throttle || 0, forward > 0 ? 1 : 0, inputEase);
+  v.brakeInput = lerp(v.brakeInput || 0, forward < 0 ? 1 : 0, inputEase);
+  v.steerInput = lerp(v.steerInput || 0, steer, 1 - Math.pow(0.02, dt));
+  const mass = spec.mass || 1500;
+  const weight = clamp(1500 / mass, 0.58, 1.25);
+  const traction = slip ? 0.72 : 1;
+  if (forward > 0) v.vel += spec.accel * v.throttle * (boost ? (spec.nitroAcc || 1.3) : 1) * weight * traction * dt;
   else if (forward < 0) {
-    if (v.vel > 0.2) v.vel -= spec.brake * dt;
-    else v.vel -= spec.accel * 0.6 * dt; // reverse
+    if (v.vel > 0.25) v.vel -= spec.brake * v.brakeInput * dt;
+    else v.vel -= spec.accel * 0.55 * v.brakeInput * weight * dt; // reverse
   } else {
-    v.vel *= Math.pow(slip ? 0.995 : 0.985, dt * 60);   // wet Songkran roads glide
+    const coast = spec.kind === 'boat' ? 0.992 : slip ? 0.996 : 0.982;
+    v.vel *= Math.pow(coast, dt * 60);
   }
-  if (handbrake) v.vel *= Math.pow(0.94, dt*60);
+  if (handbrake) v.vel *= Math.pow(spec.kind === 'bike' ? 0.965 : 0.93, dt * 60);
   const speedMul = v.tiresBlown ? 0.5 : 1;   // spike strips halve your top speed
   v.vel = clamp(v.vel, -spec.topSpeed * 0.4 * speedMul, spec.topSpeed * (boost ? (spec.nitroTop || 1.15) : 1) * speedMul);
-  // steering — speed dependent
-  const steerRate = spec.turn * (1 - Math.min(1, Math.abs(v.vel)/spec.topSpeed) * 0.4);
-  // ramp steering in with speed (0 at a dead stop, full by ~0.6) so slow reverse
-  // and creeping forward still turn instead of hitting a hard dead zone.
-  v.heading += steer * steerRate * dt * (v.vel >= 0 ? 1 : -1) * Math.min(1, Math.abs(v.vel) / 0.6);
-  v.steerAngle = lerp(v.steerAngle || 0, steer * 0.48, 0.22);
+  const speed01 = Math.min(1, Math.abs(v.vel) / Math.max(1, spec.topSpeed));
+  const steerLimit = lerp(0.55, 0.34, speed01);
+  v.steerAngle = lerp(v.steerAngle || 0, v.steerInput * steerLimit, 0.18);
+  const lowSpeed = clamp(Math.abs(v.vel) / 1.2, 0.28, 1);
+  const highSpeed = lerp(1, 0.58, speed01);
+  const boatMul = spec.kind === 'boat' ? 0.55 : 1;
+  v.heading += v.steerAngle * spec.turn * lowSpeed * highSpeed * weight * boatMul * dt * (v.vel >= 0 ? 1 : -1);
   // arcade handbrake drift: extra oversteer + lay rubber while sliding
-  if (handbrake && Math.abs(v.vel) > 6 && Math.abs(steer) > 0.15 && spec.kind !== 'boat' && spec.kind !== 'bike') {
-    v.heading += steer * 1.5 * dt * (v.vel >= 0 ? 1 : -1);
+  if (handbrake && Math.abs(v.vel) > 6 && Math.abs(v.steerInput) > 0.15 && spec.kind !== 'boat' && spec.kind !== 'bike') {
+    v.heading += v.steerInput * 1.35 * dt * (v.vel >= 0 ? 1 : -1);
     spawnSkid(v);
   }
-  if (slip && !handbrake && Math.abs(v.vel) > 5 && Math.abs(steer) > 0.1) {   // wet-road slide
-    v.heading += steer * 0.5 * dt * (v.vel >= 0 ? 1 : -1);
+  if (slip && !handbrake && Math.abs(v.vel) > 5 && Math.abs(v.steerInput) > 0.1) {   // wet-road slide
+    v.heading += v.steerInput * 0.45 * dt * (v.vel >= 0 ? 1 : -1);
     spawnSkid(v);
   }
 
   // motorbike lean
   if (v.spec.kind === 'bike') {
-    v.mesh.rotation.z = lerp(v.mesh.rotation.z || 0, -steer * 0.35, 0.15);
+    v.mesh.rotation.z = lerp(v.mesh.rotation.z || 0, -v.steerInput * 0.35, 0.15);
   } else if (v.spec.kind === 'tuktuk') {
     // tippy oversteer wiggle
-    v.mesh.rotation.z = lerp(v.mesh.rotation.z || 0, -steer * 0.18 + Math.sin(performance.now()*0.01)*0.02, 0.2);
+    v.mesh.rotation.z = lerp(v.mesh.rotation.z || 0, -v.steerInput * 0.18 + Math.sin(performance.now()*0.01)*0.02, 0.2);
   }
 
   // apply motion
@@ -116,7 +124,10 @@ export function updatePlayerInVehicle(dt) {
     reverse: forward < 0 && v.vel < -0.1,
   });
 
-  if (v.spec.kind !== 'boat') resolveVehicleVsBuildings(v);
+  if (v.spec.kind !== 'boat') {
+    resolveVehicleVsBuildings(v);
+    resolveVehicleVsVehicles(v);
+  }
 
   // place player at seat (invisible while inside)
   p.group.visible = false;
@@ -294,6 +305,7 @@ export function updateTrafficCar(v, dt) {
   }
 
   const target = Math.min(obstacleTarget, signalTarget);
+  const braking = target < v.vel - 0.1;
   if (v.vel < target) v.vel = Math.min(target, v.vel + v.spec.accel * dt);
   else v.vel = Math.max(target, v.vel - v.spec.brake * 1.4 * dt);
 
@@ -313,7 +325,8 @@ export function updateTrafficCar(v, dt) {
   else if (v.spec.kind === 'tuktuk') v.mesh.rotation.z = lerp(v.mesh.rotation.z || 0, -v.steerAngle * 0.35, 0.18);
   v.mesh.position.copy(v.pos);
   v.mesh.rotation.y = v.heading;
-  updateVehicleVisuals(v, dt, { braking: target < v.vel, reverse: v.vel < -0.1 });
+  updateVehicleVisuals(v, dt, { braking, reverse: v.vel < -0.1 });
+  if (v.spec.kind !== 'boat') resolveVehicleVsVehicles(v);
 
   // honk only when something's actually blocking us while the light is green —
   // not while we're simply waiting our turn at a red.
@@ -351,15 +364,24 @@ export function updateCamera(dt) {
   const shakeY = (Math.random()*2-1) * rig.shake;
 
   if (p.inVehicle) {
-    _camTarget.copy(p.inVehicle.pos); _camTarget.y += 1.2;
-    // chase camera: ride behind the vehicle heading, but slow yaw follow lets player look around
-    const followYaw = p.inVehicle.heading + PI; // behind
-    rig.yaw = lerpAngle(rig.yaw, followYaw, dt * 1.4);
-    rig.targetDistance = p.inVehicle.spec.kind === 'bike' ? 4.8 : 6.5;
+    const v = p.inVehicle;
+    const speed01 = Math.min(1, Math.abs(v.vel) / Math.max(1, v.spec.topSpeed));
+    _camTarget.copy(v.pos);
+    _camTarget.y += lerp(1.05, 1.55, speed01);
+    const side = (v.steerAngle || 0) * lerp(0.5, 1.35, speed01);
+    _camTarget.x += Math.cos(v.heading) * side;
+    _camTarget.z += -Math.sin(v.heading) * side;
+    const followYaw = v.heading + PI; // behind
+    rig.yaw = lerpAngle(rig.yaw, followYaw, dt * lerp(1.15, 2.45, speed01));
+    rig.targetDistance = (v.spec.kind === 'bike' ? 4.8 : 6.4) + speed01 * (v.spec.kind === 'boat' ? 1.2 : 2.1);
+    rig.pitch = lerp(rig.pitch, -0.13 - speed01 * 0.07, 0.025);
   } else {
     _camTarget.copy(p.group.position); _camTarget.y += 1.5;
     rig.targetDistance = 4.5;
   }
+  if (!rig.targetSmooth) rig.targetSmooth = new THREE.Vector3().copy(_camTarget);
+  else rig.targetSmooth.lerp(_camTarget, p.inVehicle ? 0.18 : 0.35);
+  _camTarget.copy(rig.targetSmooth);
   rig.distance = lerp(rig.distance, rig.targetDistance, 0.08);
   const cy = Math.cos(rig.yaw), sy = Math.sin(rig.yaw);
   const cp = Math.cos(rig.pitch), sp = Math.sin(rig.pitch);
