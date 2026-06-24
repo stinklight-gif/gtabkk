@@ -665,10 +665,46 @@ export function taxiClear(t) {
   if (t.beam) t.beam.visible = false;
 }
 
-function perfClass(value, ok, warn, higherIsBetter = false) {
-  const good = higherIsBetter ? value >= ok : value <= ok;
-  const weak = higherIsBetter ? value >= warn : value <= warn;
-  return good ? 'ok' : weak ? 'warn' : 'bad';
+export const PERFORMANCE_BUDGETS = {
+  fps: { label: 'FPS', target: 55, failAt: 45, higherIsBetter: true, suffix: 'target 55+' },
+  drawCalls: { label: 'draw calls', target: 900, failAt: 1200, suffix: 'budget 900' },
+  triangles: { label: 'triangles', target: 450000, failAt: 650000, suffix: 'budget 450k' },
+  visibleMeshes: { label: 'meshes', target: 850, failAt: 1150, suffix: 'visible budget 850' },
+  activeEntities: { label: 'entities', target: 180, failAt: 220, suffix: 'active budget 180' },
+  nearLodEntities: { label: 'near LOD', target: 95, failAt: 125, suffix: 'near budget 95' },
+  farLodEntities: { label: 'far LOD', target: 8, failAt: 1, higherIsBetter: true, suffix: 'target 8+' },
+};
+
+function budgetLevel(value, budget) {
+  const higher = !!budget.higherIsBetter;
+  const good = higher ? value >= budget.target : value <= budget.target;
+  const passing = higher ? value >= budget.failAt : value <= budget.failAt;
+  return good ? 'ok' : passing ? 'warn' : 'bad';
+}
+export function evaluatePerformanceBudget(metrics) {
+  const out = {};
+  let status = 'ok';
+  for (const [key, budget] of Object.entries(PERFORMANCE_BUDGETS)) {
+    const value = Number(metrics[key] || 0);
+    const level = budgetLevel(value, budget);
+    if (level === 'bad') status = 'bad';
+    else if (level === 'warn' && status !== 'bad') status = 'warn';
+    out[key] = {
+      label: budget.label,
+      value,
+      target: budget.target,
+      failAt: budget.failAt,
+      higherIsBetter: !!budget.higherIsBetter,
+      level,
+      pass: level !== 'bad',
+    };
+  }
+  out.status = status;
+  out.pass = status !== 'bad';
+  return out;
+}
+function perfClass(results, key) {
+  return (results && results[key] && results[key].level) || 'bad';
 }
 function perfLine(label, value, cls, budget) {
   return `${label.padEnd(13)} <span class="${cls}">${value}</span>${budget ? `  ${budget}` : ''}`;
@@ -703,32 +739,62 @@ export function updatePerformanceBudget(realDt) {
   const sceneTriangles = p.sceneTriangles != null ? p.sceneTriangles : (r.triangles || 0);
   const lod = G.lodStats || {};
   const nearEntities = (lod.nearPeds || 0) + (lod.nearVehicles || 0);
+  const nearLodEntities = (lod.pedHigh || 0) + (lod.vehicleHigh || 0);
+  const farLodEntities = (lod.pedLow || 0) + (lod.vehicleLow || 0);
+  const activeEntities = (G.peds ? G.peds.length : 0) + (G.vehicles ? G.vehicles.length : 0) + (G.cops ? G.cops.length : 0) + (G.dogs ? G.dogs.length : 0);
+  const metrics = {
+    fps: p.fps,
+    drawCalls: sceneCalls,
+    triangles: sceneTriangles,
+    visibleMeshes: visible,
+    activeEntities,
+    nearLodEntities,
+    farLodEntities,
+  };
+  const budgetResults = evaluatePerformanceBudget(metrics);
   p.snapshot = {
     fps: p.fps,
     drawCalls: sceneCalls,
     triangles: sceneTriangles,
     meshes,
     visibleMeshes: visible,
+    activeEntities,
+    nearEntities,
+    nearLodEntities,
+    farLodEntities,
     geometries: mem.geometries || 0,
     textures: mem.textures || 0,
     lod,
+    budgets: budgetResults,
+    budgetPass: budgetResults.pass,
+    budgetStatus: budgetResults.status,
   };
+  const statusLabel = budgetResults.status === 'ok' ? 'PASS' : budgetResults.status === 'warn' ? 'WARN' : 'FAIL';
   const lines = [
-    'VISUAL BUDGET',
-    perfLine('FPS', p.fps.toFixed(0), perfClass(p.fps, 55, 45, true), 'target 55+'),
-    perfLine('draw calls', String(sceneCalls), perfClass(sceneCalls, 900, 1200), 'budget 900'),
-    perfLine('triangles', `${Math.round(sceneTriangles / 1000)}k`, perfClass(sceneTriangles, 450000, 650000), 'budget 450k'),
-    perfLine('meshes', `${visible}/${meshes}`, perfClass(visible, 850, 1150), `inst ${instanced}`),
-    perfLine('entities', `${G.peds.length} peds · ${G.vehicles.length} veh`, perfClass(nearEntities, 95, 125), `${nearEntities} near`),
-    perfLine('ped LOD', `${lod.pedHigh || 0} high · ${lod.pedLow || 0} low`, 'ok'),
-    perfLine('car LOD', `${lod.vehicleHigh || 0} high · ${lod.vehicleLow || 0} low`, 'ok'),
+    `VISUAL BUDGET <span class="${budgetResults.status === 'ok' ? 'ok' : budgetResults.status}">${statusLabel}</span>`,
+    perfLine('FPS', p.fps.toFixed(0), perfClass(budgetResults, 'fps'), PERFORMANCE_BUDGETS.fps.suffix),
+    perfLine('draw calls', String(sceneCalls), perfClass(budgetResults, 'drawCalls'), PERFORMANCE_BUDGETS.drawCalls.suffix),
+    perfLine('triangles', `${Math.round(sceneTriangles / 1000)}k`, perfClass(budgetResults, 'triangles'), PERFORMANCE_BUDGETS.triangles.suffix),
+    perfLine('meshes', `${visible}/${meshes}`, perfClass(budgetResults, 'visibleMeshes'), `inst ${instanced}`),
+    perfLine('entities', `${activeEntities} active`, perfClass(budgetResults, 'activeEntities'), `${G.peds.length} peds · ${G.vehicles.length} veh`),
+    perfLine('near LOD', `${nearLodEntities} high`, perfClass(budgetResults, 'nearLodEntities'), `${nearEntities} near`),
+    perfLine('far LOD', `${farLodEntities} low`, perfClass(budgetResults, 'farLodEntities'), 'should be >0'),
   ];
   el.innerHTML = lines.join('\n');
 }
 
-function quickDropClear(q) {
-  q.stage = 'idle'; q.markerPos = null; q.dest = null; q.timeLeft = 0; q.reward = 0; q.policeCalled = false;
+function quickDropClear(q, result = 'idle', reason = null) {
+  q.lastResult = result;
+  q.failReason = reason;
+  q.stage = 'idle'; q.markerPos = null; q.pickup = null; q.dest = null;
+  q.timeLeft = 0; q.totalTime = 0; q.baseReward = 0; q.reward = 0; q.heatLevel = 0; q.policeCalled = false;
   if (q.beam) q.beam.visible = false;
+}
+function quickDropFail(q, reason, message) {
+  q.failures = (q.failures || 0) + 1;
+  q.streak = 0;
+  G.hud.showNotif(message);
+  quickDropClear(q, 'failed', reason);
 }
 function quickDropDest(from) {
   for (let i = 0; i < 18; i++) {
@@ -739,7 +805,12 @@ function quickDropDest(from) {
   return taxiRandPoint(from, 170);
 }
 export function updateQuickDelivery(dt) {
-  const q = G.quickDrop || (G.quickDrop = { stage: 'idle', markerPos: null, dest: null, beam: null, timeLeft: 0, reward: 0, deliveries: 0, policeCalled: false });
+  const q = G.quickDrop || (G.quickDrop = {
+    stage: 'idle', markerPos: null, pickup: null, dest: null, beam: null,
+    timeLeft: 0, totalTime: 0, baseReward: 0, reward: 0,
+    deliveries: 0, failures: 0, streak: 0, heatLevel: 0, policeCalled: false,
+    lastResult: null, failReason: null,
+  });
   const p = G.player;
   const v = p.inVehicle;
   const courierRide = v && (v.kind === 'bike' || v.kind === 'tuktuk');
@@ -748,36 +819,71 @@ export function updateQuickDelivery(dt) {
     if (courierRide) {
       G.hud.showPrompt('Press <b>Y</b>/<b>J</b> for Moto Drop', 0.4);
       if (G.input.pressed('KeyY') || G.input.pressed('KeyJ')) {
-        q.stage = 'toDropoff';
-        q.dest = quickDropDest(v.pos);
-        q.markerPos = q.dest;
-        const d = Math.sqrt(dist2(v.pos, q.dest));
-        q.timeLeft = 34 + d / 9;
-        q.reward = Math.round(420 + d * 7);
+        q.stage = 'toPickup';
+        q.pickup = taxiRandPoint(v.pos, 80);
+        q.markerPos = q.pickup;
+        q.dest = null;
+        q.timeLeft = 0;
+        q.reward = 0;
+        q.heatLevel = 0;
         q.policeCalled = false;
-        taxiBeam(q, q.markerPos, 0x21f0ff);
-        G.hud.showNotif('Moto Drop — cut across traffic to the blue marker');
+        q.failReason = null;
+        taxiBeam(q, q.markerPos, 0xffcf4a);
+        G.hud.showNotif('Moto Drop — collect the package at the yellow marker');
         if (G.audio && G.audio.blip) G.audio.blip({ freq: 680, dur: 0.09, gain: 0.12 });
       }
     }
     return;
   }
-  if (!courierRide) { G.hud.showNotif('Moto Drop cancelled — lost the bike.'); quickDropClear(q); return; }
+  if (!courierRide) { quickDropFail(q, 'lost-ride', 'Moto Drop failed — lost the bike.'); return; }
+  if (v.dead || v.hp <= 14) { quickDropFail(q, 'wrecked', 'Moto Drop failed — the bike is wrecked.'); return; }
+  if (q.stage === 'toPickup') {
+    const d = Math.sqrt(dist2(v.pos, q.markerPos));
+    G.hud.showPrompt(`MOTO PICKUP &nbsp; ${Math.round(d)}m`, 0.4);
+    if (d < 7) {
+      q.dest = quickDropDest(v.pos);
+      q.markerPos = q.dest;
+      const trip = Math.sqrt(dist2(v.pos, q.dest));
+      q.totalTime = 32 + trip / 8.5;
+      q.timeLeft = q.totalTime;
+      q.baseReward = Math.round(380 + trip * 6.4);
+      q.reward = q.baseReward;
+      q.stage = 'toDropoff';
+      q.heatLevel = 0;
+      taxiBeam(q, q.markerPos, 0x21f0ff);
+      G.hud.showNotif('Package aboard — hit the blue drop-off before the timer burns down');
+      G.hud.showPrompt(`MOTO DROP &nbsp; ⏱ ${q.timeLeft.toFixed(0)}s &nbsp;→&nbsp; ฿${q.reward.toLocaleString()}`, 0.4);
+      if (G.audio && G.audio.blip) G.audio.blip({ freq: 760, dur: 0.08, gain: 0.12 });
+    }
+    return;
+  }
   q.timeLeft -= dt;
-  if (!q.policeCalled && q.timeLeft < 24) {
+  const elapsedRatio = q.totalTime > 0 ? 1 - (q.timeLeft / q.totalTime) : 0;
+  if (q.heatLevel < 1 && elapsedRatio > 0.45) {
+    q.heatLevel = 1;
     q.policeCalled = true;
     raiseWanted(Math.max(1, G.wanted.stars));
     G.hud.showNotif('Dispatch heard the package call-in — keep moving.');
+  } else if (q.heatLevel < 2 && q.timeLeft < 13) {
+    q.heatLevel = 2;
+    q.policeCalled = true;
+    raiseWanted(Math.max(2, G.wanted.stars));
+    G.hud.showNotif('Last-mile heat — cops are closing in.');
   }
-  if (q.timeLeft <= 0) { G.hud.showNotif('Moto Drop failed — too slow.'); quickDropClear(q); return; }
-  G.hud.showPrompt(`MOTO DROP &nbsp; ⏱ ${q.timeLeft.toFixed(0)}s &nbsp;→&nbsp; ฿${q.reward.toLocaleString()}`, 0.4);
+  if (q.timeLeft <= 0) { quickDropFail(q, 'timeout', 'Moto Drop failed — too slow.'); return; }
+  const runningReward = q.baseReward + Math.round(Math.max(0, q.timeLeft) * 6) + Math.min(5, q.streak || 0) * 90;
+  q.reward = runningReward;
+  G.hud.showPrompt(`MOTO DROP &nbsp; ⏱ ${q.timeLeft.toFixed(0)}s &nbsp;→&nbsp; ฿${runningReward.toLocaleString()}`, 0.4);
   if (dist2(v.pos, q.dest) < 8 * 8) {
-    G.cash += q.reward;
+    q.streak = (q.streak || 0) + 1;
+    const payout = q.baseReward + Math.round(Math.max(0, q.timeLeft) * 6) + Math.min(5, q.streak) * 90;
+    q.reward = payout;
+    G.cash += payout;
     q.deliveries++;
     G.hud.setCash(G.cash); G.hud.cashPop(q.reward);
-    G.hud.showNotif(`Moto Drop delivered: +฿${q.reward.toLocaleString()} (${q.deliveries})`);
+    G.hud.showNotif(`Moto Drop delivered: +฿${q.reward.toLocaleString()} · streak ${q.streak}`);
     if (G.audio && G.audio.chime) G.audio.chime();
-    quickDropClear(q);
+    quickDropClear(q, 'delivered');
   }
 }
 
@@ -951,9 +1057,9 @@ export function drawFullMap() {
   }
   if (G.quickDrop && G.quickDrop.stage !== 'idle' && G.quickDrop.markerPos) {
     const qx = to(G.quickDrop.markerPos.x), qz = to(G.quickDrop.markerPos.z);
-    ctx.fillStyle = '#21f0ff';
+    ctx.fillStyle = G.quickDrop.stage === 'toPickup' ? '#ffcf4a' : '#21f0ff';
     ctx.beginPath(); ctx.arc(qx, qz, 7, 0, TAU); ctx.fill();
-    ctx.strokeStyle = '#21f0ff'; ctx.lineWidth = 2.5;
+    ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.arc(qx, qz, 12, 0, TAU); ctx.stroke();
   }
   if (G.heist && G.heist.active && G.heist.markerPos) {

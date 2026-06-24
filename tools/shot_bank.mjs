@@ -35,7 +35,7 @@ async function main() {
   const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || undefined, args: ['--no-sandbox', '--enable-unsafe-swiftshader', '--use-angle=swiftshader'] });
   try {
     const page = await browser.newPage({ viewport: { width: 1024, height: 576 } });
-    await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'commit', timeout: 60_000 });
     await page.click('#slots button', { timeout: 180_000 });
     await page.waitForFunction(() => window.GAME && window.GAME.state === 'playing', null, { timeout: 180_000 });
 

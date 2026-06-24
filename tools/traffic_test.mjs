@@ -60,14 +60,17 @@ async function main() {
     page.on('console', msg => { if (msg.type() === 'error') errors.push(`console.error: ${msg.text()}`); });
 
     console.log(`serving ${ROOT} on :${PORT}, booting game…`);
-    await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'commit', timeout: 60_000 });
     await page.click('#slots button', { timeout: 180_000 });
     await page.waitForFunction(
       () => window.GAME && (window.GAME.state === 'playing' || window.GAME.state === 'paused'),
       null, { timeout: 180_000 },
     );
     console.log('game started');
-    await page.evaluate(() => { window.GAME.noBloom = true; });   // gameplay probe — skip the costly bloom pass
+    await page.evaluate(async () => {
+      window.GAME.noBloom = true;
+      window.__TRAFFIC_MAIN = await import('./main.js');
+    });   // gameplay probe — skip costly bloom and drive exported update functions directly
 
     // ---- 1. Signals exist + phase cycles with NS/EW mutually exclusive ---------
     console.log('\n[1] signals exist and the phase cycles');
@@ -81,8 +84,10 @@ async function main() {
     // loop computes from it — far cheaper than waiting out the real 24.8 s cycle
     // under SwiftShader. (dt is clamped to 0.05 s, so +2 frames barely moves t.)
     const phaseAt = async (t) => {
-      await page.evaluate(v => { window.GAME.traffic.t = v; }, t);
-      await waitFrames(page, 2);
+      await page.evaluate(v => {
+        window.GAME.traffic.t = v;
+        window.__TRAFFIC_MAIN.updateTrafficLights(0);
+      }, t);
       return page.evaluate(() => ({ ns: window.GAME.traffic.ns, ew: window.GAME.traffic.ew }));
     };
     const gNS = await phaseAt(1.0);    // N/S green window
@@ -135,18 +140,20 @@ async function main() {
       GAME.traffic.t = 13.0;
       return { idx: GAME.vehicles.indexOf(car), cx, cz, startZ };
     });
-    // run ~3 s; keep re-pinning the phase so the light stays red through the test
-    let stoppedZ = null, finalVel = null;
-    for (let k = 0; k < 10; k++) {
-      await page.evaluate(() => { window.GAME.traffic.t = 13.0; window.__clearAhead(); });
-      await waitFrames(page, 18);
-      const s = await page.evaluate(i => {
-        const v = window.GAME.vehicles[i];
-        return { z: v.pos.z, vel: v.vel, ns: window.GAME.traffic.ns };
-      }, setup.idx);
-      stoppedZ = s.z; finalVel = s.vel;
-      if (Math.abs(s.vel) < 0.4 && s.z < setup.cz - 4) break;
-    }
+    // Run the real traffic update directly. This keeps the test deterministic
+    // under slow SwiftShader while still exercising updateTrafficCar + lightFor.
+    const red = await page.evaluate(i => {
+      const G = window.GAME, main = window.__TRAFFIC_MAIN, v = G.vehicles[i];
+      for (let k = 0; k < 70; k++) {
+        G.traffic.t = 13.0;
+        main.updateTrafficLights(0);
+        window.__clearAhead();
+        main.updateTrafficCar(v, 0.1);
+        if (Math.abs(v.vel) < 0.4 && v.pos.z < 96) break;
+      }
+      return { z: v.pos.z, vel: v.vel, ns: G.traffic.ns };
+    }, setup.idx);
+    const stoppedZ = red.z, finalVel = red.vel;
     const stopLine = setup.cz - (12 / 2 + 1.6);   // ROAD_WIDTH/2 + margin = 7.6 → z ≈ 92.4
     assert(stoppedZ < setup.cz - 4, `car halted before the junction centre (z ${stoppedZ.toFixed(1)} < ${setup.cz}, line ≈ ${stopLine.toFixed(1)})`);
     assert(Math.abs(finalVel) < 0.6, `car is stopped at the red (vel ${finalVel.toFixed(2)} m/s)`);
@@ -154,13 +161,19 @@ async function main() {
     // ---- 3. The same car proceeds on green -----------------------------------
     console.log('\n[3] AI car proceeds through on green');
     const beforeZ = await page.evaluate(i => window.GAME.vehicles[i].pos.z, setup.idx);
-    let afterZ = beforeZ;
-    for (let k = 0; k < 10; k++) {
-      await page.evaluate(() => { window.GAME.traffic.t = 1.0; window.__clearAhead(); });   // N/S green
-      await waitFrames(page, 18);
-      afterZ = await page.evaluate(i => window.GAME.vehicles[i].pos.z, setup.idx);
-      if (afterZ > beforeZ + 6) break;
-    }
+    const afterZ = await page.evaluate(i => {
+      const G = window.GAME, main = window.__TRAFFIC_MAIN, v = G.vehicles[i];
+      for (let k = 0; k < 80; k++) {
+        G.traffic.t = 1.0;
+        main.updateTrafficLights(0);
+        v.npc.dir = 0;
+        v.npc.turnCD = 999;
+        window.__clearAhead();
+        main.updateTrafficCar(v, 0.1);
+        if (v.pos.z > 102) break;
+      }
+      return v.pos.z;
+    }, setup.idx);
     assert(afterZ > beforeZ + 6, `car advanced through the junction on green (z ${beforeZ.toFixed(1)} → ${afterZ.toFixed(1)})`);
 
     console.log('');
