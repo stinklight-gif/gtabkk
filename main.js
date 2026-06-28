@@ -175,6 +175,7 @@ export function saveGame() {
       bank: { balance: Math.max(0, Math.floor(G.econ.bank.balance) || 0), lastDay: G.econ.bank.lastDay },
       wealthRank: G._wealthRank || 0,
       kingpinCar: !!G._kingpinCar,
+      starterGunRobbed: !!G._starterGunRobbed,
       turfs: Object.fromEntries(TURFS.map(t => [t.id, !!(G.turfs && G.turfs[t.id] && G.turfs[t.id].owned)])),
       cosmetics: { shirt: G._shirtColor, hat: G._hat, jacket: G._jacketColor },
       owned: G._owned || [],
@@ -257,6 +258,8 @@ export function loadGame() {
   }
   if (typeof s.wealthRank === 'number') G._wealthRank = Math.max(0, Math.min(4, s.wealthRank | 0));   // restore achieved rank
   if (s.kingpinCar) G._kingpinCar = true;                                                            // don't re-deliver the perk car
+  G._starterGunRobbed = !!s.starterGunRobbed;
+  for (const shop of (G.world.gunShops || [])) if (shop.id === 'starter') shop.robbed = G._starterGunRobbed;
   if (s.turfs && typeof s.turfs === 'object') {                     // restore held gang turf
     G.turfs = G.turfs || {};
     for (const t of TURFS) { G.turfs[t.id] = G.turfs[t.id] || { owned: false, gang: [], spawned: false }; G.turfs[t.id].owned = !!s.turfs[t.id]; }
@@ -976,11 +979,14 @@ export function drawFullMap() {
   const to = v => (v + HALF) / (2 * HALF) * S;
   // Plain POI text labels (Home + Garage get a glyph below, drawn separately).
   const poi = G.world.poi || {};
+  const gunShops = (G.world.gunShops && G.world.gunShops.length)
+    ? G.world.gunShops
+    : (G.world.gunShop ? [{ pos: G.world.gunShop }] : []);
   const labels = [
     { p: poi.goldShop, t: "Uncle Seng's" },
     { p: poi.temple, t: 'Temple' },
     { p: poi.yaowarat, t: 'Yaowarat' },
-    { p: G.world.gunShop, t: 'Guns' },
+    ...gunShops.map(s => ({ p: s.pos || s, t: s.id === 'starter' ? 'Starter Guns' : 'Guns' })),
   ];
   ctx.fillStyle = '#cfe3e0'; ctx.font = '13px system-ui, sans-serif'; ctx.textAlign = 'center';
   for (const L of labels) if (L.p) ctx.fillText(L.t, to(L.p.x), to(L.p.z) - 8);
@@ -1136,7 +1142,7 @@ export function updateRadio(dt) {
   }
   if (inV && !G._wasInVehicle) {
     G.hud.showNotif('📻 ' + a.radio.names[a.radio.station]);
-    tip('drive', 'Driving: W/S throttle, A/D steer, SPACE handbrake, SHIFT boost. Press M to change the radio.', 'M เปลี่ยนวิทยุ');
+    tip('drive', 'Driving: W/S throttle, A/D steer, SPACE handbrake, SHIFT boost. Press E to exit, M to change the radio.', 'E ลงรถ · M เปลี่ยนวิทยุ');
   }
   G._wasInVehicle = inV;
   a.radio.tick(inV);

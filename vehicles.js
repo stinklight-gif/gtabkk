@@ -61,7 +61,6 @@ export function updatePlayerInVehicle(dt) {
   const forward = (G.input.down('KeyW')?1:0) - (G.input.down('KeyS')?1:0);
   const steer   = (G.input.down('KeyA')?1:0) - (G.input.down('KeyD')?1:0);
   const handbrake = G.input.down('Space');
-  const slip = G.festival.type === 'songkran' && v.spec.kind !== 'boat' && v.spec.kind !== 'bike';  // slippery wet roads
   const boost = G.input.down('ShiftLeft');
 
   const spec = v.spec;
@@ -71,14 +70,13 @@ export function updatePlayerInVehicle(dt) {
   v.steerInput = lerp(v.steerInput || 0, steer, 1 - Math.pow(0.02, dt));
   const mass = spec.mass || 1500;
   const weight = clamp(1500 / mass, 0.58, 1.25);
-  const traction = slip ? 0.72 : 1;
   const speedNow01 = Math.min(1, Math.abs(v.vel) / Math.max(1, spec.topSpeed));
-  if (forward > 0) v.vel += spec.accel * v.throttle * (boost ? (spec.nitroAcc || 1.3) : 1) * weight * traction * dt;
+  if (forward > 0) v.vel += spec.accel * v.throttle * (boost ? (spec.nitroAcc || 1.3) : 1) * weight * dt;
   else if (forward < 0) {
     if (v.vel > 0.25) v.vel -= spec.brake * (1 + speedNow01 * 0.35) * v.brakeInput * dt;
     else v.vel -= spec.accel * 0.55 * v.brakeInput * weight * dt; // reverse
   } else {
-    const coast = spec.kind === 'boat' ? 0.992 : slip ? 0.996 : 0.982;
+    const coast = spec.kind === 'boat' ? 0.992 : 0.982;
     v.vel *= Math.pow(coast, dt * 60);
     if (Math.abs(v.vel) < 0.04) v.vel = 0;
   }
@@ -98,10 +96,6 @@ export function updatePlayerInVehicle(dt) {
   // arcade handbrake drift: extra oversteer + lay rubber while sliding
   if (handbrake && Math.abs(v.vel) > 6 && Math.abs(v.steerInput) > 0.15 && spec.kind !== 'boat' && spec.kind !== 'bike') {
     v.heading += v.steerInput * 1.35 * dt * (v.vel >= 0 ? 1 : -1);
-    spawnSkid(v);
-  }
-  if (slip && !handbrake && Math.abs(v.vel) > 5 && Math.abs(v.steerInput) > 0.1) {   // wet-road slide
-    v.heading += v.steerInput * 0.45 * dt * (v.vel >= 0 ? 1 : -1);
     spawnSkid(v);
   }
 

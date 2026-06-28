@@ -38,7 +38,6 @@ const SHOTS = [
   { name: 'smoke_night.png', dayT: 0.87 },  // ~20:50 — full neon
   { name: 'smoke_3am.png',   dayT: 0.13 },  // ~03:00 — dead streets (same spot as noon)
   { name: 'smoke_festival.png', dayT: 0.9, festival: true },  // Loy Krathong on the river
-  { name: 'smoke_songkran.png', dayT: 0.5, songkran: true },  // Songkran water fight in the street
   { name: 'smoke_waypoint.png', dayT: 0.5, waypoint: true },  // objective waypoint + radio chip, in a car
   { name: 'smoke_map.png',      dayT: 0.5, tabmap: true   },  // TAB full map: icons, legend, objective line
   { name: 'smoke_mall.png',     dayT: 0.5, mall: true     },  // inside Terminal 21: atrium, shops, directory
@@ -108,7 +107,7 @@ async function main() {
     console.log('game started');
 
     for (const shot of SHOTS) {
-      await page.evaluate(({ dayT, festival, songkran, waypoint, tabmap, mall, bts, heli, river, bank }) => {
+      await page.evaluate(({ dayT, festival, waypoint, tabmap, mall, bts, heli, river, bank }) => {
         const GAME = window.GAME;
         GAME.state = 'playing';                                  // force-resume if pointer lock dropped
         document.getElementById('pause').classList.remove('show');
@@ -123,10 +122,6 @@ async function main() {
           GAME.time.day = 2;                                     // day % 4 === 2 + night → Loy Krathong
           GAME.player.group.position.set(-228, 0, -120);
           GAME.camRig.yaw = Math.PI; GAME.camRig.pitch = -0.15; // look down-river (the floats recede north)
-        } else if (songkran) {
-          GAME.time.day = 0;                                     // day % 4 === 0 + midday → Songkran
-          GAME.player.group.position.set(0, 0, -130);
-          GAME.camRig.yaw = Math.PI; GAME.camRig.pitch = -0.04;  // street full of splashing peds
         } else if (waypoint || tabmap) {
           // objective waypoint + radio chip: set a mission marker, drop into a car
           GAME.player.group.position.set(0, 0, -110);
@@ -171,7 +166,7 @@ async function main() {
           GAME.player.inVehicle = null; GAME.player.group.visible = true;
           GAME.player.group.position.set(-204, 1.4, -50);
           GAME.camRig.yaw = Math.PI / 2; GAME.camRig.pitch = -0.08;   // yaw +PI/2 → look due west
-          GAME.time.day = 1; GAME.festival.type = null; GAME.wanted.stars = 0;   // day%4≠0 → no Songkran; clear heat
+          GAME.time.day = 1; GAME.festival.type = null; GAME.wanted.stars = 0;
           document.getElementById('subtitle').classList.remove('show');
         } else if (bank) {
           // outside Krung Thep Bank, looking south at the columned facade
@@ -188,7 +183,7 @@ async function main() {
         GAME.camRig.shake = 0;
         if (GAME.resyncCrowd) GAME.resyncCrowd();                // snap crowd to this hour (busy noon vs dead 3am)
       }, shot);
-      await waitFrames(page, (shot.festival || shot.songkran || shot.waypoint || shot.tabmap || shot.mall || shot.bts || shot.heli || shot.river || shot.bank) ? 20 : 12);  // let day/night + camera settle
+      await waitFrames(page, (shot.festival || shot.waypoint || shot.tabmap || shot.mall || shot.bts || shot.heli || shot.river || shot.bank) ? 20 : 12);  // let day/night + camera settle
       await page.screenshot({ path: path.join(ROOT, shot.name), timeout: 120_000 });
       const size = fs.statSync(path.join(ROOT, shot.name)).size;
       const calls = await page.evaluate(() => window.GAME.renderer.info.render.calls);

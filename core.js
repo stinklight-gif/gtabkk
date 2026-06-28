@@ -78,7 +78,7 @@ export const G = {
   particles: [],
   effects: [],
   time: { dayT: 0.27, weather: 'clear', rainStrength: 0, day: 0 }, // dayT 0..1; day = whole days elapsed
-  // Festivals — Loy Krathong (night, floats/lanterns) and Songkran (day, water fight)
+  // Festivals — Loy Krathong nights fill the river with floats and lanterns.
   festival: { type: null, floats: [], lanterns: [], watchers: [], announcedDay: -1, krathongFloated: 0 },
   wanted: { stars: 0, lastSeenAt: 0, lastSeenPos: new THREE.Vector3() },
   heist: { active: false, stage: 0, crackT: 0, markerPos: null, beam: null, cooldownUntil: 0 }, // bank-heist set-piece

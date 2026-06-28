@@ -9,6 +9,8 @@ import { G } from './core.js';
 export function makeInput() {
   const keys = new Set();
   const vkeys = new Set();              // virtual keys driven by the touch UI
+  const pressedKeys = new Set();
+  const pressedVkeys = new Set();
   let mouseX = 0, mouseY = 0;
   let mouseDX = 0, mouseDY = 0;
   let mouseDown = false, rightDown = false;
@@ -18,11 +20,12 @@ export function makeInput() {
   const isTouch = (('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0);
 
   window.addEventListener('keydown', e => {
+    if (!keys.has(e.code) && !e.repeat) pressedKeys.add(e.code);
     keys.add(e.code);
     if (['Tab','Space','KeyT','KeyB','F3','F8','Backquote'].includes(e.code)) e.preventDefault();
   });
   window.addEventListener('keyup',   e => keys.delete(e.code));
-  window.addEventListener('blur',    ()=> keys.clear());
+  window.addEventListener('blur',    ()=> { keys.clear(); pressedKeys.clear(); pressedVkeys.clear(); });
   window.addEventListener('mousemove', e => {
     if (pointerLocked) { mouseDX += e.movementX; mouseDY += e.movementY; }
     mouseX = e.clientX; mouseY = e.clientY;
@@ -41,7 +44,12 @@ export function makeInput() {
     }
   });
 
-  const vk = (code, on) => { if (on) vkeys.add(code); else vkeys.delete(code); };
+  const vk = (code, on) => {
+    if (on) {
+      if (!vkeys.has(code)) pressedVkeys.add(code);
+      vkeys.add(code);
+    } else vkeys.delete(code);
+  };
 
   // ---- touch controls ----------------------------------------------------
   function setupTouch() {
@@ -53,8 +61,8 @@ export function makeInput() {
     // Hold-to-press buttons: data-key holds a virtual key down while touched.
     root.querySelectorAll('button[data-key]').forEach(btn => {
       const code = btn.getAttribute('data-key');
-      const press = e => { vkeys.add(code); btn.classList.add('on'); if (e.cancelable) e.preventDefault(); e.stopPropagation(); };
-      const release = e => { vkeys.delete(code); btn.classList.remove('on'); e.stopPropagation(); };
+      const press = e => { vk(code, true); btn.classList.add('on'); if (e.cancelable) e.preventDefault(); e.stopPropagation(); };
+      const release = e => { vk(code, false); btn.classList.remove('on'); e.stopPropagation(); };
       btn.addEventListener('touchstart', press, opt);
       btn.addEventListener('touchend', release, opt);
       btn.addEventListener('touchcancel', release, opt);
@@ -115,7 +123,7 @@ export function makeInput() {
   return {
     isTouch,
     down: c => keys.has(c) || vkeys.has(c),
-    pressed: c => (keys.has(c) || vkeys.has(c)) && !(prevKeys.has(c) || prevVkeys.has(c)),
+    pressed: c => pressedKeys.has(c) || pressedVkeys.has(c) || ((keys.has(c) || vkeys.has(c)) && !(prevKeys.has(c) || prevVkeys.has(c))),
     get mouseDown(){ return mouseDown; },
     get rightDown(){ return rightDown; },
     get pointerLocked(){ return pointerLocked; },
@@ -130,6 +138,6 @@ export function makeInput() {
         } catch (_) {}
       }
     },
-    endFrame() { prevKeys = new Set(keys); prevVkeys = new Set(vkeys); },
+    endFrame() { prevKeys = new Set(keys); prevVkeys = new Set(vkeys); pressedKeys.clear(); pressedVkeys.clear(); },
   };
 }

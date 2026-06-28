@@ -1,8 +1,7 @@
 // Physics probe: boots the real game headless and asserts the on-foot collision
-// + Songkran water-throw fixes:
+// fixes:
 //   1. Player vs vehicles — you get pushed out of a car instead of through it.
 //   2. Player vs shop landmarks — the gold shop is now solid (not walk-through).
-//   3. Songkran F-throw — water shoves + startles the peds it lands on.
 //
 // Run:  CHROME_PATH=/path/to/chrome node tools/physics_test.mjs
 // (same SwiftShader / save-slot-boot caveats as tools/smoke.mjs).
@@ -109,47 +108,8 @@ async function main() {
     });
     assert(shopPen <= 0.2, `player is pushed out of the gold shop (surface gap ${shopPen.toFixed(2)} m)`);
 
-    // ---- 3. Songkran water-throw physics -------------------------------------
-    console.log('\n[3] Songkran F-throw shoves peds');
-    await page.evaluate(() => {
-      const GAME = window.GAME;
-      GAME.state = 'playing'; document.getElementById('pause').classList.remove('show');
-      GAME.time.day = 0; GAME.time.dayT = 0.5;        // schedule-driven Songkran (midday, day%4==0)
-      GAME.player.inVehicle = null; GAME.player.group.visible = true;
-      GAME.player.group.position.set(0, 0, -130);
-      GAME.player.yaw = 0;                            // forward = (-sin,-cos) = (0,-1) → -z
-    });
-    await waitFrames(page, 6);                        // let the festival start
-    const before = await page.evaluate(() => {
-      const GAME = window.GAME;
-      // put a stationary test ped 3 m in front of the player (beyond melee reach)
-      const ped = GAME.peds.find(p => !p.dead) || GAME.peds[0];
-      ped.mesh.position.set(0, 0, -133);
-      ped.speed = 0; ped.state = 'idle'; ped.panicT = 0; ped.knockX = 0; ped.knockZ = 0;
-      ped._id = 'wtest';
-      const pp = GAME.player.group.position;
-      return { type: GAME.festival.type, dist: Math.hypot(0 - pp.x, -133 - pp.z) };
-    });
-    assert(before.type === 'songkran', `Songkran festival is active (got "${before.type}")`);
-    // throw water: hold F across a couple frames so the edge-triggered press lands
-    await page.keyboard.down('KeyF');
-    await waitFrames(page, 3);
-    await page.keyboard.up('KeyF');
-    await waitFrames(page, 4);
-    const after = await page.evaluate(() => {
-      const GAME = window.GAME, pp = GAME.player.group.position;
-      const ped = GAME.peds.find(p => p._id === 'wtest');
-      if (!ped) return null;
-      return { dist: Math.hypot(ped.mesh.position.x - pp.x, ped.mesh.position.z - pp.z), panicT: ped.panicT };
-    });
-    assert(after, 'test ped still present after the throw');
-    if (after) {
-      assert(after.dist > before.dist + 0.3, `water throw pushed the ped away (${before.dist.toFixed(2)} → ${after.dist.toFixed(2)} m)`);
-      assert(after.panicT > 0, `water throw startled the ped (panicT ${after.panicT.toFixed(2)})`);
-    }
-
-    // ---- 4. BTS Skytrain platform is walk-up ---------------------------------
-    console.log('\n[4] BTS walk-up platform');
+    // ---- 3. BTS Skytrain platform is walk-up ---------------------------------
+    console.log('\n[3] BTS walk-up platform');
     const bts = await page.evaluate(() => window.GAME.world.bts);
     assert(bts && bts.platformY > 10, `BTS platform is registered (y=${bts && bts.platformY})`);
     // stand on the escalator halfway up

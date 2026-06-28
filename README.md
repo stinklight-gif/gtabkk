@@ -79,6 +79,9 @@ arrival. After that the world is open — try the bike, hit peds (gain stars),
 bribe your way out, watch the monsoon roll in. Keep an eye out for **bag-snatchers**
 (orange-marked peds that bolt) — run one down for a bounty.
 
+A small gun counter sits just east of the Hua Lamphong platform. You can buy the
+first pistol there, or steal it at the start for immediate heat.
+
 **Soi Run (mission 2).** Once you've delivered the envelope, Uncle Seng has a
 second job. Leave his shop and return to the **pink marker** to start *Soi Run* —
 a timed checkpoint race (you'll want the bike). Reach each cyan checkpoint before
@@ -179,7 +182,7 @@ The original numbered sections (now spread across those modules):
 | 16 | Particles / FX | Smoke emitter (vehicles below 30% HP), explosion (light flash + smoke + camera shake + thunder SFX), tire-skid decals (`spawnSkid`, laid while drifting and faded over 5 s), impact dust puffs (`spawnDust`), and a global **hit-stop** (`triggerHitStop` slows the loop ~0.05 s on a solid melee/gun connect). |
 | 17 | Interaction | Vehicle proximity check + E to enter. |
 | 18 | Camera update | Follow rig with smoothed distance, shake decay, in-vehicle chase view auto-aligns to vehicle heading, **occlusion** (ray-casts target→camera against building AABBs and pulls in so it never clips into a wall), and a speed-based FOV kick while driving. |
-| 19 | Day/Night + Weather + Festivals | 8-min day cycle drives sun position (tilted so noon actually sunlights the facades), sky/fog colours, neon and street-lamp intensity; the sun + shadow camera track the player. A whole-day counter (`G.time.day`) ticks at midnight and `scheduledFestival()` drives two **festivals** (`updateFestival`, on distinct days): **Loy Krathong** nights fill the Chao Phraya with drifting candle-lit floats + rising sky lanterns and a riverside crowd — press **E** at the bank to float your own krathong (+฿50); **Songkran** middays turn the city into a water fight — peds splash each other, roads go slippery, and **F** throws water. Monsoon weather (clear ⇄ drizzle/downpour) with lightning; dawn temple bell at 5–6 AM. |
+| 19 | Day/Night + Weather + Festivals | 8-min day cycle drives sun position (tilted so noon actually sunlights the facades), sky/fog colours, neon and street-lamp intensity; the sun + shadow camera track the player. A whole-day counter (`G.time.day`) ticks at midnight and `scheduledFestival()` drives **Loy Krathong** nights, filling the Chao Phraya with drifting candle-lit floats + rising sky lanterns and a riverside crowd — press **E** at the bank to float your own krathong (+฿50). Monsoon weather (clear ⇄ drizzle/downpour) with lightning; dawn temple bell at 5–6 AM. |
 | 20 | Main loop | Single `loop()` calls every system in order. |
 
 The mutable global is `window.GAME`. Useful while developing:

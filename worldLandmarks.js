@@ -601,6 +601,43 @@ export function buildLandmarks(env) {
   station.position.y = 0;
   scene.add(station);
 
+  // ---- Hua Lamphong starter gun counter: close enough to rob at the start ----
+  {
+    const sx = world.spawns.player.x + 18, sz = world.spawns.player.z + 7;
+    const stall = new THREE.Group();
+    const matWall = new THREE.MeshStandardMaterial({ color: 0x262b33, roughness: 0.82 });
+    const matCounter = new THREE.MeshStandardMaterial({ color: 0x594a36, roughness: 0.78 });
+    const matMetal = new THREE.MeshStandardMaterial({ color: 0x899098, roughness: 0.42, metalness: 0.4 });
+    const back = new THREE.Mesh(new THREE.BoxGeometry(7.2, 3.2, 0.35), matWall);
+    back.position.set(0, 1.6, 2.0); back.castShadow = true; back.receiveShadow = true; stall.add(back);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(8.0, 0.32, 5.0), matWall);
+    roof.position.set(0, 3.35, 0.1); roof.castShadow = true; stall.add(roof);
+    const counter = new THREE.Mesh(new THREE.BoxGeometry(6.2, 1.0, 0.9), matCounter);
+    counter.position.set(0, 0.5, -1.25); counter.castShadow = true; stall.add(counter);
+    const rack = new THREE.Mesh(new THREE.BoxGeometry(5.0, 0.12, 0.12), matMetal);
+    rack.position.set(0, 2.0, 1.78); stall.add(rack);
+    for (const x of [-1.8, 0, 1.8]) {
+      const barrel = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.08, 0.1), matMetal);
+      barrel.position.set(x, 2.18, 1.66); barrel.rotation.z = -0.18; stall.add(barrel);
+      const grip = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.35, 0.12), matMetal);
+      grip.position.set(x - 0.42, 1.97, 1.66); grip.rotation.z = -0.18; stall.add(grip);
+    }
+    const signMat = new THREE.MeshStandardMaterial({ color: 0xff3344, emissive: 0xff3344, emissiveIntensity: 0.45, roughness: 0.5 });
+    G.nightEmissive.push({ mat: signMat, dayIntensity: 0.45, nightIntensity: 1.8 });
+    const sign = new THREE.Mesh(new THREE.BoxGeometry(5.0, 0.75, 0.14), signMat);
+    sign.position.set(0, 3.0, -2.35); stall.add(sign);
+    stall.position.set(sx, 0, sz);
+    scene.add(stall);
+    world.gunShops = world.gunShops || [];
+    world.gunShops.push({
+      id: 'starter',
+      name: 'Hua Lamphong Gun Counter',
+      pos: new THREE.Vector3(sx, 0, sz - 2.1),
+      stealable: true,
+      robbed: !!G._starterGunRobbed,
+    });
+  }
+
   // ---- Distant city ring: low-detail silhouettes outside the playable bounds ----
   // Fakes a bigger world. Just unlit boxes in a 250..500m band from origin.
   const ringColors = [0x7a7a88, 0x8d8794, 0x9a8a70, 0x837a7a, 0x6e7077, 0x878291, 0x9b9082];
@@ -807,6 +844,8 @@ export function buildLandmarks(env) {
     world.buildings.push({ pos: new THREE.Vector3(gx - wWidth / 2, wY, gz), size: new THREE.Vector3(0.6, wH, depth), mesh: sideW });
     world.buildings.push({ pos: new THREE.Vector3(gx + wWidth / 2, wY, gz), size: new THREE.Vector3(0.6, wH, depth), mesh: sideE });
     world.gunShop = new THREE.Vector3(gx, 0, gz - depth / 2 + 1.5); // stand at the open front
+    world.gunShops = world.gunShops || [];
+    world.gunShops.push({ id: 'sukhumvit', name: 'Sukhumvit Gun Shop', pos: world.gunShop, stealable: false });
   }
 
   // ---- Yaowarat: a dense Chinatown market street (blocks (-2, 2..3)) ----

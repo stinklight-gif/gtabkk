@@ -808,10 +808,16 @@ export function makeMinimapBase(world) {
     g.fillRect(mapW(ga.pos.x) - 3, mapW(ga.pos.z) - 3, 6, 6);
   }
 
-  // Gun shop
-  if (world.gunShop) {
+  // Gun shops
+  const gunShops = (world.gunShops && world.gunShops.length)
+    ? world.gunShops
+    : (world.gunShop ? [{ pos: world.gunShop }] : []);
+  if (gunShops.length) {
     g.fillStyle = '#ff3344';
-    g.fillRect(mapW(world.gunShop.x) - 3, mapW(world.gunShop.z) - 3, 6, 6);
+    for (const shop of gunShops) {
+      const pos = shop.pos || shop;
+      g.fillRect(mapW(pos.x) - 3, mapW(pos.z) - 3, 6, 6);
+    }
   }
 
   // Yaowarat market street

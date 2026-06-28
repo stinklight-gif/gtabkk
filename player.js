@@ -764,16 +764,44 @@ export function markSafehouseOwned() {
 }
 
 // Gun shop: on foot in the shop zone, E buys the next thing you need (then ammo).
+// The Hua Lamphong starter counter also lets you steal the first pistol for heat.
 export function updateGunShop(dt) {
   const p = G.player;
-  const shop = G.world.gunShop;
-  if (!shop || dist2(p.group.position, shop) > 7 * 7) return;
+  const shops = (G.world.gunShops && G.world.gunShops.length)
+    ? G.world.gunShops
+    : (G.world.gunShop ? [{ id: 'sukhumvit', name: 'Gun shop', pos: G.world.gunShop }] : []);
+  let shop = null, nd = Infinity;
+  for (const s of shops) {
+    const pos = s.pos || s;
+    const d = dist2(p.group.position, pos);
+    if (d < 7 * 7 && d < nd) { shop = s; nd = d; }
+  }
+  if (!shop) return;
   let label, cost, action;
   if (!p.weapons.pistol)    { label = 'Buy 9mm Pistol'; cost = 800;  action = 'pistol'; }
   else if (!p.weapons.shotgun) { label = 'Buy Shotgun'; cost = 2500; action = 'shotgun'; }
   else if (!p.weapons.smg)  { label = 'Buy SMG';        cost = 4000; action = 'smg'; }
   else                      { label = 'Buy ammo';       cost = 300;  action = 'ammo'; }
-  G.hud.showPrompt(`Gun shop — <b>E</b>: ${label} (฿${cost})`, 0.4);
+  const canStealPistol = shop.stealable && !shop.robbed && !p.weapons.pistol;
+  const name = shop.name || 'Gun shop';
+  const stealCopy = canStealPistol
+    ? (G.cash >= cost ? ' · <b>F</b>: steal 9mm (★★)' : ' · <b>E</b>/<b>F</b>: steal 9mm (★★)')
+    : '';
+  G.hud.showPrompt(`${name} — <b>E</b>: ${label} (฿${cost})${stealCopy}`, 0.4);
+  if (canStealPistol && (G.input.pressed('KeyF') || (G.input.pressed('KeyE') && G.cash < cost))) {
+    shop.robbed = true;
+    G._starterGunRobbed = true;
+    p.weapons.pistol = true;
+    p.activeWeapon = 'pistol';
+    p.pistolAmmo = p.pistolMag;
+    p.pistolReserve = p.pistolMag;
+    updateAmmoHud();
+    raiseWanted(2);
+    G.hud.showNotif('Stole a 9mm — cops alerted ★★');
+    G.audio.blip({ freq: 180, dur: 0.18, gain: 0.14 });
+    saveGame();
+    return;
+  }
   if (G.input.pressed('KeyE')) {
     if (G.cash < cost) { G.hud.showNotif('Not enough cash'); return; }
     G.cash -= cost; G.hud.setCash(G.cash);

@@ -3,9 +3,9 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, pick, sign, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
-import { makePedMesh, splashWater } from './main.js';
+import { makePedMesh } from './main.js';
 
 // 19. DAY/NIGHT + WEATHER
 // =============================================================================
@@ -146,12 +146,10 @@ export function makeSkyLantern() {
   m.userData.mat = mat; m.frustumCulled = false;
   return m;
 }
-// Which festival (if any) is on right now — Loy Krathong nights vs Songkran days,
-// on distinct days so they never overlap, and only at the right time of day.
+// Which festival (if any) is on right now.
 export function scheduledFestival() {
   const d = G.time.day, night = (G.nightK || 0) > 0.45;
   if (night && d % 4 === 2) return 'loykrathong';
-  if (!night && G.time.dayT > 0.34 && G.time.dayT < 0.62 && d % 4 === 0) return 'songkran';
   return null;
 }
 export function startFestival(type) {
@@ -170,8 +168,6 @@ export function startFestival(type) {
       f.watchers.push(m);
     }
     G.hud.showSubtitle('Loy Krathong — float a krathong on the river.', 'ลอยกระทง');
-  } else if (type === 'songkran') {
-    G.hud.showSubtitle('Songkran! The whole city is a water fight.', 'สงกรานต์');
   }
   if (G.audio && G.audio.bell) G.audio.bell();
 }
@@ -194,7 +190,6 @@ export function updateFestival(dt) {
   if (want !== f.type) { stopFestival(); if (want) startFestival(want); }
   if (!f.type) return;
   if (f.type === 'loykrathong') updateLoyKrathong(dt);
-  else updateSongkran(dt);
 }
 function updateLoyKrathong(dt) {
   const f = G.festival, now = performance.now();
@@ -228,50 +223,6 @@ function updateLoyKrathong(dt) {
       if (G.audio && G.audio.chime) G.audio.chime();
     }
   }
-}
-function updateSongkran(dt) {
-  const f = G.festival, p = G.player, pp = p.group.position;
-  // peds splash water at each other near the player (visible participation)
-  f.splashT = (f.splashT || 0) - dt;
-  if (f.splashT <= 0 && G.peds.length) {
-    f.splashT = rand(0.08, 0.2);
-    let thrown = 0;
-    for (let t = 0; t < 7 && thrown < 3; t++) {
-      const ped = G.peds[irand(0, G.peds.length - 1)];
-      if (ped && !ped.dead && dist2(ped.mesh.position, pp) < 85 * 85) {
-        splashWater(ped.mesh.position.x, 1.4, ped.mesh.position.z, 20);
-        thrown++;
-      }
-    }
-    if (thrown && Math.random() < 0.4 && G.audio && G.audio.step) G.audio.step(true);
-    // a splash near the player too, so the fight is always around you
-    if (Math.random() < 0.6) splashWater(pp.x + rand(-4, 4), 1.4, pp.z + rand(2, 10), 22);
-  }
-  // player joins: F on foot throws water in the facing direction — and shoves +
-  // startles whoever it lands on (a real splash with physics, not just particles)
-  if (!p.inVehicle && G.input && G.input.pressed && G.input.pressed('KeyF')) {
-    const yaw = p.yaw || 0;
-    const dirX = -Math.sin(yaw), dirZ = -Math.cos(yaw);
-    splashWater(pp.x + dirX * 1.6, 1.3, pp.z + dirZ * 1.6, 20);
-    const RANGE = 6;
-    let soaked = 0;
-    for (const ped of G.peds) {
-      if (ped.dead) continue;
-      const rx = ped.mesh.position.x - pp.x, rz = ped.mesh.position.z - pp.z;
-      const d = Math.hypot(rx, rz);
-      if (d > RANGE || d < 0.01) continue;
-      if ((rx / d) * dirX + (rz / d) * dirZ < 0.4) continue;        // only those in the throw cone
-      const f = 7 * (1 - d / RANGE);                                // shove harder up close
-      ped.knockX = (ped.knockX || 0) + (rx / d) * f;
-      ped.knockZ = (ped.knockZ || 0) + (rz / d) * f;
-      ped.panicT = Math.max(ped.panicT || 0, 1.2);                  // flinch + scurry a moment
-      splashWater(ped.mesh.position.x, 1.4, ped.mesh.position.z, 10);
-      soaked++;
-    }
-    if (G.audio && G.audio.step) G.audio.step(true);
-    if (soaked && G.audio && G.audio.blip) G.audio.blip({ freq: 520, dur: 0.06, gain: 0.08 });
-  }
-  G.hud.showPrompt('Songkran — <b>F</b> to throw water', 0.3);
 }
 
 // =============================================================================

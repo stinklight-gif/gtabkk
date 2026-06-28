@@ -232,7 +232,7 @@ export function updatePeds(dt) {
     }
     ped.mesh.position.x += Math.sin(ped.heading) * ped.speed * dt;
     ped.mesh.position.z += Math.cos(ped.heading) * ped.speed * dt;
-    // knockback impulse (Songkran water throw, etc.) — a short shove that decays fast
+    // knockback impulse — a short shove that decays fast
     if (ped.knockX || ped.knockZ) {
       ped.mesh.position.x += ped.knockX * dt;
       ped.mesh.position.z += ped.knockZ * dt;
