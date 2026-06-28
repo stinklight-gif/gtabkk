@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, UPGRADES, rankDiscount, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
-import { tip, cycleWeapon, damagePlayer, firePistol, fireSMG, fireShotgun, makeExplosion, makeSmokeEmitter, makeVehicle, onCopKilled, raiseWanted, resolveVehicleVsBuildings, resolveVehicleVsVehicles, saveGame, spawnSkid, updateAmmoHud, updateCop, vehicleName } from './main.js';
+import { tip, cycleWeapon, damagePlayer, firePistol, fireSMG, fireShotgun, makeExplosion, makeSmokeEmitter, makeVehicle, onCopKilled, raiseWanted, resolveVehicleVsBuildings, resolveVehicleVsVehicles, saveGame, spawnSkid, updateCop, vehicleName } from './main.js';
 import { lightFor } from './traffic.js';
 
 export function updateVehicleVisuals(v, dt, opts={}) {
@@ -23,6 +23,21 @@ export function updateVehicleVisuals(v, dt, opts={}) {
   for (const l of visual.headlights || []) if (l.material && l.material.opacity != null) l.material.opacity = headOpacity;
   for (const l of visual.brakeLights || []) if (l.material && l.material.opacity != null) l.material.opacity = brakeOpacity;
   for (const l of visual.reverseLights || []) if (l.material && l.material.opacity != null) l.material.opacity = reverseOpacity;
+}
+
+function applyLooseImpactMotion(v, dt) {
+  const impactSpeed = Math.hypot(v._impactVX || 0, v._impactVZ || 0);
+  if (impactSpeed <= 0.02) return;
+  v.pos.x += (v._impactVX || 0) * dt;
+  v.pos.z += (v._impactVZ || 0) * dt;
+  if (Math.abs(v._impactSpin || 0) > 0.01) v.heading += v._impactSpin * dt;
+  const decay = Math.pow(0.08, dt);
+  v._impactVX *= decay;
+  v._impactVZ *= decay;
+  v._impactSpin = (v._impactSpin || 0) * decay;
+  v.pos.x = clamp(v.pos.x, -HALF + 2, HALF - 2);
+  v.pos.z = clamp(v.pos.z, -HALF + 2, HALF - 2);
+  if (v.mesh) { v.mesh.position.copy(v.pos); v.mesh.rotation.y = v.heading; }
 }
 
 export function updatePlayerInVehicle(dt) {
@@ -67,7 +82,9 @@ export function updatePlayerInVehicle(dt) {
   const inputEase = 1 - Math.pow(0.035, dt);
   v.throttle = lerp(v.throttle || 0, forward > 0 ? 1 : 0, inputEase);
   v.brakeInput = lerp(v.brakeInput || 0, forward < 0 ? 1 : 0, inputEase);
-  v.steerInput = lerp(v.steerInput || 0, steer, 1 - Math.pow(0.02, dt));
+  const roadVehicle = spec.kind !== 'boat';
+  const steerEase = roadVehicle ? (1 - Math.pow(0.0035, dt)) : (1 - Math.pow(0.02, dt));
+  v.steerInput = lerp(v.steerInput || 0, steer, steerEase);
   const mass = spec.mass || 1500;
   const weight = clamp(1500 / mass, 0.58, 1.25);
   const speedNow01 = Math.min(1, Math.abs(v.vel) / Math.max(1, spec.topSpeed));
@@ -84,13 +101,15 @@ export function updatePlayerInVehicle(dt) {
   const speedMul = v.tiresBlown ? 0.5 : 1;   // spike strips halve your top speed
   v.vel = clamp(v.vel, -spec.topSpeed * 0.4 * speedMul, spec.topSpeed * (boost ? (spec.nitroTop || 1.15) : 1) * speedMul);
   const speed01 = Math.min(1, Math.abs(v.vel) / Math.max(1, spec.topSpeed));
-  const steerLimit = lerp(0.55, 0.34, speed01);
-  v.steerAngle = lerp(v.steerAngle || 0, v.steerInput * steerLimit, 0.18);
-  const lowSpeed = clamp(Math.abs(v.vel) / 1.2, 0.28, 1);
-  const highSpeed = lerp(1, 0.58, speed01);
+  const steerLimit = roadVehicle ? lerp(0.76, 0.48, speed01) : lerp(0.55, 0.34, speed01);
+  const steerResponse = roadVehicle ? 0.32 : 0.18;
+  v.steerAngle = lerp(v.steerAngle || 0, v.steerInput * steerLimit, steerResponse);
+  const lowSpeed = roadVehicle ? clamp(Math.abs(v.vel) / 0.9, 0.48, 1) : clamp(Math.abs(v.vel) / 1.2, 0.28, 1);
+  const highSpeed = roadVehicle ? lerp(1.12, 0.72, speed01) : lerp(1, 0.58, speed01);
   const boatMul = spec.kind === 'boat' ? 0.55 : 1;
-  const yawTarget = v.steerAngle * spec.turn * lowSpeed * highSpeed * weight * boatMul * (v.vel >= 0 ? 1 : -1);
-  v.yawRate = lerp(v.yawRate || 0, yawTarget, 1 - Math.pow(0.025, dt));
+  const turnAssist = spec.kind === 'boat' ? 1 : spec.kind === 'bike' ? 1.08 : spec.kind === 'tuktuk' ? 1.18 : 1.25;
+  const yawTarget = v.steerAngle * spec.turn * lowSpeed * highSpeed * weight * boatMul * turnAssist * (v.vel >= 0 ? 1 : -1);
+  v.yawRate = lerp(v.yawRate || 0, yawTarget, roadVehicle ? (1 - Math.pow(0.008, dt)) : (1 - Math.pow(0.025, dt)));
   if (Math.abs(v.vel) < 0.08) v.yawRate *= Math.pow(0.35, dt * 60);
   v.heading += v.yawRate * dt;
   // arcade handbrake drift: extra oversteer + lay rubber while sliding
@@ -149,12 +168,10 @@ export function updatePlayerInVehicle(dt) {
     const firing = G.input.mouseDown || G.input.down('KeyF');
     G.hud.setCrosshair(G.input.rightDown || firing);
     const w = p.activeWeapon;            // 'pistol' | 'smg' | 'shotgun'
-    const ammo = w + 'Ammo';
     const cd = w === 'smg' ? 0.07 : w === 'shotgun' ? 0.8 : 0.18;
-    if (firing && p.attackCooldown <= 0 && p[ammo] > 0) {
+    if (firing && p.attackCooldown <= 0) {
       if (w === 'smg') fireSMG(); else if (w === 'shotgun') fireShotgun(); else firePistol();
-      p[ammo]--; p.attackCooldown = cd; p.gunRecoil = 1;
-      updateAmmoHud();
+      p.attackCooldown = cd; p.gunRecoil = 1;
     }
   } else {
     G.hud.setCrosshair(false);
@@ -198,6 +215,7 @@ export function updateVehicles(dt) {
       const braking = v.driver === 'player' && (G.input.down('KeyS') || G.input.down('Space'));
       v.lights[1].emissiveIntensity = braking ? Math.max(base, 0.9) : base;  // tail/brake lights
     }
+    if (v.driver !== 'player' && !v.npc) applyLooseImpactMotion(v, dt);
     if (v.driver === 'player') continue;
     if (v.isCop && v.driver) updateCop(v, dt);
     else if (v.npc) updateTrafficCar(v, dt);
@@ -245,6 +263,7 @@ function inferDir(h) {
 export function updateTrafficCar(v, dt) {
   const npc = v.npc;
   const prevHeading = v.heading;
+  npc.ramPanic = Math.max(0, (npc.ramPanic || 0) - dt);
   if (npc.dir === undefined) npc.dir = inferDir(v.heading);
   let dir = npc.dir;
 
@@ -313,11 +332,26 @@ export function updateTrafficCar(v, dt) {
   // --- move along the cardinal, keep the lane, ease the visual heading around ---
   v.pos.x += hx * v.vel * dt;
   v.pos.z += hz * v.vel * dt;
-  if (even2) v.pos.x = lerp(v.pos.x, laneTarget, Math.min(1, dt * 4));
-  else       v.pos.z = lerp(v.pos.z, laneTarget, Math.min(1, dt * 4));
+  const laneEase = Math.min(1, dt * (npc.ramPanic > 0 ? 0.65 : 4));
+  if (even2) v.pos.x = lerp(v.pos.x, laneTarget, laneEase);
+  else       v.pos.z = lerp(v.pos.z, laneTarget, laneEase);
   v.pos.x = clamp(v.pos.x, -HALF + 8, HALF - 2);   // out of the river, inside bounds
   v.pos.z = clamp(v.pos.z, -HALF + 2, HALF - 2);
-  v.heading = lerpAngle(v.heading, DH[dir], Math.min(1, dt * 6));
+  v.heading = lerpAngle(v.heading, DH[dir], Math.min(1, dt * (npc.ramPanic > 0 ? 1.8 : 6)));
+  const impactSpeed = Math.hypot(v._impactVX || 0, v._impactVZ || 0);
+  if (impactSpeed > 0.02) {
+    v.pos.x += (v._impactVX || 0) * dt;
+    v.pos.z += (v._impactVZ || 0) * dt;
+    const decay = Math.pow(0.08, dt);
+    v._impactVX *= decay;
+    v._impactVZ *= decay;
+    if (Math.abs(v._impactSpin || 0) > 0.01) {
+      v.heading += v._impactSpin * dt;
+      v._impactSpin *= decay;
+    }
+    v.pos.x = clamp(v.pos.x, -HALF + 8, HALF - 2);
+    v.pos.z = clamp(v.pos.z, -HALF + 2, HALF - 2);
+  }
   let headingDelta = v.heading - prevHeading;
   while (headingDelta > PI) headingDelta -= TAU;
   while (headingDelta < -PI) headingDelta += TAU;

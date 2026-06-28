@@ -558,6 +558,7 @@ export function vigilanteSpawnTarget(vg) {
     new THREE.MeshStandardMaterial({ color: 0xff2a2a, emissive: 0xff2a2a, emissiveIntensity: 0.8, roughness: 0.5 }));
   mk.position.set(0, 2.5, 0); ped.mesh.add(mk);
   vg.target = ped; vg.marker = mk;
+  vg.markerPos = ped.mesh.position;
 }
 export function vigilanteEnd(msg) {
   const vg = G.vigilante;
@@ -566,6 +567,7 @@ export function vigilanteEnd(msg) {
     vg.target.isTarget = false; vg.target.panicT = 0;
     if (vg.marker && vg.marker.parent) { vg.marker.parent.remove(vg.marker); disposeObject(vg.marker); }
   }
+  vg.markerPos = null;
   G.hud.showNotif('Vigilante over — ' + msg);
   G.vigilante = null;
 }
@@ -577,7 +579,10 @@ export function updateVigilante(dt) {
     if (!inCop) { vigilanteEnd('left the unit'); return; }
     vg.timeLeft -= dt;
     if (vg.timeLeft <= 0) { vigilanteEnd(`time up · ${vg.busts} busts`); return; }
-    G.hud.showPrompt(`VIGILANTE &nbsp; ⏱ ${vg.timeLeft.toFixed(0)}s &nbsp;·&nbsp; busts ${vg.busts}`, 0.4);
+    const targetPos = vg.target && !vg.target.dead ? vg.target.mesh.position : null;
+    const pp = p.inVehicle ? p.inVehicle.pos : p.group.position;
+    const dist = targetPos ? Math.round(Math.hypot(targetPos.x - pp.x, targetPos.z - pp.z)) : null;
+    G.hud.showPrompt(`VIGILANTE &nbsp; TARGET ${dist == null ? '--' : dist + 'm'} &nbsp;·&nbsp; ⏱ ${vg.timeLeft.toFixed(0)}s &nbsp;·&nbsp; busts ${vg.busts}`, 0.4);
     if (vg.target.dead) {
       vg.busts++;
       const r = 200 + vg.busts * 100;
@@ -588,6 +593,7 @@ export function updateVigilante(dt) {
       vigilanteSpawnTarget(vg);
     } else {
       vg.target.panicT = 2;   // keep them fleeing
+      vg.markerPos = vg.target.mesh.position;
     }
     return;
   }

@@ -781,13 +781,14 @@ export function updateGunShop(dt) {
   if (!p.weapons.pistol)    { label = 'Buy 9mm Pistol'; cost = 800;  action = 'pistol'; }
   else if (!p.weapons.shotgun) { label = 'Buy Shotgun'; cost = 2500; action = 'shotgun'; }
   else if (!p.weapons.smg)  { label = 'Buy SMG';        cost = 4000; action = 'smg'; }
-  else                      { label = 'Buy ammo';       cost = 300;  action = 'ammo'; }
+  else                      { label = 'Ammo is unlimited'; cost = 0; action = 'none'; }
   const canStealPistol = shop.stealable && !shop.robbed && !p.weapons.pistol;
   const name = shop.name || 'Gun shop';
   const stealCopy = canStealPistol
     ? (G.cash >= cost ? ' · <b>F</b>: steal 9mm (★★)' : ' · <b>E</b>/<b>F</b>: steal 9mm (★★)')
     : '';
-  G.hud.showPrompt(`${name} — <b>E</b>: ${label} (฿${cost})${stealCopy}`, 0.4);
+  const actionCopy = cost > 0 ? `${label} (฿${cost})` : label;
+  G.hud.showPrompt(`${name} — <b>E</b>: ${actionCopy}${stealCopy}`, 0.4);
   if (canStealPistol && (G.input.pressed('KeyF') || (G.input.pressed('KeyE') && G.cash < cost))) {
     shop.robbed = true;
     G._starterGunRobbed = true;
@@ -803,6 +804,7 @@ export function updateGunShop(dt) {
     return;
   }
   if (G.input.pressed('KeyE')) {
+    if (action === 'none') { G.hud.showNotif('Ammo is unlimited'); return; }
     if (G.cash < cost) { G.hud.showNotif('Not enough cash'); return; }
     G.cash -= cost; G.hud.setCash(G.cash);
     if (action === 'pistol')   { p.weapons.pistol = true; p.activeWeapon = 'pistol'; p.pistolAmmo = p.pistolMag; p.pistolReserve = p.pistolMag * 3; }

@@ -12,6 +12,8 @@ let _muzzleLight = null, _sparkLight = null, _muzzleT = 0, _sparkT = 0;
 // pooled muzzle-flash sprite parented to the held gun (reused every shot)
 let _muzzleFlash = null, _muzzleFlashT = 0;
 const _muzzleWorld = new THREE.Vector3();
+const _bodyPoint = new THREE.Vector3();
+const _bodyClosest = new THREE.Vector3();
 
 // Brief expanding spark/puff at a bullet's hit point — reuses the G.dust pool
 // (updateDust fades + frees it) so we add no new per-frame system. Cheap: ~6 pts.
@@ -85,6 +87,25 @@ function spawnShotTracer(start, dir, len = 70, color = 0xfff0aa, life = 0.075) {
 function spawnRicochetTrail(point) {
   const dir = new THREE.Vector3(rand(-0.7, 0.7), rand(0.25, 0.9), rand(-0.7, 0.7)).normalize();
   spawnShotTracer(point, dir, rand(1.6, 3.4), 0xffd070, 0.09);
+}
+
+function actorBodyRayHit(actor, origin, dir, far) {
+  const pos = actor.mesh.position;
+  let best = null;
+  // Three sample points approximate a standing body. The radius grows slightly
+  // with range so third-person camera shots hit what reads as centered on screen.
+  for (const yOff of [0.55, 1.05, 1.5]) {
+    _bodyPoint.set(pos.x, pos.y + yOff, pos.z);
+    const t = _bodyPoint.sub(origin).dot(dir);
+    if (t < 0.8 || t > far) continue;
+    _bodyClosest.copy(origin).addScaledVector(dir, t);
+    const d = _bodyClosest.distanceTo(_bodyPoint.add(origin));
+    const r = Math.min(1.25, 0.46 + t * 0.018);
+    if (d <= r && (!best || t < best.dist)) {
+      best = { dist: t, point: _bodyClosest.clone(), target: actor };
+    }
+  }
+  return best;
 }
 
 // 14. COMBAT — melee + pistol
@@ -183,14 +204,10 @@ export function updateCombat(dt) {
 
     const firing = gunTriggerDown();
     G.hud.setCrosshair(G.input.rightDown || firing);
-    if (firing && p.attackCooldown <= 0 && p.pistolAmmo > 0) {
+    if (firing && p.attackCooldown <= 0) {
       firePistol();
-      p.pistolAmmo--; p.attackCooldown = 0.18;
+      p.attackCooldown = 0.18;
       p.gunRecoil = 1;
-      updateAmmoHud();
-    } else if (firing && p.pistolAmmo === 0 && p.attackCooldown <= 0) {
-      G.audio.blip({freq: 200, dur: 0.04, type:'square', gain: 0.05});
-      p.attackCooldown = 0.25;
     }
   } else if (p.activeWeapon === 'smg' && p.weapons.smg) {
     // reuse the held-weapon model
@@ -198,28 +215,20 @@ export function updateCombat(dt) {
     setHeldGunPose('smg', recoil);
     const firing = gunTriggerDown();
     G.hud.setCrosshair(G.input.rightDown || firing);
-    if (firing && p.attackCooldown <= 0 && p.smgAmmo > 0) {
+    if (firing && p.attackCooldown <= 0) {
       fireSMG();
-      p.smgAmmo--; p.attackCooldown = 0.07;   // fast, full-auto
+      p.attackCooldown = 0.07;   // fast, full-auto
       p.gunRecoil = 1;
-      updateAmmoHud();
-    } else if (firing && p.smgAmmo === 0 && p.attackCooldown <= 0) {
-      G.audio.blip({freq: 200, dur: 0.04, type: 'square', gain: 0.05});
-      p.attackCooldown = 0.25;
     }
   } else if (p.activeWeapon === 'shotgun' && p.weapons.shotgun) {
     const recoil = p.gunRecoil || 0;
     setHeldGunPose('shotgun', recoil);
     const firing = gunTriggerDown();
     G.hud.setCrosshair(G.input.rightDown || firing);
-    if (firing && p.attackCooldown <= 0 && p.shotgunAmmo > 0) {
+    if (firing && p.attackCooldown <= 0) {
       fireShotgun();
-      p.shotgunAmmo--; p.attackCooldown = 0.8;   // slow, punchy
+      p.attackCooldown = 0.8;   // slow, punchy
       p.gunRecoil = 1;
-      updateAmmoHud();
-    } else if (firing && p.shotgunAmmo === 0 && p.attackCooldown <= 0) {
-      G.audio.blip({freq: 200, dur: 0.04, type: 'square', gain: 0.05});
-      p.attackCooldown = 0.3;
     }
   }
 }
@@ -227,9 +236,9 @@ export function updateCombat(dt) {
 export function updateAmmoHud() {
   const p = G.player;
   if (p.activeWeapon === 'fists') G.hud.setAmmo('FISTS', 'MUAY THAI');
-  else if (p.activeWeapon === 'smg') G.hud.setAmmo(`${p.smgAmmo} / ${p.smgReserve}`, 'SMG');
-  else if (p.activeWeapon === 'shotgun') G.hud.setAmmo(`${p.shotgunAmmo} / ${p.shotgunReserve}`, 'SHOTGUN');
-  else G.hud.setAmmo(`${p.pistolAmmo} / ${p.pistolReserve}`, '9MM PISTOL');
+  else if (p.activeWeapon === 'smg') G.hud.setAmmo('∞', 'SMG');
+  else if (p.activeWeapon === 'shotgun') G.hud.setAmmo('∞', 'SHOTGUN');
+  else G.hud.setAmmo('∞', '9MM PISTOL');
 }
 
 export function triggerHitStop(s) { G.hitStop = Math.max(G.hitStop || 0, s); }
@@ -388,6 +397,10 @@ export function doBulletRaycast(origin, dir, dmg = 35) {
     if (intersects.length) {
       const hit = intersects[0];
       if (!best || hit.distance < best.dist) best = { dist: hit.distance, point: hit.point, target: c };
+    }
+    if (c.actor) {
+      const bodyHit = actorBodyRayHit(c, origin, dir, _ray.far);
+      if (bodyHit && (!best || bodyHit.dist < best.dist)) best = bodyHit;
     }
   }
   // Buildings are merged into shared meshes now, so test their stored AABBs

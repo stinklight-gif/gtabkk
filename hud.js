@@ -388,6 +388,8 @@ export function bindHud() {
     let target = null, targetLabel = 'OBJ', targetColor = '#ff2a86';
     if (G.heist && G.heist.active && G.heist.markerPos) {
       target = G.heist.markerPos; targetLabel = G.heist.stage === 2 ? 'DROP' : 'VAULT'; targetColor = G.heist.stage === 2 ? '#39ff7a' : '#ffcf4a';
+    } else if (G.vigilante && G.vigilante.active && G.vigilante.markerPos) {
+      target = G.vigilante.markerPos; targetLabel = 'TARGET'; targetColor = '#ff3333';
     } else if (G.quickDrop && G.quickDrop.stage !== 'idle' && G.quickDrop.markerPos) {
       target = G.quickDrop.markerPos; targetLabel = G.quickDrop.stage === 'toPickup' ? 'PICK' : 'DROP'; targetColor = G.quickDrop.stage === 'toPickup' ? '#ffcf4a' : '#21f0ff';
     } else if (G.taxi && G.taxi.stage && G.taxi.stage !== 'idle' && G.taxi.markerPos) {
@@ -399,6 +401,7 @@ export function bindHud() {
     if (shPos) drawMiniBadge(shPos, 'HOME', HOME_COLOR);
     if (ga0 && ga0.pos) drawMiniBadge(ga0.pos, 'GAR', GARAGE_COLOR);
     if (t21) drawMiniBadge(t21, 'MALL', MALL_COLOR);
+    for (const e of (G.world.sevenElevens || [])) drawMiniBadge(e.pos, '7-11', SEVEN_COLOR);
     for (const shop of ((G.world.gunShops && G.world.gunShops.length) ? G.world.gunShops : (G.world.gunShop ? [{ pos: G.world.gunShop }] : []))) drawMiniBadge(shop.pos || shop, 'GUN', '#ff3344');
     if (G.world.poi && G.world.poi.bank) drawMiniBadge(G.world.poi.bank, 'BANK', BANK_COLOR);
     if (G.world.bts) drawMiniBadge({ x: G.world.bts.x, z: G.world.bts.z || 0 }, 'BTS', BTS_COLOR);
@@ -439,6 +442,8 @@ export function bindHud() {
     const m = G.mission && G.mission.active;
     if (G.heist && G.heist.active && G.heist.markerPos) {
       target = G.heist.markerPos; color = G.heist.stage === 2 ? '#39ff7a' : '#ffcf4a'; label = G.heist.stage === 2 ? 'Loot drop' : 'Vault';
+    } else if (G.vigilante && G.vigilante.active && G.vigilante.markerPos) {
+      target = G.vigilante.markerPos; color = '#ff3333'; label = `Vigilante target · ${Math.ceil(G.vigilante.timeLeft || 0)}s`;
     } else if (G.quickDrop && G.quickDrop.stage !== 'idle' && G.quickDrop.markerPos) {
       target = G.quickDrop.markerPos; color = G.quickDrop.stage === 'toPickup' ? '#ffcf4a' : '#21f0ff'; label = G.quickDrop.stage === 'toDropoff' ? 'Moto drop' : 'Moto pickup';
     } else if (G.taxi && G.taxi.stage && G.taxi.stage !== 'idle' && G.taxi.markerPos) {

@@ -1042,9 +1042,24 @@ export function drawFullMap() {
     drawMallGlyph(ctx, tx, ty, 7, MALL_COLOR);
     ctx.fillStyle = MALL_COLOR; ctx.textAlign = 'center'; ctx.fillText('Terminal 21 · Arcade', tx, ty - 15);
   }
-  // 7-Elevens (orange squares)
-  ctx.fillStyle = SEVEN_COLOR;
-  for (const e of (G.world.sevenElevens || [])) ctx.fillRect(to(e.pos.x) - 3, to(e.pos.z) - 3, 6, 6);
+  // 7-Elevens: draw as labeled destination markers, not tiny loose pixels.
+  for (const e of (G.world.sevenElevens || [])) {
+    const sx = to(e.pos.x), sz = to(e.pos.z);
+    ctx.save();
+    ctx.fillStyle = 'rgba(5,8,10,0.82)';
+    ctx.fillRect(sx - 22, sz - 24, 44, 18);
+    ctx.strokeStyle = SEVEN_COLOR; ctx.lineWidth = 2;
+    ctx.strokeRect(sx - 21, sz - 23, 42, 16);
+    ctx.fillStyle = '#fff0d0'; ctx.font = 'bold 11px system-ui, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText('7-11', sx, sz - 11);
+    ctx.fillStyle = SEVEN_COLOR;
+    ctx.fillRect(sx - 6, sz - 6, 12, 12);
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2;
+    ctx.strokeRect(sx - 7, sz - 7, 14, 14);
+    ctx.strokeStyle = SEVEN_COLOR; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(sx, sz, 16, 0, TAU); ctx.stroke();
+    ctx.restore();
+  }
   // BTS station
   if (G.world.bts) {
     const bx = to(G.world.bts.x), bz = to(G.world.bts.z || 0);
@@ -1111,6 +1126,18 @@ export function drawFullMap() {
     ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.arc(hx, hz, 13, 0, TAU); ctx.stroke();
   }
+  if (G.vigilante && G.vigilante.active && G.vigilante.markerPos) {
+    const vx = to(G.vigilante.markerPos.x), vz = to(G.vigilante.markerPos.z);
+    ctx.fillStyle = '#ff3333';
+    ctx.beginPath(); ctx.arc(vx, vz, 7, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(vx, vz, 16, 0, TAU); ctx.stroke();
+    ctx.strokeStyle = '#ff3333'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(vx, vz, 16, 0, TAU); ctx.stroke();
+    ctx.font = 'bold 13px system-ui, sans-serif'; ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffcccc';
+    ctx.fillText('VIGILANTE TARGET', vx, vz - 22);
+  }
   ctx.fillStyle = '#ff3333';
   for (const v of G.vehicles) if (v.isCop && v.driver) { ctx.beginPath(); ctx.arc(to(v.pos.x), to(v.pos.z), 3.5, 0, TAU); ctx.fill(); }
   const pMapPos = (G.player.inVehicle && G.player.inVehicle.pos) || G.player.group.position;
@@ -1174,7 +1201,7 @@ export function drawFullMap() {
     ['dot',    '#ff3333',    'Cops'],
     ['dot',    '#ffcf4a',    'Amulet'],
   ];
-  const lx = 14, ly0 = 24, rowH = 21, panelW = 130, panelH = items.length * rowH + 12;
+  const lx = 14, ly0 = 24, rowH = 21, panelW = 146, panelH = items.length * rowH + 12;
   ctx.fillStyle = 'rgba(8,10,14,0.62)'; ctx.fillRect(lx - 6, ly0 - 14, panelW, panelH);
   ctx.strokeStyle = 'rgba(33,240,255,0.35)'; ctx.lineWidth = 1; ctx.strokeRect(lx - 6, ly0 - 14, panelW, panelH);
   ctx.textAlign = 'left'; ctx.font = '12px system-ui, sans-serif';
@@ -1197,6 +1224,7 @@ export function drawFullMap() {
   // Objective line (bottom center): the active target name + live distance.
   let objText = 'No active objective — free roam', op = null, on = null;
   if (G.heist && G.heist.active && G.heist.markerPos) { op = G.heist.markerPos; on = G.heist.stage === 2 ? 'Bank Heist — loot drop' : 'Bank Heist — crack the vault'; }
+  else if (G.vigilante && G.vigilante.active && G.vigilante.markerPos) { op = G.vigilante.markerPos; on = `Vigilante target · ${Math.ceil(G.vigilante.timeLeft || 0)}s`; }
   else if (G.quickDrop && G.quickDrop.stage !== 'idle' && G.quickDrop.markerPos) { op = G.quickDrop.markerPos; on = G.quickDrop.stage === 'toDropoff' ? 'Moto Drop' : 'Moto pickup'; }
   else if (G.taxi && G.taxi.stage && G.taxi.stage !== 'idle' && G.taxi.markerPos) { op = G.taxi.markerPos; on = G.taxi.stage === 'toDropoff' ? 'Taxi drop-off' : 'Taxi pick-up'; }
   else if (G.mission && G.mission.active && G.mission.active.markerPos) { op = G.mission.active.markerPos; on = G.mission.active.name || 'Objective'; }

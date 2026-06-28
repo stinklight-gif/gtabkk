@@ -136,9 +136,12 @@ export function resolveVehicleVsVehicles(v) {
     if (d2 <= 0.0001 || d2 > min * min) continue;
     const d = Math.sqrt(d2), nx = dx / d, nz = dz / d;
     const overlap = min - d;
-    const oLocked = o.driver && o.driver !== 'player';
-    const vShare = oLocked ? 0.85 : 0.55;
-    const oShare = oLocked ? 0.15 : 0.45;
+    const vIsPlayer = v.driver === 'player';
+    const oIsPlayer = o.driver === 'player';
+    const playerHit = vIsPlayer || oIsPlayer;
+    const oLocked = o.driver && o.driver !== 'player' && !playerHit;
+    const vShare = playerHit ? (vIsPlayer ? 0.24 : 0.82) : (oLocked ? 0.85 : 0.55);
+    const oShare = playerHit ? (vIsPlayer ? 0.76 : 0.08) : (oLocked ? 0.15 : 0.45);
     v.pos.x += nx * overlap * vShare;
     v.pos.z += nz * overlap * vShare;
     moved = true;
@@ -148,8 +151,32 @@ export function resolveVehicleVsVehicles(v) {
       o.mesh.position.copy(o.pos);
     }
 
-    const rel = Math.abs((v.vel || 0) - (o.vel || 0));
-    const playerHit = v.driver === 'player' || o.driver === 'player';
+    const vvx = Math.sin(v.heading || 0) * (v.vel || 0) + (v._impactVX || 0);
+    const vvz = Math.cos(v.heading || 0) * (v.vel || 0) + (v._impactVZ || 0);
+    const ovx = Math.sin(o.heading || 0) * (o.vel || 0) + (o._impactVX || 0);
+    const ovz = Math.cos(o.heading || 0) * (o.vel || 0) + (o._impactVZ || 0);
+    const rel = Math.abs((vvx - ovx) * nx + (vvz - ovz) * nz);
+    if (playerHit && rel > 2.2) {
+      const rammer = vIsPlayer ? v : oIsPlayer ? o : null;
+      const target = vIsPlayer ? o : oIsPlayer ? v : null;
+      if (rammer && target && target.driver !== 'player') {
+        const away = target === o ? -1 : 1;
+        const fx = Math.sin(rammer.heading || 0), fz = Math.cos(rammer.heading || 0);
+        const shove = clamp(Math.abs(rammer.vel || 0) * 0.55 + rel * 0.55, 3, 18);
+        target._impactVX = (target._impactVX || 0) + (nx * away * shove * 0.55 + fx * shove * 0.45);
+        target._impactVZ = (target._impactVZ || 0) + (nz * away * shove * 0.55 + fz * shove * 0.45);
+        const impactMag = Math.hypot(target._impactVX, target._impactVZ);
+        if (impactMag > 22) {
+          target._impactVX = target._impactVX / impactMag * 22;
+          target._impactVZ = target._impactVZ / impactMag * 22;
+        }
+        target._impactSpin = (target._impactSpin || 0) + clamp((fx * nz - fz * nx) * away * rel * 0.09, -1.8, 1.8);
+        if (target.npc) {
+          target.npc.ramPanic = Math.max(target.npc.ramPanic || 0, 1.2);
+          target.vel = Math.max(target.vel || 0, Math.min(target.npc.cruiseSpeed * 1.15, Math.abs(rammer.vel || 0) * 0.42));
+        }
+      }
+    }
     if (rel > 3.5 && performance.now() - (v._vehHitAt || 0) > 260) {
       v._vehHitAt = performance.now();
       const dmg = Math.max(1, (rel - 3.5) * 0.8) * (v.spec.armorMul != null ? v.spec.armorMul : 1);
@@ -161,9 +188,9 @@ export function resolveVehicleVsVehicles(v) {
         if (G.audio && G.audio.hit) G.audio.hit();
       }
     }
-    const damp = rel > 2 ? 0.55 : 0.78;
+    const damp = playerHit ? (vIsPlayer ? 0.82 : 0.72) : (rel > 2 ? 0.55 : 0.78);
     v.vel *= damp;
-    if (!oLocked) o.vel *= 0.75;
+    if (!oLocked) o.vel *= playerHit && !oIsPlayer ? 0.96 : 0.75;
   }
   if (moved && v.mesh) v.mesh.position.copy(v.pos);
 }
