@@ -277,15 +277,18 @@ async function main() {
       const camera = { fov: G.camera.fov, targetDistance: G.camRig.targetDistance, distance: G.camRig.distance, pitch: G.camRig.pitch };
 
       playerCar.pos.set(20, 0, -120); playerCar.heading = 0; playerCar.vel = 9; playerCar.hp = 100;
+      const collisionStartVel = playerCar.vel;
       blocker.pos.set(20, 0, -118.8); blocker.heading = 0; blocker.vel = 0; blocker.hp = 100; blocker.driver = null; blocker.npc = null; blocker.dead = false;
-      playerCar._vehHitAt = 0; blocker._vehHitAt = 0; G.camRig.shake = 0;
+      playerCar._vehHitAt = 0; blocker._vehHitAt = 0; blocker._impactVX = 0; blocker._impactVZ = 0; blocker._impactSpin = 0; G.camRig.shake = 0;
       sync(playerCar); sync(blocker);
       const gapBefore = Math.hypot(playerCar.pos.x - blocker.pos.x, playerCar.pos.z - blocker.pos.z);
       main.resolveVehicleVsVehicles(playerCar);
       const gapAfter = Math.hypot(playerCar.pos.x - blocker.pos.x, playerCar.pos.z - blocker.pos.z);
       const collision = {
         gapBefore, gapAfter,
+        velBefore: collisionStartVel,
         velAfter: playerCar.vel,
+        targetImpact: Math.hypot(blocker._impactVX || 0, blocker._impactVZ || 0),
         playerHp: playerCar.hp,
         blockerHp: blocker.hp,
         shake: G.camRig.shake || 0,
@@ -310,7 +313,7 @@ async function main() {
     assert(Math.abs(driving.firstYawRate) > 0.01 && Math.abs(driving.fourthYawRate) >= Math.abs(driving.firstYawRate), 'steering yaw rate builds smoothly over repeated frames');
     assert(Math.abs(driving.fourthHeading) > Math.abs(driving.firstHeading) * 1.4, 'vehicle heading continues turning as steering input builds');
     assert(driving.camera.fov > 74 && driving.camera.targetDistance > 6, `driving camera responds to speed (FOV ${driving.camera.fov.toFixed(1)}, distance ${driving.camera.targetDistance.toFixed(1)})`);
-    assert(driving.collision.gapAfter > driving.collision.gapBefore + 0.2 && driving.collision.velAfter < 7, 'vehicle collision separates overlapping cars and damps player speed');
+    assert(driving.collision.gapAfter > driving.collision.gapBefore + 0.2 && driving.collision.velAfter < driving.collision.velBefore && driving.collision.targetImpact > 2, 'vehicle collision separates cars, damps the player, and shoves the target');
     assert(driving.collision.playerHp < 100 && driving.collision.blockerHp < 100 && driving.collision.shake > 0, 'vehicle collision applies damage and camera shake');
     assert(driving.traffic.end < driving.traffic.start * 0.65 && driving.traffic.z < driving.traffic.playerZ - 1.5, 'traffic car brakes for the player vehicle ahead');
   } catch (err) {
