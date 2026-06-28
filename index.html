@@ -120,6 +120,15 @@
     background: #1a1d22;
   }
   #minimap { width: 100%; height: 100%; display: block; }
+  #minimap-key {
+    width: 180px; margin-top: 6px; padding: 5px 7px; box-sizing: border-box;
+    display: grid; grid-template-columns: repeat(3, auto); gap: 4px 7px;
+    background: rgba(8,10,14,.58); border: 1px solid rgba(255,255,255,.18); border-radius: 4px;
+    color: #dfeee9; font-size: 9px; line-height: 1; letter-spacing: .5px; text-shadow: 0 1px 0 #000;
+  }
+  #minimap-key span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+  #minimap-key i { width: 7px; height: 7px; display: inline-block; border-radius: 50%; box-shadow: 0 0 0 1px rgba(0,0,0,.7); }
+  #minimap-key .square { border-radius: 1px; }
   #fullmap-wrap { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(8,10,14,0.84); z-index: 60; }
   #fullmap-wrap.show { display: flex; }
   #fullmap { border: 2px solid var(--neon-cyan); box-shadow: 0 0 36px rgba(33,240,255,0.28); width: 86vmin; height: 86vmin; image-rendering: pixelated; }
@@ -394,6 +403,14 @@
   <div class="hud-corner top-right">
     <div id="minimap-wrap"><canvas id="minimap" width="256" height="256"></canvas></div>
     <div id="compass">N</div>
+    <div id="minimap-key" aria-hidden="true">
+      <span><i style="background:#ff2a86"></i>Obj</span>
+      <span><i style="background:#ff3344" class="square"></i>Gun</span>
+      <span><i style="background:#39ff7a"></i>Biz</span>
+      <span><i style="background:#ff3333"></i>Cop</span>
+      <span><i style="background:#4fe3c0" class="square"></i>Home</span>
+      <span><i style="background:#ff7a2a" class="square"></i>Shop</span>
+    </div>
     <div id="radio-chip"></div>
   </div>
 
@@ -467,7 +484,7 @@
 
 <div id="fullmap-wrap">
   <canvas id="fullmap" width="760" height="760"></canvas>
-  <div class="map-hint">KRUNG THEP — press TAB to close</div>
+  <div class="map-hint">KRUNG THEP — TAB close · +/- zoom · 0 reset</div>
 </div>
 
 <div id="pause"><h2>PAUSED</h2><button id="pause-police">Police: ON</button><p>click to resume</p></div>

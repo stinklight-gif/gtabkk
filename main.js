@@ -969,14 +969,38 @@ export function updateDebugShowcase(dt) {
 // Full-screen, north-up map overlay (TAB). Draws the minimap base scaled up plus
 // live markers (amulets, mission/taxi, cops, player heading).
 let _fullmapCtx = null;
+const FULLMAP_ZOOMS = [1, 1.7, 2.6, 3.8];
+function setFullMapZoom(dir) {
+  const cur = G.fullMapZoom || 1;
+  if (dir === 0) { G.fullMapZoom = 1; return; }
+  let idx = FULLMAP_ZOOMS.indexOf(cur);
+  if (idx < 0) idx = FULLMAP_ZOOMS.reduce((best, z, i) => Math.abs(z - cur) < Math.abs(FULLMAP_ZOOMS[best] - cur) ? i : best, 0);
+  G.fullMapZoom = FULLMAP_ZOOMS[clamp(idx + dir, 0, FULLMAP_ZOOMS.length - 1)];
+}
+function fullMapView(S) {
+  const zoom = G.fullMapZoom || 1;
+  const span = (HALF * 2) / zoom;
+  const pp = (G.player && G.player.inVehicle && G.player.inVehicle.pos) || (G.player && G.player.group && G.player.group.position) || { x: 0, z: 0 };
+  const minC = -HALF + span / 2, maxC = HALF - span / 2;
+  const cx = clamp(pp.x, minC, maxC), cz = clamp(pp.z, minC, maxC);
+  const x0 = cx - span / 2, z0 = cz - span / 2;
+  const to = v => (v - x0) / span * S;
+  return { zoom, span, x0, z0, to };
+}
 export function drawFullMap() {
   const cv = document.getElementById('fullmap');
   if (!cv) return;
   const ctx = _fullmapCtx || (_fullmapCtx = cv.getContext('2d'));
   const S = cv.width;
   ctx.clearRect(0, 0, S, S);
-  if (G.world && G.world.minimap) ctx.drawImage(G.world.minimap, 0, 0, S, S);
-  const to = v => (v + HALF) / (2 * HALF) * S;
+  const view = fullMapView(S);
+  const to = view.to;
+  if (G.world && G.world.minimap) {
+    const src = G.world.minimap, sw = src.width / view.zoom, sh = src.height / view.zoom;
+    const sx = (view.x0 + HALF) / (HALF * 2) * src.width;
+    const sy = (view.z0 + HALF) / (HALF * 2) * src.height;
+    ctx.drawImage(src, sx, sy, sw, sh, 0, 0, S, S);
+  }
   // Plain POI text labels (Home + Garage get a glyph below, drawn separately).
   const poi = G.world.poi || {};
   const gunShops = (G.world.gunShops && G.world.gunShops.length)
@@ -1077,12 +1101,51 @@ export function drawFullMap() {
   }
   ctx.fillStyle = '#ff3333';
   for (const v of G.vehicles) if (v.isCop && v.driver) { ctx.beginPath(); ctx.arc(to(v.pos.x), to(v.pos.z), 3.5, 0, TAU); ctx.fill(); }
-  const px = to(G.player.group.position.x), py = to(G.player.group.position.z);
-  const fx = -Math.sin(G.player.yaw), fz = -Math.cos(G.player.yaw);
-  ctx.strokeStyle = '#21f0ff'; ctx.lineWidth = 2.5;
-  ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + fx * 14, py + fz * 14); ctx.stroke();
-  ctx.fillStyle = '#21f0ff';
-  ctx.beginPath(); ctx.arc(px, py, 5, 0, TAU); ctx.fill();
+  const pMapPos = (G.player.inVehicle && G.player.inVehicle.pos) || G.player.group.position;
+  const pMapYaw = G.player.inVehicle ? G.player.inVehicle.heading : G.player.yaw;
+  const px = to(pMapPos.x), py = to(pMapPos.z);
+  const fx = -Math.sin(pMapYaw), fz = -Math.cos(pMapYaw);
+  const drawPlayerMarker = () => {
+    const pulse = 0.5 + Math.sin(performance.now() * 0.006) * 0.5;
+    const halo = 17 + pulse * 5;
+    ctx.save();
+    ctx.lineWidth = 7;
+    ctx.strokeStyle = 'rgba(4,8,12,0.88)';
+    ctx.beginPath(); ctx.arc(px, py, halo, 0, TAU); ctx.stroke();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(33,240,255,0.95)';
+    ctx.beginPath(); ctx.arc(px, py, halo, 0, TAU); ctx.stroke();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(px, py, 10, 0, TAU); ctx.stroke();
+    ctx.fillStyle = '#21f0ff';
+    ctx.beginPath(); ctx.arc(px, py, 6, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#071014';
+    ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + fx * 24, py + fz * 24); ctx.stroke();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(px + fx * 24, py + fz * 24); ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(px + fx * 30, py + fz * 30);
+    ctx.lineTo(px + fx * 15 + fz * 7, py + fz * 15 - fx * 7);
+    ctx.lineTo(px + fx * 15 - fz * 7, py + fz * 15 + fx * 7);
+    ctx.closePath();
+    ctx.fill();
+    const label = 'YOU', lw = 42, lh = 20;
+    const lx2 = clamp(px + 14, 8, S - lw - 8);
+    const ly2 = clamp(py - 34, 8, S - lh - 8);
+    ctx.fillStyle = 'rgba(4,8,12,0.88)';
+    ctx.fillRect(lx2 - 2, ly2 - 2, lw + 4, lh + 4);
+    ctx.fillStyle = '#21f0ff';
+    ctx.fillRect(lx2, ly2, lw, lh);
+    ctx.fillStyle = '#041018';
+    ctx.font = 'bold 12px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, lx2 + lw / 2, ly2 + 14);
+    ctx.restore();
+  };
 
   // Legend — a small color key (panel-backed) so the map reads to a first-timer.
   const items = [
@@ -1117,6 +1180,7 @@ export function drawFullMap() {
     else { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(lx + 8, yy, 5, 0, TAU); ctx.fill(); }
     ctx.fillStyle = '#dfeee9'; ctx.fillText(text, lx + 24, yy + 4);
   }
+  drawPlayerMarker();
 
   // Objective line (bottom center): the active target name + live distance.
   let objText = 'No active objective — free roam', op = null, on = null;
@@ -1133,6 +1197,13 @@ export function drawFullMap() {
   ctx.fillStyle = 'rgba(8,10,14,0.62)'; ctx.fillRect(S / 2 - tw / 2 - 12, S - 40, tw + 24, 26);
   ctx.fillStyle = '#ffe08a'; ctx.fillText(objText, S / 2, S - 22);
   ctx.textAlign = 'left';
+
+  // Zoom chip — kept on-map so the control is discoverable while inspecting POI clusters.
+  const zText = `ZOOM ${view.zoom.toFixed(1)}x   +/- zoom   0 reset`;
+  ctx.font = 'bold 12px system-ui, sans-serif'; ctx.textAlign = 'right';
+  const zw = ctx.measureText(zText).width;
+  ctx.fillStyle = 'rgba(8,10,14,0.62)'; ctx.fillRect(S - zw - 28, 14, zw + 14, 24);
+  ctx.fillStyle = '#21f0ff'; ctx.fillText(zText, S - 20, 31);
 }
 export function updateRadio(dt) {
   const a = G.audio; if (!a || !a.radio) return;
@@ -1295,11 +1366,19 @@ export function loop() {
     G.state = G.showMap ? 'map' : 'playing';
     if (G.showMap) document.exitPointerLock(); else G.input.requestLock();
   }
+  if (G.input && G.state === 'map') {
+    if (G.input.pressed('Equal') || G.input.pressed('NumpadAdd')) setFullMapZoom(1);
+    else if (G.input.pressed('Minus') || G.input.pressed('NumpadSubtract')) setFullMapZoom(-1);
+    else if (G.input.pressed('Digit0') || G.input.pressed('Numpad0')) setFullMapZoom(0);
+  }
 
   // minimap zoom (N)
   if (G.input && G.input.pressed && G.input.pressed('KeyN') && G.state === 'playing') {
-    const levels = [1, 1.7, 2.6];
-    G.minimapZoom = levels[(levels.indexOf(G.minimapZoom || 1) + 1) % levels.length];
+    const levels = [1.6, 2.4, 3.4];
+    const cur = G.minimapZoom || levels[1];
+    let idx = levels.indexOf(cur);
+    if (idx < 0) idx = levels.reduce((best, z, i) => Math.abs(z - cur) < Math.abs(levels[best] - cur) ? i : best, 0);
+    G.minimapZoom = levels[(idx + 1) % levels.length];
   }
 
   // photo mode (P): free-fly camera + hidden HUD, sim paused

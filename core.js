@@ -83,6 +83,7 @@ export const G = {
   wanted: { stars: 0, lastSeenAt: 0, lastSeenPos: new THREE.Vector3() },
   heist: { active: false, stage: 0, crackT: 0, markerPos: null, beam: null, cooldownUntil: 0 }, // bank-heist set-piece
   cash: 100,
+  minimapZoom: 2.4,
   policeOff: false,      // user toggle (pause menu): when true the whole wanted/cop system is suppressed
   copsKilled: 0,         // lifetime cop takedowns (drives pistol/heat unlocks + phone stat)
   notifQueue: [],

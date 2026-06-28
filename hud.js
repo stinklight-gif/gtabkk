@@ -269,14 +269,44 @@ export function bindHud() {
     mctx.clearRect(0,0,256,256);
     // center the world on the player by translating
     const SCALE = 256 / (HALF * 2);                 // world metres → minimap px
-    const ppx = (player.group.position.x + HALF) * SCALE;
-    const ppy = (player.group.position.z + HALF) * SCALE;
+    const mapPos = (player.inVehicle && player.inVehicle.pos) || player.group.position;
+    const zoom = G.minimapZoom || 2.4;
+    const ppx = (mapPos.x + HALF) * SCALE;
+    const ppy = (mapPos.z + HALF) * SCALE;
     const mm = p => [(p.x + HALF) * SCALE - ppx, (p.z + HALF) * SCALE - ppy];
+    const projectMini = p => {
+      const [lx, ly] = mm(p);
+      const sx = lx * zoom, sy = ly * zoom;
+      const c = Math.cos(G.camRig.yaw), s = Math.sin(G.camRig.yaw);
+      return [128 + sx * c + sy * s, 128 - sx * s + sy * c];
+    };
+    const inRadar = (x, y, pad = 0) => Math.hypot(x - 128, y - 128) <= 122 - pad;
+    const drawMiniBadge = (pos, label, color) => {
+      if (!pos) return;
+      const [x, y] = projectMini(pos);
+      if (!inRadar(x, y, 18)) return;
+      mctx.save();
+      mctx.fillStyle = 'rgba(3,6,10,0.88)';
+      mctx.beginPath(); mctx.arc(x, y, 8, 0, TAU); mctx.fill();
+      mctx.fillStyle = color;
+      mctx.beginPath(); mctx.arc(x, y, 5, 0, TAU); mctx.fill();
+      mctx.font = 'bold 9px system-ui, sans-serif';
+      mctx.textAlign = 'center';
+      const tw = Math.ceil(mctx.measureText(label).width) + 8;
+      const lx = clamp(x - tw / 2, 5, 251 - tw), ly = clamp(y - 24, 5, 232);
+      mctx.fillStyle = 'rgba(3,6,10,0.82)';
+      mctx.fillRect(lx, ly, tw, 14);
+      mctx.strokeStyle = color; mctx.lineWidth = 1;
+      mctx.strokeRect(lx + 0.5, ly + 0.5, tw - 1, 13);
+      mctx.fillStyle = '#f2fff9';
+      mctx.fillText(label, lx + tw / 2, ly + 10);
+      mctx.restore();
+    };
     mctx.save();
     mctx.translate(128, 128);
     // rotate by camera yaw so up = forward
     mctx.rotate(-G.camRig.yaw);
-    mctx.scale(G.minimapZoom || 1, G.minimapZoom || 1);   // N cycles zoom levels
+    mctx.scale(zoom, zoom);   // N cycles zoom levels
     mctx.drawImage(G.world.minimap, -ppx, -ppy);
 
     // mission marker on minimap
@@ -352,14 +382,45 @@ export function bindHud() {
     // buyable businesses (diamonds; filled once owned)
     for (const b of BUSINESSES) { if (!b.pos) continue; const [x, y] = mm(b.pos); drawBizGlyph(mctx, x, y, 4, BIZ_COLOR, !!(G.econ.businesses[b.id] && G.econ.businesses[b.id].owned)); }
     mctx.restore();
+
+    // Upright badges for important markers. These sit above the rotating map so
+    // the radar can explain what the colored symbols mean at a glance.
+    let target = null, targetLabel = 'OBJ', targetColor = '#ff2a86';
+    if (G.heist && G.heist.active && G.heist.markerPos) {
+      target = G.heist.markerPos; targetLabel = G.heist.stage === 2 ? 'DROP' : 'VAULT'; targetColor = G.heist.stage === 2 ? '#39ff7a' : '#ffcf4a';
+    } else if (G.quickDrop && G.quickDrop.stage !== 'idle' && G.quickDrop.markerPos) {
+      target = G.quickDrop.markerPos; targetLabel = G.quickDrop.stage === 'toPickup' ? 'PICK' : 'DROP'; targetColor = G.quickDrop.stage === 'toPickup' ? '#ffcf4a' : '#21f0ff';
+    } else if (G.taxi && G.taxi.stage && G.taxi.stage !== 'idle' && G.taxi.markerPos) {
+      target = G.taxi.markerPos; targetLabel = G.taxi.stage === 'toDropoff' ? 'DROP' : 'TAXI'; targetColor = G.taxi.stage === 'toDropoff' ? '#39ff7a' : '#ffcf4a';
+    } else if (G.mission && G.mission.active && G.mission.active.markerPos) {
+      target = G.mission.active.markerPos; targetLabel = 'OBJ'; targetColor = '#ff2a86';
+    }
+    drawMiniBadge(target, targetLabel, targetColor);
+    if (shPos) drawMiniBadge(shPos, 'HOME', HOME_COLOR);
+    if (ga0 && ga0.pos) drawMiniBadge(ga0.pos, 'GAR', GARAGE_COLOR);
+    if (t21) drawMiniBadge(t21, 'MALL', MALL_COLOR);
+    for (const shop of ((G.world.gunShops && G.world.gunShops.length) ? G.world.gunShops : (G.world.gunShop ? [{ pos: G.world.gunShop }] : []))) drawMiniBadge(shop.pos || shop, 'GUN', '#ff3344');
+    if (G.world.poi && G.world.poi.bank) drawMiniBadge(G.world.poi.bank, 'BANK', BANK_COLOR);
+    if (G.world.bts) drawMiniBadge({ x: G.world.bts.x, z: G.world.bts.z || 0 }, 'BTS', BTS_COLOR);
+
     // player blip (always center, facing up)
+    mctx.save();
+    mctx.strokeStyle = 'rgba(3,6,10,0.9)';
+    mctx.lineWidth = 7;
+    mctx.beginPath(); mctx.arc(128, 128, 14, 0, TAU); mctx.stroke();
+    mctx.strokeStyle = '#ffffff';
+    mctx.lineWidth = 2;
+    mctx.beginPath(); mctx.arc(128, 128, 14, 0, TAU); mctx.stroke();
     mctx.fillStyle = '#21f0ff';
     mctx.beginPath();
-    mctx.moveTo(128, 122);
-    mctx.lineTo(124, 134);
-    mctx.lineTo(132, 134);
+    mctx.moveTo(128, 114);
+    mctx.lineTo(119, 137);
+    mctx.lineTo(128, 132);
+    mctx.lineTo(137, 137);
     mctx.closePath();
     mctx.fill();
+    mctx.strokeStyle = '#061014'; mctx.lineWidth = 2; mctx.stroke();
+    mctx.restore();
     // compass
     const dirs = ['N','NE','E','SE','S','SW','W','NW'];
     const yawDeg = (G.camRig.yaw * 180 / PI + 360) % 360;
