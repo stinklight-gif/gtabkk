@@ -102,7 +102,9 @@ export function onCopKilled() {
   G.copsKilled++;
   if (GAMEPLAY.pistolOnCopKill && G.copsKilled === 1 && !G.player.weapons.pistol) {
     G.player.weapons.pistol = true;
+    G.player.activeWeapon = 'pistol';
     G.player.pistolAmmo = G.player.pistolMag;
+    G.player.pistolReserve = Math.max(G.player.pistolReserve || 0, G.player.pistolMag * 2);
     updateAmmoHud();
     G.hud.showNotif('Picked up a 9mm');
   }
@@ -156,6 +158,7 @@ export function saveGame() {
     localStorage.setItem(slotKey(), JSON.stringify({
       cash: G.cash, armor: p.armor, dayT: G.time.dayT, day: G.time.day | 0, copsKilled: G.copsKilled,
       weapons: { pistol: !!p.weapons.pistol, smg: !!p.weapons.smg, shotgun: !!p.weapons.shotgun },
+      activeWeapon: p.activeWeapon,
       pistolAmmo: p.pistolAmmo, pistolReserve: p.pistolReserve,
       smgAmmo: p.smgAmmo, smgReserve: p.smgReserve,
       shotgunAmmo: p.shotgunAmmo, shotgunReserve: p.shotgunReserve,
@@ -216,6 +219,15 @@ export function loadGame() {
     if (typeof s.shotgunAmmo === 'number') p.shotgunAmmo = s.shotgunAmmo;
     if (typeof s.shotgunReserve === 'number') p.shotgunReserve = s.shotgunReserve;
   }
+  const savedWeapon = typeof s.activeWeapon === 'string' ? s.activeWeapon : '';
+  if (savedWeapon === 'fists' || (['pistol', 'smg', 'shotgun'].includes(savedWeapon) && p.weapons[savedWeapon])) {
+    p.activeWeapon = savedWeapon;
+  } else if (p.weapons.pistol) {
+    p.activeWeapon = 'pistol';
+  } else {
+    p.activeWeapon = 'fists';
+  }
+  p.pistol.visible = p.activeWeapon !== 'fists';
   if (Array.isArray(s.amulets) && G.world.collectibles) {
     s.amulets.forEach((taken, i) => {
       const a = G.world.collectibles[i];

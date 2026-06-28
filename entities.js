@@ -51,14 +51,25 @@ export function makePlayer(scene) {
     hand.position.y = -0.63; hand.castShadow = true; arm.add(hand);
   }
 
-  // pistol model (hidden by default)
+  // Held pistol model (hidden by default). It is parented to the right arm so
+  // the chase camera clearly reads it as being in the player's hand.
   const pistol = new THREE.Group();
-  const gunBody = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.12, 0.22), new THREE.MeshStandardMaterial({ color: 0x222, metalness: 0.7, roughness: 0.4 }));
-  pistol.add(gunBody);
-  const gunGrip = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.18, 0.10), new THREE.MeshStandardMaterial({ color: 0x111 }));
-  gunGrip.position.set(-0.02, -0.13, 0); pistol.add(gunGrip);
+  const gunMat = new THREE.MeshStandardMaterial({ color: 0x191b1f, metalness: 0.75, roughness: 0.34 });
+  const gunDarkMat = new THREE.MeshStandardMaterial({ color: 0x08090b, metalness: 0.45, roughness: 0.5 });
+  const gunBody = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.10, 0.36), gunMat);
+  gunBody.position.set(0, 0, 0.12); gunBody.castShadow = true; pistol.add(gunBody);
+  const gunBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.26, 8), gunMat);
+  gunBarrel.rotation.x = PI / 2; gunBarrel.position.set(0, 0.006, 0.36); gunBarrel.castShadow = true; pistol.add(gunBarrel);
+  const gunGrip = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.24, 0.11), gunDarkMat);
+  gunGrip.position.set(-0.01, -0.16, -0.02); gunGrip.rotation.x = -0.18; gunGrip.castShadow = true; pistol.add(gunGrip);
+  const trigger = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.008, 5, 10), gunDarkMat);
+  trigger.rotation.x = PI / 2; trigger.position.set(0, -0.075, 0.11); pistol.add(trigger);
+  const sight = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.025, 0.035), gunDarkMat);
+  sight.position.set(0, 0.065, -0.035); pistol.add(sight);
+  pistol.position.set(0.03, -0.64, 0.07);
+  pistol.scale.setScalar(1.18);
   pistol.visible = false;
-  group.add(pistol);
+  armR.add(pistol);
 
   group.position.copy(G.world.spawns.player);
   scene.add(group);

@@ -11,6 +11,7 @@ import { killCop, killPed, raiseWanted, spawnBark } from './main.js';
 let _muzzleLight = null, _sparkLight = null, _muzzleT = 0, _sparkT = 0;
 // pooled muzzle-flash sprite parented to the held gun (reused every shot)
 let _muzzleFlash = null, _muzzleFlashT = 0;
+const _muzzleWorld = new THREE.Vector3();
 
 // Brief expanding spark/puff at a bullet's hit point — reuses the G.dust pool
 // (updateDust fades + frees it) so we add no new per-frame system. Cheap: ~6 pts.
@@ -36,14 +37,55 @@ function flashMuzzle() {
   if (!_muzzleFlash) {
     const mat = new THREE.SpriteMaterial({ color: 0xfff0b0, transparent: true, opacity: 0, depthWrite: false, depthTest: false });
     _muzzleFlash = new THREE.Sprite(mat);
-    _muzzleFlash.scale.set(0.6, 0.6, 1);
+    _muzzleFlash.scale.set(0.78, 0.78, 1);
   }
   if (_muzzleFlash.parent !== gun) { gun.add(_muzzleFlash); }
-  _muzzleFlash.position.set(0, 0, 0.32);          // out past the barrel
+  _muzzleFlash.position.set(0, 0, 0.54);          // out past the barrel
   _muzzleFlash.material.opacity = 0.95;
   _muzzleFlashT = 0.05;
 }
 function hitMarker() { if (G.hud && G.hud.hitMarker) G.hud.hitMarker(); }
+
+function gunTriggerDown() {
+  return !!(G.input && (G.input.mouseDown || G.input.down('KeyF')));
+}
+
+function setHeldGunPose(kind, recoil) {
+  const p = G.player;
+  p.pistol.visible = true;
+  p.armR.rotation.x = -1.2 + recoil * 0.42;
+  p.armR.rotation.y = -0.08;
+  p.armR.rotation.z = 0.16;
+  p.armL.rotation.x = -0.72 + recoil * 0.16;
+  p.armL.rotation.y = 0.08;
+  p.armL.rotation.z = -0.22;
+  p.pistol.position.set(0.03, -0.64, 0.07 - recoil * 0.025);
+  p.pistol.rotation.set(-0.05 - recoil * 0.18, 0, 0);
+  const longGun = kind === 'smg' || kind === 'shotgun';
+  p.pistol.scale.set(1.18, 1.18, longGun ? 1.55 : 1.18);
+}
+
+function getMuzzleWorld() {
+  const gun = G.player && G.player.pistol;
+  if (!gun) return _muzzleWorld.copy(G.camera.position);
+  gun.updateWorldMatrix(true, false);
+  return gun.localToWorld(_muzzleWorld.set(0, 0, 0.54));
+}
+
+function spawnShotTracer(start, dir, len = 70, color = 0xfff0aa, life = 0.075) {
+  const end = start.clone().addScaledVector(dir, len);
+  const geo = new THREE.BufferGeometry().setFromPoints([start.clone(), end]);
+  const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.9, depthWrite: false });
+  const line = new THREE.Line(geo, mat);
+  line.frustumCulled = false;
+  G.scene.add(line);
+  G.bullets.push({ mesh: line, life, maxLife: life, fade: true, dispose: true });
+}
+
+function spawnRicochetTrail(point) {
+  const dir = new THREE.Vector3(rand(-0.7, 0.7), rand(0.25, 0.9), rand(-0.7, 0.7)).normalize();
+  spawnShotTracer(point, dir, rand(1.6, 3.4), 0xffd070, 0.09);
+}
 
 // 14. COMBAT — melee + pistol
 // =============================================================================
@@ -72,7 +114,7 @@ export function updateCombat(dt) {
   if (G.input.pressed('KeyQ')) cycleWeapon();
   // pickup pistol (give it to player after first cop kill or via cheat)
   if (G.input.pressed('KeyG')) { // dev: grant pistol
-    p.weapons.pistol = true; p.pistolAmmo = p.pistolMag; updateAmmoHud(); G.hud.showNotif('+9mm Pistol');
+    p.weapons.pistol = true; p.activeWeapon = 'pistol'; p.pistolAmmo = p.pistolMag; updateAmmoHud(); G.hud.showNotif('+9mm Pistol equipped');
   }
 
   // block
@@ -100,6 +142,11 @@ export function updateCombat(dt) {
 
   // attack — F (melee) or LMB / F for pistol
   if (p.activeWeapon === 'fists') {
+    p.pistol.visible = false;
+    p.pistol.scale.setScalar(1.18);
+    p.armL.rotation.y *= 0.85; p.armR.rotation.y *= 0.85;
+    p.armL.rotation.z = lerp(p.armL.rotation.z, -0.12, 0.2);
+    p.armR.rotation.z = lerp(p.armR.rotation.z, 0.12, 0.2);
     // combo window ticks down between swings; let it lapse and the chain resets
     if (p.comboWindow > 0) { p.comboWindow -= dt; if (p.comboWindow <= 0) p.comboStep = 0; }
     if (G.input.pressed('KeyF') && p.attackCooldown <= 0 && p.stam > 8) {
@@ -130,52 +177,47 @@ export function updateCombat(dt) {
     }
     G.hud.setCrosshair(false);
   } else if (p.activeWeapon === 'pistol' && p.weapons.pistol) {
-    p.pistol.visible = true;
     // raise the right arm to aim; it kicks back on each shot (gunRecoil)
     const recoil = p.gunRecoil || 0;
-    p.armR.rotation.x = -0.6 + recoil * 0.5;
-    p.pistol.position.set(0.42, 1.25, 0.5);
-    p.pistol.rotation.set(-0.6 + recoil * 0.5, 0, 0);
+    setHeldGunPose('pistol', recoil);
 
-    G.hud.setCrosshair(G.input.rightDown);
-    if (G.input.mouseDown && p.attackCooldown <= 0 && p.pistolAmmo > 0) {
+    const firing = gunTriggerDown();
+    G.hud.setCrosshair(G.input.rightDown || firing);
+    if (firing && p.attackCooldown <= 0 && p.pistolAmmo > 0) {
       firePistol();
       p.pistolAmmo--; p.attackCooldown = 0.18;
       p.gunRecoil = 1;
       updateAmmoHud();
-    } else if (G.input.mouseDown && p.pistolAmmo === 0 && p.attackCooldown <= 0) {
+    } else if (firing && p.pistolAmmo === 0 && p.attackCooldown <= 0) {
       G.audio.blip({freq: 200, dur: 0.04, type:'square', gain: 0.05});
       p.attackCooldown = 0.25;
     }
   } else if (p.activeWeapon === 'smg' && p.weapons.smg) {
-    p.pistol.visible = true; // reuse the held-weapon model
+    // reuse the held-weapon model
     const recoil = p.gunRecoil || 0;
-    p.armR.rotation.x = -0.7 + recoil * 0.4;
-    p.pistol.position.set(0.42, 1.3, 0.5);
-    p.pistol.rotation.set(-0.7 + recoil * 0.4, 0, 0);
-    G.hud.setCrosshair(G.input.rightDown);
-    if (G.input.mouseDown && p.attackCooldown <= 0 && p.smgAmmo > 0) {
+    setHeldGunPose('smg', recoil);
+    const firing = gunTriggerDown();
+    G.hud.setCrosshair(G.input.rightDown || firing);
+    if (firing && p.attackCooldown <= 0 && p.smgAmmo > 0) {
       fireSMG();
       p.smgAmmo--; p.attackCooldown = 0.07;   // fast, full-auto
       p.gunRecoil = 1;
       updateAmmoHud();
-    } else if (G.input.mouseDown && p.smgAmmo === 0 && p.attackCooldown <= 0) {
+    } else if (firing && p.smgAmmo === 0 && p.attackCooldown <= 0) {
       G.audio.blip({freq: 200, dur: 0.04, type: 'square', gain: 0.05});
       p.attackCooldown = 0.25;
     }
   } else if (p.activeWeapon === 'shotgun' && p.weapons.shotgun) {
-    p.pistol.visible = true;
     const recoil = p.gunRecoil || 0;
-    p.armR.rotation.x = -0.6 + recoil * 0.6;
-    p.pistol.position.set(0.42, 1.25, 0.5);
-    p.pistol.rotation.set(-0.6 + recoil * 0.6, 0, 0);
-    G.hud.setCrosshair(G.input.rightDown);
-    if (G.input.mouseDown && p.attackCooldown <= 0 && p.shotgunAmmo > 0) {
+    setHeldGunPose('shotgun', recoil);
+    const firing = gunTriggerDown();
+    G.hud.setCrosshair(G.input.rightDown || firing);
+    if (firing && p.attackCooldown <= 0 && p.shotgunAmmo > 0) {
       fireShotgun();
       p.shotgunAmmo--; p.attackCooldown = 0.8;   // slow, punchy
       p.gunRecoil = 1;
       updateAmmoHud();
-    } else if (G.input.mouseDown && p.shotgunAmmo === 0 && p.attackCooldown <= 0) {
+    } else if (firing && p.shotgunAmmo === 0 && p.attackCooldown <= 0) {
       G.audio.blip({freq: 200, dur: 0.04, type: 'square', gain: 0.05});
       p.attackCooldown = 0.3;
     }
@@ -260,7 +302,7 @@ export function scarePeds(pos, radius) {
 }
 
 export function firePistol() {
-  const origin = G.camera.position;          // used synchronously below; copied where stored
+  const origin = getMuzzleWorld();
   G.camera.getWorldDirection(_fireDir);
   // pistol stays accurate — only a whisper of spread so it's not laser-perfect
   _fireDir.x += rand(-0.006, 0.006);
@@ -272,18 +314,19 @@ export function firePistol() {
   _muzzleLight.intensity = 2.5; _muzzleT = 0.06;
   flashMuzzle();                              // visible flash at the gun barrel
   G.player.gunRecoil = 1;                     // arm/gun kick (decays in updateCombat)
+  spawnShotTracer(origin, _fireDir, 78, 0xfff0aa, 0.07);
   // spawn tracer bullet (visual only; the hit is the raycast below)
   const bullet = new THREE.Mesh(G.bulletGeom, G.bulletMat);
   bullet.position.copy(origin); G.scene.add(bullet);
   G.bullets.push({ mesh: bullet, vel: _fireDir.clone().multiplyScalar(80), life: 1.0 });
   G.audio.shot();
   G.camRig.shake = Math.max(G.camRig.shake, 0.07);
-  if (doBulletRaycast(origin, _fireDir)) { hitMarker(); G.audio.hit(); }
+  if (doBulletRaycast(G.camera.position, _fireDir)) { hitMarker(); G.audio.hit(); }
   scarePeds(origin, 14);
 }
 
 export function fireSMG() {
-  const origin = G.camera.position;
+  const origin = getMuzzleWorld();
   G.camera.getWorldDirection(_fireDir);
   // sprayier than the pistol — a wide, full-auto cone you have to fight
   _fireDir.x += rand(-0.045, 0.045);
@@ -294,21 +337,24 @@ export function fireSMG() {
   _muzzleLight.position.copy(origin);
   _muzzleLight.intensity = 2.0; _muzzleT = 0.05;
   flashMuzzle();
+  spawnShotTracer(origin, _fireDir, 72, 0xffef96, 0.055);
   const bullet = new THREE.Mesh(G.bulletGeom, G.bulletMat);
   bullet.position.copy(origin); G.scene.add(bullet);
   G.bullets.push({ mesh: bullet, vel: _fireDir.clone().multiplyScalar(90), life: 0.8 });
   G.audio.shot();
   G.camRig.shake = Math.max(G.camRig.shake, 0.05);
-  if (doBulletRaycast(origin, _fireDir, 20)) { hitMarker(); G.audio.hit(); }
+  if (doBulletRaycast(G.camera.position, _fireDir, 20)) { hitMarker(); G.audio.hit(); }
   scarePeds(origin, 14);
 }
 
 export function fireShotgun() {
-  const origin = G.camera.position;
+  const origin = getMuzzleWorld();
   if (!_muzzleLight) { _muzzleLight = new THREE.PointLight(0xffd577, 0, 6, 2); G.scene.add(_muzzleLight); }
   _muzzleLight.position.copy(origin);
   _muzzleLight.intensity = 3.2; _muzzleT = 0.07;
   flashMuzzle();
+  G.camera.getWorldDirection(_fireDir);
+  spawnShotTracer(origin, _fireDir, 34, 0xfff0aa, 0.08);
   G.audio.shot();
   G.camRig.shake = Math.max(G.camRig.shake, 0.12);
   // a tight cone of pellets — devastating up close (all 9 land), falls off at range
@@ -322,7 +368,7 @@ export function fireShotgun() {
     const pellet = new THREE.Mesh(G.bulletGeom, G.bulletMat);
     pellet.position.copy(origin); G.scene.add(pellet);
     G.bullets.push({ mesh: pellet, vel: _fireDir.clone().multiplyScalar(80), life: 0.5 });
-    if (doBulletRaycast(origin, _fireDir, 12)) connected = true;
+    if (doBulletRaycast(G.camera.position, _fireDir, 12)) connected = true;
   }
   if (connected) { hitMarker(); G.audio.hit(); }   // one marker per blast, not per pellet
   scarePeds(origin, 16);
@@ -357,6 +403,14 @@ export function doBulletRaycast(origin, dir, dmg = 35) {
       if (dist <= _ray.far && (!best || dist < best.dist)) best = { dist, point: hit.clone(), target: { obj: b } };
     }
   }
+  // Road/sidewalk impacts matter for player feedback: shooting down at the
+  // street should still throw sparks and ricochet instead of silently vanishing.
+  if (dir.y < -0.025) {
+    const t = (0.04 - origin.y) / dir.y;
+    if (t > 0 && t <= _ray.far && (!best || t < best.dist)) {
+      best = { dist: t, point: origin.clone().addScaledVector(dir, t), target: { ground: true } };
+    }
+  }
   let connected = false;                     // true if we hit an actor/cop-car (drives the hitmarker)
   if (best) {
     G.audio.ricochet();
@@ -379,6 +433,7 @@ export function doBulletRaycast(origin, dir, dmg = 35) {
     }
     // impact spark/puff at the hit point (reuses the dust pool) + pooled light
     spawnImpactSpark(best.point);
+    if (!t.actor) spawnRicochetTrail(best.point);
     if (!_sparkLight) { _sparkLight = new THREE.PointLight(0xffeebb, 0, 4, 2); G.scene.add(_sparkLight); }
     _sparkLight.position.copy(best.point);
     _sparkLight.intensity = 1.5; _sparkT = 0.08;
@@ -393,10 +448,15 @@ export function updateBullets(dt) {
   if (_muzzleFlashT > 0) { _muzzleFlashT -= dt; if (_muzzleFlash) _muzzleFlash.material.opacity = Math.max(0, _muzzleFlashT / 0.05 * 0.95); }
   for (let i = G.bullets.length - 1; i >= 0; i--) {
     const b = G.bullets[i];
-    b.mesh.position.addScaledVector(b.vel, dt);
+    if (b.vel) b.mesh.position.addScaledVector(b.vel, dt);
+    if (b.fade && b.mesh.material && b.maxLife) b.mesh.material.opacity = Math.max(0, b.life / b.maxLife);
     b.life -= dt;
     if (b.life <= 0) {
       G.scene.remove(b.mesh);
+      if (b.dispose) {
+        if (b.mesh.geometry) b.mesh.geometry.dispose();
+        if (b.mesh.material) b.mesh.material.dispose();
+      }
       G.bullets.splice(i, 1);
     }
   }

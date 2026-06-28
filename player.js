@@ -54,8 +54,8 @@ export function updatePlayer(dt) {
   if (p.group.position.y <= gy + 0.02) { p.group.position.y = gy; p.velocity.y = 0; p.grounded = true; }
   else p.grounded = false;
 
-  // body face direction of movement (or aim if firing)
-  if (p.activeWeapon === 'pistol' && G.input.rightDown) {
+  // body face direction of movement (or aim/firing with a weapon)
+  if (p.activeWeapon !== 'fists' && (G.input.rightDown || G.input.mouseDown || G.input.down('KeyF'))) {
     p.yaw = G.camRig.yaw + PI;
   } else if (moving) {
     const desired = Math.atan2(vx, vz);
@@ -805,9 +805,9 @@ export function updateGunShop(dt) {
   if (G.input.pressed('KeyE')) {
     if (G.cash < cost) { G.hud.showNotif('Not enough cash'); return; }
     G.cash -= cost; G.hud.setCash(G.cash);
-    if (action === 'pistol')   { p.weapons.pistol = true; p.pistolAmmo = p.pistolMag; p.pistolReserve = p.pistolMag * 3; }
-    else if (action === 'smg') { p.weapons.smg = true; p.smgAmmo = p.smgMag; p.smgReserve = p.smgMag * 3; }
-    else if (action === 'shotgun') { p.weapons.shotgun = true; p.shotgunAmmo = p.shotgunMag; p.shotgunReserve = p.shotgunMag * 3; }
+    if (action === 'pistol')   { p.weapons.pistol = true; p.activeWeapon = 'pistol'; p.pistolAmmo = p.pistolMag; p.pistolReserve = p.pistolMag * 3; }
+    else if (action === 'smg') { p.weapons.smg = true; p.activeWeapon = 'smg'; p.smgAmmo = p.smgMag; p.smgReserve = p.smgMag * 3; }
+    else if (action === 'shotgun') { p.weapons.shotgun = true; p.activeWeapon = 'shotgun'; p.shotgunAmmo = p.shotgunMag; p.shotgunReserve = p.shotgunMag * 3; }
     else { p.pistolReserve += p.pistolMag * 3; if (p.weapons.smg) p.smgReserve += p.smgMag * 3; if (p.weapons.shotgun) p.shotgunReserve += p.shotgunMag * 3; }
     updateAmmoHud();
     G.hud.showNotif(label + ' ✓');

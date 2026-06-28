@@ -146,11 +146,12 @@ export function updatePlayerInVehicle(dt) {
   if (p.gunRecoil > 0) p.gunRecoil = Math.max(0, p.gunRecoil - dt * 6);
   if (G.input.pressed('KeyQ')) cycleWeapon();
   if (p.activeWeapon !== 'fists' && p.weapons[p.activeWeapon]) {
-    G.hud.setCrosshair(G.input.rightDown);
+    const firing = G.input.mouseDown || G.input.down('KeyF');
+    G.hud.setCrosshair(G.input.rightDown || firing);
     const w = p.activeWeapon;            // 'pistol' | 'smg' | 'shotgun'
     const ammo = w + 'Ammo';
     const cd = w === 'smg' ? 0.07 : w === 'shotgun' ? 0.8 : 0.18;
-    if (G.input.mouseDown && p.attackCooldown <= 0 && p[ammo] > 0) {
+    if (firing && p.attackCooldown <= 0 && p[ammo] > 0) {
       if (w === 'smg') fireSMG(); else if (w === 'shotgun') fireShotgun(); else firePistol();
       p[ammo]--; p.attackCooldown = cd; p.gunRecoil = 1;
       updateAmmoHud();

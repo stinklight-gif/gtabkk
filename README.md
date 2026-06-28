@@ -45,10 +45,10 @@ CDN is blocked, point `CHROME_PATH` at any Chrome/Chromium binary.
 | Shift | Sprint (foot) / boost (vehicle) |
 | Space | Jump (foot) / handbrake (vehicle) |
 | E | Enter/exit vehicle |
-| F | Melee attack (jab/cross/kick randomised) |
-| LMB | Fire pistol / SMG (also drive-by while driving) |
+| F | Melee attack / fire active weapon |
+| LMB | Fire active weapon (also drive-by while driving) |
 | RMB | Aim (pistol) — shows crosshair |
-| Q | Cycle weapon (fists / pistol / SMG, whichever are owned) |
+| Q | Cycle weapon (fists / pistol / SMG / shotgun, whichever are owned) |
 | R | Reload |
 | Ctrl | Block |
 | B | Bribe a nearby cop (฿1,000) at 1–2★ |
