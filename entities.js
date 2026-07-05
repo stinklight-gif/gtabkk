@@ -37,18 +37,27 @@ export function makePlayer(scene) {
     mesh.castShadow = cast;
     return mesh;
   }
+  function jointedLimb(totalLen, r, mat, cast=true) {
+    const upperLen = totalLen * 0.45;
+    const lowerLen = totalLen * 0.43;
+    const upper = limb(upperLen, r, mat, cast);
+    const lower = limb(lowerLen, r * 0.92, mat, cast);
+    lower.position.y = -(upperLen + r * 1.85);
+    upper.add(lower);
+    return { upper, lower, lowerLen, lowerR: r * 0.92 };
+  }
   function shoe(parent, y) {
     const s = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.08, 0.26), shoeMat);
     s.position.set(0, y, 0.07); s.castShadow = true; parent.add(s);
   }
 
-  const legL = limb(0.62, 0.075, pantsMat); legL.position.set(-0.13, 0.82, 0); group.add(legL); shoe(legL, -0.78);
-  const legR = limb(0.62, 0.075, pantsMat); legR.position.set( 0.13, 0.82, 0); group.add(legR); shoe(legR, -0.78);
-  const armL = limb(0.52, 0.058, bodyMat); armL.position.set(-0.33, 1.38, 0); armL.rotation.z = -0.12; group.add(armL);
-  const armR = limb(0.52, 0.058, bodyMat); armR.position.set( 0.33, 1.38, 0); armR.rotation.z =  0.12; group.add(armR);
-  for (const arm of [armL, armR]) {
+  const jlL = jointedLimb(0.62, 0.075, pantsMat); const legL = jlL.upper, shinL = jlL.lower; legL.position.set(-0.13, 0.82, 0); group.add(legL); shoe(shinL, -(jlL.lowerLen + jlL.lowerR * 2) + 0.03);
+  const jlR = jointedLimb(0.62, 0.075, pantsMat); const legR = jlR.upper, shinR = jlR.lower; legR.position.set( 0.13, 0.82, 0); group.add(legR); shoe(shinR, -(jlR.lowerLen + jlR.lowerR * 2) + 0.03);
+  const jaL = jointedLimb(0.52, 0.058, bodyMat, false); const armL = jaL.upper, foreL = jaL.lower; armL.position.set(-0.33, 1.38, 0); armL.rotation.z = -0.12; group.add(armL);
+  const jaR = jointedLimb(0.52, 0.058, bodyMat, false); const armR = jaR.upper, foreR = jaR.lower; armR.position.set( 0.33, 1.38, 0); armR.rotation.z =  0.12; group.add(armR);
+  for (const arm of [foreL, foreR]) {
     const hand = new THREE.Mesh(new THREE.SphereGeometry(0.062, 7, 6), skinMat);
-    hand.position.y = -0.63; hand.castShadow = true; arm.add(hand);
+    hand.position.y = -0.33; hand.castShadow = true; arm.add(hand);
   }
 
   // Held pistol model (hidden by default). It is parented to the right arm so
@@ -76,7 +85,7 @@ export function makePlayer(scene) {
 
   return {
     group, torso, legs: legR, legL, legR, pelvis, head, neck, hair, armL, armR, pistol,
-    parts: { torso, pelvis, head, neck, hair, legL, legR, armL, armR },
+    parts: { torso, pelvis, head, neck, hair, legL, legR, shinL, shinR, armL, armR, foreL, foreR },
     velocity: new THREE.Vector3(),
     yaw: 0, pitch: 0,
     grounded: true,
@@ -198,9 +207,34 @@ export function setGroupLod(group, mode) {
   const lod = group && group.userData && group.userData.lod;
   if (!lod || lod.state === mode) return;
   const highVisible = mode !== 'low';
-  for (const child of lod.high) child.visible = highVisible;
+  for (const child of lod.high) child.visible = highVisible && !(child.userData && child.userData.propHidden);
   lod.low.visible = !highVisible;
   lod.state = mode;
+}
+
+function applyVehicleRealismSpec(spec, kind) {
+  if (!spec) return spec;
+  const family = spec.kind || kind;
+  if (family === 'bike') {
+    spec.wheelbase = spec.wheelbase || 1.3;
+    spec.grip = spec.grip || 11;
+  } else if (family === 'tuktuk') {
+    spec.wheelbase = spec.wheelbase || 2.0;
+    spec.grip = spec.grip || 7.5;
+  } else if (family === 'hilux' || family === 'songthaew' || family === 'cop' || family === 'fortuner') {
+    spec.wheelbase = spec.wheelbase || 2.9;
+    spec.grip = spec.grip || 8.5;
+  } else if (family === 'bus' || family === 'swat') {
+    spec.wheelbase = spec.wheelbase || 4.8;
+    spec.grip = spec.grip || 8.0;
+  } else if (family === 'supercar') {
+    spec.wheelbase = spec.wheelbase || 2.6;
+    spec.grip = spec.grip || 11.5;
+  } else if (family !== 'boat') {
+    spec.wheelbase = spec.wheelbase || 2.6;
+    spec.grip = spec.grip || 9.5;
+  }
+  return spec;
 }
 
 function makePedLodProxy(shirtColor, pantsColor, skinColor, kind) {
@@ -542,6 +576,7 @@ export function makeVehicleMesh(kind) {
     g.userData.dims = { L: 3.8, W: 1.8, H: 1.6 };
     g.userData.spec = { topSpeed: 24, accel: 11, brake: 16, turn: 1.7, mass: 1500, kind };
   }
+  applyVehicleRealismSpec(g.userData.spec, kind);
   enhanceVehicleVisual(g, kind);
   const low = makeVehicleLodProxy(g, kind);
   if (low) configureLodGroup(g, low);
@@ -571,8 +606,10 @@ export function makeVehicle(kind, scene) {
     kind, mesh, spec,
     pos: mesh.position,
     vel: 0,            // forward speed (m/s)
+    latVel: 0,         // lateral slip speed in vehicle space (m/s, +right)
     heading: 0,        // yaw radians
     steerAngle: 0,
+    yawRate: 0,
     wheelSpin: 0,
     hp: 100,
     smoke: null, fire: null,
@@ -644,17 +681,20 @@ export function makePedMesh(forcedKind = null) {
   neck.position.y = 1.42; g.add(neck);
 
   // head + hair/hat
+  const headRoot = new THREE.Group();
+  headRoot.position.y = 1.5;
+  g.add(headRoot);
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.135, 10, 8), skinMat);
-  head.position.y = 1.5; head.scale.set(0.92, 1.06, 0.96); head.castShadow = true; g.add(head);
+  head.scale.set(0.92, 1.06, 0.96); head.castShadow = true; headRoot.add(head);
   if (kind === 'vendor' || kind === 'laborer') {
     const hat = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.2, 10), new THREE.MeshStandardMaterial({ color: 0xcba76a, roughness: 0.9 }));
-    hat.position.y = 1.6; g.add(hat);                                   // conical straw hat
+    hat.position.y = 0.1; headRoot.add(hat);                                   // conical straw hat
   } else if (kind === 'tourist' && Math.random() < 0.6) {
     const cap = new THREE.Mesh(new THREE.SphereGeometry(0.15, 8, 6, 0, TAU, 0, PI/2), new THREE.MeshStandardMaterial({ color: pick([0xb03030, 0x305080, 0xf0f0f0]) }));
-    cap.position.y = 1.55; g.add(cap);
+    cap.position.y = 0.05; headRoot.add(cap);
   } else if (kind !== 'monk') {
     const hair = new THREE.Mesh(new THREE.SphereGeometry(0.145, 8, 6, 0, TAU, 0, PI/1.7), new THREE.MeshStandardMaterial({ color: pick([0x1a1410, 0x2a2018, 0x0a0a0a]) }));
-    hair.position.y = 1.5; g.add(hair);
+    headRoot.add(hair);
   }
 
   // limbs — geometry offset so the mesh origin sits at the joint (rotation.x pivots there)
@@ -662,6 +702,15 @@ export function makePedMesh(forcedKind = null) {
     const geo = new THREE.CapsuleGeometry(r, len, 3, 6);
     geo.translate(0, -(len / 2 + r), 0);
     const m = new THREE.Mesh(geo, mat); m.castShadow = !!cast; return m;
+  }
+  function jointedLimb(totalLen, r, upperMat, lowerMat, cast) {
+    const upperLen = totalLen * 0.45;
+    const lowerLen = totalLen * 0.43;
+    const upper = limb(upperLen, r, upperMat, cast);
+    const lower = limb(lowerLen, r * 0.92, lowerMat || upperMat, cast);
+    lower.position.y = -(upperLen + r * 1.85);
+    upper.add(lower);
+    return { upper, lower, lowerLen, lowerR: r * 0.92 };
   }
   const hipY = 0.92, shoulderY = 1.42;
   // shoe — box parented to a leg so it swings with the stride; own material so the
@@ -673,25 +722,31 @@ export function makePedMesh(forcedKind = null) {
     const s = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.07, 0.2), shoeMat);
     s.position.set(0, footY, 0.04); s.castShadow = true; legMesh.add(s);
   }
-  let legL, legR;
+  let legL, legR, shinL, shinR;
   if (skirt) {
     const sk = new THREE.Mesh(new THREE.ConeGeometry(0.26, 0.5, 10), pantsMat);
     sk.position.y = 0.7; sk.castShadow = true; g.add(sk);
-    legL = limb(0.3, 0.07, skinMat, false); legL.position.set(-0.08, 0.42, 0);
-    legR = limb(0.3, 0.07, skinMat, false); legR.position.set( 0.08, 0.42, 0);
-    shoe(legL, -0.42); shoe(legR, -0.42);
+    const jl = jointedLimb(0.3, 0.06, skinMat, skinMat, false);
+    const jr = jointedLimb(0.3, 0.06, skinMat, skinMat, false);
+    legL = jl.upper; shinL = jl.lower; legL.position.set(-0.08, 0.42, 0);
+    legR = jr.upper; shinR = jr.lower; legR.position.set( 0.08, 0.42, 0);
+    shoe(shinL, -(jl.lowerLen + jl.lowerR * 2) + 0.02); shoe(shinR, -(jr.lowerLen + jr.lowerR * 2) + 0.02);
   } else {
-    legL = limb(0.62, 0.085, pantsMat, true); legL.position.set(-0.09, hipY, 0);
-    legR = limb(0.62, 0.085, pantsMat, true); legR.position.set( 0.09, hipY, 0);
-    shoe(legL, -0.76); shoe(legR, -0.76);
+    const jl = jointedLimb(0.62, 0.085, pantsMat, pantsMat, true);
+    const jr = jointedLimb(0.62, 0.085, pantsMat, pantsMat, true);
+    legL = jl.upper; shinL = jl.lower; legL.position.set(-0.09, hipY, 0);
+    legR = jr.upper; shinR = jr.lower; legR.position.set( 0.09, hipY, 0);
+    shoe(shinL, -(jl.lowerLen + jl.lowerR * 2) + 0.03); shoe(shinR, -(jr.lowerLen + jr.lowerR * 2) + 0.03);
   }
   g.add(legL); g.add(legR);
   // hand — small skin sphere at each arm's end, parented so it swings with the arm
-  const armL = limb(0.5, 0.06, armMat, false); armL.position.set(-0.25, shoulderY, 0); g.add(armL);
-  const armR = limb(0.5, 0.06, armMat, false); armR.position.set( 0.25, shoulderY, 0); g.add(armR);
-  for (const arm of [armL, armR]) {
+  const jaL = jointedLimb(0.5, 0.06, armMat, skinMat, false);
+  const jaR = jointedLimb(0.5, 0.06, armMat, skinMat, false);
+  const armL = jaL.upper, foreL = jaL.lower; armL.position.set(-0.25, shoulderY, 0); g.add(armL);
+  const armR = jaR.upper, foreR = jaR.lower; armR.position.set( 0.25, shoulderY, 0); g.add(armR);
+  for (const arm of [foreL, foreR]) {
     const hand = new THREE.Mesh(new THREE.SphereGeometry(0.062, 6, 5), skinMat);
-    hand.position.y = -0.6; arm.add(hand);
+    hand.position.y = -0.32; arm.add(hand);
   }
 
   // archetype props
@@ -706,36 +761,53 @@ export function makePedMesh(forcedKind = null) {
     bowl.rotation.x = PI; bowl.position.set(0, 1.0, 0.2); g.add(bowl);
   }
 
-  const accessoryRoll = Math.random();
-  if (accessoryRoll < 0.18 && kind !== 'monk') {
+  const props = {};
+  const phoneWalker = kind !== 'monk' && ['local', 'office', 'tourist'].includes(kind) && Math.random() < 0.12;
+  if (phoneWalker) {
     const phone = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.09, 0.014), new THREE.MeshStandardMaterial({ color: 0x0b0d12, roughness: 0.45, metalness: 0.25 }));
-    phone.position.set(0.025, -0.51, 0.07);
+    phone.position.set(0.025, -0.28, 0.07);
     phone.rotation.set(0.45, 0.15, -0.25);
-    armL.add(phone);
+    foreL.add(phone);
+    props.phone = phone;
     g.userData.accessory = 'phone';
-  } else if (accessoryRoll < 0.29 && kind !== 'monk') {
+  } else if (Math.random() < 0.13 && kind !== 'monk') {
     const bag = new THREE.Mesh(
       new THREE.BoxGeometry(0.14, 0.22, 0.18),
       new THREE.MeshStandardMaterial({ color: pick([0x8a6435, 0xe0d0a8, 0x314a66, 0xa33a3a]), roughness: 0.8 })
     );
-    bag.position.set(0, -0.58, 0.04);
-    armL.add(bag);
+    bag.position.set(0, -0.32, 0.04);
+    foreL.add(bag);
     g.userData.accessory = 'shopping-bag';
-  } else if (accessoryRoll < 0.36 && kind !== 'monk') {
+  }
+  if (kind !== 'monk') {
+    const umbrella = new THREE.Group();
+    umbrella.userData.propHidden = true;
+    umbrella.visible = false;
     const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.78, 5), new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.5 }));
-    shaft.position.set(-0.23, 1.42, 0.02); g.add(shaft);
+    shaft.position.y = 0.33; umbrella.add(shaft);
     const canopy = new THREE.Mesh(new THREE.ConeGeometry(0.42, 0.22, 14), new THREE.MeshStandardMaterial({ color: pick([0xffcf4a, 0x2a8fc0, 0xc04a74, 0xf0f0f0]), roughness: 0.75 }));
-    canopy.position.set(-0.23, 1.88, 0.02);
+    canopy.position.y = 0.82;
     canopy.rotation.x = PI;
-    g.add(canopy);
-    g.userData.accessory = 'umbrella';
+    umbrella.add(canopy);
+    umbrella.position.set(-0.22, 1.16, 0.02);
+    g.add(umbrella);
+    props.umbrella = umbrella;
+    g.userData.umbrellaUser = Math.random() < 0.3;
   }
 
   const build = rand(0.92, 1.08);
   g.scale.set(build, rand(0.94, 1.06), build);
-  g.userData.parts = { torso, head, legL, legR, armL, armR };
+  g.userData.parts = {
+    torso, head: headRoot, headMesh: head, neck,
+    legL, legR, shinL, shinR, armL, armR, foreL, foreR,
+    shirtParts: [torso, armL, armR].concat(bareArms ? [] : [foreL, foreR]),
+    pantsParts: skirt ? [legL, legR, shinL, shinR] : [legL, legR, shinL, shinR],
+    props,
+  };
   g.userData.kind = kind;
   g.userData.phase = rand(0, TAU);
+  g.userData.gaitFreq = rand(0.9, 1.12);
+  g.userData.gaitAmp = rand(0.85, 1.1);
   configureLodGroup(g, makePedLodProxy(shirtColor, pantsColor, skin, kind));
   return g;
 }
@@ -749,8 +821,8 @@ export function recolorTorso(parts, color, roughness = 0.8) {
   if (!parts || !parts.torso) return;
   const old = parts.torso.material;
   parts.torso.material = new THREE.MeshStandardMaterial({ color, roughness });
-  const armL = parts.armL && parts.armL.material, armR = parts.armR && parts.armR.material;
-  if (old && old !== armL && old !== armR) old.dispose();
+  const keep = new Set([parts.armL, parts.armR, parts.foreL, parts.foreR].map(x => x && x.material).filter(Boolean));
+  if (old && !keep.has(old)) old.dispose();
 }
 
 // Shared limb animator for peds + foot cops: advances a per-mesh walk phase and
@@ -759,14 +831,41 @@ export function recolorTorso(parts, color, roughness = 0.8) {
 export function animateWalk(mesh, speed, dt, moving) {
   const p = mesh.userData.parts; if (!p) return;
   const ud = mesh.userData;
-  ud.phase = (ud.phase || 0) + (moving ? (1.6 + speed) * dt * 2.0 : dt * 1.2);
-  const amp = moving ? Math.min(0.7, 0.3 + speed * 0.16) : 0.05;
+  const freq = (moving ? (1.35 + speed * 0.55) : 0.25) * (ud.gaitFreq || 1);
+  ud.phase = (ud.phase || 0) + freq * dt * TAU * 0.55;
+  const runK = clamp((speed - 3.0) / 3.0, 0, 1);
+  const amp = moving ? Math.min(0.86, (0.26 + speed * 0.11 + runK * 0.12) * (ud.gaitAmp || 1)) : 0.035;
   const s = Math.sin(ud.phase), c = Math.sin(ud.phase + PI);
+  const hipDrop = moving ? (1 - Math.abs(Math.cos(ud.phase))) * 0.055 : 0;
   if (p.legL) p.legL.rotation.x = s * amp;
   if (p.legR) p.legR.rotation.x = c * amp;
-  if (p.armL) p.armL.rotation.x = c * amp * 0.9;
-  if (p.armR) p.armR.rotation.x = s * amp * 0.9;
-  if (p.torso) p.torso.position.y = 1.18 + (moving ? 0 : Math.sin(ud.phase * 0.7) * 0.012);
+  if (p.shinL) p.shinL.rotation.x = Math.max(0, -s) * (0.72 + runK * 0.22);
+  if (p.shinR) p.shinR.rotation.x = Math.max(0, -c) * (0.72 + runK * 0.22);
+  if (p.armL) p.armL.rotation.x = c * amp * (0.82 + runK * 0.25);
+  if (p.armR) p.armR.rotation.x = s * amp * (0.82 + runK * 0.25);
+  if (p.foreL) p.foreL.rotation.x = 0.28 + Math.max(0, c) * 0.18;
+  if (p.foreR) p.foreR.rotation.x = 0.28 + Math.max(0, s) * 0.18;
+  const phone = ud.accessory === 'phone';
+  const umbrellaVisible = p.props && p.props.umbrella && p.props.umbrella.visible;
+  if (phone && p.armL && p.foreL) {
+    p.armL.rotation.x = lerp(p.armL.rotation.x, -0.52, 0.55);
+    p.armL.rotation.y = lerp(p.armL.rotation.y || 0, -0.22, 0.35);
+    p.foreL.rotation.x = lerp(p.foreL.rotation.x, -1.15, 0.55);
+  } else if (umbrellaVisible && p.armL && p.foreL) {
+    p.armL.rotation.x = lerp(p.armL.rotation.x, -1.25, 0.5);
+    p.armL.rotation.z = lerp(p.armL.rotation.z || 0, -0.18, 0.35);
+    p.foreL.rotation.x = lerp(p.foreL.rotation.x, -0.15, 0.5);
+  } else {
+    if (p.armL) p.armL.rotation.y *= 0.85;
+    if (p.armR) p.armR.rotation.y *= 0.85;
+  }
+  if (p.torso) {
+    p.torso.position.y = 1.18 - hipDrop + (moving ? 0 : Math.sin(ud.phase) * 0.004);
+    p.torso.rotation.x = lerp(p.torso.rotation.x || 0, moving ? -runK * 0.12 : 0, 0.2);
+  }
+  if (p.neck) p.neck.position.y = 1.42 - hipDrop;
+  if (p.head) p.head.position.y = 1.5 - hipDrop;
+  if (p.head) p.head.rotation.x = lerp(p.head.rotation.x || 0, phone ? 0.35 : 0, 0.12);
 }
 
 export function makeDogMesh() {
@@ -803,10 +902,12 @@ export function spawnPed(scene, pos) {
   m.position.copy(pos);
   m.userData.heading = rand(0, TAU);
   scene.add(m);
+  const speedMul = m.userData.accessory === 'phone' ? 0.8 : 1;
   const ped = {
     mesh: m,
     heading: m.userData.heading,
-    speed: rand(0.9, 1.7),
+    speed: rand(0.9, 1.7) * speedMul,
+    speedMul,
     state: 'walking',
     waitT: 0,
     panicT: 0,
@@ -815,6 +916,25 @@ export function spawnPed(scene, pos) {
   };
   G.peds.push(ped);
   return ped;
+}
+
+export function spawnWalkingPair(scene, center) {
+  const heading = rand(0, TAU);
+  const right = new THREE.Vector3(Math.cos(heading), 0, -Math.sin(heading));
+  const a = spawnPed(scene, center.clone().addScaledVector(right, -0.42));
+  const b = spawnPed(scene, center.clone().addScaledVector(right, 0.42));
+  const group = { heading, waitT: rand(1.2, 3.0), speed: rand(0.9, 1.45), peds: [a, b] };
+  a.buddy = b; b.buddy = a;
+  a.pair = { group, side: -0.42, leader: true };
+  b.pair = { group, side: 0.42, leader: false };
+  for (const p of group.peds) {
+    p.heading = heading;
+    p.speed = group.speed * (p.speedMul || 1);
+    p.state = 'walking';
+    p.waitT = group.waitT;
+    p.mesh.rotation.y = heading;
+  }
+  return group;
 }
 
 export function spawnPedGroup(scene, center, count = irand(2, 3)) {
@@ -876,15 +996,23 @@ export function spawnTraffic(scene) {
     }
     v.mesh.position.copy(v.pos);
     v.mesh.rotation.y = v.heading;
+    const seed = Math.random();
+    const cruiseBase = rand(8, 14) * (kind==='bike'?1.2:1) * (kind==='tuktuk'?0.7:1);
     v.npc = {
       kind: 'traffic',
       // assign nearest grid intersection ahead as the immediate target
       targetIdx: null,
-      cruiseSpeed: rand(8, 14) * (kind==='bike'?1.2:1) * (kind==='tuktuk'?0.7:1),
+      seed,
+      cruiseMul: rand(0.85, 1.15),
+      cruiseSpeed: cruiseBase,
+      followMul: rand(0.8, 1.3),
+      amberRunner: seed > 0.7,
+      wanderAmp: rand(0.06, 0.14),
       reactionT: 0,
       stopT: 0,
       honkCooldown: rand(5, 20),
     };
+    v.npc.cruiseSpeed *= v.npc.cruiseMul;
     v.vel = v.npc.cruiseSpeed;
   }
 }
@@ -924,7 +1052,10 @@ export function spawnBoat(scene) {
 export function spawnPeds(scene, n) {
   for (let i = 0; i < n; i++) {
     const pos = sidewalkPos(rand(-HALF + 12, HALF - 12), rand(-HALF + 12, HALF - 12), 8);
-    if (i < n - 2 && Math.random() < 0.16) {
+    if (i < n - 2 && Math.random() < 0.10) {
+      spawnWalkingPair(scene, pos);
+      i += 1;
+    } else if (i < n - 2 && Math.random() < 0.16) {
       const count = irand(2, 3);
       spawnPedGroup(scene, pos, count);
       i += count - 1;

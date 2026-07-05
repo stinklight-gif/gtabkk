@@ -26,6 +26,8 @@ export function updatePlayer(dt) {
   let speed = 3.4;
   if (sprint && moving) { speed = 6.4; p.stam = Math.max(0, p.stam - 22*dt); }
   else { p.stam = Math.min(p.stamMax, p.stam + 18*dt); }
+  p.isSprinting = sprint && moving;
+  p.moveSpeed = moving ? speed : 0;
 
   // calculate desired velocity in world space relative to camera yaw
   const fx = -Math.sin(G.camRig.yaw), fz = -Math.cos(G.camRig.yaw);
@@ -63,23 +65,33 @@ export function updatePlayer(dt) {
   }
   p.group.rotation.y = p.yaw;
 
-  // animations: leg bob, arm swing
-  const tnow = performance.now() * 0.005;
+  // animations: segmented gait with knees/elbows and a slight sprint lean
   const parts = p.parts;
   if (moving) {
-    const stride = Math.sin(tnow * speed * 0.5);
+    p._walkPhase = (p._walkPhase || 0) + dt * speed * (sprint ? 3.9 : 3.1);
+    const stride = Math.sin(p._walkPhase);
+    const other = Math.sin(p._walkPhase + PI);
+    const runK = sprint ? 1 : 0;
+    const amp = 0.5 + runK * 0.16;
     if (parts && parts.legL && parts.legR) {
-      parts.legL.rotation.x = stride * 0.55;
-      parts.legR.rotation.x = -stride * 0.55;
-      parts.legL.rotation.z = Math.max(0, Math.cos(tnow * speed)) * 0.02;
-      parts.legR.rotation.z = -Math.max(0, -Math.cos(tnow * speed)) * 0.02;
+      parts.legL.rotation.x = stride * amp;
+      parts.legR.rotation.x = other * amp;
+      if (parts.shinL) parts.shinL.rotation.x = Math.max(0, -stride) * (0.8 + runK * 0.18);
+      if (parts.shinR) parts.shinR.rotation.x = Math.max(0, -other) * (0.8 + runK * 0.18);
+      parts.legL.rotation.z = Math.max(0, Math.cos(p._walkPhase)) * 0.02;
+      parts.legR.rotation.z = -Math.max(0, -Math.cos(p._walkPhase)) * 0.02;
     } else {
       p.legs.rotation.x = stride * 0.5;
     }
-    p.torso.rotation.x = Math.sin(tnow * speed * 0.5) * 0.05;
+    p.torso.rotation.x = -runK * 0.12 + Math.sin(p._walkPhase) * 0.035;
     p.torso.rotation.z = stride * 0.025;
-    p.armL.rotation.x = -stride * 0.6;
-    p.armR.rotation.x =  stride * 0.6;
+    p.armL.rotation.x = other * amp * 0.95;
+    p.armR.rotation.x = stride * amp * 0.95;
+    if (parts && parts.foreL) parts.foreL.rotation.x = 0.34 + Math.max(0, other) * 0.16;
+    if (parts && parts.foreR) parts.foreR.rotation.x = 0.34 + Math.max(0, stride) * 0.16;
+    const hipDrop = (1 - Math.abs(Math.cos(p._walkPhase))) * 0.035;
+    p.torso.position.y = 1.15 - hipDrop;
+    if (p.pelvis) p.pelvis.position.y = 0.82 - hipDrop * 0.6;
     // footstep audio
     p._stepPhase = (p._stepPhase||0) + dt * speed;
     if (p._stepPhase > 0.6) { p._stepPhase = 0; G.audio.step(G.time.rainStrength > 0.3); }
@@ -87,6 +99,8 @@ export function updatePlayer(dt) {
     if (parts && parts.legL && parts.legR) {
       parts.legL.rotation.x *= 0.85;
       parts.legR.rotation.x *= 0.85;
+      if (parts.shinL) parts.shinL.rotation.x *= 0.82;
+      if (parts.shinR) parts.shinR.rotation.x *= 0.82;
       parts.legL.rotation.z *= 0.85;
       parts.legR.rotation.z *= 0.85;
     } else {
@@ -94,8 +108,12 @@ export function updatePlayer(dt) {
     }
     p.torso.rotation.x *= 0.85;
     p.torso.rotation.z *= 0.85;
+    p.torso.position.y = lerp(p.torso.position.y, 1.15 + Math.sin((p._walkPhase || 0) * 0.25) * 0.004, 0.12);
+    if (p.pelvis) p.pelvis.position.y = lerp(p.pelvis.position.y, 0.82, 0.12);
     p.armL.rotation.x *= 0.85;
     p.armR.rotation.x *= 0.85;
+    if (parts && parts.foreL) parts.foreL.rotation.x = lerp(parts.foreL.rotation.x || 0, 0.24, 0.15);
+    if (parts && parts.foreR) parts.foreR.rotation.x = lerp(parts.foreR.rotation.x || 0, 0.24, 0.15);
   }
 
   // Combat

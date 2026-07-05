@@ -86,15 +86,24 @@ export function buildWorld(scene) {
   }
 
   // ---- ground / asphalt ----
-  const groundMat = new THREE.MeshStandardMaterial({ color: COLORS.asphalt, roughness: 0.9 });
+  const asphaltTex = makeAsphaltTextures();
+  const sidewalkTex = makeSidewalkTexture();
+  const facadeGrimeTex = makeFacadeGrimeTexture();
+  const groundMat = new THREE.MeshStandardMaterial({
+    color: COLORS.asphalt, roughness: 0.9,
+    map: asphaltTex.map, roughnessMap: asphaltTex.roughnessMap,
+  });
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(HALF*2 + 200, HALF*2 + 200, 1, 1), groundMat);
   ground.rotation.x = -PI/2; ground.position.y = 0; ground.receiveShadow = true;
   scene.add(ground);
 
   // ---- road grid ----
-  const roadMat = new THREE.MeshStandardMaterial({ color: 0x3a3d42, roughness: 0.85 });
+  const roadMat = new THREE.MeshStandardMaterial({
+    color: 0x3a3d42, roughness: 0.85,
+    map: asphaltTex.map, roughnessMap: asphaltTex.roughnessMap,
+  });
   const stripeMat = new THREE.MeshBasicMaterial({ color: 0xffe699 });
-  const sidewalkMat = new THREE.MeshStandardMaterial({ color: COLORS.sidewalk, roughness: 1.0 });
+  const sidewalkMat = new THREE.MeshStandardMaterial({ color: COLORS.sidewalk, roughness: 1.0, map: sidewalkTex.map });
 
   const ROAD_W = 12, SIDEWALK_W = 3;
 
@@ -155,7 +164,7 @@ export function buildWorld(scene) {
   //  - glass:    cooler blue-grey, lower roughness + a touch of metalness so it
   //              catches the sky differently from the matte boxes
   const concreteMat = COLORS.building.map(c => new THREE.MeshStandardMaterial({
-    color: c, roughness: 0.9, metalness: 0.0,
+    color: c, roughness: 0.9, metalness: 0.0, map: facadeGrimeTex.map,
   }));
   const PAINTED_COLORS = [0xb7a98c, 0xc9b89a, 0xa89a8e, 0xbfa6a0, 0x9fb0a6, 0xc6b0a0];
   const paintedMat = PAINTED_COLORS.map(c => new THREE.MeshStandardMaterial({
@@ -213,6 +222,14 @@ export function buildWorld(scene) {
 
   const SIDEWALK_EDGE = BLOCK/2 - ROAD_W/2 - SIDEWALK_W*2; // 13: distance from block center to inner sidewalk edge
   const SHOP_LEVEL_H = 4; // height of ground-floor shop band
+
+  world.surfaceMaterials = {
+    road: [roadMat],
+    ground: [groundMat],
+    sidewalk: [sidewalkMat],
+    facades: concreteMat,
+    puddleMat: null,
+  };
 
   // ---- Rooftop-decor instancing pools ----
   // placeBuilding scatters water tanks, AC condensers, antennas and dishes across
@@ -555,6 +572,35 @@ export function buildWorld(scene) {
   addInstanced(antGeo, antMat, antM, false, false);
   addInstanced(dishGeo, dishMat, dishM, false, false);
 
+  // ---- Wet-road puddles: one instanced decal batch, faded by updateDayNight ----
+  {
+    const puddleGeo = new THREE.CircleGeometry(1, 18);
+    puddleGeo.rotateX(-PI / 2);
+    const puddleMat = new THREE.MeshStandardMaterial({
+      color: 0x080a0c, roughness: 0.05, metalness: 0.6,
+      transparent: true, opacity: 0, depthWrite: false,
+      envMap: G.envMap || null, envMapIntensity: 1.2,
+    });
+    const puddles = new THREE.InstancedMesh(puddleGeo, puddleMat, 40);
+    puddles.frustumCulled = false;
+    for (let k = 0; k < 40; k++) {
+      const along = rand(-HALF + 12, HALF - 12);
+      const road = irand(-GRID / 2, GRID / 2) * BLOCK;
+      const side = Math.random() < 0.5 ? -1 : 1;
+      const edge = ROAD_W / 2 - rand(0.8, 2.1);
+      const ew = Math.random() < 0.5;
+      _p.set(ew ? along : road + side * edge, 0.055 + k * 0.00001, ew ? road + side * edge : along);
+      _q.setFromEuler(_e.set(0, rand(0, TAU), 0));
+      const sx = rand(0.45, 1.45), sz = rand(0.25, 0.9);
+      _s.set(sx, 1, sz);
+      puddles.setMatrixAt(k, _m.compose(_p, _q, _s));
+    }
+    puddles.instanceMatrix.needsUpdate = true;
+    scene.add(puddles);
+    world.surfaceMaterials.puddleMat = puddleMat;
+    world.puddles = puddles;
+  }
+
   // temple + power lines (kept inline to balance file sizes)
   // ---- Temple compound (wat) — a landmark block with viharn + chedi ----
   {
@@ -765,6 +811,108 @@ export function makeWindowTexture() {
   const emissiveMap = new THREE.CanvasTexture(ce);
   emissiveMap.wrapS = emissiveMap.wrapT = THREE.RepeatWrapping;
   return { map, emissiveMap };
+}
+
+function canvasTex(canvas, srgb = true) {
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 4;
+  if (srgb && THREE.SRGBColorSpace) tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+export function makeAsphaltTextures() {
+  const ca = document.createElement('canvas'); ca.width = ca.height = 512;
+  const cr = document.createElement('canvas'); cr.width = cr.height = 512;
+  const ga = ca.getContext('2d');
+  const gr = cr.getContext('2d');
+  ga.fillStyle = '#34383d'; ga.fillRect(0, 0, 512, 512);
+  gr.fillStyle = '#d8d8d8'; gr.fillRect(0, 0, 512, 512);
+  const img = ga.getImageData(0, 0, 512, 512);
+  const rough = gr.getImageData(0, 0, 512, 512);
+  for (let y = 0; y < 512; y++) {
+    for (let x = 0; x < 512; x++) {
+      const i = (y * 512 + x) * 4;
+      const laneWear = Math.exp(-Math.pow((x % 256) - 78, 2) / 900) + Math.exp(-Math.pow((x % 256) - 178, 2) / 900);
+      const speck = (Math.random() - 0.5) * 18 - laneWear * 8;
+      img.data[i] = clamp(52 + speck, 35, 76);
+      img.data[i + 1] = clamp(56 + speck, 38, 80);
+      img.data[i + 2] = clamp(62 + speck, 42, 86);
+      rough.data[i] = rough.data[i + 1] = rough.data[i + 2] = clamp(220 - laneWear * 42 + (Math.random() - 0.5) * 18, 145, 245);
+    }
+  }
+  ga.putImageData(img, 0, 0);
+  gr.putImageData(rough, 0, 0);
+  ga.globalAlpha = 0.35;
+  ga.strokeStyle = '#17191c'; ga.lineWidth = 2;
+  for (let k = 0; k < 34; k++) {
+    let x = rand(0, 512), y = rand(0, 512);
+    ga.beginPath(); ga.moveTo(x, y);
+    for (let s = 0; s < irand(3, 8); s++) { x += rand(-28, 28); y += rand(8, 34); ga.lineTo(x, y); }
+    ga.stroke();
+  }
+  ga.globalAlpha = 0.22;
+  for (let k = 0; k < 20; k++) {
+    const x = rand(70, 442), y = rand(0, 512), r = rand(14, 44);
+    const g = ga.createRadialGradient(x, y, 1, x, y, r);
+    g.addColorStop(0, '#0e1012'); g.addColorStop(1, 'rgba(14,16,18,0)');
+    ga.fillStyle = g; ga.beginPath(); ga.arc(x, y, r, 0, TAU); ga.fill();
+    gr.fillStyle = 'rgba(80,80,80,0.28)'; gr.beginPath(); gr.arc(x, y, r * 0.85, 0, TAU); gr.fill();
+  }
+  const map = canvasTex(ca, true);
+  const roughnessMap = canvasTex(cr, false);
+  map.repeat.set(42, 42);
+  roughnessMap.repeat.copy(map.repeat);
+  return { map, roughnessMap };
+}
+
+export function makeSidewalkTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 512;
+  const g = c.getContext('2d');
+  g.fillStyle = '#787878'; g.fillRect(0, 0, 512, 512);
+  const img = g.getImageData(0, 0, 512, 512);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const n = (Math.random() - 0.5) * 20;
+    img.data[i] = clamp(120 + n, 96, 146);
+    img.data[i + 1] = clamp(120 + n, 96, 146);
+    img.data[i + 2] = clamp(116 + n, 92, 142);
+  }
+  g.putImageData(img, 0, 0);
+  g.strokeStyle = 'rgba(45,45,45,0.45)';
+  g.lineWidth = 3;
+  for (let x = 0; x <= 512; x += 64) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, 512); g.stroke(); }
+  for (let y = 0; y <= 512; y += 64) { g.beginPath(); g.moveTo(0, y); g.lineTo(512, y); g.stroke(); }
+  g.globalAlpha = 0.16;
+  for (let k = 0; k < 24; k++) {
+    g.fillStyle = '#2b2b2b';
+    g.beginPath(); g.ellipse(rand(0, 512), rand(0, 512), rand(8, 28), rand(4, 16), rand(0, TAU), 0, TAU); g.fill();
+  }
+  const map = canvasTex(c, true);
+  map.repeat.set(18, 18);
+  return { map };
+}
+
+export function makeFacadeGrimeTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 512;
+  const g = c.getContext('2d');
+  const base = g.createLinearGradient(0, 0, 0, 512);
+  base.addColorStop(0, '#d6d2c9');
+  base.addColorStop(0.62, '#b8b1a7');
+  base.addColorStop(1, '#7d776f');
+  g.fillStyle = base; g.fillRect(0, 0, 512, 512);
+  g.globalAlpha = 0.18;
+  for (let k = 0; k < 70; k++) {
+    const x = rand(0, 512), y = rand(60, 500), len = rand(30, 180);
+    g.strokeStyle = '#4e4a45';
+    g.lineWidth = rand(1, 5);
+    g.beginPath(); g.moveTo(x, y); g.bezierCurveTo(x + rand(-8, 8), y + len * 0.35, x + rand(-12, 12), y + len * 0.75, x + rand(-8, 8), Math.min(512, y + len)); g.stroke();
+  }
+  g.globalAlpha = 0.08;
+  g.fillStyle = '#101010';
+  for (let y = 70; y < 490; y += 64) g.fillRect(0, y, 512, rand(2, 5));
+  const map = canvasTex(c, true);
+  map.repeat.set(1, 1);
+  return { map };
 }
 
 export function makeMinimapBase(world) {

@@ -92,11 +92,52 @@ export function resolvePlayerVsPlatforms(player) {
   }
 }
 
-// Vehicle vs buildings — soft pushback that also kills speed
+function vehicleBasis(v) {
+  const h = v.heading || 0;
+  return {
+    fx: Math.sin(h), fz: Math.cos(h),
+    rx: Math.cos(h), rz: -Math.sin(h),
+  };
+}
+
+function vehicleWorldVelocity(v, includeImpact = true) {
+  const b = vehicleBasis(v);
+  return {
+    x: b.fx * (v.vel || 0) + b.rx * (v.latVel || 0) + (includeImpact ? (v._impactVX || 0) : 0),
+    z: b.fz * (v.vel || 0) + b.rz * (v.latVel || 0) + (includeImpact ? (v._impactVZ || 0) : 0),
+  };
+}
+
+function setVehicleWorldVelocity(v, wx, wz) {
+  const b = vehicleBasis(v);
+  v.vel = wx * b.fx + wz * b.fz;
+  v.latVel = wx * b.rx + wz * b.rz;
+  if (v.spec && v.spec.kind === 'bike') v.latVel *= 0.55;
+}
+
+function addNpcImpact(v, ix, iz, spin) {
+  v._impactVX = (v._impactVX || 0) + ix;
+  v._impactVZ = (v._impactVZ || 0) + iz;
+  const mag = Math.hypot(v._impactVX, v._impactVZ);
+  const cap = v.spec && v.spec.kind === 'bike' ? 18 : 22;
+  if (mag > cap) {
+    v._impactVX = v._impactVX / mag * cap;
+    v._impactVZ = v._impactVZ / mag * cap;
+  }
+  v._impactSpin = clamp((v._impactSpin || 0) + spin, -2.4, 2.4);
+}
+
+function exciteSuspension(v, amount) {
+  if (!v || !v.spec || v.spec.kind === 'boat') return;
+  v._suspVel = (v._suspVel || 0) + clamp(amount * 0.035, 0.03, 0.7);
+}
+
+// Vehicle vs buildings — AABB pushback plus impulse-like deflection
 export function resolveVehicleVsBuildings(v) {
   const p = v.pos;
   const r = Math.max(v.boundsHalf.x, v.boundsHalf.z) + 0.2;
   let hit = false;
+  let hitN = null;
   for (const b of G.world.buildings) {
     const bx = b.pos.x, bz = b.pos.z;
     const hx = b.size.x/2 + r, hz = b.size.z/2 + r;
@@ -104,19 +145,40 @@ export function resolveVehicleVsBuildings(v) {
     if (Math.abs(dx) < hx && Math.abs(dz) < hz) {
       const px = hx - Math.abs(dx);
       const pz = hz - Math.abs(dz);
-      if (px < pz) p.x = bx + (Math.sign(dx) || 1) * hx;
-      else         p.z = bz + (Math.sign(dz) || 1) * hz;
+      if (px < pz) {
+        const sx = Math.sign(dx) || 1;
+        p.x = bx + sx * hx;
+        hitN = { x: sx, z: 0 };
+      } else {
+        const sz = Math.sign(dz) || 1;
+        p.z = bz + sz * hz;
+        hitN = { x: 0, z: sz };
+      }
       hit = true;
     }
   }
   if (hit) {
-    if (Math.abs(v.vel) > 6) {
-      v.hp -= Math.abs(v.vel) * 0.6 * (v.spec.armorMul != null ? v.spec.armorMul : 1);   // Armor upgrade softens crashes
-      G.camRig.shake = Math.min(0.4, Math.abs(v.vel) * 0.02);
+    const n = hitN || { x: -Math.sign(Math.sin(v.heading || 0)) || 1, z: -Math.sign(Math.cos(v.heading || 0)) || 0 };
+    const w = vehicleWorldVelocity(v, false);
+    const vn = w.x * n.x + w.z * n.z;
+    const normalSpeed = Math.max(0, -vn);
+    const tx = w.x - vn * n.x, tz = w.z - vn * n.z;
+    const outN = vn < 0 ? -vn * 0.25 : vn;
+    const wx = tx * 0.8 + n.x * outN;
+    const wz = tz * 0.8 + n.z * outN;
+    setVehicleWorldVelocity(v, wx, wz);
+    if (normalSpeed > 0.2) {
+      const b = vehicleBasis(v);
+      const contactForward = (-n.x * r) * b.fx + (-n.z * r) * b.fz;
+      v.yawRate = clamp((v.yawRate || 0) + sign(contactForward) * normalSpeed * 0.15, -1.5, 1.5);
+      exciteSuspension(v, normalSpeed);
+    }
+    if (normalSpeed > 6) {
+      v.hp -= normalSpeed * 0.6 * (v.spec.armorMul != null ? v.spec.armorMul : 1);   // Armor upgrade softens crashes
+      G.camRig.shake = Math.min(0.4, normalSpeed * 0.02);
       G.audio.hit();
       spawnDust(p.x, p.z, 16);                 // impact puff
     }
-    v.vel *= 0.4;
   }
   // bounds
   p.x = clamp(p.x, -HALF + 1, HALF - 1);
@@ -151,27 +213,31 @@ export function resolveVehicleVsVehicles(v) {
       o.mesh.position.copy(o.pos);
     }
 
-    const vvx = Math.sin(v.heading || 0) * (v.vel || 0) + (v._impactVX || 0);
-    const vvz = Math.cos(v.heading || 0) * (v.vel || 0) + (v._impactVZ || 0);
-    const ovx = Math.sin(o.heading || 0) * (o.vel || 0) + (o._impactVX || 0);
-    const ovz = Math.cos(o.heading || 0) * (o.vel || 0) + (o._impactVZ || 0);
-    const rel = Math.abs((vvx - ovx) * nx + (vvz - ovz) * nz);
-    if (playerHit && rel > 2.2) {
-      const rammer = vIsPlayer ? v : oIsPlayer ? o : null;
-      const target = vIsPlayer ? o : oIsPlayer ? v : null;
-      if (rammer && target && target.driver !== 'player') {
-        const away = target === o ? -1 : 1;
-        const fx = Math.sin(rammer.heading || 0), fz = Math.cos(rammer.heading || 0);
-        const shove = clamp(Math.abs(rammer.vel || 0) * 0.55 + rel * 0.55, 3, 18);
-        target._impactVX = (target._impactVX || 0) + (nx * away * shove * 0.55 + fx * shove * 0.45);
-        target._impactVZ = (target._impactVZ || 0) + (nz * away * shove * 0.55 + fz * shove * 0.45);
-        const impactMag = Math.hypot(target._impactVX, target._impactVZ);
-        if (impactMag > 22) {
-          target._impactVX = target._impactVX / impactMag * 22;
-          target._impactVZ = target._impactVZ / impactMag * 22;
-        }
-        target._impactSpin = (target._impactSpin || 0) + clamp((fx * nz - fz * nx) * away * rel * 0.09, -1.8, 1.8);
-        if (target.npc) {
+    const vw = vehicleWorldVelocity(v, false);
+    const ow = vehicleWorldVelocity(o, false);
+    const relN = (vw.x - ow.x) * nx + (vw.z - ow.z) * nz;
+    const rel = Math.max(0, -relN);
+    if (relN < 0) {
+      const m1 = v.spec && v.spec.mass || 1500;
+      const m2 = o.spec && o.spec.mass || 1500;
+      const j = -(1 + 0.3) * relN / (1 / m1 + 1 / m2);
+      const dvx = j * nx / m1, dvz = j * nz / m1;
+      const dox = -j * nx / m2, doz = -j * nz / m2;
+      setVehicleWorldVelocity(v, vw.x + dvx, vw.z + dvz);
+      setVehicleWorldVelocity(o, ow.x + dox, ow.z + doz);
+      const rvx = (o.pos.x - v.pos.x) * 0.5, rvz = (o.pos.z - v.pos.z) * 0.5;
+      const spinV = clamp((rvx * (j * nz) - rvz * (j * nx)) * 0.0004 / Math.max(1, m1 / 1500), -1.6, 1.6);
+      const spinO = clamp((rvx * (-j * nz) - rvz * (-j * nx)) * 0.0004 / Math.max(1, m2 / 1500), -1.8, 1.8);
+      v.yawRate = clamp((v.yawRate || 0) + spinV, -2.2, 2.2);
+      o.yawRate = clamp((o.yawRate || 0) + spinO, -2.2, 2.2);
+      exciteSuspension(v, rel);
+      exciteSuspension(o, rel);
+      if (o.driver !== 'player') addNpcImpact(o, dox, doz, spinO);
+      if (v.driver !== 'player') addNpcImpact(v, dvx, dvz, spinV);
+      if (playerHit) {
+        const target = vIsPlayer ? o : oIsPlayer ? v : null;
+        const rammer = vIsPlayer ? v : oIsPlayer ? o : null;
+        if (target && rammer && target.driver !== 'player' && target.npc) {
           target.npc.ramPanic = Math.max(target.npc.ramPanic || 0, 1.2);
           target.vel = Math.max(target.vel || 0, Math.min(target.npc.cruiseSpeed * 1.15, Math.abs(rammer.vel || 0) * 0.42));
         }
@@ -188,9 +254,12 @@ export function resolveVehicleVsVehicles(v) {
         if (G.audio && G.audio.hit) G.audio.hit();
       }
     }
-    const damp = playerHit ? (vIsPlayer ? 0.82 : 0.72) : (rel > 2 ? 0.55 : 0.78);
-    v.vel *= damp;
-    if (!oLocked) o.vel *= playerHit && !oIsPlayer ? 0.96 : 0.75;
+    const damp = playerHit ? (vIsPlayer ? 0.94 : 0.88) : (rel > 2 ? 0.82 : 0.9);
+    v.vel *= damp; v.latVel = (v.latVel || 0) * damp;
+    if (!oLocked) {
+      const od = playerHit && !oIsPlayer ? 0.98 : 0.9;
+      o.vel *= od; o.latVel = (o.latVel || 0) * od;
+    }
   }
   if (moved && v.mesh) v.mesh.position.copy(v.pos);
 }

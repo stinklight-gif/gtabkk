@@ -2,8 +2,8 @@
 
 A single-file browser-playable 3D open-world prototype set in Bangkok, in the
 spirit of GTA III but with its own identity. Implements the Phase 1 deliverables
-from `gta.md`: Sukhumvit district, three vehicles, on-foot Muay Thai melee, 9mm
-pistol, day/night cycle, light rain, traffic + peds + soi dogs, functional
+from `gta.md`: Sukhumvit district, multiple vehicles, on-foot Muay Thai melee, 9mm
+pistol, day/night cycle, monsoon rain with wet streets, traffic + peds + soi dogs, functional
 minimap, 1–3 star wanted system with bribe mechanic, tutorial mission, and
 free-roam.
 
@@ -22,10 +22,9 @@ offline. When the loader finishes, pick a save slot to start.
 ## Smoke test
 
 A headless Playwright harness boots the real game, fails on any page error, and
-captures four screenshots (`smoke_noon.png` / `smoke_night.png` / `smoke_3am.png`
-— the night/3am pair from the same spot prove the crowd thins from a busy midday
-to dead small-hours — plus `smoke_festival.png`, a Loy Krathong night on the
-river) along with the renderer draw-call count:
+captures a screenshot suite (`smoke_noon.png`, `smoke_night.png`, `smoke_3am.png`,
+festival, waypoint, map, mall, BTS, chase, river, and bank shots) along with the
+renderer draw-call count:
 
 ```bash
 npm install --no-save playwright && npx playwright install chromium   # once
@@ -141,8 +140,9 @@ file is under ~800 lines.
   static-geometry baker, `disposeObject`, `lerpAngle`. Pure leaf.
 - `audio.js` — procedural Web Audio (engine loopers, SFX, the car radio).
 - `input.js` — keyboard set + pointer-lock mouse deltas + edge-detected `pressed`.
-- `world.js` — `buildWorld`: grid/roads/sidewalks/buildings, instancing, the
-  static-merge baker, window texture + minimap base.
+- `world.js` — `buildWorld`: grid/roads/sidewalks/buildings, shared procedural
+  asphalt/concrete/facade textures, puddle instances, instancing, the static-merge
+  baker, window texture + minimap base.
 - `worldLandmarks.js` — `buildLandmarks(env)`: BTS, river, garage, safehouse,
   gun shop, Yaowarat, shrines, collectibles, food/armor pickups… (the inline
   landmark blocks, fed `buildWorld`'s locals via `env`).
@@ -166,24 +166,24 @@ The original numbered sections (now spread across those modules):
 |---|---|---|
 | 1 | Audio | Procedural Web Audio. Engine loopers (on a duckable `engineBus`), 7-Eleven chime, temple bell, footsteps, gunshots, sirens, rain bed, and a **car radio** — a lookahead step-sequencer (`makeRadio`) with three procedural stations (Luk Thung synth-pop, Bangkok Bars boom-bap, AM talk/ads) that play in-vehicle and duck the engine. |
 | 2 | Input | Keyboard set + pointer-lock mouse deltas + `pressed` (edge) helper. |
-| 3 | World | Procedural 10×10 block grid (BLOCK=50m), road grid, buildings with neon strips and lit-window planes, BTS Skytrain elevated track, street lamps, 7-Elevens, spirit-house shrines, gold-shop POI with pillar of light, temple compound, a U-Spray garage (drive a vehicle in to repair it and clear your wanted level for a heat-scaled fee, or rent it as a vehicle lock-up — store/retrieve/repaint), a buyable safehouse (respawn point) just north of spawn, a gun shop (buy pistol/shotgun/SMG/ammo with cash on foot), a Yaowarat Chinatown market street (paifang gate, dense shophouses, hanging lanterns, market stalls), and a Chao Phraya river down the west edge (water + embankment + pier + longtail boats, including one **drivable** longtail at the pier gap). Repeated props use `InstancedMesh`. Builds an off-screen canvas as the minimap base. |
-| 4 | Player + Camera | Capsule character (torso/legs/head/arms), arcade third-person camera rig (orbit yaw/pitch/distance, shake decay). |
+| 3 | World | Procedural 10×10 block grid (BLOCK=50m), road grid with shared asphalt wear/crack/oil textures, concrete sidewalk slab texture, grime-mapped concrete facades, buildings with neon strips and lit-window planes, BTS Skytrain elevated track, street lamps, 7-Elevens, spirit-house shrines, gold-shop POI with pillar of light, temple compound, a U-Spray garage (drive a vehicle in to repair it and clear your wanted level for a heat-scaled fee, or rent it as a vehicle lock-up — store/retrieve/repaint), a buyable safehouse (respawn point) just north of spawn, a gun shop (buy pistol/shotgun/SMG/ammo with cash on foot), a Yaowarat Chinatown market street (paifang gate, dense shophouses, hanging lanterns, market stalls), and a Chao Phraya river down the west edge (water + embankment + pier + longtail boats, including one **drivable** longtail at the pier gap). Repeated props and puddles use `InstancedMesh`. Builds an off-screen canvas as the minimap base. |
+| 4 | Player + Camera | Segmented character rig (torso/head, upper/lower arms and legs) with knees/elbows, sprint lean, and subtle sprint head-bob. Third-person camera rig has orbit yaw/pitch/distance, shake decay, occlusion, acceleration follow lag, and speed-squared FOV kick in vehicles. |
 | 5b | More vehicles | City bus, luxury sedan, and a rare-spawn supercar join the traffic mix; a drivable longtail boat sits at the river pier. |
-| 5 | Vehicles | `makeVehicleMesh(kind)` produces bike / tuk-tuk / hilux / cop / camry / sedan with per-kind `spec` (topSpeed, accel, brake, turn, mass). Tuk-tuk has a leaning wiggle, bike leans into turns. |
-| 6 | NPCs | Articulated humanoid peds (torso/head/two legs/two arms) with a shared `animateWalk` cycle and six archetype silhouettes (local, office worker w/ briefcase, tourist w/ cap+backpack, bald monk w/ alms bowl, conical-hatted vendor & laborer, plus a skirt variant). Crowd density follows the time of day (`crowdFactor` — dead 3am, rush-hour/midday busy) and peds spawn onto the sidewalk band (`sidewalkPos`). Behavioral clusters (`buildClusterAnchors`/`updateClusters`) queue customers at food stalls and loiterers at 7-Elevens. `spawnPeds`, `spawnDogs`, `spawnTraffic`. District banners announce Yaowarat / The Wat / Riverside / Sukhumvit on entry. |
-| 7 | Rain | Particle points re-centered on the player each frame, opacity fades with weather. |
+| 5 | Vehicles | `makeVehicleMesh(kind)` produces bike / tuk-tuk / hilux / cop / camry / sedan and larger/premium variants with per-kind `spec` (topSpeed, accel, brake, turn, mass, grip, wheelbase). Player vehicles keep public scalar `vel` but add lateral slip, wet-grip loss, handbrake slides/skids, speed scrub, visual pitch/roll/suspension bounce, and impulse-friendly `latVel`; boats keep their river/swell path. |
+| 6 | NPCs | Articulated humanoid peds (torso/head/two-segment legs/two-segment arms) with a shared speed-blended `animateWalk` cycle, varied gait frequency/phase, knees/elbows, head look, phone walkers, rain umbrellas, walking pairs, and six archetype silhouettes (local, office worker w/ briefcase, tourist w/ cap+backpack, bald monk w/ alms bowl, conical-hatted vendor & laborer, plus a skirt variant). Crowd density follows the time of day (`crowdFactor` — dead 3am, rush-hour/midday busy) and peds spawn onto the sidewalk band (`sidewalkPos`). Behavioral clusters (`buildClusterAnchors`/`updateClusters`) queue customers at food stalls and loiterers at 7-Elevens. Traffic drivers have seeded speed/gap/amber-running/wander personalities, and motorbikes filter around blocked lanes. District banners announce Yaowarat / The Wat / Riverside / Sukhumvit on entry. |
+| 7 | Rain | Particle points re-centered on the player each frame, opacity fades with weather; rain also lowers vehicle grip, darkens/glosses roads and sidewalks, raises env reflections, and fades in puddle decals that linger after storms. |
 | 8 | Engine init | Renderer, lights (sun + hemi + ambient), camera, audio, world build, player, vehicles, peds, dogs. Loading bar + start gate. |
 | 9 | HUD | Star/cash/HP/stamina/ammo/clock/weather binds, subtitle + prompt + notif queues, phone (T) with live stats (amulets/fares/cops + completion %), full north-up map overlay (TAB), minimap renderer (camera-yaw rotated, mission + taxi markers, amulet + snatcher + cop dots). |
 | 10 | Mission system | Stage-based; the `welcome` mission listens for player proximity to the gold shop POI. Add more to the `missions` object. |
-| 11 | Collisions | AABB pushback for player and vehicle vs buildings. World-bound clamping. |
-| 12 | Player update | Movement, sprint+stamina, jump, in-vehicle controls, exit on E, leg-bob animation, 7-Eleven door chime trigger. |
-| 13 | Peds + Dogs | Wander state machines; peds panic when attacked; dogs scatter when player approaches, settle back when far. |
+| 11 | Collisions | AABB broad collision with impulse-style response for vehicles: wall hits decompose forward/lateral speed into normal/tangent components for bounce, scrape, yaw kick, damage, dust, suspension impulse, and camera shake; vehicle-vs-vehicle collisions use mass/restitution impulses plus the legacy loose-impact channel for NPC/parked shoves. Player collision remains lightweight pushback. World-bound clamping. |
+| 12 | Player update | Movement, sprint+stamina, jump, in-vehicle controls, exit on E, segmented gait animation, 7-Eleven door chime trigger. |
+| 13 | Peds + Dogs | Wander, pair-walk, crossing-wait, social, cluster, and panic state machines; peds panic when attacked or brushed by fast vehicles and turn their heads toward nearby players/traffic; dogs scatter when player approaches, settle back when far. |
 | 14 | Combat | Muay Thai jab/cross/kick (animated arm/leg swings), pistol + full-auto SMG + pellet-spread shotgun fire (forgiving character hits + tracer sphere + muzzle flash + camera shake), unlimited ammo. Pistol on first cop kill; SMG drops from a destroyed 3★ Fortuner; shotgun/SMG also buyable at the gun shop. |
 | 15 | Cops + Wanted | Star-based heat with decay after 35 s out of sight. Spawns foot cops at 1★, cop-pickup chase cars at 2★, unmarked Crime Suppression Fortuners + spike strips at 3★ (after ~3 cop kills), armored SWAT vans at 4★ (after ~6 kills); a star increase flashes the HUD and whoops a siren; nights run one extra unit. Bribe with B near a foot cop (1–2★ only). |
 | 16 | Particles / FX | Smoke emitter (vehicles below 30% HP), explosion (light flash + smoke + camera shake + thunder SFX), tire-skid decals (`spawnSkid`, laid while drifting and faded over 5 s), impact dust puffs (`spawnDust`), and a global **hit-stop** (`triggerHitStop` slows the loop ~0.05 s on a solid melee/gun connect). |
 | 17 | Interaction | Vehicle proximity check + E to enter. |
-| 18 | Camera update | Follow rig with smoothed distance, shake decay, in-vehicle chase view auto-aligns to vehicle heading, **occlusion** (ray-casts target→camera against building AABBs and pulls in so it never clips into a wall), and a speed-based FOV kick while driving. |
-| 19 | Day/Night + Weather + Festivals | 8-min day cycle drives sun position (tilted so noon actually sunlights the facades), sky/fog colours, neon and street-lamp intensity; the sun + shadow camera track the player. A whole-day counter (`G.time.day`) ticks at midnight and `scheduledFestival()` drives **Loy Krathong** nights, filling the Chao Phraya with drifting candle-lit floats + rising sky lanterns and a riverside crowd — press **E** at the bank to float your own krathong (+฿50). Monsoon weather (clear ⇄ drizzle/downpour) with lightning; dawn temple bell at 5–6 AM. |
+| 18 | Camera update | Follow rig with smoothed distance, shake decay, in-vehicle chase view auto-aligns to vehicle heading, **occlusion** (ray-casts target→camera against building AABBs and pulls in so it never clips into a wall), speed-squared FOV kick, acceleration follow stretch/compression, and sprint-only on-foot bob. |
+| 19 | Day/Night + Weather + Festivals | 8-min day cycle drives sun position (tilted so noon actually sunlights the facades), sky/fog colours, neon and street-lamp intensity; the sun + shadow camera track the player. A whole-day counter (`G.time.day`) ticks at midnight and `scheduledFestival()` drives **Loy Krathong** nights, filling the Chao Phraya with drifting candle-lit floats + rising sky lanterns and a riverside crowd — press **E** at the bank to float your own krathong (+฿50). Monsoon weather (clear ⇄ drizzle/downpour) with lightning, wet material response, puddles, lower road grip, and dawn temple bell at 5–6 AM. |
 | 20 | Main loop | Single `loop()` calls every system in order. |
 
 The mutable global is `window.GAME`. Useful while developing:
@@ -193,7 +193,7 @@ GAME.player.hp = 100;
 GAME.cash = 99999;
 GAME.wanted.stars = 0;
 GAME.time.dayT = 0.85;          // 8:24 PM — neon comes alive
-GAME.time.weather = 'rain';     // force monsoon
+GAME.time.weather = 'rain'; GAME._rainTarget = 0.85; GAME.time.rainStrength = 0.85; // force monsoon
 GAME.player.weapons.pistol = true; GAME.player.pistolAmmo = 12;
 ```
 
@@ -243,10 +243,12 @@ traffic AI.
 ## Limits / Known compromises
 
 - All geometry is procedural — no GLTF assets. Faster to ship, less detail.
-- Collisions are AABB pushback, not rigid body. Bumping a wall at speed loses
-  velocity but doesn't bounce realistically.
-- Traffic AI is grid-aware but doesn't yield at intersections — a few honks per
-  block at rush hour, which is admittedly authentic.
+- Collisions still use simple AABB/contact normals rather than a full rigid-body
+  solver. Vehicle impacts now bounce, scrape, spin, and exchange momentum, but
+  they are tuned game impulses, not continuous physics.
+- Traffic AI is grid-aware with signal stops, obstacle yielding, seeded driver
+  personalities, amber runners, and bike filtering; it is still lane-following
+  rather than route-planned city driving.
 - Cops use lightweight road-aware steering, not true pathfinding: beyond ~25 m
   they route along the 50 m road grid (so they stop grinding the canyon walls);
   inside 25 m they pursue and ram directly. AABB pushback is still the backstop.
@@ -262,11 +264,11 @@ sidewalk props are each baked to world space and merged into one mesh per
 material at world-build time. That takes a street-level view from ~7,700 meshes
 / ~2,800 draw calls down to ~1,200 meshes / **~370 draw calls** (measured via
 `tools/smoke.mjs`, which prints `renderer.info.render.calls`). What's left is
-mostly dynamic — vehicles, peds, dogs, the rooftop/lamp/wire `InstancedMesh`
+mostly dynamic — vehicles, peds, dogs, the puddle/rooftop/lamp/wire `InstancedMesh`
 batches — plus a few one-off landmarks. A busy midday crowd (the articulated
-peds are ~7 meshes each, frustum-culled) adds a few hundred calls when the
-sidewalks are full, landing the noon view around ~800; the small hours drop back
-toward the ~370 floor. If it still chugs, lower `PED_TARGET`, raise the
+peds are higher-detail near the camera and switch to boxy far LODs) adds a few
+hundred calls when the sidewalks are full, landing inside the live visual budget;
+the small hours drop back toward the static floor. If it still chugs, lower `PED_TARGET`, raise the
 pedestrian/traffic despawn radius, or drop pixel ratio.
 
 The in-game visual budget overlay (`~` / F3) now turns the live scene metrics
@@ -276,9 +278,9 @@ near LOD entities, and at least 8 far low-detail LOD entities. The CI realism
 probe exercises the same thresholds through `tools/realism_pass_test.mjs`.
 
 Repeated props (rooftop tanks/AC/antennas, lamps, poles, wires, Yaowarat
-lanterns, parked bikes) use `InstancedMesh`; pooled materials with night-emissive
-ramps are shared, so the per-frame day/night loop touches ~a dozen materials,
-not hundreds.
+lanterns, parked bikes, puddles) use `InstancedMesh`; pooled materials with
+night-emissive and wet-weather ramps are shared, so the per-frame day/night loop
+touches cached material arrays, not the scene graph.
 
 ## Balance knobs (first-pass — tune after a playtest)
 

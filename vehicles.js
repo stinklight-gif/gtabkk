@@ -23,6 +23,7 @@ export function updateVehicleVisuals(v, dt, opts={}) {
   for (const l of visual.headlights || []) if (l.material && l.material.opacity != null) l.material.opacity = headOpacity;
   for (const l of visual.brakeLights || []) if (l.material && l.material.opacity != null) l.material.opacity = brakeOpacity;
   for (const l of visual.reverseLights || []) if (l.material && l.material.opacity != null) l.material.opacity = reverseOpacity;
+  applyVehicleSuspensionVisual(v, dt, opts);
 }
 
 function applyLooseImpactMotion(v, dt) {
@@ -38,6 +39,41 @@ function applyLooseImpactMotion(v, dt) {
   v.pos.x = clamp(v.pos.x, -HALF + 2, HALF - 2);
   v.pos.z = clamp(v.pos.z, -HALF + 2, HALF - 2);
   if (v.mesh) { v.mesh.position.copy(v.pos); v.mesh.rotation.y = v.heading; }
+}
+
+function applyVehicleSuspensionVisual(v, dt, opts = {}) {
+  if (!v || !v.mesh || !v.spec || v.spec.kind === 'boat' || dt <= 0) return;
+  const spec = v.spec;
+  const accelForward = opts.accelForward != null
+    ? opts.accelForward
+    : ((v.vel || 0) - (v._visualPrevVel == null ? (v.vel || 0) : v._visualPrevVel)) / Math.max(0.001, dt);
+  v._visualPrevVel = v.vel || 0;
+  const ease = 1 - Math.pow(0.001, dt);
+  const pitchTarget = clamp(-accelForward * 0.006, -0.05, 0.06);
+  v._pitch = lerp(v._pitch || 0, pitchTarget, ease);
+
+  const aLat = opts.aLat != null ? opts.aLat : (v.vel || 0) * (v._visualYawRate || v.yawRate || 0);
+  let rollTarget = clamp((aLat + (v.latVel || 0) * 2) * 0.01, -0.09, 0.09);
+  if (spec.kind === 'bike') rollTarget = clamp(-rollTarget * 3, -0.42, 0.42);
+  v._roll = lerp(v._roll || 0, rollTarget, ease);
+
+  const onRoad = isNearGridLine(v.pos.x) || isNearGridLine(v.pos.z);
+  const rough = (!onRoad && Math.abs(v.vel || 0) > 2) || Math.abs(v.latVel || 0) > 1;
+  if (rough) {
+    const n = Math.sin((v.pos.x * 12.9898 + v.pos.z * 78.233 + performance.now() * 0.018) * 437.58);
+    v._suspVel = (v._suspVel || 0) + n * 0.018;
+  }
+  v._suspY = v._suspY || 0;
+  v._suspVel = v._suspVel || 0;
+  v._suspVel += (-v._suspY * 55 - v._suspVel * 8) * dt;
+  v._suspY += v._suspVel * dt;
+  v._suspY = clamp(v._suspY, -0.08, 0.14);
+
+  const baseRoll = opts.baseRoll || 0;
+  const wiggle = opts.wiggleRoll || 0;
+  v.mesh.rotation.x = v._pitch;
+  v.mesh.rotation.z = baseRoll + v._roll + wiggle;
+  v.mesh.position.y = v.pos.y + v._suspY;
 }
 
 export function updatePlayerInVehicle(dt) {
@@ -79,6 +115,7 @@ export function updatePlayerInVehicle(dt) {
   const boost = G.input.down('ShiftLeft');
 
   const spec = v.spec;
+  const prevVel = v.vel || 0;
   const inputEase = 1 - Math.pow(0.035, dt);
   v.throttle = lerp(v.throttle || 0, forward > 0 ? 1 : 0, inputEase);
   v.brakeInput = lerp(v.brakeInput || 0, forward < 0 ? 1 : 0, inputEase);
@@ -108,27 +145,47 @@ export function updatePlayerInVehicle(dt) {
   const highSpeed = roadVehicle ? lerp(1.12, 0.72, speed01) : lerp(1, 0.58, speed01);
   const boatMul = spec.kind === 'boat' ? 0.55 : 1;
   const turnAssist = spec.kind === 'boat' ? 1 : spec.kind === 'bike' ? 1.08 : spec.kind === 'tuktuk' ? 1.18 : 1.25;
-  const yawTarget = v.steerAngle * spec.turn * lowSpeed * highSpeed * weight * boatMul * turnAssist * (v.vel >= 0 ? 1 : -1);
+  const yawArcade = v.steerAngle * spec.turn * lowSpeed * highSpeed * weight * boatMul * turnAssist * (v.vel >= 0 ? 1 : -1);
+  let yawTarget = yawArcade;
+  if (roadVehicle) {
+    const wheelbase = spec.wheelbase || 2.6;
+    const yawGeom = (v.vel / Math.max(0.8, wheelbase)) * Math.tan(v.steerAngle || 0);
+    yawTarget = lerp(yawArcade, yawGeom, 0.65);
+  }
   v.yawRate = lerp(v.yawRate || 0, yawTarget, roadVehicle ? (1 - Math.pow(0.008, dt)) : (1 - Math.pow(0.025, dt)));
   if (Math.abs(v.vel) < 0.08) v.yawRate *= Math.pow(0.35, dt * 60);
+  let aLatAchieved = v.vel * (v.yawRate || 0);
+  if (roadVehicle) {
+    const rain = G.time && G.time.rainStrength || 0;
+    const gripDry = spec.grip || 9;
+    const gripMul = 1 - 0.45 * rain;
+    const aMax = gripDry * gripMul * (handbrake ? 0.35 : 1);
+    const demanded = v.vel * (v.yawRate || 0);
+    const capped = clamp(demanded, -aMax, aMax);
+    let excess = demanded - capped;
+    if (spec.kind === 'bike') excess *= 0.4;
+    v.latVel = (v.latVel || 0) + excess * dt;
+    if (Math.abs(demanded) > aMax && Math.abs(v.vel) > 0.2) {
+      v.yawRate *= clamp(aMax / Math.max(0.001, Math.abs(demanded)), 0.22, 1);
+    }
+    aLatAchieved = v.vel * (v.yawRate || 0);
+    const bleed = Math.max(0.6, aMax) * dt;
+    v.latVel -= clamp(v.latVel || 0, -bleed, bleed);
+    if (Math.abs(v.latVel || 0) > 0.05) {
+      v.vel *= 1 - Math.min(0.5, Math.abs(v.latVel || 0) * 0.02) * dt * 60 * 0.01;
+    }
+  } else {
+    v.latVel = 0;
+  }
   v.heading += v.yawRate * dt;
-  // arcade handbrake drift: extra oversteer + lay rubber while sliding
-  if (handbrake && Math.abs(v.vel) > 6 && Math.abs(v.steerInput) > 0.15 && spec.kind !== 'boat' && spec.kind !== 'bike') {
-    v.heading += v.steerInput * 1.35 * dt * (v.vel >= 0 ? 1 : -1);
+  if (roadVehicle && Math.abs(v.latVel || 0) > 2.5 && Math.abs(v.vel) > 4) {
     spawnSkid(v);
   }
 
-  // motorbike lean
-  if (v.spec.kind === 'bike') {
-    v.mesh.rotation.z = lerp(v.mesh.rotation.z || 0, -v.steerInput * 0.35, 0.15);
-  } else if (v.spec.kind === 'tuktuk') {
-    // tippy oversteer wiggle
-    v.mesh.rotation.z = lerp(v.mesh.rotation.z || 0, -v.steerInput * 0.18 + Math.sin(performance.now()*0.01)*0.02, 0.2);
-  }
-
   // apply motion
-  v.pos.x += Math.sin(v.heading) * v.vel * dt;
-  v.pos.z += Math.cos(v.heading) * v.vel * dt;
+  const rightX = Math.cos(v.heading), rightZ = -Math.sin(v.heading);
+  v.pos.x += Math.sin(v.heading) * v.vel * dt + rightX * (v.latVel || 0) * dt;
+  v.pos.z += Math.cos(v.heading) * v.vel * dt + rightZ * (v.latVel || 0) * dt;
   if (v.spec.kind === 'boat') {            // keep the boat in the river channel + ride the swell
     v.pos.x = clamp(v.pos.x, -248, -210);
     v.pos.z = clamp(v.pos.z, -246, 246);
@@ -137,9 +194,19 @@ export function updatePlayerInVehicle(dt) {
   }
   v.mesh.position.copy(v.pos);
   v.mesh.rotation.y = v.heading;
+  const baseRoll = v.spec.kind === 'bike'
+    ? lerp(v._baseRoll || 0, -v.steerInput * 0.22, 0.15)
+    : v.spec.kind === 'tuktuk'
+      ? lerp(v._baseRoll || 0, -v.steerInput * 0.14, 0.2)
+      : 0;
+  v._baseRoll = baseRoll;
   updateVehicleVisuals(v, dt, {
     braking: handbrake || (forward < 0 && v.vel > 0.5),
     reverse: forward < 0 && v.vel < -0.1,
+    accelForward: (v.vel - prevVel) / Math.max(0.001, dt),
+    aLat: aLatAchieved,
+    baseRoll,
+    wiggleRoll: v.spec.kind === 'tuktuk' ? Math.sin(performance.now()*0.01)*0.02 : 0,
   });
 
   if (v.spec.kind !== 'boat') {
@@ -263,6 +330,7 @@ function inferDir(h) {
 export function updateTrafficCar(v, dt) {
   const npc = v.npc;
   const prevHeading = v.heading;
+  v.latVel = 0;
   npc.ramPanic = Math.max(0, (npc.ramPanic || 0) - dt);
   if (npc.dir === undefined) npc.dir = inferDir(v.heading);
   let dir = npc.dir;
@@ -288,7 +356,7 @@ export function updateTrafficCar(v, dt) {
   // --- lane target on the perpendicular axis ---
   const even2 = dir % 2 === 0;
   const road = Math.round((even2 ? v.pos.x : v.pos.z) / BLOCK) * BLOCK;
-  const laneTarget = road + LANE * LANESIGN[dir];
+  let laneTarget = road + LANE * LANESIGN[dir];
 
   // --- yield: brake for the nearest obstacle ahead in the lane ---
   const hx = DVX[dir], hz = DVZ[dir];
@@ -305,9 +373,10 @@ export function updateTrafficCar(v, dt) {
   else consider(pp.x, pp.z, 1.6);   // yield to the player on foot
 
   // obstacle-limited speed (cars / peds / player ahead) + shootout caution
+  const followMul = npc.followMul || 1;
   let obstacleTarget = npc.cruiseSpeed;
   if (gap < 3.5) obstacleTarget = 0;
-  else if (gap < 10) obstacleTarget = npc.cruiseSpeed * (gap - 3.5) / 6.5;
+  else if (gap < 10 * followMul) obstacleTarget = npc.cruiseSpeed * (gap - 3.5) / (10 * followMul - 3.5);
   if (G.wanted.stars > 0 && dist2(v.pos, pp) < 22 * 22) obstacleTarget = Math.min(obstacleTarget, npc.cruiseSpeed * 0.4); // cautious during a shootout
 
   // traffic signal: ease to a halt at the stop line on red/amber — unless already
@@ -319,7 +388,7 @@ export function updateTrafficCar(v, dt) {
   const fwdToLine = (cellNow - (even2 ? v.pos.z : v.pos.x)) * moveSign - (ROAD_WIDTH / 2 + 1.6);
   const sig = lightFor(dir);
   if (sig !== 'green' && fwdToLine > -1.0 && fwdToLine < 16) {
-    if (sig === 'amber' && fwdToLine < 2.5) { /* too close to stop safely — clear the box */ }
+    if (sig === 'amber' && (fwdToLine < 2.5 || npc.amberRunner)) { /* too close or bold enough — clear the box */ }
     else if (fwdToLine <= 0.4) signalTarget = 0;
     else signalTarget = npc.cruiseSpeed * clamp(fwdToLine / 6, 0, 1);
   }
@@ -332,7 +401,10 @@ export function updateTrafficCar(v, dt) {
   // --- move along the cardinal, keep the lane, ease the visual heading around ---
   v.pos.x += hx * v.vel * dt;
   v.pos.z += hz * v.vel * dt;
-  const laneEase = Math.min(1, dt * (npc.ramPanic > 0 ? 0.65 : 4));
+  const blockedForBike = v.spec.kind === 'bike' && obstacleTarget < npc.cruiseSpeed * 0.35 && v.vel < npc.cruiseSpeed * 0.3 && signalTarget > 0.1;
+  if (blockedForBike) laneTarget += LANESIGN[dir] * 1.05;
+  laneTarget += Math.sin((performance.now() * 0.001) * 0.3 + (npc.seed || 0)) * (npc.wanderAmp || 0.12);
+  const laneEase = Math.min(1, dt * (npc.ramPanic > 0 ? 0.65 : (blockedForBike ? 2.0 : 4)));
   if (even2) v.pos.x = lerp(v.pos.x, laneTarget, laneEase);
   else       v.pos.z = lerp(v.pos.z, laneTarget, laneEase);
   v.pos.x = clamp(v.pos.x, -HALF + 8, HALF - 2);   // out of the river, inside bounds
@@ -356,11 +428,11 @@ export function updateTrafficCar(v, dt) {
   while (headingDelta > PI) headingDelta -= TAU;
   while (headingDelta < -PI) headingDelta += TAU;
   v.steerAngle = lerp(v.steerAngle || 0, clamp(headingDelta * 5, -0.5, 0.5), 0.24);
-  if (v.spec.kind === 'bike') v.mesh.rotation.z = lerp(v.mesh.rotation.z || 0, -v.steerAngle * 0.7, 0.18);
-  else if (v.spec.kind === 'tuktuk') v.mesh.rotation.z = lerp(v.mesh.rotation.z || 0, -v.steerAngle * 0.35, 0.18);
+  v._visualYawRate = headingDelta / Math.max(0.001, dt);
   v.mesh.position.copy(v.pos);
   v.mesh.rotation.y = v.heading;
-  updateVehicleVisuals(v, dt, { braking, reverse: v.vel < -0.1 });
+  const baseRoll = v.spec.kind === 'bike' ? -v.steerAngle * 0.42 : v.spec.kind === 'tuktuk' ? -v.steerAngle * 0.24 : 0;
+  updateVehicleVisuals(v, dt, { braking, reverse: v.vel < -0.1, aLat: v.vel * v._visualYawRate, baseRoll });
   if (v.spec.kind !== 'boat') resolveVehicleVsVehicles(v);
 
   // honk only when something's actually blocking us while the light is green —
@@ -386,6 +458,7 @@ export function respawnTraffic(v, playerPos) {
   v.pos.set(x, 0, z);
   v.heading = DH[dir]; v.npc.dir = dir; v.npc.turnCD = 0.6;
   v.vel = v.npc.cruiseSpeed * 0.7;
+  v.latVel = 0; v.yawRate = 0; v._impactVX = 0; v._impactVZ = 0; v._impactSpin = 0;
   v.mesh.position.copy(v.pos); v.mesh.rotation.y = v.heading;
 }
 
@@ -401,6 +474,9 @@ export function updateCamera(dt) {
   if (p.inVehicle) {
     const v = p.inVehicle;
     const speed01 = Math.min(1, Math.abs(v.vel) / Math.max(1, v.spec.topSpeed));
+    const accel = ((v.vel || 0) - (rig._vehPrevVel == null ? (v.vel || 0) : rig._vehPrevVel)) / Math.max(0.001, dt);
+    rig._vehPrevVel = v.vel || 0;
+    rig._followStretch = lerp(rig._followStretch || 0, clamp(accel * 0.045, -0.45, 0.6), 1 - Math.pow(0.08, dt));
     _camTarget.copy(v.pos);
     _camTarget.y += lerp(1.05, 1.55, speed01);
     const side = (v.steerAngle || 0) * lerp(0.5, 1.35, speed01);
@@ -408,11 +484,17 @@ export function updateCamera(dt) {
     _camTarget.z += -Math.sin(v.heading) * side;
     const followYaw = v.heading + PI; // behind
     rig.yaw = lerpAngle(rig.yaw, followYaw, dt * lerp(1.15, 2.45, speed01));
-    rig.targetDistance = (v.spec.kind === 'bike' ? 4.8 : 6.4) + speed01 * (v.spec.kind === 'boat' ? 1.2 : 2.1);
+    rig.targetDistance = (v.spec.kind === 'bike' ? 4.8 : 6.4) + speed01 * (v.spec.kind === 'boat' ? 1.2 : 2.1) + (rig._followStretch || 0);
     rig.pitch = lerp(rig.pitch, -0.13 - speed01 * 0.07, 1 - Math.pow(0.975, dt * 60));
   } else {
     _camTarget.copy(p.group.position); _camTarget.y += 1.5;
+    if (p.isSprinting) {
+      rig._sprintBobPhase = (rig._sprintBobPhase || 0) + dt * 13.5;
+      _camTarget.y += Math.sin(rig._sprintBobPhase) * 0.03;
+    }
     rig.targetDistance = 4.5;
+    rig._vehPrevVel = null;
+    rig._followStretch = lerp(rig._followStretch || 0, 0, 1 - Math.pow(0.08, dt));
   }
   const targetEase = p.inVehicle ? (1 - Math.pow(0.82, dt * 60)) : (1 - Math.pow(0.65, dt * 60));
   if (!rig.targetSmooth) rig.targetSmooth = new THREE.Vector3().copy(_camTarget);
@@ -439,7 +521,7 @@ export function updateCamera(dt) {
   rig.cam.lookAt(_camTarget);
   // speed-based FOV kick while driving — a little sense of velocity
   const sp01 = p.inVehicle ? Math.min(1, Math.abs(p.inVehicle.vel) / p.inVehicle.spec.topSpeed) : 0;
-  const targetFov = 72 + sp01 * 14;
+  const targetFov = 72 + sp01 * sp01 * 9;
   if (Math.abs(rig.cam.fov - targetFov) > 0.05) { rig.cam.fov = lerp(rig.cam.fov, targetFov, 1 - Math.pow(0.94, dt * 60)); rig.cam.updateProjectionMatrix(); }
 }
 

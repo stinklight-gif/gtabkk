@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, TURFS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
-import { animateWalk, damagePlayer, recolorTorso, saveGame, sidewalkPos, spawnPed } from './main.js';
+import { animateWalk, damagePlayer, recolorTorso, saveGame, sidewalkPos, spawnPed, spawnWalkingPair } from './main.js';
 import { lightFor } from './traffic.js';
 
 // 13. PEDESTRIANS + DOGS
@@ -22,6 +22,53 @@ function steppingIntoLiveRoad(cx, cz, nx, nz) {
   const gz = Math.round(nz / BLOCK) * BLOCK;          // nearest E/W road (cars run E/W → dir 1)
   if (Math.abs(cz - gz) >= _RW2 && Math.abs(nz - gz) < _RW2 + 0.3 && lightFor(1) === 'green') return true;
   return false;
+}
+
+function localBearingTo(ped, target) {
+  const dx = target.x - ped.mesh.position.x;
+  const dz = target.z - ped.mesh.position.z;
+  let a = Math.atan2(dx, dz) - ped.heading;
+  while (a > PI) a -= TAU;
+  while (a < -PI) a += TAU;
+  return a;
+}
+
+function updatePedRainProp(ped) {
+  const parts = ped.mesh.userData.parts;
+  const umbrella = parts && parts.props && parts.props.umbrella;
+  if (!umbrella) return;
+  const show = !!ped.mesh.userData.umbrellaUser && (G.time.rainStrength || 0) > 0.4 && !ped.gang && ped.panicT <= 0;
+  umbrella.userData.propHidden = !show;
+  const low = ped.mesh.userData.lod && ped.mesh.userData.lod.state === 'low';
+  umbrella.visible = show && !low;
+}
+
+function updatePedHeadLook(ped, idx, dt, playerPos) {
+  const parts = ped.mesh.userData.parts;
+  const head = parts && parts.head;
+  if (!head) return;
+  ped._lookT = (ped._lookT || (0.08 + (idx % 7) * 0.055)) - dt;
+  if (ped._lookT <= 0) {
+    ped._lookT = 0.36 + (idx % 5) * 0.035;
+    let yaw = 0;
+    const dPlayer = dist2(ped.mesh.position, playerPos);
+    if (dPlayer < 8 * 8 || (G.wanted.stars > 0 && dPlayer < 14 * 14)) {
+      yaw = clamp(localBearingTo(ped, playerPos), -1.1, 1.1);
+    } else {
+      let best = null, bestD = 999;
+      for (const v of G.vehicles) {
+        if (!v || v.dead || Math.abs(v.vel || 0) < 9) continue;
+        const dx = v.pos.x - ped.mesh.position.x, dz = v.pos.z - ped.mesh.position.z;
+        const fwd = Math.sin(ped.heading) * dx + Math.cos(ped.heading) * dz;
+        const lat = -Math.cos(ped.heading) * dx + Math.sin(ped.heading) * dz;
+        const d2 = dx * dx + dz * dz;
+        if (fwd > -1 && Math.abs(lat) < 6 && d2 < 12 * 12 && d2 < bestD) { best = v.pos; bestD = d2; }
+      }
+      if (best) yaw = clamp(localBearingTo(ped, best), -1.1, 1.1);
+    }
+    ped._lookYawTarget = yaw;
+  }
+  head.rotation.y = lerp(head.rotation.y || 0, ped._lookYawTarget || 0, 1 - Math.pow(0.04, dt));
 }
 
 // Floating reaction-bark sprites over panicking peds.
@@ -110,7 +157,8 @@ G.resyncCrowd = resyncCrowd;   // exposed on window.GAME for the smoke harness
 
 export function updatePeds(dt) {
   const playerPos = G.player.group.position;
-  for (const ped of G.peds) {
+  for (let pedIdx = 0; pedIdx < G.peds.length; pedIdx++) {
+    const ped = G.peds[pedIdx];
     if (ped.dead) continue;
     if (!ped.gang && ped.panicT <= 0 && !ped.anchor) {
       for (const v of G.vehicles) {
@@ -191,7 +239,7 @@ export function updatePeds(dt) {
       const nz = ped.mesh.position.z + Math.cos(ped.heading) * probeSpeed * dt;
       if (!steppingIntoLiveRoad(ped.mesh.position.x, ped.mesh.position.z, nx, nz)) {
         ped.state = 'walking';
-        ped.speed = rand(0.9, 1.7);
+        ped.speed = rand(0.9, 1.7) * (ped.speedMul || 1);
         ped.waitT = rand(1.0, 2.4);
       }
     } else if (ped.state === 'walking') {
@@ -200,6 +248,27 @@ export function updatePeds(dt) {
       if (ped.waitT <= 0) {
         ped.heading += rand(-0.5, 0.5);
         ped.waitT = rand(1.5, 4);
+      }
+    }
+    if (ped.pair && ped.buddy && !ped.buddy.dead && !ped.anchor && ped.panicT <= 0 && !ped.gang) {
+      const pair = ped.pair.group;
+      if (ped.pair.leader) {
+        pair.waitT = Math.max(0, (pair.waitT || ped.waitT || 0) - dt);
+        if (pair.waitT <= 0) {
+          pair.heading += rand(-0.45, 0.45);
+          pair.waitT = rand(1.8, 4.2);
+        }
+        ped.heading = pair.heading;
+        ped.speed = pair.speed * (ped.speedMul || 1);
+      } else {
+        const leader = ped.buddy;
+        const rightX = Math.cos(pair.heading), rightZ = -Math.sin(pair.heading);
+        const tx = leader.mesh.position.x + rightX * ped.pair.side;
+        const tz = leader.mesh.position.z + rightZ * ped.pair.side;
+        const dx = tx - ped.mesh.position.x, dz = tz - ped.mesh.position.z;
+        const d = Math.hypot(dx, dz);
+        ped.heading = d > 0.08 ? Math.atan2(dx, dz) : pair.heading;
+        ped.speed = pair.speed * (ped.speedMul || 1) * (d > 1.2 ? 1.25 : d < 0.45 ? 0.45 : 1);
       }
     }
     // signal-aware kerb hold: plain wanderers wait at the edge of a carriageway
@@ -217,6 +286,7 @@ export function updatePeds(dt) {
       let ax = 0, az = 0, n = 0;
       for (const other of G.peds) {
         if (other === ped || other.dead) continue;
+        if ((ped.buddy && other === ped.buddy) || (ped.pair && other.pair && ped.pair.group === other.pair.group)) continue;
         const dx = ped.mesh.position.x - other.mesh.position.x, dz = ped.mesh.position.z - other.mesh.position.z;
         const d2 = dx * dx + dz * dz;
         if (d2 <= 0.0001 || d2 > 0.9 * 0.9) continue;
@@ -241,7 +311,9 @@ export function updatePeds(dt) {
       if (Math.abs(ped.knockX) < 0.05 && Math.abs(ped.knockZ) < 0.05) { ped.knockX = 0; ped.knockZ = 0; }
     }
     ped.mesh.rotation.y = ped.heading;
+    updatePedRainProp(ped);
     animateWalk(ped.mesh, ped.speed, dt, ped.speed > 0.05);
+    updatePedHeadLook(ped, pedIdx, dt, playerPos);
 
     // bounds
     ped.mesh.position.x = clamp(ped.mesh.position.x, -HALF + 2, HALF - 2);
@@ -254,15 +326,17 @@ export function updatePeds(dt) {
       if (ped.social) {
         ped.social = null;
         ped.state = 'walking';
-        ped.speed = rand(0.9, 1.7);
+        ped.speed = rand(0.9, 1.7) * (ped.speedMul || 1);
       }
+      if (ped.pair) { if (ped.buddy) ped.buddy.buddy = null; ped.pair = null; ped.buddy = null; }
     }
   }
   // keep the streets populated to the time-of-day target — busy at rush hour,
   // near-empty in the small hours (see crowdFactor)
   const target = crowdTarget();
   if (G.peds.length < target) {
-    spawnPed(G.scene, sidewalkPos(playerPos.x, playerPos.z, 90));   // ramps in smoothly
+    if (target - G.peds.length > 1 && Math.random() < 0.12) spawnWalkingPair(G.scene, sidewalkPos(playerPos.x, playerPos.z, 90));
+    else spawnPed(G.scene, sidewalkPos(playerPos.x, playerPos.z, 90));   // ramps in smoothly
   } else if (G.peds.length > target) {
     // thin toward the target by dropping the farthest non-special ped each frame
     let fi = -1, fd = 60 * 60;

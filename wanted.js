@@ -17,9 +17,8 @@ export function spawnCop(scene, pos) {
   const copShirt = new THREE.MeshStandardMaterial({ color: 0x8a7f4a, roughness: 0.7 });
   const copPants = new THREE.MeshStandardMaterial({ color: 0x4a4030, roughness: 0.8 });
   const pp = m.userData.parts;
-  pp.torso.material = copShirt;
-  pp.armL.material = pp.armR.material = copShirt;
-  pp.legL.material = pp.legR.material = copPants;
+  for (const part of [pp.torso, pp.armL, pp.armR, pp.foreL, pp.foreR]) if (part) part.material = copShirt;
+  for (const part of (pp.pantsParts || [pp.legL, pp.legR])) if (part) part.material = copPants;
   m.position.copy(pos);
   scene.add(m);
   const cop = {

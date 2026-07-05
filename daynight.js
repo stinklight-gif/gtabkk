@@ -14,6 +14,49 @@ export const DAY_LENGTH = 480; // seconds for a full 24h cycle (slow enough that
                         // doesn't blow through dusk-to-dark mid-chase). Everything
                         // time-of-day keys off the normalized dayT/nightK, not this.
 
+function prepWetMat(mat) {
+  if (!mat || mat._drySurface) return;
+  mat._drySurface = {
+    color: mat.color ? mat.color.clone() : new THREE.Color(0xffffff),
+    roughness: mat.roughness == null ? 0.8 : mat.roughness,
+    metalness: mat.metalness == null ? 0 : mat.metalness,
+    envMapIntensity: mat.envMapIntensity || 0,
+  };
+}
+
+function applyWetMat(mat, wet, opts) {
+  if (!mat) return;
+  prepWetMat(mat);
+  const dry = mat._drySurface;
+  mat.roughness = lerp(dry.roughness, opts.roughness, wet);
+  mat.metalness = lerp(dry.metalness, opts.metalness, wet);
+  if (G.envMap) mat.envMap = G.envMap;
+  mat.envMapIntensity = lerp(dry.envMapIntensity, opts.envMapIntensity, wet);
+  if (mat.color) mat.color.copy(dry.color).lerp(opts.color, wet);
+  mat.needsUpdate = true;
+}
+
+function updateWetSurfaces(dt) {
+  const sm = G.world && G.world.surfaceMaterials;
+  if (!sm) return;
+  const rain = G.time.rainStrength || 0;
+  if (rain > (G._wetSurface || 0)) G._wetSurface = lerp(G._wetSurface || 0, rain, 0.08);
+  else G._wetSurface = Math.max(rain, (G._wetSurface || 0) - dt / 30);
+  const wet = clamp(G._wetSurface || 0, 0, 1);
+  const wetRoad = { roughness: 0.12, metalness: 0.25, envMapIntensity: 1.2, color: new THREE.Color(0x25282b) };
+  const wetGround = { roughness: 0.22, metalness: 0.12, envMapIntensity: 0.8, color: new THREE.Color(0x292c30) };
+  const wetWalk = { roughness: 0.45, metalness: 0.08, envMapIntensity: 0.45, color: new THREE.Color(0x55595a) };
+  for (const m of sm.road || []) applyWetMat(m, wet, wetRoad);
+  for (const m of sm.ground || []) applyWetMat(m, wet * 0.65, wetGround);
+  for (const m of sm.sidewalk || []) applyWetMat(m, wet * 0.5, wetWalk);
+  if (sm.puddleMat) {
+    sm.puddleMat.opacity = wet;
+    sm.puddleMat.envMap = G.envMap || sm.puddleMat.envMap;
+    sm.puddleMat.envMapIntensity = 0.4 + wet * 1.2;
+    sm.puddleMat.needsUpdate = true;
+  }
+}
+
 export function updateDayNight(dt) {
   const prevT = G.time.dayT;
   G.time.dayT = (G.time.dayT + dt / DAY_LENGTH) % 1;
@@ -88,6 +131,7 @@ export function updateDayNight(dt) {
     }
   }
   G.time.rainStrength = lerp(G.time.rainStrength, G._rainTarget, 0.012);
+  updateWetSurfaces(dt);
   G.audio.rainBed.setLevel(G.time.rainStrength * 0.18);
   G.rain.update(dt, G.player.group.position, G.time.rainStrength);
 
