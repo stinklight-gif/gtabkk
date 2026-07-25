@@ -320,6 +320,132 @@ async function main() {
     assert(driving.collision.gapAfter > driving.collision.gapBefore + 0.2 && driving.collision.velAfter < driving.collision.velBefore && driving.collision.targetImpact > 2, 'vehicle collision separates cars, damps the player, and shoves the target');
     assert(driving.collision.playerHp < 100 && driving.collision.blockerHp < 100 && driving.collision.shake > 0, 'vehicle collision applies damage and camera shake');
     assert(driving.traffic.end < driving.traffic.start * 0.65 && driving.traffic.z < driving.traffic.playerZ - 1.5, 'traffic car brakes for the player vehicle ahead');
+
+    console.log('\n[5] weight and consequence');
+    const weight = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const down = code => window.dispatchEvent(new KeyboardEvent('keydown', { code }));
+      const up = code => window.dispatchEvent(new KeyboardEvent('keyup', { code }));
+      const car = G.player.inVehicle;
+      const spec = car.spec;
+      const reset = v => {
+        car.pos.set(0, 0, -140); car.heading = 0; car.vel = v;
+        car.yawRate = 0; car.steerAngle = 0; car.steerInput = 0;
+        car.throttle = 0; car.brakeInput = 0; car.latVel = 0; car._aLong = 0;
+        car.mesh.position.copy(car.pos); car.mesh.rotation.y = car.heading;
+        G.player.group.position.copy(car.pos);
+      };
+      const clearKeys = () => { for (const k of ['KeyW','KeyA','KeyS','KeyD']) up(k); if (G.input && G.input.endFrame) G.input.endFrame(); };
+      // updatePlayerInVehicle resolves building collisions, so a long open-throttle run
+      // would drive the car across the city and into a wall. Re-pin it to the same
+      // clear spot every step — we're measuring the speed curve, not the map.
+      const stepPinned = (n, dt) => {
+        for (let i = 0; i < n; i++) {
+          main.updatePlayerInVehicle(dt);
+          car.pos.set(0, 0, -140); car.heading = 0;
+          car.mesh.position.copy(car.pos); car.mesh.rotation.y = 0;
+          G.player.group.position.copy(car.pos);
+        }
+      };
+
+      // --- accel taper: the engine must pull harder low than near the top ---
+      reset(0); down('KeyW');
+      stepPinned(6, 0.1);   // let throttle ease in
+      let v0 = car.vel;
+      stepPinned(10, 0.1);
+      const gainLow = car.vel - v0;
+      const velLow = car.vel;
+      reset(spec.topSpeed * 0.85); car.throttle = 1;
+      stepPinned(6, 0.1);
+      v0 = car.vel;
+      stepPinned(10, 0.1);
+      const gainHigh = car.vel - v0;
+
+      // --- terminal velocity: drag must replace the clamp, not break topSpeed ---
+      reset(0);
+      let overshoot = 0;
+      for (let i = 0; i < 60; i++) { stepPinned(5, 0.1); overshoot = Math.max(overshoot, car.vel); }
+      const terminal = car.vel;
+      clearKeys();
+
+      // --- friction circle: braking mid-corner must cost lateral grip ---
+      const cornerRun = brake => {
+        reset(16); car.steerInput = 1; car.steerAngle = 0.3;
+        if (brake) down('KeyS');
+        for (let i = 0; i < 6; i++) { car.steerInput = 1; main.updatePlayerInVehicle(0.08); }
+        if (brake) up('KeyS');
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        return Math.abs(car.heading);
+      };
+      const turnCoast = cornerRun(false);
+      const turnBraking = cornerRun(true);
+      clearKeys();
+
+      // --- line of sight through a real building ---
+      const p = G.player.group.position;
+      const b = G.world.buildings.find(x => x.size.y > 6) || G.world.buildings[0];
+      const nx = b.pos.x + b.size.x / 2 + 3, nz = b.pos.z;
+      const fx = b.pos.x - b.size.x / 2 - 3;
+      const losThrough = main.hasLineOfSight(nx, 1.5, nz, fx, 1.5, nz);          // straight through it
+      const losClear = main.hasLineOfSight(nx, 1.5, nz, nx + 6, 1.5, nz);        // along the open side
+
+      // --- heat accumulates with the size of the crime ---
+      G.policeOff = false;
+      G.wanted.stars = 0; G.wanted.crime = 0;
+      main.raiseWanted(2, 2);
+      const starsOnce = G.wanted.stars;
+      for (let i = 0; i < 12; i++) main.raiseWanted(2, 5);
+      const starsSpree = G.wanted.stars;
+      const crimeSpree = G.wanted.crime;
+
+      return {
+        gainLow, gainHigh, velLow, terminal, overshoot, topSpeed: spec.topSpeed,
+        turnCoast, turnBraking, losThrough, losClear,
+        starsOnce, starsSpree, crimeSpree,
+      };
+    });
+    assert(weight.gainHigh > 0 && weight.gainHigh < weight.gainLow * 0.6, `engine pull tapers with speed (low +${weight.gainLow.toFixed(2)} from ${weight.velLow.toFixed(1)} vs high +${weight.gainHigh.toFixed(2)} m/s)`);
+    assert(weight.terminal > weight.topSpeed * 0.9 && weight.overshoot <= weight.topSpeed * 1.03, `drag settles at spec top speed without a clamp (${weight.terminal.toFixed(1)} of ${weight.topSpeed}, peak ${weight.overshoot.toFixed(1)})`);
+    assert(weight.turnBraking < weight.turnCoast, `braking mid-corner costs lateral grip (turned ${weight.turnBraking.toFixed(3)} braking vs ${weight.turnCoast.toFixed(3)} coasting)`);
+    assert(weight.losThrough === false && weight.losClear === true, 'line of sight is blocked by a building and clear in the open');
+    assert(weight.starsSpree > weight.starsOnce, `wanted heat accumulates with the spree (${weight.starsOnce}★ once -> ${weight.starsSpree}★ after 12, ${weight.crimeSpree} pts)`);
+
+    console.log('\n[6] on-foot weight and fall damage');
+    const foot = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const p = G.player;
+      const place = (y, vy) => {
+        G.player.inVehicle = null; p.group.visible = true;
+        p.group.position.set(0, y, -140);
+        p.velocity.set(0, vy, 0);
+        p.hp = p.hpMax; p.armor = 0; p.grounded = false; p._fallV = 0; p.landStunT = 0;
+      };
+      const settle = () => { for (let i = 0; i < 200 && !p.grounded; i++) main.updatePlayer(1 / 60); };
+
+      place(20, 0); settle();
+      const hpBigDrop = p.hp;
+      place(0.9, 0); settle();
+      const hpStepDown = p.hp;
+      place(0, 5.0); p.grounded = false; settle();      // a normal jump arc
+      const hpJump = p.hp;
+
+      // dt-invariance: the same second of acceleration at two step sizes
+      const runAccel = (steps, dt) => {
+        p.group.position.set(0, 0, -140); p.velocity.set(0, 0, 0); p.grounded = true;
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }));
+        for (let i = 0; i < steps; i++) main.updatePlayer(dt);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        return Math.hypot(p.velocity.x, p.velocity.z);
+      };
+      const fast = runAccel(60, 1 / 60);
+      const slow = runAccel(15, 1 / 15);
+      return { hpBigDrop, hpStepDown, hpJump, hpMax: p.hpMax, fast, slow };
+    });
+    assert(foot.hpBigDrop < foot.hpMax && foot.hpBigDrop > 0, `a long fall hurts without being an instant kill (${foot.hpBigDrop.toFixed(0)}/${foot.hpMax} HP)`);
+    assert(foot.hpStepDown === foot.hpMax, 'a step down off a kerb costs nothing');
+    assert(foot.hpJump === foot.hpMax, 'a normal jump costs nothing');
+    assert(Math.abs(foot.fast - foot.slow) < Math.max(0.35, foot.fast * 0.08), `on-foot acceleration is frame-rate independent (${foot.fast.toFixed(2)} at 60 Hz vs ${foot.slow.toFixed(2)} at 15 Hz)`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
