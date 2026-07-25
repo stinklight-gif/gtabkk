@@ -5,7 +5,24 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
-import { abortHeist, animateWalk, damagePlayer, makePedMesh, makeVehicle, onCopKilled, raiseWanted, updateVehicleVisuals } from './main.js';
+import { abortHeist, animateWalk, damagePlayer, hasLineOfSight, makePedMesh, makeVehicle, onCopKilled, raiseWanted, updateVehicleVisuals } from './main.js';
+
+// Cops see with their eyes, not with a distance check. Resolving line of sight walks
+// the building AABBs, so we cache it per cop and refresh a few times a second rather
+// than every frame — police reactions don't need 60 Hz, and at 4★ there can be 8+ of
+// them. EYE/CHEST are the sample heights (a cop looking at the player's torso).
+const LOS_REFRESH = 0.2;
+const EYE_Y = 1.5, CHEST_Y = 1.05;
+function copSeesPlayer(c, dt) {
+  c._losT = (c._losT || 0) - dt;
+  if (c._losT <= 0) {
+    c._losT = LOS_REFRESH;
+    const p = G.player.group.position;
+    const m = c.mesh ? c.mesh.position : c.pos;
+    c._losOk = hasLineOfSight(m.x, m.y + EYE_Y, m.z, p.x, p.y + CHEST_Y, p.z);
+  }
+  return c._losOk !== false;
+}
 
 // 15. COPS + WANTED SYSTEM
 // =============================================================================
@@ -134,11 +151,19 @@ export function updateWanted(dt) {
   // line of sight: a cop close enough to see you keeps refreshing "last seen",
   // so heat only starts cooling once you've actually broken contact. The sight
   // radius is smaller than the spawn radius so fresh spawns don't auto-refresh.
+  // "See" means an actual unobstructed line — duck behind a building or into an
+  // alley and contact breaks, which is what makes cover worth using.
   if (GAMEPLAY.wantedLOS && G.wanted.stars > 0) {
     const seeR = 30 * 30;
     let seen = false;
-    for (const c of G.cops) if (!c.dead && c.state !== 'bribed' && dist2(c.mesh.position, p) < seeR) { seen = true; break; }
-    if (!seen) for (const v of G.vehicles) if (v.isCop && !v.dead && v.driver && dist2(v.pos, p) < seeR) { seen = true; break; }
+    for (const c of G.cops) {
+      if (c.dead || c.state === 'bribed' || dist2(c.mesh.position, p) >= seeR) continue;
+      if (copSeesPlayer(c, dt)) { seen = true; break; }
+    }
+    if (!seen) for (const v of G.vehicles) {
+      if (!v.isCop || v.dead || !v.driver || dist2(v.pos, p) >= seeR) continue;
+      if (copSeesPlayer(v, dt)) { seen = true; break; }
+    }
     if (seen) G.wanted.lastSeenAt = performance.now();
   }
 
@@ -339,6 +364,27 @@ export function updateFootCops(dt) {
     // pick a strafe direction occasionally so a group doesn't bunch into one line
     c.strafeT = (c.strafeT || 0) - dt;
     if (c.strafeT <= 0) { c.strafeDir = Math.random() < 0.5 ? -1 : 1; c.strafeT = rand(0.8, 1.8); }
+    // A cop needs an actual line on you to engage. With the line broken they switch
+    // to 'seeking' and head for where you were last seen (lastSeenPos is already
+    // maintained by raiseWanted) instead of tracking you through a wall.
+    const sees = copSeesPlayer(c, dt);
+    c.state = sees ? 'engaging' : 'seeking';
+    if (!sees) {
+      const lp = G.wanted.lastSeenPos;
+      const sx = lp.x - c.mesh.position.x, sz = lp.z - c.mesh.position.z;
+      const sd = Math.hypot(sx, sz);
+      if (sd > 1.2) {
+        c.heading = Math.atan2(sx, sz);
+        c.mesh.position.x += Math.sin(c.heading) * c.speed * 0.8 * dt;
+        c.mesh.position.z += Math.cos(c.heading) * c.speed * 0.8 * dt;
+        animateWalk(c.mesh, c.speed * 0.8, dt, true);
+      } else {
+        animateWalk(c.mesh, 0, dt, false);   // arrived, casting about
+        c.heading += dt * 0.9;
+      }
+      c.mesh.rotation.y = c.heading;
+      continue;
+    }
     if (armed && d < 22) {
       // hold a firing line: close to ~12 m, then stop and strafe-shoot; back off if crowded
       const want = aiming ? 16 : 12;          // give ground when aimed at
@@ -356,7 +402,13 @@ export function updateFootCops(dt) {
       if (c.shootCooldown <= 0) {
         c.shootCooldown = rand(1.4, 2.6);
         G.audio.shot();
-        if (Math.random() < 0.5) { damagePlayer(8); G.camRig.shake = Math.max(G.camRig.shake, 0.08); }
+        // accuracy falls off with range: point-blank is genuinely dangerous, 20 m is
+        // mostly suppressive noise. Replaces a flat 50%-at-any-range coin flip.
+        const hitChance = clamp(0.72 - d * 0.026, 0.14, 0.72);
+        if (Math.random() < hitChance) {
+          damagePlayer(lerp(10, 4, Math.min(1, d / 22)));
+          G.camRig.shake = Math.max(G.camRig.shake, 0.08);
+        }
       }
       animateWalk(c.mesh, c.speed, dt, mv !== 0 || true);
     } else if (d > 2.5) {
