@@ -92,6 +92,38 @@ export function resolvePlayerVsPlatforms(player) {
   }
 }
 
+// Line of sight between two world points, blocked by building AABBs. Buildings are
+// merged into shared meshes, so we test their stored boxes directly — the same trick
+// the camera occlusion pass uses (see updateCamera in vehicles.js).
+//
+// NOTE: this deliberately uses its own ray/box scratch rather than the pooled `_ray`
+// / `_bbox` / `_vBox` from core.js, because the pooled ones are mid-use inside
+// doBulletRaycast — calling this from there would corrupt an in-flight shot.
+const _losRay = new THREE.Ray();
+const _losBox = new THREE.Box3();
+const _losHit = new THREE.Vector3();
+export function hasLineOfSight(ax, ay, az, bx, by, bz) {
+  let dx = bx - ax, dy = by - ay, dz = bz - az;
+  const len = Math.hypot(dx, dy, dz);
+  if (len < 0.001) return true;
+  dx /= len; dy /= len; dz /= len;
+  _losRay.origin.set(ax, ay, az);
+  _losRay.direction.set(dx, dy, dz);
+  const cullR2 = (len + 12) * (len + 12);
+  for (const b of G.world.buildings) {
+    // cheap reject: anything further from the eye than the segment can't block it
+    const bdx = b.pos.x - ax, bdz = b.pos.z - az;
+    if (bdx * bdx + bdz * bdz > cullR2) continue;
+    _losBox.min.set(b.pos.x - b.size.x / 2, b.pos.y - b.size.y / 2, b.pos.z - b.size.z / 2);
+    _losBox.max.set(b.pos.x + b.size.x / 2, b.pos.y + b.size.y / 2, b.pos.z + b.size.z / 2);
+    const hit = _losRay.intersectBox(_losBox, _losHit);
+    if (!hit) continue;
+    const hd = Math.hypot(hit.x - ax, hit.y - ay, hit.z - az);
+    if (hd < len - 0.4) return false;      // a wall sits between the two points
+  }
+  return true;
+}
+
 function vehicleBasis(v) {
   const h = v.heading || 0;
   return {

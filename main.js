@@ -70,10 +70,24 @@ import {
 
 // Bump wanted level and refresh the "last seen" tracker. Replaces the same
 // three-line pattern that was copy-pasted across combat/cop code.
-export function raiseWanted(n) {
+// Heat thresholds: crime points needed for each star. Twenty dead civilians used to
+// read exactly the same as one, because raiseWanted was a Math.max floor rather than
+// an accumulator. Points now pile up and stars are derived from them, while the old
+// floor behaviour is kept so all ~30 existing call sites keep working unchanged.
+export const CRIME_THRESHOLDS = [0, 1, 5, 12, 22, 38];
+export function crimeStars(crime) {
+  let s = 0;
+  for (let i = 5; i >= 1; i--) if (crime >= CRIME_THRESHOLDS[i]) { s = i; break; }
+  return s;
+}
+
+// `points` lets a caller say how *big* the crime was independently of the star floor
+// it forces; it defaults to n so existing single-argument calls are unchanged.
+export function raiseWanted(n, points = n) {
   if (G.policeOff) return;                      // police disabled — heist/turf/crime can't re-trigger stars
   const prev = G.wanted.stars;
-  G.wanted.stars = Math.max(G.wanted.stars, n);
+  G.wanted.crime = (G.wanted.crime || 0) + points;
+  G.wanted.stars = Math.min(5, Math.max(G.wanted.stars, n, crimeStars(G.wanted.crime)));
   G.wanted.lastSeenAt = performance.now();
   G.wanted.lastSeenPos.copy(G.player.group.position);
   if (G.wanted.stars > prev) {                 // escalation feedback
@@ -1496,7 +1510,7 @@ export function loop() {
     updateDayNight(dt);
     updateFestival(dt);
     // distant daytime traffic honks (ambient flavor)
-    if (Math.random() < 0.004 * (1 - (G.nightK || 0))) G.audio.blip({ freq: 360, dur: 0.2, type: 'square', gain: 0.03, freqEnd: 330 });
+    if (Math.random() < (1 - Math.exp(-0.24 * dt)) * (1 - (G.nightK || 0))) G.audio.blip({ freq: 360, dur: 0.2, type: 'square', gain: 0.03, freqEnd: 330 });
     G._saveTimer = (G._saveTimer || 0) + dt;
     if (G._saveTimer > 8) { G._saveTimer = 0; saveGame(); }
     // one-time 100% celebration (cheap: amulet counter + the 6 mission flags)

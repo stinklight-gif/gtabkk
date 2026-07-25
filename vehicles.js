@@ -129,16 +129,34 @@ export function updatePlayerInVehicle(dt) {
   else if (forward < 0) {
     if (v.vel > 0.25) v.vel -= spec.brake * (1 + speedNow01 * 0.35) * v.brakeInput * dt;
     else v.vel -= spec.accel * 0.55 * v.brakeInput * weight * dt; // reverse
-  } else {
-    const coast = spec.kind === 'boat' ? 0.992 : 0.982;
-    v.vel *= Math.pow(coast, dt * 60);
-    if (Math.abs(v.vel) < 0.04) v.vel = 0;
   }
+  // Resistance runs every frame, not just while coasting: rolling/hull drag plus a
+  // quadratic aero term. dragK is solved so the two exactly balance the engine at
+  // spec.topSpeed, which makes top speed an emergent terminal velocity instead of a
+  // clamp you slam into — and means lifting off at 120 sheds speed much faster than
+  // lifting off at 30, the most legible cue that a car has mass. topSpeed keeps its
+  // meaning, so nothing that reads it needs retuning.
+  const roll = spec.rollDrag !== undefined ? spec.rollDrag : (spec.kind === 'boat' ? 0.35 : 0.55);
+  // solved against accel*weight (the actual drive force) so each vehicle still tops
+  // out at its own spec.topSpeed — mass shows up as launch character, not a lower ceiling
+  const dragK = spec.dragK !== undefined ? spec.dragK
+    : Math.max(0.0001, spec.accel * weight - roll) / Math.max(1, spec.topSpeed * spec.topSpeed);
+  if (v.vel !== 0) {
+    const resist = (roll + dragK * v.vel * v.vel) * dt;
+    v.vel -= Math.sign(v.vel) * Math.min(resist, Math.abs(v.vel));   // never drags through zero
+  }
+  if (forward === 0 && Math.abs(v.vel) < 0.12) v.vel = 0;
   if (handbrake) v.vel *= Math.pow(spec.kind === 'bike' ? 0.965 : 0.93, dt * 60);
   const speedMul = v.tiresBlown ? 0.5 : 1;   // spike strips halve your top speed
   v.vel = clamp(v.vel, -spec.topSpeed * 0.4 * speedMul, spec.topSpeed * (boost ? (spec.nitroTop || 1.15) : 1) * speedMul);
   const speed01 = Math.min(1, Math.abs(v.vel) / Math.max(1, spec.topSpeed));
-  const steerLimit = roadVehicle ? lerp(0.76, 0.48, speed01) : lerp(0.55, 0.34, speed01);
+  // Weight transfer, using last frame's longitudinal accel (stored below). Braking
+  // loads the front axle and gives the car a touch more bite; getting on the power
+  // unloads it and washes out. applyVehicleSuspensionVisual already pitches the body
+  // on this same number, so what you see and what the car does finally agree.
+  // Capped at +/-12% — texture, not a handling rewrite.
+  const loadFront = roadVehicle ? clamp(-(v._aLong || 0) / 9, -1, 1) : 0;
+  const steerLimit = (roadVehicle ? lerp(0.76, 0.48, speed01) : lerp(0.55, 0.34, speed01)) * (1 + 0.12 * loadFront);
   const steerResponse = roadVehicle ? 0.32 : 0.18;
   v.steerAngle = lerp(v.steerAngle || 0, v.steerInput * steerLimit, steerResponse);
   const lowSpeed = roadVehicle ? clamp(Math.abs(v.vel) / 0.9, 0.48, 1) : clamp(Math.abs(v.vel) / 1.2, 0.28, 1);
@@ -160,13 +178,22 @@ export function updatePlayerInVehicle(dt) {
     const gripDry = spec.grip || 9;
     const gripMul = 1 - 0.45 * rain;
     const aMax = gripDry * gripMul * (handbrake ? 0.35 : 1);
+    // Friction circle: a tire only has so much grip, and braking or accelerating
+    // spends part of it. Trail-braking into a corner now understeers and power-on
+    // pushes the tail, instead of longitudinal and lateral being free of each other.
+    // The 0.18 floor keeps this forgiving — you can always still turn something —
+    // and the slide bleed below stays on the full aMax so recoveries feel unchanged.
+    const aLong = (v.vel - prevVel) / Math.max(0.001, dt);
+    v._aLong = aLong;                        // read next frame by the weight-transfer term
+    const longUse = clamp(Math.abs(aLong) / Math.max(1, aMax), 0, 1);
+    const aMaxLat = aMax * Math.sqrt(Math.max(0.18, 1 - longUse * longUse));
     const demanded = v.vel * (v.yawRate || 0);
-    const capped = clamp(demanded, -aMax, aMax);
+    const capped = clamp(demanded, -aMaxLat, aMaxLat);
     let excess = demanded - capped;
     if (spec.kind === 'bike') excess *= 0.4;
     v.latVel = (v.latVel || 0) + excess * dt;
-    if (Math.abs(demanded) > aMax && Math.abs(v.vel) > 0.2) {
-      v.yawRate *= clamp(aMax / Math.max(0.001, Math.abs(demanded)), 0.22, 1);
+    if (Math.abs(demanded) > aMaxLat && Math.abs(v.vel) > 0.2) {
+      v.yawRate *= clamp(aMaxLat / Math.max(0.001, Math.abs(demanded)), 0.22, 1);
     }
     aLatAchieved = v.vel * (v.yawRate || 0);
     const bleed = Math.max(0.6, aMax) * dt;
@@ -251,7 +278,7 @@ export function updatePlayerInVehicle(dt) {
     if (ped.dead) continue;
     if (dist2(ped.mesh.position, v.pos) < 1.6*1.6 && Math.abs(v.vel) > 4) {
       killPed(ped);
-      raiseWanted(2);
+      raiseWanted(2, 5);
       G.hud.showNotif('Hit & Run! +Wanted Star');
     }
   }
@@ -297,7 +324,7 @@ export function updateVehicles(dt) {
       v.mesh.children.forEach(c => { if (c.material && c.material.color) c.material.color.lerp(_blackColor, 0.6); });
       makeExplosion(v.pos);
       v.vel = 0;
-      if (v.isCop) { raiseWanted(2); onCopKilled(); }
+      if (v.isCop) { raiseWanted(2, 9); onCopKilled(); }   // destroying a cruiser reads like killing its crew
       if (v.kind === 'fortuner' && !G.player.weapons.smg) {
         G.player.weapons.smg = true;
         G.player.smgAmmo = G.player.smgMag;
@@ -545,6 +572,7 @@ export function updateGarage(dt) {
     v.tiresBlown = false;   // respray patches the tires too
     if (v.smoke) { v.smoke.life = 0; v.smoke = null; }
     G.wanted.stars = 0;
+    G.wanted.crime = 0;      // a respray clears the accumulated heat too, not just the stars
     G.wanted.lastSeenAt = now;
     // clear every active cop (foot + vehicles)
     for (let i = G.cops.length - 1; i >= 0; i--) {

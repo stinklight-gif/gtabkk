@@ -434,15 +434,17 @@ export function doBulletRaycast(origin, dir, dmg = 35) {
       t.obj.flinchT = 0.18;                  // brief stagger (read by the AI updates)
       triggerHitStop(0.035);                 // tiny freeze so a connecting shot reads
       connected = true;
-      if (t.obj.hp <= 0) {
-        if (G.cops.includes(t.obj)) killCop(t.obj);
+      const killed = t.obj.hp <= 0;
+      if (killed) {
+        if (G.cops.includes(t.obj)) killCop(t.obj);   // killCop books its own, heavier heat
         else killPed(t.obj);
       }
-      raiseWanted(2);
+      // wounding is bad, killing is worse — the accumulator tells them apart now
+      raiseWanted(2, killed && !G.cops.includes(t.obj) ? 5 : 2);
     } else if (t.vehicle) {
       // cop cars take real damage and die through updateVehicles' explosion path
       t.obj.hp -= t.obj.isCop ? dmg : Math.round(dmg * 0.5);
-      if (t.obj.isCop) { connected = true; raiseWanted(2); }
+      if (t.obj.isCop) { connected = true; raiseWanted(2, 3); }
     }
     // impact spark/puff at the hit point (reuses the dust pool) + pooled light
     spawnImpactSpark(best.point);

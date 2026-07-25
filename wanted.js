@@ -5,7 +5,24 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
-import { abortHeist, animateWalk, damagePlayer, makePedMesh, makeVehicle, onCopKilled, raiseWanted, updateVehicleVisuals } from './main.js';
+import { CRIME_THRESHOLDS, abortHeist, animateWalk, damagePlayer, hasLineOfSight, makePedMesh, makeVehicle, onCopKilled, raiseWanted, updateVehicleVisuals } from './main.js';
+
+// Cops see with their eyes, not with a distance check. Resolving line of sight walks
+// the building AABBs, so we cache it per cop and refresh a few times a second rather
+// than every frame — police reactions don't need 60 Hz, and at 4★ there can be 8+ of
+// them. EYE/CHEST are the sample heights (a cop looking at the player's torso).
+const LOS_REFRESH = 0.2;
+const EYE_Y = 1.5, CHEST_Y = 1.05;
+function copSeesPlayer(c, dt) {
+  c._losT = (c._losT || 0) - dt;
+  if (c._losT <= 0) {
+    c._losT = LOS_REFRESH;
+    const p = G.player.group.position;
+    const m = c.mesh ? c.mesh.position : c.pos;
+    c._losOk = hasLineOfSight(m.x, m.y + EYE_Y, m.z, p.x, p.y + CHEST_Y, p.z);
+  }
+  return c._losOk !== false;
+}
 
 // 15. COPS + WANTED SYSTEM
 // =============================================================================
@@ -72,7 +89,7 @@ export function killCop(cop) {
   cop.dead = true;
   cop.mesh.rotation.x = PI/2;
   cop.mesh.position.y = 0.05;
-  raiseWanted(2);
+  raiseWanted(2, 9);          // killing a cop is the heaviest single crime in the game
   onCopKilled();
   setTimeout(() => {
     G.scene.remove(cop.mesh);
@@ -86,6 +103,7 @@ export function updateWanted(dt) {
   // police disabled (pause-menu toggle): force 0★, clear the streets, spawn nothing
   if (G.policeOff) {
     if (G.wanted.stars !== 0) G.wanted.stars = 0;
+    G.wanted.crime = 0;
     // despawn any live foot cops + driven cop vehicles + the chopper so it clears at once
     // (only cop-driven cars; leaves the parked, enterable Vigilante prop alone)
     for (let i = G.cops.length - 1; i >= 0; i--) { G.scene.remove(G.cops[i].mesh); disposeObject(G.cops[i].mesh); G.cops.splice(i, 1); }
@@ -101,7 +119,7 @@ export function updateWanted(dt) {
       const flash = Math.sin(t) > 0;
       v.mesh.userData.copLamps[0].material.color.setHex(flash ? 0xff2222 : 0x441111);
       v.mesh.userData.copLamps[1].material.color.setHex(flash ? 0x2266ff : 0x111144);
-      if (Math.random() < 0.005) G.audio.siren();
+      if (Math.random() < 1 - Math.exp(-0.3 * dt)) G.audio.siren();   // per-second rate, not per-frame
     }
   }
 
@@ -111,7 +129,9 @@ export function updateWanted(dt) {
   let alive = 0;
   for (const c of G.cops) if (!c.dead && c.state !== 'bribed') alive++;   // bribed cops aren't pursuers
   for (const v of G.vehicles) if (v.isCop && !v.dead && v.driver) alive++;
-  if (alive < desiredCops && Math.random() < 0.01 + G.wanted.stars * 0.01) {
+  // per-second spawn rate: the old per-frame probability made cops arrive ~2.4x
+  // faster on a 144 Hz machine than on a 60 Hz one
+  if (alive < desiredCops && Math.random() < 1 - Math.exp(-(0.6 + G.wanted.stars * 0.6) * dt)) {
     // spawn just outside view
     const ang = rand(0, TAU);
     const r = rand(35, 60);
@@ -134,18 +154,31 @@ export function updateWanted(dt) {
   // line of sight: a cop close enough to see you keeps refreshing "last seen",
   // so heat only starts cooling once you've actually broken contact. The sight
   // radius is smaller than the spawn radius so fresh spawns don't auto-refresh.
+  // "See" means an actual unobstructed line — duck behind a building or into an
+  // alley and contact breaks, which is what makes cover worth using.
   if (GAMEPLAY.wantedLOS && G.wanted.stars > 0) {
     const seeR = 30 * 30;
     let seen = false;
-    for (const c of G.cops) if (!c.dead && c.state !== 'bribed' && dist2(c.mesh.position, p) < seeR) { seen = true; break; }
-    if (!seen) for (const v of G.vehicles) if (v.isCop && !v.dead && v.driver && dist2(v.pos, p) < seeR) { seen = true; break; }
-    if (seen) G.wanted.lastSeenAt = performance.now();
+    for (const c of G.cops) {
+      if (c.dead || c.state === 'bribed' || dist2(c.mesh.position, p) >= seeR) continue;
+      if (copSeesPlayer(c, dt)) { seen = true; break; }
+    }
+    if (!seen) for (const v of G.vehicles) {
+      if (!v.isCop || v.dead || !v.driver || dist2(v.pos, p) >= seeR) continue;
+      if (copSeesPlayer(v, dt)) { seen = true; break; }
+    }
+    // refresh the position too, not just the timestamp — otherwise a cop that loses
+    // the line walks to wherever raiseWanted last fired, which can be blocks stale
+    if (seen) { G.wanted.lastSeenAt = performance.now(); G.wanted.lastSeenPos.copy(p); }
   }
 
   // wanted decay once out of sight long enough
   const sinceSeen = (performance.now() - G.wanted.lastSeenAt) / 1000;
   if (G.wanted.stars > 0 && sinceSeen > 35) {
     G.wanted.stars = Math.max(0, G.wanted.stars - 1);
+    // drop the accumulator to the new star's floor, or the pile of points behind a
+    // massacre would instantly re-derive the star you just shed
+    G.wanted.crime = Math.min(G.wanted.crime || 0, CRIME_THRESHOLDS[G.wanted.stars] || 0);
     G.wanted.lastSeenAt = performance.now();
     G.hud.showNotif(G.wanted.stars === 0 ? 'You lost the cops.' : 'Heat reduced ★');
   }
@@ -161,6 +194,7 @@ export function updateWanted(dt) {
     if (G.input.pressed('KeyB') && G.cash >= 1000) {
       G.cash -= 1000;
       G.wanted.stars--;
+      G.wanted.crime = Math.min(G.wanted.crime || 0, CRIME_THRESHOLDS[G.wanted.stars] || 0);
       G.hud.setCash(G.cash);
       G.hud.showNotif('Bribed: -฿1,000');
       G.audio.blip({freq:600, dur:0.1, gain:0.1});
@@ -168,9 +202,48 @@ export function updateWanted(dt) {
     }
   }
 
+  updateTrafficOffences(dt);
   updateHelicopter(dt);   // 4★+ searchlight
   maybeAmbush();          // 3★+ roadblock ahead while driving
   G.hud.setStars(G.wanted.stars);
+}
+
+// ---- Traffic law -----------------------------------------------------------
+// Signals used to be pure decoration for the player (see the header comment in
+// traffic.js): you could run every red in Sukhumvit at 90 km/h for free. Now a red
+// light costs you — but only when a cop is actually there to see it. An unwitnessed
+// red stays free, deliberately: policing every junction in a game whose core loop is
+// fleeing would be exhausting, and "don't do it in front of the police" is the rule
+// that actually changes how you drive.
+function copWitness(dt) {
+  const p = G.player.group.position;
+  for (const c of G.cops) {
+    if (c.dead || c.state === 'bribed' || dist2(c.mesh.position, p) > 35 * 35) continue;
+    if (copSeesPlayer(c, dt)) return true;
+  }
+  for (const v of G.vehicles) {
+    if (!v.isCop || v.dead || !v.driver || dist2(v.pos, p) > 40 * 40) continue;
+    if (copSeesPlayer(v, dt)) return true;
+  }
+  return false;
+}
+
+export function updateTrafficOffences(dt) {
+  const v = G.player.inVehicle;
+  if (!v || !v.spec || v.spec.kind === 'boat' || Math.abs(v.vel || 0) < 6) { G._inJunction = false; return; }
+  // dominant travel axis — same dir convention as updateTrafficCar (even = along z)
+  const alongZ = Math.abs(Math.cos(v.heading)) >= Math.abs(Math.sin(v.heading));
+  const coord = alongZ ? v.pos.z : v.pos.x;
+  const centre = Math.round(coord / BLOCK) * BLOCK;
+  const inJunction = Math.abs(coord - centre) < ROAD_WIDTH / 2;
+  const entering = inJunction && !G._inJunction;
+  G._inJunction = inJunction;
+  if (!entering) return;
+  const sig = alongZ ? (G.traffic && G.traffic.ns) : (G.traffic && G.traffic.ew);
+  if (sig !== 'red') return;
+  if (!copWitness(dt)) return;
+  raiseWanted(1, 1);
+  G.hud.showNotif('Ran a red light — in front of a cop.');
 }
 
 // ---- Police helicopter (4★+): a searchlight that keeps the heat fresh while
@@ -339,6 +412,27 @@ export function updateFootCops(dt) {
     // pick a strafe direction occasionally so a group doesn't bunch into one line
     c.strafeT = (c.strafeT || 0) - dt;
     if (c.strafeT <= 0) { c.strafeDir = Math.random() < 0.5 ? -1 : 1; c.strafeT = rand(0.8, 1.8); }
+    // A cop needs an actual line on you to engage. With the line broken they switch
+    // to 'seeking' and head for where you were last seen (lastSeenPos is already
+    // maintained by raiseWanted) instead of tracking you through a wall.
+    const sees = copSeesPlayer(c, dt);
+    c.state = sees ? 'engaging' : 'seeking';
+    if (!sees) {
+      const lp = G.wanted.lastSeenPos;
+      const sx = lp.x - c.mesh.position.x, sz = lp.z - c.mesh.position.z;
+      const sd = Math.hypot(sx, sz);
+      if (sd > 1.2) {
+        c.heading = Math.atan2(sx, sz);
+        c.mesh.position.x += Math.sin(c.heading) * c.speed * 0.8 * dt;
+        c.mesh.position.z += Math.cos(c.heading) * c.speed * 0.8 * dt;
+        animateWalk(c.mesh, c.speed * 0.8, dt, true);
+      } else {
+        animateWalk(c.mesh, 0, dt, false);   // arrived, casting about
+        c.heading += dt * 0.9;
+      }
+      c.mesh.rotation.y = c.heading;
+      continue;
+    }
     if (armed && d < 22) {
       // hold a firing line: close to ~12 m, then stop and strafe-shoot; back off if crowded
       const want = aiming ? 16 : 12;          // give ground when aimed at
@@ -356,7 +450,13 @@ export function updateFootCops(dt) {
       if (c.shootCooldown <= 0) {
         c.shootCooldown = rand(1.4, 2.6);
         G.audio.shot();
-        if (Math.random() < 0.5) { damagePlayer(8); G.camRig.shake = Math.max(G.camRig.shake, 0.08); }
+        // accuracy falls off with range: point-blank is genuinely dangerous, 20 m is
+        // mostly suppressive noise. Replaces a flat 50%-at-any-range coin flip.
+        const hitChance = clamp(0.72 - d * 0.026, 0.14, 0.72);
+        if (Math.random() < hitChance) {
+          damagePlayer(lerp(10, 4, Math.min(1, d / 22)));
+          G.camRig.shake = Math.max(G.camRig.shake, 0.08);
+        }
       }
       animateWalk(c.mesh, c.speed, dt, mv !== 0 || true);
     } else if (d > 2.5) {
@@ -400,6 +500,10 @@ export function respawnPlayer() {
   G.cash = Math.max(0, G.cash - 500);
   G.hud.setCash(G.cash);
   G.wanted.stars = 0;
+  G.wanted.crime = 0;
+  // a spree you already paid for shouldn't follow you out of the hospital — this was
+  // a one-way ratchet across the whole save, pinning veterans at a permanent 3-4★ floor
+  G.copsKilled = 0;
   G.hud.setStars(0);
   abortHeist();   // a heist you died during is over — no lingering beam or payout
   // clear any active cops — clean slate on respawn

@@ -35,6 +35,12 @@ CI (`.github/workflows/smoke.yml`) runs it on every PR and push to main, and
 uploads the screenshots as artifacts. In sandboxes where Playwright's browser
 CDN is blocked, point `CHROME_PATH` at any Chrome/Chromium binary.
 
+`node tools/realism_pass_test.mjs` runs alongside it in CI and covers the
+performance budget, the Moto Drop loop, driving/collision/camera feel, and —
+sections `[5]`/`[6]` — the engine speed curve, the friction circle, police line
+of sight, wanted-heat accumulation, fall damage, and frame-rate independence.
+`physics_test`, `hud_test`, `traffic_test` and `mall_test` are local-only.
+
 ## Controls
 
 | Key | Action |
@@ -176,10 +182,10 @@ The original numbered sections (now spread across those modules):
 | 9 | HUD | Star/cash/HP/stamina/ammo/clock/weather binds, subtitle + prompt + notif queues, phone (T) with live stats (amulets/fares/cops + completion %), full north-up map overlay (TAB), minimap renderer (camera-yaw rotated, mission + taxi markers, amulet + snatcher + cop dots). |
 | 10 | Mission system | Stage-based; the `welcome` mission listens for player proximity to the gold shop POI. Add more to the `missions` object. |
 | 11 | Collisions | AABB broad collision with impulse-style response for vehicles: wall hits decompose forward/lateral speed into normal/tangent components for bounce, scrape, yaw kick, damage, dust, suspension impulse, and camera shake; vehicle-vs-vehicle collisions use mass/restitution impulses plus the legacy loose-impact channel for NPC/parked shoves. Player collision remains lightweight pushback. World-bound clamping. |
-| 12 | Player update | Movement, sprint+stamina, jump, in-vehicle controls, exit on E, segmented gait animation, 7-Eleven door chime trigger. |
+| 12 | Player update | Movement with dt-correct momentum and heavily reduced air control, sprint+stamina with an exhaustion penalty (empty the bar and you're winded for 2 s), jump, **fall damage** (free below a ~2.8 m drop, ~23 HP off the Terminal 21 upper floor, ~64 off a BTS platform; toggle with `GAMEPLAY.fallDamage`), in-vehicle controls, exit on E, segmented gait animation, 7-Eleven door chime trigger. |
 | 13 | Peds + Dogs | Wander, pair-walk, crossing-wait, social, cluster, and panic state machines; peds panic when attacked or brushed by fast vehicles and turn their heads toward nearby players/traffic; dogs scatter when player approaches, settle back when far. |
 | 14 | Combat | Muay Thai jab/cross/kick (animated arm/leg swings), pistol + full-auto SMG + pellet-spread shotgun fire (forgiving character hits + tracer sphere + muzzle flash + camera shake), unlimited ammo. Pistol on first cop kill; SMG drops from a destroyed 3★ Fortuner; shotgun/SMG also buyable at the gun shop. |
-| 15 | Cops + Wanted | Star-based heat with decay after 35 s out of sight. Spawns foot cops at 1★, cop-pickup chase cars at 2★, unmarked Crime Suppression Fortuners + spike strips at 3★ (after ~3 cop kills), armored SWAT vans at 4★ (after ~6 kills); a star increase flashes the HUD and whoops a siren; nights run one extra unit. Bribe with B near a foot cop (1–2★ only). |
+| 15 | Cops + Wanted | Star-based heat backed by a `G.wanted.crime` point accumulator, so a spree escalates further than a single crime, with decay after 35 s out of **line of sight** — cops need a real unobstructed line, so ducking behind a building breaks contact. Armed cops won't fire through walls and their accuracy falls off with range. Running a red light with a cop watching costs a star. Spawns foot cops at 1★, cop-pickup chase cars at 2★, unmarked Crime Suppression Fortuners + spike strips at 3★ (after ~3 cop kills), armored SWAT vans at 4★ (after ~6 kills); a star increase flashes the HUD and whoops a siren; nights run one extra unit. Bribe with B near a foot cop (1–2★ only). |
 | 16 | Particles / FX | Smoke emitter (vehicles below 30% HP), explosion (light flash + smoke + camera shake + thunder SFX), tire-skid decals (`spawnSkid`, laid while drifting and faded over 5 s), impact dust puffs (`spawnDust`), and a global **hit-stop** (`triggerHitStop` slows the loop ~0.05 s on a solid melee/gun connect). |
 | 17 | Interaction | Vehicle proximity check + E to enter. |
 | 18 | Camera update | Follow rig with smoothed distance, shake decay, in-vehicle chase view auto-aligns to vehicle heading, **occlusion** (ray-casts target→camera against building AABBs and pulls in so it never clips into a wall), speed-squared FOV kick, acceleration follow stretch/compression, and sprint-only on-foot bob. |
@@ -246,9 +252,21 @@ traffic AI.
 - Collisions still use simple AABB/contact normals rather than a full rigid-body
   solver. Vehicle impacts now bounce, scrape, spin, and exchange momentum, but
   they are tuned game impulses, not continuous physics.
+- Vehicles have a speed-dependent engine taper, rolling + quadratic aero drag
+  (so top speed is an emergent terminal velocity rather than a clamp), a friction
+  circle shared between braking and cornering, and weight transfer that feeds
+  back into steering. There is still no drivetrain: no gears, clutch, RPM or
+  torque curve, no per-wheel tire model or slip ratio, no per-corner suspension,
+  no rollover, no fuel, and damage is one `hp` number plus `tiresBlown` rather
+  than per-component.
+- Police line of sight is a segment test against building AABBs, cached per cop
+  at 5 Hz. It does not account for vehicles, props or crowds as cover — only
+  buildings block a line.
 - Traffic AI is grid-aware with signal stops, obstacle yielding, seeded driver
   personalities, amber runners, and bike filtering; it is still lane-following
-  rather than route-planned city driving.
+  rather than route-planned city driving. Signals still run on one shared
+  city-wide phase (a deliberate anti-deadlock choice), and pedestrians still have
+  no pathfinding — they walk through buildings.
 - Cops use lightweight road-aware steering, not true pathfinding: beyond ~25 m
   they route along the 50 m road grid (so they stop grinding the canyon walls);
   inside 25 m they pursue and ram directly. AABB pushback is still the backstop.
@@ -305,6 +323,12 @@ These values were set without runtime testing; adjust to taste. Locations are in
 | 3★ escalation threshold | `onCopKilled` | 3 cop kills |
 | Spike-strip cadence | `updateSpikes` | every 12s at 3★ |
 | Out-of-combat HP regen | `loop` | 5/s after 5s |
+| Fall damage threshold / rate | `updatePlayer` | >10 m/s impact, 6.5 HP per m/s over, capped 95 |
+| Cop LOS refresh / sight radius | `wanted.js` | 5 Hz / 30 m |
+| Cop hit chance (point blank → 22 m) | `updateFootCops` | 0.72 → 0.14, damage 10 → 4 |
+| Crime points per star | `CRIME_THRESHOLDS` | 1 / 5 / 12 / 22 / 38 |
+| Crime points (civ shot / killed, hit-and-run, cop killed) | `raiseWanted` calls | 2 / 5 / 5 / 9 |
+| Friction-circle bite (0 = off, 1 = full) | `updatePlayerInVehicle` | 0.18 lateral floor |
 
 ## Roadmap (Phase 2+)
 
