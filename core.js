@@ -200,6 +200,7 @@ export const GAMEPLAY = {
   vulnerableOnFoot: true, // cops can hurt the player while on foot
   pistolOnCopKill: true,  // first cop kill grants the 9mm (per README)
   wantedLOS: true,        // stars only decay once no cop is within sight
+  fallDamage: true,       // long drops hurt (threshold ~2.8 m; a normal jump is free)
 };
 
 // pooled scratch objects (never returned/stored — copy out before reuse)

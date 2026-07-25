@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, bizRate, bizCap, bizUpgradeCost, bizManagerCost, bizSaleValue, BANK_INTEREST, BANK_INTEREST_CAP, WEALTH_TIERS, netWorth, wealthRank, rankDiscount, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
-import { tip, resolvePlayerVsBuildings, resolvePlayerVsVehicles, resolvePlayerVsPlatforms, worldSupportY, saveGame, startArcade, applyUpgrades, raiseWanted, makeVehicle, updateAmmoHud, updateCombat, updatePlayerInVehicle } from './main.js';
+import { tip, damagePlayer, resolvePlayerVsBuildings, resolvePlayerVsVehicles, resolvePlayerVsPlatforms, worldSupportY, saveGame, startArcade, applyUpgrades, raiseWanted, makeVehicle, updateAmmoHud, updateCombat, updatePlayerInVehicle } from './main.js';
 
 export function updatePlayer(dt) {
   const p = G.player;
@@ -21,11 +21,18 @@ export function updatePlayer(dt) {
   // movement input
   const forward = (G.input.down('KeyW')?1:0) - (G.input.down('KeyS')?1:0);
   const strafe  = (G.input.down('KeyD')?1:0) - (G.input.down('KeyA')?1:0);
-  const sprint  = G.input.down('ShiftLeft') && p.stam > 4;
+  // Exhaustion: running the bar to empty leaves you winded and walking it off, and
+  // sprint re-arms at 25 rather than 4 so you can't stutter-sprint on fumes. Turns a
+  // decorative bar into a decision during a foot chase.
+  if (p.stam <= 0.5) p._winded = 2.0;
+  if (p._winded > 0) p._winded = Math.max(0, p._winded - dt);
+  const sprint  = G.input.down('ShiftLeft') && p.stam > (p._sprintArmed ? 4 : 25) && !p._winded;
   const moving = forward !== 0 || strafe !== 0;
   let speed = 3.4;
-  if (sprint && moving) { speed = 6.4; p.stam = Math.max(0, p.stam - 22*dt); }
-  else { p.stam = Math.min(p.stamMax, p.stam + 18*dt); }
+  if (sprint && moving) { speed = 6.4; p.stam = Math.max(0, p.stam - 22*dt); p._sprintArmed = true; }
+  else { p.stam = Math.min(p.stamMax, p.stam + 18*dt); p._sprintArmed = false; }
+  if (p._winded > 0) speed = Math.min(speed, 2.6);
+  if (p.landStunT > 0) { p.landStunT = Math.max(0, p.landStunT - dt); speed = Math.min(speed, 1.6); }
   p.isSprinting = sprint && moving;
   p.moveSpeed = moving ? speed : 0;
 
@@ -36,14 +43,22 @@ export function updatePlayer(dt) {
   let vz = fz * forward + rz * strafe;
   const len = Math.hypot(vx, vz);
   if (len > 0.001) { vx = vx / len * speed; vz = vz / len * speed; }
-  p.velocity.x = lerp(p.velocity.x, vx, 0.25);
-  p.velocity.z = lerp(p.velocity.z, vz, 0.25);
+  // Momentum. The old lerp(..., 0.25) was per-frame, so the player literally
+  // accelerated faster at higher frame rates; these are dt-correct. Air control is
+  // heavily reduced rather than removed — you can still steer a jump, you just can't
+  // turn 180 degrees in mid-air, which is what makes height read as height.
+  const groundEase = 1 - Math.pow(0.000045, dt);   // ~90% of target in 0.23 s
+  const airEase    = 1 - Math.pow(0.55, dt);
+  const ease = p.grounded ? groundEase : airEase;
+  p.velocity.x = lerp(p.velocity.x, vx, ease);
+  p.velocity.z = lerp(p.velocity.z, vz, ease);
   // gravity / jump
   if (G.input.pressed('Space') && p.grounded && !G.input.down('ControlLeft')) {
     p.velocity.y = 5.0; p.grounded = false;
   }
   if (!p.grounded) {
     p.velocity.y -= 18 * dt;
+    p._fallV = Math.min(p._fallV || 0, p.velocity.y);   // worst downward speed this fall
   }
   p.group.position.addScaledVector(p.velocity, dt);
 
@@ -53,8 +68,25 @@ export function updatePlayer(dt) {
   // Vertical support: city ground (y=0) or a walkable floor / escalator (mall, BTS
   // platform) under the player's feet. Walk off an edge → support drops → you fall.
   const gy = worldSupportY(p.group.position.x, p.group.position.z, p.group.position.y);
-  if (p.group.position.y <= gy + 0.02) { p.group.position.y = gy; p.velocity.y = 0; p.grounded = true; }
-  else p.grounded = false;
+  if (p.group.position.y <= gy + 0.02) {
+    p.group.position.y = gy; p.velocity.y = 0;
+    // Landing: consume the fall. With gravity 18 the 10 m/s gate is a ~2.8 m free
+    // drop, so the 5.0 m/s jump, curbs, escalators and ramps all cost nothing —
+    // worldSupportY is velocity-neutral, so walking a slope never accumulates a
+    // fall at all. Terminal 21's upper floor runs ~23 HP, a BTS platform ~64.
+    // Capped below lethal on its own: this is consequence, not a death trap.
+    const impact = -(p._fallV || 0);
+    p._fallV = 0;
+    if (GAMEPLAY.fallDamage && !p.grounded && impact > 10) {
+      const dmg = Math.min(95, (impact - 10) * 6.5);
+      damagePlayer(dmg);                                 // soaks armor + locks regen
+      p.velocity.x *= 0.25; p.velocity.z *= 0.25;        // stumble on touchdown
+      p.landStunT = Math.min(0.6, (impact - 10) * 0.05);
+      G.camRig.shake = Math.max(G.camRig.shake, Math.min(0.35, dmg * 0.006));
+      if (G.audio && G.audio.punch) G.audio.punch();
+    }
+    p.grounded = true;
+  } else p.grounded = false;
 
   // body face direction of movement (or aim/firing with a weapon)
   if (p.activeWeapon !== 'fists' && (G.input.rightDown || G.input.mouseDown || G.input.down('KeyF'))) {
