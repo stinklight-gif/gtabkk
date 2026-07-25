@@ -119,7 +119,7 @@ export function updateWanted(dt) {
       const flash = Math.sin(t) > 0;
       v.mesh.userData.copLamps[0].material.color.setHex(flash ? 0xff2222 : 0x441111);
       v.mesh.userData.copLamps[1].material.color.setHex(flash ? 0x2266ff : 0x111144);
-      if (Math.random() < 0.005) G.audio.siren();
+      if (Math.random() < 1 - Math.exp(-0.3 * dt)) G.audio.siren();   // per-second rate, not per-frame
     }
   }
 
@@ -129,7 +129,9 @@ export function updateWanted(dt) {
   let alive = 0;
   for (const c of G.cops) if (!c.dead && c.state !== 'bribed') alive++;   // bribed cops aren't pursuers
   for (const v of G.vehicles) if (v.isCop && !v.dead && v.driver) alive++;
-  if (alive < desiredCops && Math.random() < 0.01 + G.wanted.stars * 0.01) {
+  // per-second spawn rate: the old per-frame probability made cops arrive ~2.4x
+  // faster on a 144 Hz machine than on a 60 Hz one
+  if (alive < desiredCops && Math.random() < 1 - Math.exp(-(0.6 + G.wanted.stars * 0.6) * dt)) {
     // spawn just outside view
     const ang = rand(0, TAU);
     const r = rand(35, 60);

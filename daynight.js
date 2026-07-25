@@ -130,13 +130,14 @@ export function updateDayNight(dt) {
       G._weatherUntil = G._weatherT + rand(70, 150);
     }
   }
-  G.time.rainStrength = lerp(G.time.rainStrength, G._rainTarget, 0.012);
+  // dt-correct: 0.012/frame at 60 fps is a ~5.7 s half-life, now expressed as one
+  G.time.rainStrength = lerp(G.time.rainStrength, G._rainTarget, 1 - Math.pow(0.5, dt / 5.7));
   updateWetSurfaces(dt);
   G.audio.rainBed.setLevel(G.time.rainStrength * 0.18);
   G.rain.update(dt, G.player.group.position, G.time.rainStrength);
 
   // lightning flashes during heavy rain (transient light boost; reset next frame)
-  if (G.time.rainStrength > 0.6 && Math.random() < 0.0045) { G._lightningT = 0.14; G.audio.thunder(); }
+  if (G.time.rainStrength > 0.6 && Math.random() < 1 - Math.exp(-0.27 * dt)) { G._lightningT = 0.14; G.audio.thunder(); }
   if (G._lightningT > 0) {
     G._lightningT -= dt;
     const f = (G._lightningT > 0.08) ? 1 : 0.35;   // bright flash, then a fainter second pop

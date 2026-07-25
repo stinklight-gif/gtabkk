@@ -334,11 +334,17 @@ export function updatePeds(dt) {
   // keep the streets populated to the time-of-day target — busy at rush hour,
   // near-empty in the small hours (see crowdFactor)
   const target = crowdTarget();
-  if (G.peds.length < target) {
+  // Spend a dt-based budget rather than exactly one ped per frame: the old version
+  // ramped the crowd in at whatever the frame rate happened to be, so a fast machine
+  // filled the pavements more than twice as quickly as a slow one.
+  G._pedAcc = Math.min(4, (G._pedAcc || 0) + dt * 12);
+  if (G.peds.length < target && G._pedAcc >= 1) {
+    G._pedAcc -= 1;
     if (target - G.peds.length > 1 && Math.random() < 0.12) spawnWalkingPair(G.scene, sidewalkPos(playerPos.x, playerPos.z, 90));
     else spawnPed(G.scene, sidewalkPos(playerPos.x, playerPos.z, 90));   // ramps in smoothly
-  } else if (G.peds.length > target) {
-    // thin toward the target by dropping the farthest non-special ped each frame
+  } else if (G.peds.length > target && G._pedAcc >= 1) {
+    G._pedAcc -= 1;
+    // thin toward the target by dropping the farthest non-special ped
     let fi = -1, fd = 60 * 60;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];

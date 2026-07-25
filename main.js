@@ -1510,7 +1510,7 @@ export function loop() {
     updateDayNight(dt);
     updateFestival(dt);
     // distant daytime traffic honks (ambient flavor)
-    if (Math.random() < 0.004 * (1 - (G.nightK || 0))) G.audio.blip({ freq: 360, dur: 0.2, type: 'square', gain: 0.03, freqEnd: 330 });
+    if (Math.random() < (1 - Math.exp(-0.24 * dt)) * (1 - (G.nightK || 0))) G.audio.blip({ freq: 360, dur: 0.2, type: 'square', gain: 0.03, freqEnd: 330 });
     G._saveTimer = (G._saveTimer || 0) + dt;
     if (G._saveTimer > 8) { G._saveTimer = 0; saveGame(); }
     // one-time 100% celebration (cheap: amulet counter + the 6 mission flags)
