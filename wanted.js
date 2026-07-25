@@ -167,7 +167,9 @@ export function updateWanted(dt) {
       if (!v.isCop || v.dead || !v.driver || dist2(v.pos, p) >= seeR) continue;
       if (copSeesPlayer(v, dt)) { seen = true; break; }
     }
-    if (seen) G.wanted.lastSeenAt = performance.now();
+    // refresh the position too, not just the timestamp — otherwise a cop that loses
+    // the line walks to wherever raiseWanted last fired, which can be blocks stale
+    if (seen) { G.wanted.lastSeenAt = performance.now(); G.wanted.lastSeenPos.copy(p); }
   }
 
   // wanted decay once out of sight long enough
