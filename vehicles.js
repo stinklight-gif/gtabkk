@@ -278,7 +278,7 @@ export function updatePlayerInVehicle(dt) {
     if (ped.dead) continue;
     if (dist2(ped.mesh.position, v.pos) < 1.6*1.6 && Math.abs(v.vel) > 4) {
       killPed(ped);
-      raiseWanted(2);
+      raiseWanted(2, 5);
       G.hud.showNotif('Hit & Run! +Wanted Star');
     }
   }
@@ -324,7 +324,7 @@ export function updateVehicles(dt) {
       v.mesh.children.forEach(c => { if (c.material && c.material.color) c.material.color.lerp(_blackColor, 0.6); });
       makeExplosion(v.pos);
       v.vel = 0;
-      if (v.isCop) { raiseWanted(2); onCopKilled(); }
+      if (v.isCop) { raiseWanted(2, 9); onCopKilled(); }   // destroying a cruiser reads like killing its crew
       if (v.kind === 'fortuner' && !G.player.weapons.smg) {
         G.player.weapons.smg = true;
         G.player.smgAmmo = G.player.smgMag;
@@ -572,6 +572,7 @@ export function updateGarage(dt) {
     v.tiresBlown = false;   // respray patches the tires too
     if (v.smoke) { v.smoke.life = 0; v.smoke = null; }
     G.wanted.stars = 0;
+    G.wanted.crime = 0;      // a respray clears the accumulated heat too, not just the stars
     G.wanted.lastSeenAt = now;
     // clear every active cop (foot + vehicles)
     for (let i = G.cops.length - 1; i >= 0; i--) {

@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
-import { abortHeist, animateWalk, damagePlayer, hasLineOfSight, makePedMesh, makeVehicle, onCopKilled, raiseWanted, updateVehicleVisuals } from './main.js';
+import { CRIME_THRESHOLDS, abortHeist, animateWalk, damagePlayer, hasLineOfSight, makePedMesh, makeVehicle, onCopKilled, raiseWanted, updateVehicleVisuals } from './main.js';
 
 // Cops see with their eyes, not with a distance check. Resolving line of sight walks
 // the building AABBs, so we cache it per cop and refresh a few times a second rather
@@ -89,7 +89,7 @@ export function killCop(cop) {
   cop.dead = true;
   cop.mesh.rotation.x = PI/2;
   cop.mesh.position.y = 0.05;
-  raiseWanted(2);
+  raiseWanted(2, 9);          // killing a cop is the heaviest single crime in the game
   onCopKilled();
   setTimeout(() => {
     G.scene.remove(cop.mesh);
@@ -103,6 +103,7 @@ export function updateWanted(dt) {
   // police disabled (pause-menu toggle): force 0★, clear the streets, spawn nothing
   if (G.policeOff) {
     if (G.wanted.stars !== 0) G.wanted.stars = 0;
+    G.wanted.crime = 0;
     // despawn any live foot cops + driven cop vehicles + the chopper so it clears at once
     // (only cop-driven cars; leaves the parked, enterable Vigilante prop alone)
     for (let i = G.cops.length - 1; i >= 0; i--) { G.scene.remove(G.cops[i].mesh); disposeObject(G.cops[i].mesh); G.cops.splice(i, 1); }
@@ -171,6 +172,9 @@ export function updateWanted(dt) {
   const sinceSeen = (performance.now() - G.wanted.lastSeenAt) / 1000;
   if (G.wanted.stars > 0 && sinceSeen > 35) {
     G.wanted.stars = Math.max(0, G.wanted.stars - 1);
+    // drop the accumulator to the new star's floor, or the pile of points behind a
+    // massacre would instantly re-derive the star you just shed
+    G.wanted.crime = Math.min(G.wanted.crime || 0, CRIME_THRESHOLDS[G.wanted.stars] || 0);
     G.wanted.lastSeenAt = performance.now();
     G.hud.showNotif(G.wanted.stars === 0 ? 'You lost the cops.' : 'Heat reduced ★');
   }
@@ -186,6 +190,7 @@ export function updateWanted(dt) {
     if (G.input.pressed('KeyB') && G.cash >= 1000) {
       G.cash -= 1000;
       G.wanted.stars--;
+      G.wanted.crime = Math.min(G.wanted.crime || 0, CRIME_THRESHOLDS[G.wanted.stars] || 0);
       G.hud.setCash(G.cash);
       G.hud.showNotif('Bribed: -฿1,000');
       G.audio.blip({freq:600, dur:0.1, gain:0.1});
@@ -193,9 +198,48 @@ export function updateWanted(dt) {
     }
   }
 
+  updateTrafficOffences(dt);
   updateHelicopter(dt);   // 4★+ searchlight
   maybeAmbush();          // 3★+ roadblock ahead while driving
   G.hud.setStars(G.wanted.stars);
+}
+
+// ---- Traffic law -----------------------------------------------------------
+// Signals used to be pure decoration for the player (see the header comment in
+// traffic.js): you could run every red in Sukhumvit at 90 km/h for free. Now a red
+// light costs you — but only when a cop is actually there to see it. An unwitnessed
+// red stays free, deliberately: policing every junction in a game whose core loop is
+// fleeing would be exhausting, and "don't do it in front of the police" is the rule
+// that actually changes how you drive.
+function copWitness(dt) {
+  const p = G.player.group.position;
+  for (const c of G.cops) {
+    if (c.dead || c.state === 'bribed' || dist2(c.mesh.position, p) > 35 * 35) continue;
+    if (copSeesPlayer(c, dt)) return true;
+  }
+  for (const v of G.vehicles) {
+    if (!v.isCop || v.dead || !v.driver || dist2(v.pos, p) > 40 * 40) continue;
+    if (copSeesPlayer(v, dt)) return true;
+  }
+  return false;
+}
+
+export function updateTrafficOffences(dt) {
+  const v = G.player.inVehicle;
+  if (!v || !v.spec || v.spec.kind === 'boat' || Math.abs(v.vel || 0) < 6) { G._inJunction = false; return; }
+  // dominant travel axis — same dir convention as updateTrafficCar (even = along z)
+  const alongZ = Math.abs(Math.cos(v.heading)) >= Math.abs(Math.sin(v.heading));
+  const coord = alongZ ? v.pos.z : v.pos.x;
+  const centre = Math.round(coord / BLOCK) * BLOCK;
+  const inJunction = Math.abs(coord - centre) < ROAD_WIDTH / 2;
+  const entering = inJunction && !G._inJunction;
+  G._inJunction = inJunction;
+  if (!entering) return;
+  const sig = alongZ ? (G.traffic && G.traffic.ns) : (G.traffic && G.traffic.ew);
+  if (sig !== 'red') return;
+  if (!copWitness(dt)) return;
+  raiseWanted(1, 1);
+  G.hud.showNotif('Ran a red light — in front of a cop.');
 }
 
 // ---- Police helicopter (4★+): a searchlight that keeps the heat fresh while
@@ -452,6 +496,10 @@ export function respawnPlayer() {
   G.cash = Math.max(0, G.cash - 500);
   G.hud.setCash(G.cash);
   G.wanted.stars = 0;
+  G.wanted.crime = 0;
+  // a spree you already paid for shouldn't follow you out of the hospital — this was
+  // a one-way ratchet across the whole save, pinning veterans at a permanent 3-4★ floor
+  G.copsKilled = 0;
   G.hud.setStars(0);
   abortHeist();   // a heist you died during is over — no lingering beam or payout
   // clear any active cops — clean slate on respawn

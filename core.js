@@ -80,7 +80,7 @@ export const G = {
   time: { dayT: 0.27, weather: 'clear', rainStrength: 0, day: 0 }, // dayT 0..1; day = whole days elapsed
   // Festivals — Loy Krathong nights fill the river with floats and lanterns.
   festival: { type: null, floats: [], lanterns: [], watchers: [], announcedDay: -1, krathongFloated: 0 },
-  wanted: { stars: 0, lastSeenAt: 0, lastSeenPos: new THREE.Vector3() },
+  wanted: { stars: 0, crime: 0, lastSeenAt: 0, lastSeenPos: new THREE.Vector3() },   // crime = accumulated heat points behind the stars
   heist: { active: false, stage: 0, crackT: 0, markerPos: null, beam: null, cooldownUntil: 0 }, // bank-heist set-piece
   cash: 100,
   minimapZoom: 2.4,
