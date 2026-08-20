@@ -66,7 +66,7 @@ of sight, wanted-heat accumulation, fall damage, and frame-rate independence.
 | P | Photo mode — free-fly camera + hidden HUD (WASD/Space/Ctrl to fly, Shift faster) |
 | V | Start Vigilante (while in a cop vehicle) |
 | N | Cycle minimap zoom |
-| O | Options — mouse sensitivity + master volume |
+| O | Options — mouse sensitivity, master volume, ambient occlusion on/off |
 | `~` / F3 | Toggle visual/performance budget overlay |
 | F8 | Open vehicle/pedestrian showcase mode (Esc to return) |
 | E | Buy/rest at the safehouse · rent/retrieve at the garage (on foot) |
@@ -162,7 +162,7 @@ file is under ~800 lines.
 - `missions.js` — the stage-based mission system.
 - `hud.js` — HUD bindings + full-map render.
 - `physics.js` — collision resolvers + skid/dust/smoke/explosion FX.
-- `daynight.js` — day/night/weather + the Loy Krathong festival.
+- `daynight.js` — day/night/weather (solar arc, sun colour, sky dome + haze) + the Loy Krathong festival.
 - `main.js` — the entry: init/save, taxi, radio, photo mode, the main loop,
   boot, and the re-export barrel.
 
@@ -189,7 +189,7 @@ The original numbered sections (now spread across those modules):
 | 16 | Particles / FX | Smoke emitter (vehicles below 30% HP), explosion (light flash + smoke + camera shake + thunder SFX), tire-skid decals (`spawnSkid`, laid while drifting and faded over 5 s), impact dust puffs (`spawnDust`), and a global **hit-stop** (`triggerHitStop` slows the loop ~0.05 s on a solid melee/gun connect). |
 | 17 | Interaction | Vehicle proximity check + E to enter. |
 | 18 | Camera update | Follow rig with smoothed distance, shake decay, in-vehicle chase view auto-aligns to vehicle heading, **occlusion** (ray-casts target→camera against building AABBs and pulls in so it never clips into a wall), speed-squared FOV kick, acceleration follow stretch/compression, and sprint-only on-foot bob. |
-| 19 | Day/Night + Weather + Festivals | 8-min day cycle drives sun position (tilted so noon actually sunlights the facades), sky/fog colours, neon and street-lamp intensity; the sun + shadow camera track the player. A whole-day counter (`G.time.day`) ticks at midnight and `scheduledFestival()` drives **Loy Krathong** nights, filling the Chao Phraya with drifting candle-lit floats + rising sky lanterns and a riverside crowd — press **E** at the bank to float your own krathong (+฿50). Monsoon weather (clear ⇄ drizzle/downpour) with lightning, wet material response, puddles, lower road grip, and dawn temple bell at 5–6 AM. |
+| 19 | Day/Night + Weather + Festivals | 8-min day cycle drives a real solar arc for Bangkok's latitude — a great circle tilted ~14° south, so the sun passes near-overhead at noon (~76°) and rakes the east-west streets at dawn/dusk — plus sun colour temperature (near-white overhead, reddening as it sinks), the gradient sky dome, aerial-perspective haze, neon and street-lamp intensity; the sun + shadow camera track the player. A whole-day counter (`G.time.day`) ticks at midnight and `scheduledFestival()` drives **Loy Krathong** nights, filling the Chao Phraya with drifting candle-lit floats + rising sky lanterns and a riverside crowd — press **E** at the bank to float your own krathong (+฿50). Monsoon weather (clear ⇄ drizzle/downpour) with lightning, wet material response, puddles, lower road grip, and dawn temple bell at 5–6 AM. |
 | 20 | Main loop | Single `loop()` calls every system in order. |
 
 The mutable global is `window.GAME`. Useful while developing:
@@ -273,6 +273,14 @@ traffic AI.
 - Audio is fully synthesised, including the car radio's three procedural music
   stations — catchy enough to read as luk-thung / hip-hop / talk, but not actual
   songs. Licensed or hand-composed tracks would be a future upgrade.
+- Ambient occlusion is a screen-space approximation reconstructed from the depth
+  buffer — there is no normal buffer, so normals come from depth derivatives.
+  It grounds props and characters but can't see geometry that's off-screen or
+  hidden behind something else, and it fades out past ~40 m where the depth
+  reconstruction stops being reliable. Toggle it in Options (**O**).
+- Surfaces are still flat-shaded procedural colour with shared wear/grime
+  textures — no per-building material variation, panel lines, or dirt maps. That
+  is the largest remaining gap between this and a photoreal look.
 
 ## Performance
 
@@ -288,6 +296,12 @@ peds are higher-detail near the camera and switch to boxy far LODs) adds a few
 hundred calls when the sidewalks are full, landing inside the live visual budget;
 the small hours drop back toward the static floor. If it still chugs, lower `PED_TARGET`, raise the
 pedestrian/traffic despawn radius, or drop pixel ratio.
+
+Post-processing runs as a chain of small fullscreen passes on the scene render
+target: SSAO (half-res, 12 taps, depth-only) and its depth-aware blur, then the
+bloom bright-pass and separable blurs at quarter-res, then one composite that
+applies AO, adds bloom, and does exposure + ACES + sRGB in a single pass. AO is
+the most expensive of these; **O** turns it off on GPUs that can't afford it.
 
 The in-game visual budget overlay (`~` / F3) now turns the live scene metrics
 into pass/warn/fail checks. Current targets are 55+ FPS, <=900 draw calls,

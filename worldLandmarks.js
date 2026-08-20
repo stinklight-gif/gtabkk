@@ -260,10 +260,14 @@ export function buildLandmarks(env) {
   // rendering); now the poles and bulb heads are instanced, and the bulbs glow via
   // a shared emissive material that ramps at night instead of being real lights.
   const lampMat = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.7 });
+  // Albedo is the unlit diffuser — a dull off-white, the way a sodium lamp head
+  // actually looks in daylight. The warmth lives in the emissive, so the bulb
+  // reads as switched off at noon and glows amber at night, instead of sitting
+  // there as a saturated yellow ball in full sun.
   const bulbMat = new THREE.MeshStandardMaterial({
-    color: 0xffd577, emissive: 0xffd577, emissiveIntensity: 0.2, roughness: 0.4,
+    color: 0xcdc8bb, emissive: 0xffd577, emissiveIntensity: 0.0, roughness: 0.55,
   });
-  G.nightEmissive.push({ mat: bulbMat, dayIntensity: 0.2, nightIntensity: 1.4 });
+  G.nightEmissive.push({ mat: bulbMat, dayIntensity: 0.0, nightIntensity: 1.4 });
   const lampPoleGeo = new THREE.CylinderGeometry(0.12, 0.15, 6, 6);
   const lampBulbGeo = new THREE.SphereGeometry(0.35, 8, 8);
   const lampPoleM = [], lampBulbM = [];

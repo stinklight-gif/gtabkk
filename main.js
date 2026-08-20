@@ -201,15 +201,20 @@ export function saveGame() {
 }
 
 const SETTINGS_KEY = 'gtabkk_settings';
-export function applySettings() { if (G.audio && G.audio.setVolume) G.audio.setVolume(G.settings.volume); }
+export function applySettings() {
+  if (G.audio && G.audio.setVolume) G.audio.setVolume(G.settings.volume);
+  G.ssao = G.settings.ssao !== false;   // renderBloom reads this each frame
+}
 export function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(G.settings)); } catch (e) {} }
 export function loadSettings() {
-  G.settings = { sensitivity: 1, volume: 0.55 };
+  G.settings = { sensitivity: 1, volume: 0.55, ssao: true };
   try { const s = JSON.parse(localStorage.getItem(SETTINGS_KEY)); if (s) Object.assign(G.settings, s); } catch (e) {}
   applySettings();
   const se = document.getElementById('opt-sens'), ve = document.getElementById('opt-vol');
   if (se) se.value = G.settings.sensitivity;
   if (ve) ve.value = G.settings.volume;
+  const ao = document.getElementById('opt-ao');
+  if (ao) ao.checked = G.settings.ssao !== false;
 }
 
 export function loadGame() {
@@ -378,8 +383,10 @@ async function init() {
   const d = 80;
   sun.shadow.camera.left = -d; sun.shadow.camera.right = d;
   sun.shadow.camera.top = d; sun.shadow.camera.bottom = -d;
-  sun.shadow.camera.near = 1; sun.shadow.camera.far = 300;
-  sun.shadow.bias = -0.0008;
+  sun.shadow.camera.near = 1; sun.shadow.camera.far = 360;
+  sun.shadow.bias = -0.0004;
+  sun.shadow.normalBias = 0.03;   // the steep tropical sun grazes vertical facades; normalBias
+                                  // kills the acne that a depth-only bias can't reach there
   scene.add(sun);
   scene.add(sun.target);   // target must be in the scene graph so per-frame re-anchoring takes effect
   G.sun = sun;
@@ -408,8 +415,50 @@ async function init() {
     dome.geometry.dispose(); dome.material.dispose(); sunBall.geometry.dispose(); sunBall.material.dispose(); pmrem.dispose();
   }
 
+  // ---- Sky dome. scene.background was a single flat colour, so a third of
+  // every frame was one dead value — the one thing a real sky never is. This is
+  // a gradient dome (deep zenith → pale hazy horizon) with a sun disc and its
+  // forward-scatter glow, all driven per frame from daynight.js. depthWrite is
+  // off so it never occludes anything and the depth buffer stays at 1.0 across
+  // the sky, which is also what lets SSAO reject sky pixels for free. ----
+  {
+    const skyMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide, depthWrite: false, fog: false,
+      uniforms: {
+        zenith:  { value: new THREE.Color(0x2c6cc0) },
+        horizon: { value: new THREE.Color(0xbcd2e8) },
+        ground:  { value: new THREE.Color(0x4a463d) },
+        sunDir:  { value: new THREE.Vector3(0, 1, 0) },
+        sunTint: { value: new THREE.Color(0xfff4e4) },
+        dayK:    { value: 1 },
+      },
+      vertexShader: 'varying vec3 vDir; void main(){ vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: `
+        varying vec3 vDir;
+        uniform vec3 zenith; uniform vec3 horizon; uniform vec3 ground;
+        uniform vec3 sunDir; uniform vec3 sunTint; uniform float dayK;
+        void main(){
+          vec3 d = normalize(vDir);
+          // pow() below 1 keeps the pale band hugging the horizon instead of
+          // washing halfway up the sky, which is what real haze looks like
+          vec3 c = d.y > 0.0 ? mix(horizon, zenith, pow(d.y, 0.42))
+                             : mix(horizon, ground, pow(-d.y, 0.35));
+          float cosA = dot(d, sunDir);
+          c += sunTint * pow(max(0.0, cosA), 350.0) * 8.0 * dayK;   // disc
+          c += sunTint * pow(max(0.0, cosA), 6.0) * 0.30 * dayK;    // forward scatter
+          gl_FragColor = vec4(c, 1.0);
+        }` });
+    const skyDome = new THREE.Mesh(new THREE.SphereGeometry(1400, 32, 20), skyMat);
+    skyDome.frustumCulled = false;
+    skyDome.renderOrder = -1000;
+    scene.add(skyDome);
+    G.sky = skyDome;
+  }
+
   // Hemisphere fill — ground color is warm concrete bounce, not dark soil
-  const hemi = new THREE.HemisphereLight(0xa8c7ff, 0x8a7f72, 0.55);
+  // Skylight is blue, but 0xa8c7ff was saturated enough that shadowed asphalt
+  // came out navy rather than the grey-blue shade actually reads as.
+  const hemi = new THREE.HemisphereLight(0xbcd0ee, 0x8a7f72, 0.55);
   scene.add(hemi);
   G.hemi = hemi;
 
@@ -432,6 +481,10 @@ async function init() {
     const w = window.innerWidth, h = window.innerHeight;
     const sceneRT = new THREE.WebGLRenderTarget(w, h, { samples: 2, type: THREE.HalfFloatType });
     sceneRT.texture.colorSpace = THREE.LinearSRGBColorSpace;   // linear HDR; tone-mapping happens in the composite
+    // Depth is kept as a texture so SSAO can read it — the MSAA target resolves
+    // depth alongside colour, so this costs a blit, not a second scene pass.
+    sceneRT.depthTexture = new THREE.DepthTexture(w, h);
+    sceneRT.depthTexture.type = THREE.UnsignedIntType;
     const hw = Math.max(1, w >> 2), hh = Math.max(1, h >> 2);
     const mkRT = () => { const rt = new THREE.WebGLRenderTarget(hw, hh, { depthBuffer: false, type: THREE.HalfFloatType }); rt.texture.colorSpace = THREE.LinearSRGBColorSpace; return rt; };
     const bloomA = mkRT(), bloomB = mkRT();
@@ -441,14 +494,123 @@ async function init() {
       'uniform sampler2D tDiffuse; uniform float threshold; varying vec2 vUv; void main(){ vec3 c = texture2D(tDiffuse, vUv).rgb; float l = dot(c, vec3(0.2126,0.7152,0.0722)); gl_FragColor = vec4(c * smoothstep(threshold, threshold + 0.7, l), 1.0); }' });
     const blurMat = new THREE.ShaderMaterial({ uniforms: { tDiffuse: { value: null }, dir: { value: new THREE.Vector2() }, res: { value: new THREE.Vector2(hw, hh) } }, vertexShader: vsrc, fragmentShader:
       'uniform sampler2D tDiffuse; uniform vec2 dir; uniform vec2 res; varying vec2 vUv; void main(){ vec2 o = dir / res; vec3 s = texture2D(tDiffuse, vUv).rgb * 0.2270; s += (texture2D(tDiffuse, vUv + o*1.3846).rgb + texture2D(tDiffuse, vUv - o*1.3846).rgb) * 0.3162; s += (texture2D(tDiffuse, vUv + o*3.2308).rgb + texture2D(tDiffuse, vUv - o*3.2308).rgb) * 0.0703; gl_FragColor = vec4(s, 1.0); }' });
-    // composite: add bloom in linear, apply exposure + ACES tone map + sRGB encode
-    const compMat = new THREE.ShaderMaterial({ uniforms: { tScene: { value: null }, tBloom: { value: null }, strength: { value: 0.7 }, exposure: { value: 1.0 } }, vertexShader: vsrc, fragmentShader:
-      'uniform sampler2D tScene; uniform sampler2D tBloom; uniform float strength; uniform float exposure; varying vec2 vUv; vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14), 0.0, 1.0); } void main(){ vec3 c = (texture2D(tScene, vUv).rgb + texture2D(tBloom, vUv).rgb * strength) * exposure; c = aces(c); c = pow(c, vec3(1.0/2.2)); gl_FragColor = vec4(c, 1.0); }' });
+    // ---- SSAO. The city is flat-shaded procedural boxes; with no contact
+    // darkening every prop looked pasted onto the road rather than standing on
+    // it. This is a half-res depth-only pass: view position is rebuilt from the
+    // depth texture, the normal comes from the closer of each neighbour pair (so
+    // silhouettes don't smear), and a golden-angle hemisphere kernel — rotated
+    // per pixel — gathers occlusion. No normal buffer and no second scene pass. ----
+    const aw = Math.max(1, w >> 1), ah = Math.max(1, h >> 1);
+    const mkAoRT = () => new THREE.WebGLRenderTarget(aw, ah, { depthBuffer: false, type: THREE.HalfFloatType });
+    const aoRT = mkAoRT(), aoBlurRT = mkAoRT();
+    const AO_COMMON = `
+      uniform sampler2D tDepth; uniform mat4 projInv; uniform vec2 aoRes;
+      varying vec2 vUv;
+      vec3 viewPos(vec2 uv){
+        float d = texture2D(tDepth, uv).x;
+        vec4 c = projInv * vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
+        return c.xyz / c.w;
+      }`;
+    const aoMat = new THREE.ShaderMaterial({
+      uniforms: {
+        tDepth: { value: sceneRT.depthTexture }, projInv: { value: new THREE.Matrix4() },
+        projScale: { value: new THREE.Vector2(1, 1) }, aoRes: { value: new THREE.Vector2(aw, ah) },
+        radius: { value: 1.5 }, bias: { value: 0.005 }, biasFloor: { value: 0.06 }, intensity: { value: 1.9 }, maxScreenRadius: { value: 0.045 },
+      },
+      vertexShader: vsrc,
+      fragmentShader: AO_COMMON + `
+      uniform vec2 projScale; uniform float radius; uniform float bias; uniform float biasFloor; uniform float intensity; uniform float maxScreenRadius;
+      const int SAMPLES = 12;
+      void main(){
+        float d = texture2D(tDepth, vUv).x;
+        if (d >= 0.9999) { gl_FragColor = vec4(1.0); return; }   // sky — never occluded
+        vec3 p = viewPos(vUv);
+        // AO stops being legible at distance and that is exactly where the depth
+        // reconstruction is least accurate, so fade it out and skip the work.
+        float distFade = 1.0 - smoothstep(38.0, 62.0, -p.z);
+        if (distFade <= 0.0) { gl_FragColor = vec4(1.0); return; }
+        vec2 tx = vec2(1.0 / aoRes.x, 0.0), ty = vec2(0.0, 1.0 / aoRes.y);
+        vec3 pl = viewPos(vUv - tx), pr = viewPos(vUv + tx);
+        vec3 pd = viewPos(vUv - ty), pu = viewPos(vUv + ty);
+        // pick the neighbour that lies on the same surface, so an edge doesn't
+        // bend the normal across the silhouette and halo the object
+        vec3 ddx = abs(pr.z - p.z) < abs(p.z - pl.z) ? (pr - p) : (p - pl);
+        vec3 ddy = abs(pu.z - p.z) < abs(p.z - pd.z) ? (pu - p) : (p - pd);
+        vec3 n = normalize(cross(ddx, ddy));
+        if (dot(n, p) > 0.0) n = -n;   // face the view ray, not the view axis: a
+                                       // facade seen near edge-on has n.z ~ 0, and
+                                       // testing against the axis flipped it at
+                                       // random there and streaked the wall black
+        // Alchemy-style estimator: sample a screen-space disc, weight each hit by
+        // how far it rises above this pixel's tangent plane. Anything lying in the
+        // plane contributes nothing, which is what keeps grazing angles stable —
+        // a hemisphere-kernel depth compare has no such guarantee.
+        vec2 sr = radius * projScale / -p.z;                   // world radius → UV radius
+                                                               // (per-axis: UV is not isotropic)
+        // Cap the screen-space footprint. Close to the camera an unclamped world
+        // radius spreads the 12 taps over a quarter of the screen, so a thin pole
+        // or a kerb — the things contact AO exists to ground — falls between the
+        // samples and never darkens anything. Clamping trades radius for hit rate.
+        sr = min(sr, vec2(maxScreenRadius));
+        float ang = fract(sin(dot(vUv * aoRes, vec2(12.9898, 78.233))) * 43758.5453) * 6.2831853;
+        float occ = 0.0;
+        for (int i = 0; i < SAMPLES; i++) {
+          float fi = (float(i) + 0.5) / float(SAMPLES);
+          float phi = ang + float(i) * 2.39996323;             // golden-angle spiral
+          vec2 suv = vUv + vec2(cos(phi), sin(phi)) * sr * sqrt(fi);
+          if (suv.x < 0.0 || suv.x > 1.0 || suv.y < 0.0 || suv.y > 1.0) continue;
+          vec3 v = viewPos(suv) - p;
+          float vv = dot(v, v);
+          // The constant term has to clear the flat decals baked into the road —
+          // stripes and crosswalks sit 2.5 cm proud, and without a floor above
+          // that they read as occluders and get painted with dirty AO bands. The
+          // depth-scaled term covers the rest: a texel spans more world space the
+          // further out it is, so a fixed bias self-occludes ground at range.
+          float vn = dot(v, n) - (biasFloor + bias * (-p.z));
+          occ += max(0.0, vn) / (vv + 0.02) * step(vv, radius * radius * 4.0);
+        }
+        float ao = 1.0 - (occ / float(SAMPLES)) * intensity * distFade;
+        gl_FragColor = vec4(vec3(clamp(ao, 0.0, 1.0)), 1.0);
+      }` });
+    // depth-aware box blur: the per-pixel kernel rotation trades banding for
+    // noise, and this is what turns the noise back into a smooth gradient
+    const aoBlurMat = new THREE.ShaderMaterial({
+      uniforms: { tAO: { value: aoRT.texture }, tDepth: { value: sceneRT.depthTexture }, projInv: { value: new THREE.Matrix4() }, aoRes: { value: new THREE.Vector2(aw, ah) } },
+      vertexShader: vsrc,
+      fragmentShader: AO_COMMON + `
+      uniform sampler2D tAO;
+      void main(){
+        float cz = viewPos(vUv).z, sum = 0.0, wsum = 0.0;
+        for (int y = -2; y <= 2; y++) {
+          for (int x = -2; x <= 2; x++) {
+            vec2 uv = vUv + vec2(float(x), float(y)) / aoRes;
+            float w = 1.0 - smoothstep(0.0, 1.2, abs(viewPos(uv).z - cz));   // don't bleed across depth steps
+            sum += texture2D(tAO, uv).r * w; wsum += w;
+          }
+        }
+        gl_FragColor = vec4(vec3(wsum > 0.0 ? sum / wsum : 1.0), 1.0);
+      }` });
+    // composite: apply AO, add bloom in linear, then exposure + ACES + sRGB encode
+    const compMat = new THREE.ShaderMaterial({ uniforms: { tScene: { value: null }, tBloom: { value: null }, tAO: { value: aoBlurRT.texture }, strength: { value: 0.7 }, exposure: { value: 1.0 }, aoAmount: { value: 1.0 } }, vertexShader: vsrc, fragmentShader:
+      `uniform sampler2D tScene; uniform sampler2D tBloom; uniform sampler2D tAO; uniform float strength; uniform float exposure; uniform float aoAmount; varying vec2 vUv;
+       vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14), 0.0, 1.0); }
+       void main(){
+         vec3 s = texture2D(tScene, vUv).rgb;
+         float ao = mix(1.0, texture2D(tAO, vUv).r, aoAmount);
+         // emissive surfaces (neon, windows, headlights) are their own light
+         // source — occluding them would put dirt on a lit sign. The threshold
+         // has to sit well above full sun on white paint (~3 in linear) or it
+         // eats the AO on every daylit surface instead of just the glowing ones.
+         float lum = dot(s, vec3(0.2126, 0.7152, 0.0722));
+         ao = mix(ao, 1.0, smoothstep(4.0, 9.0, lum));
+         vec3 c = (s * ao + texture2D(tBloom, vUv).rgb * strength) * exposure;
+         c = aces(c); c = pow(c, vec3(1.0/2.2)); gl_FragColor = vec4(c, 1.0);
+       }` });
     const quadScene = new THREE.Scene();
     const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), brightMat);
     quadScene.add(quad);
     const quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    G.bloom = { sceneRT, bloomA, bloomB, brightMat, blurMat, compMat, quadScene, quad, quadCam };
+    G.bloom = { sceneRT, bloomA, bloomB, aoRT, aoBlurRT, brightMat, blurMat, aoMat, aoBlurMat, compMat, quadScene, quad, quadCam };
   }
 
   window.addEventListener('resize', () => {
@@ -459,6 +621,14 @@ async function init() {
       const w = window.innerWidth, h = window.innerHeight, hw = Math.max(1, w >> 2), hh = Math.max(1, h >> 2);
       G.bloom.sceneRT.setSize(w, h); G.bloom.bloomA.setSize(hw, hh); G.bloom.bloomB.setSize(hw, hh);
       G.bloom.blurMat.uniforms.res.value.set(hw, hh);
+      const aw = Math.max(1, w >> 1), ah = Math.max(1, h >> 1);
+      G.bloom.aoRT.setSize(aw, ah); G.bloom.aoBlurRT.setSize(aw, ah);
+      G.bloom.aoMat.uniforms.aoRes.value.set(aw, ah);
+      G.bloom.aoBlurMat.uniforms.aoRes.value.set(aw, ah);
+      // setSize drops the old depth attachment's GPU texture — re-point the AO
+      // samplers at the live one or they sample a stale/disposed target
+      G.bloom.aoMat.uniforms.tDepth.value = G.bloom.sceneRT.depthTexture;
+      G.bloom.aoBlurMat.uniforms.tDepth.value = G.bloom.sceneRT.depthTexture;
     }
   });
 
@@ -574,6 +744,8 @@ async function init() {
   if (optSens) optSens.addEventListener('input', e => { G.settings.sensitivity = parseFloat(e.target.value); saveSettings(); });
   const optVol = document.getElementById('opt-vol');
   if (optVol) optVol.addEventListener('input', e => { G.settings.volume = parseFloat(e.target.value); applySettings(); saveSettings(); });
+  const optAo = document.getElementById('opt-ao');
+  if (optAo) optAo.addEventListener('change', e => { G.settings.ssao = !!e.target.checked; applySettings(); saveSettings(); });
 
   // Store overlay "Leave" button (item buttons are generated per shop in openStore)
   const leaveBtn = document.getElementById('store-leave');
@@ -1380,6 +1552,22 @@ function renderBloom() {
   r.toneMapping = THREE.NoToneMapping;   // sceneRT holds linear HDR; the composite applies ACES + sRGB
   r.setRenderTarget(b.sceneRT); r.render(G.scene, G.camera);
   if (G.perf) { G.perf.sceneCalls = r.info.render.calls || 0; G.perf.sceneTriangles = r.info.render.triangles || 0; }
+  // SSAO: rebuild view positions from the resolved depth, gather, then blur.
+  // G.ssao === false skips both passes and the composite falls back to flat ambient.
+  const ao = G.ssao !== false;
+  if (ao) {
+    b.aoMat.uniforms.projInv.value.copy(G.camera.projectionMatrixInverse);
+    // half the focal length in each axis: turns a view-space radius at depth z
+    // into a UV-space radius (elements[0] = m11, elements[5] = m22)
+    const pe = G.camera.projectionMatrix.elements;
+    b.aoMat.uniforms.projScale.value.set(pe[0] * 0.5, pe[5] * 0.5);
+    b.aoBlurMat.uniforms.projInv.value.copy(G.camera.projectionMatrixInverse);
+    b.quad.material = b.aoMat;
+    r.setRenderTarget(b.aoRT); r.render(b.quadScene, b.quadCam);
+    b.quad.material = b.aoBlurMat;
+    r.setRenderTarget(b.aoBlurRT); r.render(b.quadScene, b.quadCam);
+  }
+  b.compMat.uniforms.aoAmount.value = ao ? 1 : 0;
   b.quad.material = b.brightMat; b.brightMat.uniforms.tDiffuse.value = b.sceneRT.texture;
   r.setRenderTarget(b.bloomA); r.render(b.quadScene, b.quadCam);
   b.quad.material = b.blurMat;

@@ -14,6 +14,19 @@ export const DAY_LENGTH = 480; // seconds for a full 24h cycle (slow enough that
                         // doesn't blow through dusk-to-dark mid-chase). Everything
                         // time-of-day keys off the normalized dayT/nightK, not this.
 
+// Sun colour endpoints. Overhead daylight is near-white with a faint warm cast
+// (~5600K); a sun low enough to be reddened has lost most of its blue to the
+// atmosphere. Lerped by horizonK in updateDayNight — never assigned directly.
+const SUN_NOON    = new THREE.Color(0xfff4e4);
+const SUN_HORIZON = new THREE.Color(0xff8c3c);
+// Daytime haze tint + its scratch colour (fog colour is rebuilt every frame;
+// allocating a Color per frame in the day/night loop is not free).
+const HAZE_TINT = new THREE.Color(0xc4d2e0);
+const _fogColor = new THREE.Color();
+// Sky dome endpoints, lerped toward by daylight (see updateDayNight).
+const ZENITH_BLUE = new THREE.Color(0x1d5ab8);
+const GROUND_HAZE = new THREE.Color(0x6a6558);
+
 function prepWetMat(mat) {
   if (!mat || mat._drySurface) return;
   mat._drySurface = {
@@ -62,13 +75,19 @@ export function updateDayNight(dt) {
   G.time.dayT = (G.time.dayT + dt / DAY_LENGTH) % 1;
   if (G.time.dayT < prevT) G.time.day++;     // crossed midnight → a whole day elapsed
   const t = G.time.dayT;          // 0..1, where 0 = midnight, 0.25 = 6am, 0.5 = noon, 0.75 = 6pm
-  // sun direction — lateral z-offset keeps noon elevation at ~39° (atan 90/110)
-  // so vertical facades still catch direct light at midday; the cos/sin arc
-  // keeps mornings/evenings raking along the east-west streets.
+  // Sun path for Bangkok's latitude (13.7°N): the old arc pinned a fixed 110 m
+  // lateral offset, which capped noon elevation at 39° — so the tower canyons
+  // shadowed the streets all day and midday read as late afternoon. Now the arc
+  // is a real great circle tilted SOLAR_TILT off vertical: overhead-ish at noon
+  // (~76°, correct for the tropics — short shadows, lit road), raking along the
+  // east-west streets at dawn and dusk.
   const sunAngle = (t - 0.25) * TAU; // 0 at sunrise (east)
-  const sx = Math.cos(sunAngle) * 100;
-  const sy = Math.sin(sunAngle) * 90;
-  const sz = 110;
+  const ex = Math.cos(sunAngle);     // east (+) → west (−)
+  const ey = Math.sin(sunAngle);     // elevation, 1 = zenith of the arc
+  const SUN_DIST = 165, SOLAR_TILT = 0.24;   // 0.24 rad ≈ 14° south lean
+  const sx = ex * SUN_DIST;
+  const sy = ey * Math.cos(SOLAR_TILT) * SUN_DIST;
+  const sz = ey * Math.sin(SOLAR_TILT) * SUN_DIST;
   // Re-anchor the sun + shadow camera on the player every frame: the shadow
   // frustum is a ±80 m box, the map is ±250 m — anchored at the origin, most
   // of the playable area would sample outside the frustum.
@@ -76,12 +95,24 @@ export function updateDayNight(dt) {
   G.sun.position.set(pp.x + sx, sy, pp.z + sz);
   G.sun.target.position.set(pp.x, 0, pp.z);
   G.sun.target.updateMatrixWorld();
-  // sun intensity
-  const dayK = clamp((Math.sin(sunAngle) + 0.2), 0, 1);
-  G.sun.intensity = dayK * 1.6;
-  G.hemi.intensity = 0.3 + dayK * 1.0;
-  G.amb.intensity = 0.10 + dayK * 0.18;
-  G.renderer.toneMappingExposure = 1.0 + dayK * 0.18;
+  // Sun intensity + colour temperature. A fixed amber sun made every hour read
+  // as golden hour; real daylight is near-white overhead and only reddens as it
+  // sinks through the atmosphere. horizonK drives both the colour ramp and the
+  // extinction that dims a low sun.
+  // dayK was a raw sine, so daylight decayed from the moment the sun passed
+  // noon — 17:15 rendered as full dusk. Daylight actually holds up until the sun
+  // is genuinely low, then goes fast. This ramp plateaus at 1 above ~16° of
+  // elevation and runs out just after the sun sets, which also stops the neon
+  // (nightK = 1 - dayK) coming up in the middle of the afternoon.
+  const dayK = clamp((ey + 0.12) / 0.40, 0, 1);
+  const horizonK = clamp(1 - ey / 0.32, 0, 1);           // 1 at the horizon → 0 above ~19°
+  G.sun.color.copy(SUN_NOON).lerp(SUN_HORIZON, horizonK * horizonK);
+  // Punchier key/fill split: sunlit vs shadow now sits near 4:1 instead of 2:1,
+  // which is what makes daylight read as daylight rather than as overcast.
+  G.sun.intensity = dayK * 2.7 * lerp(1, 0.45, horizonK);
+  G.hemi.intensity = 0.3 + dayK * 0.62;
+  G.amb.intensity = 0.10 + dayK * 0.09;
+  G.renderer.toneMappingExposure = 1.0 + dayK * 0.05;
   // background color
   const skyDay = new THREE.Color(0x8eb6e8);
   const skyDusk = new THREE.Color(0xff8866);
@@ -90,9 +121,29 @@ export function updateDayNight(dt) {
   if (dayK > 0.4) sky = skyDay.clone().lerp(skyDusk, 1 - (dayK - 0.4)/0.6);
   else if (dayK > 0.05) sky = skyDusk.clone().lerp(skyNight, 1 - (dayK - 0.05)/0.35);
   else sky = skyNight;
-  G.scene.background.copy(sky);
-  G.scene.fog.color.copy(sky);
-  G.scene.fog.density = lerp(0.0012, 0.0035, 1 - dayK) + G.time.rainStrength * 0.004;
+  G.scene.background.copy(sky);   // fallback fill behind the dome
+  // Drive the sky dome. The horizon keeps the old sky colour (so dusk and night
+  // ramp exactly as before), the zenith pulls deeper and bluer with daylight,
+  // and the dome rides with the camera so it can never be flown out of.
+  if (G.sky) {
+    const u = G.sky.material.uniforms;
+    u.horizon.value.copy(sky).lerp(HAZE_TINT, 0.28 * dayK);
+    u.zenith.value.copy(sky).lerp(ZENITH_BLUE, 0.80 * dayK);
+    u.ground.value.copy(sky).lerp(GROUND_HAZE, 0.55 * dayK);
+    u.sunDir.value.set(sx, sy, sz).normalize();
+    u.sunTint.value.copy(G.sun.color);
+    u.dayK.value = dayK;
+    G.sky.position.copy(G.camera.position);
+  }
+  // Aerial perspective. Fog was so thin (0.0012) that a tower 250 m out sat at
+  // ~9% haze — distant geometry stayed as saturated as the near kerb and the
+  // city read flat. Bangkok's actual daytime haze is heavy; 0.0030 puts that
+  // same tower near 40% and gives the skyline real depth. The fog colour lifts
+  // off the sky toward a pale grey-blue so haze reads as scattered particulate
+  // rather than as the backdrop bleeding through.
+  _fogColor.copy(sky).lerp(HAZE_TINT, 0.30 * dayK);
+  G.scene.fog.color.copy(_fogColor);
+  G.scene.fog.density = lerp(0.0030, 0.0042, 1 - dayK) + G.time.rainStrength * 0.004;
 
   // neon/lamp/window emissive + accent lights: brighter at night.
   // Iterate only the cached arrays built in buildWorld — no full scene.traverse.
