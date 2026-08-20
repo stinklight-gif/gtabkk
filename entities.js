@@ -341,8 +341,12 @@ function enhanceVehicleVisual(g, kind) {
 export function updateEntityLod() {
   if (!G.player) return;
   const viewer = (G.player.inVehicle && G.player.inVehicle.pos) || G.player.group.position;
-  const pedNear = 46 * 46, pedFar = 62 * 62;
-  const vehNear = 72 * 72, vehFar = 96 * 96;
+  // Switch distances. These were set before the aerial-perspective haze went in;
+  // a car at 96 m is now both small on screen and visibly hazed, and a high-detail
+  // vehicle costs ~6 draw calls against the far proxy's 1. The near/far gap is the
+  // hysteresis band — keep them apart or entities thrash at the boundary.
+  const pedNear = 34 * 34, pedFar = 46 * 46;
+  const vehNear = 50 * 50, vehFar = 66 * 66;
   const stats = { pedHigh: 0, pedLow: 0, vehicleHigh: 0, vehicleLow: 0, nearPeds: 0, nearVehicles: 0 };
 
   for (const ped of G.peds) {
@@ -385,7 +389,9 @@ export function makeVehicleMesh(kind) {
     const seat = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.1, 0.6), new THREE.MeshStandardMaterial({ color: 0x222 }));
     seat.position.set(0, 0.78, -0.05); g.add(seat);
     const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111, roughness: 0.8 });
-    const wF = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.08, 8, 16), wheelMat);
+    // 8x16 torus = 256 triangles per wheel; 6x10 is 120 and reads the same at
+    // the distance a chase camera ever sees a motorbike wheel from
+    const wF = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.08, 6, 10), wheelMat);
     wF.rotation.y = PI/2; wF.position.set(0, 0.32, 0.8); g.add(wF);
     const wR = wF.clone(); wR.position.z = -0.8; g.add(wR);
     const handle = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.06, 0.08), new THREE.MeshStandardMaterial({ color: 0x111 }));

@@ -22,12 +22,21 @@ export function buildLandmarks(env) {
   const bikeFrameMat = new THREE.MeshStandardMaterial({ color: 0xd6363c, roughness: 0.55, metalness: 0.3 });
   const bikeWheelMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.85 });
   const bikeHandleMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
-  const bikeWheelGeo = new THREE.TorusGeometry(0.3, 0.075, 6, 12);
+  // A torus here was the single most expensive thing in the game: 144 triangles
+  // per wheel across ~1,360 parked wheels is ~196k triangles — a third of the
+  // whole frame — and an InstancedMesh spanning the map can't be frustum-culled,
+  // so all of it drew every frame from anywhere. A short solid cylinder is 32
+  // triangles and reads *better* at any distance you actually see a parked bike
+  // from: real wheels have spokes and a hub, so they occlude, where a thin ring
+  // showed the street through the middle of every wheel.
+  const bikeWheelGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.11, 8);
   const bikeFrameGeo = new THREE.BoxGeometry(0.5, 0.4, 1.5);
   const bikeHandleGeo = new THREE.BoxGeometry(0.7, 0.05, 0.06);
   const bikeFrameM = [], bikeWheelM = [], bikeHandleM = [];
   // Local (within-bike) part transforms, baked once and reused for every bike.
-  const _wheelQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, PI/2, 0));
+  // Cylinder's axis is +Y, so the wheel lies down about Z (a torus sat in the XY
+  // plane and needed a Y turn instead — don't "restore" this to Euler(0, PI/2, 0)).
+  const _wheelQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, PI/2));
   const localFrame  = new THREE.Matrix4().compose(new THREE.Vector3(0, 0.5, 0), new THREE.Quaternion(), new THREE.Vector3(1,1,1));
   const localWheelF = new THREE.Matrix4().compose(new THREE.Vector3(0, 0.3, 0.75), _wheelQ, new THREE.Vector3(1,1,1));
   const localWheelR = new THREE.Matrix4().compose(new THREE.Vector3(0, 0.3, -0.75), _wheelQ, new THREE.Vector3(1,1,1));
@@ -269,7 +278,9 @@ export function buildLandmarks(env) {
   });
   G.nightEmissive.push({ mat: bulbMat, dayIntensity: 0.0, nightIntensity: 1.4 });
   const lampPoleGeo = new THREE.CylinderGeometry(0.12, 0.15, 6, 6);
-  const lampBulbGeo = new THREE.SphereGeometry(0.35, 8, 8);
+  // 8x8 is 128 triangles for a 0.35 m ball, instanced at every intersection.
+  // 6x5 is 60 and indistinguishable on a diffuse glowing sphere that small.
+  const lampBulbGeo = new THREE.SphereGeometry(0.35, 6, 5);
   const lampPoleM = [], lampBulbM = [];
   for (const inter of world.intersections) {
     if (inter.x < -HALF + BLOCK) continue;  // skip lamps standing in the river
@@ -899,7 +910,8 @@ export function buildLandmarks(env) {
     // hanging red lanterns strung over the lane (instanced)
     const lanternMat = new THREE.MeshStandardMaterial({ color: 0xd11a1a, emissive: 0xd11a1a, emissiveIntensity: 0.3, roughness: 0.6 });
     G.nightEmissive.push({ mat: lanternMat, dayIntensity: 0.25, nightIntensity: 1.4 });
-    const lanternGeo = new THREE.SphereGeometry(0.32, 8, 8);
+    // same reasoning as the lamp bulbs — these are small and instanced en masse
+    const lanternGeo = new THREE.SphereGeometry(0.32, 6, 5);
     const lanternM = [];
     for (let z = zStart + 4; z < zEnd; z += 6) {
       if (Math.abs(z - crossZ) < 8) continue;

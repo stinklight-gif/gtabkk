@@ -16,10 +16,22 @@ export function makeStaticBaker() {
   const buckets = new Map();  // material -> { geos, cast, receive }
   return {
     // geo: a (shared, unmodified) BufferGeometry; matrix: its world transform.
-    add(geo, matrix, material, cast = false, receive = false) {
+    // tint: optional per-piece RGB multiplier, baked into a vertex-colour
+    // attribute. This is how a merged bucket gets per-building variation without
+    // per-building materials — the whole point of the baker is one material per
+    // bucket, so anything that differs per piece has to live in the vertices.
+    // Every piece gets the attribute (white when untinted) because mergeGeometries
+    // silently returns null if the attribute sets don't match across the bucket.
+    add(geo, matrix, material, cast = false, receive = false, tint = null) {
       let bk = buckets.get(material);
       if (!bk) { bk = { geos: [], cast, receive }; buckets.set(material, bk); }
-      bk.geos.push(geo.clone().applyMatrix4(matrix));
+      const g = geo.clone().applyMatrix4(matrix);
+      const n = g.attributes.position.count;
+      const col = new Float32Array(n * 3);
+      const r = tint ? tint.r : 1, gg = tint ? tint.g : 1, b = tint ? tint.b : 1;
+      for (let i = 0; i < n; i++) { col[i * 3] = r; col[i * 3 + 1] = gg; col[i * 3 + 2] = b; }
+      g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      bk.geos.push(g);
     },
     flush(scene) {
       let meshes = 0;

@@ -143,7 +143,9 @@ file is under ~800 lines.
 
 - `index.html` — DOM shell, HUD overlays, importmap.
 - `core.js` — helpers, constants, palettes, `G` (`window.GAME`), scratch, the
-  static-geometry baker, `disposeObject`, `lerpAngle`. Pure leaf.
+  static-geometry baker (merges by material, and bakes an optional per-piece
+  tint into vertex colours so pieces can vary without new materials),
+  `disposeObject`, `lerpAngle`. Pure leaf.
 - `audio.js` — procedural Web Audio (engine loopers, SFX, the car radio).
 - `input.js` — keyboard set + pointer-lock mouse deltas + edge-detected `pressed`.
 - `world.js` — `buildWorld`: grid/roads/sidewalks/buildings, shared procedural
@@ -278,9 +280,12 @@ traffic AI.
   It grounds props and characters but can't see geometry that's off-screen or
   hidden behind something else, and it fades out past ~40 m where the depth
   reconstruction stops being reliable. Toggle it in Options (**O**).
-- Surfaces are still flat-shaded procedural colour with shared wear/grime
-  textures — no per-building material variation, panel lines, or dirt maps. That
-  is the largest remaining gap between this and a photoreal look.
+- Building surfaces carry a shared procedural detail map (floor-slab banding,
+  panel joints, rain streaking, mottled soiling) plus a roughness channel, and
+  each building gets its own tone jitter baked into vertex colours so a row of
+  them stops reading as one repeated asset. It is still one tiling texture per
+  material family rather than per-building art — no unique signage, no facade
+  geometry beyond the parapet and cornice.
 
 ## Performance
 
@@ -288,14 +293,49 @@ Targets 60 FPS at 1080p on integrated GPUs. The static city is geometry-merged:
 road stripes, sidewalks, building boxes, window/neon planes, awnings, signs and
 sidewalk props are each baked to world space and merged into one mesh per
 material at world-build time. That takes a street-level view from ~7,700 meshes
-/ ~2,800 draw calls down to ~1,200 meshes / **~370 draw calls** (measured via
-`tools/smoke.mjs`, which prints `renderer.info.render.calls`). What's left is
+/ ~2,800 draw calls down to ~1,200 meshes / **~320 draw calls for the static city**
+(measured via `tools/smoke.mjs`, which prints the per-shot figures). What's left is
 mostly dynamic — vehicles, peds, dogs, the puddle/rooftop/lamp/wire `InstancedMesh`
 batches — plus a few one-off landmarks. A busy midday crowd (the articulated
 peds are higher-detail near the camera and switch to boxy far LODs) adds a few
-hundred calls when the sidewalks are full, landing inside the live visual budget;
-the small hours drop back toward the static floor. If it still chugs, lower `PED_TARGET`, raise the
-pedestrian/traffic despawn radius, or drop pixel ratio.
+hundred calls when the sidewalks are full; the small hours drop back toward the
+static floor. If it still chugs, lower `PED_TARGET`, raise the pedestrian/traffic
+despawn radius, drop pixel ratio, or turn off ambient occlusion in Options.
+
+### Where the budget actually stands
+
+`tools/smoke.mjs` used to print `draw calls = 1` for every shot: it read
+`renderer.info.render.calls` *after* the bloom composite, so it reported the
+final fullscreen quad rather than the scene. Nothing else asserted on the live
+scene either — the budget probe only exercised the evaluator against synthetic
+numbers — so the real figures drifted unnoticed for a long time. Both are fixed:
+smoke prints the true per-shot counts, and `realism_pass_test.mjs` now asserts
+against the live scene and against a camera-pinned, entity-free static render.
+
+| | budget | now |
+|---|---|---|
+| triangles | ≤450k | 382k–440k across the shot suite ✅ |
+| draw calls | ≤900 | 416–1557 ❌ **still over** |
+
+Triangles were 537k–596k before this pass. Most of it was instanced props, which
+are one batch spanning the whole map and so cannot be frustum-culled — every
+instance draws from anywhere on it. Parked-bike wheels alone were 1,362 torus
+rings at 144 triangles each, ~196k triangles, a third of every frame; they are
+short solid cylinders now (32 tris) which also read better, since a real wheel
+occludes rather than showing the street through its middle. Lamp/lantern spheres
+dropped from 8×8 to 6×5, and the LOD switch distances tightened now that heavy
+aerial haze hides the swap.
+
+**Draw calls remain over budget and are the open performance item.** The bulk is
+per-entity: a high-detail vehicle costs ~6 calls (body, wheels, lights, trim all
+carry per-vehicle materials, so nothing batches across cars) and a busy midday
+street holds dozens inside the LOD near-band. Closing it means merging each
+vehicle's static parts into one geometry with vertex colours — the same trick
+`makeStaticBaker` uses for the city — keeping only wheels and lights separate.
+Until then `realism_pass_test.mjs` holds a regression ratchet at 1800 (loose on
+purpose: the live figure swings ~40% with crowd spawns) plus a tight bound on
+the reproducible static render. Lower them as the gap closes; don't raise them
+to make a change fit.
 
 Post-processing runs as a chain of small fullscreen passes on the scene render
 target: SSAO (half-res, 12 taps, depth-only) and its depth-aware blur, then the

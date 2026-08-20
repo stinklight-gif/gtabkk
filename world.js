@@ -68,12 +68,45 @@ export function buildWorld(scene) {
   const flatBaker = makeStaticBaker();
   const ONE = new THREE.Vector3(1, 1, 1);
   const _bm = new THREE.Matrix4(), _bq = new THREE.Quaternion(), _be = new THREE.Euler(), _bp = new THREE.Vector3();
-  function bake(target, geo, material, x, y, z, rotY, rotX, rotZ, cast, receive) {
+  function bake(target, geo, material, x, y, z, rotY, rotX, rotZ, cast, receive, tint) {
     _be.set(rotX || 0, rotY || 0, rotZ || 0);
     _bq.setFromEuler(_be);
     _bp.set(x, y, z);
     _bm.compose(_bp, _bq, ONE);
-    target.add(geo, _bm, material, cast, receive);
+    target.add(geo, _bm, material, cast, receive, tint || null);
+  }
+
+  // ---- Per-building surface variation ----
+  // A box's UVs run 0..1 on every face, so a tiled facade texture would stretch
+  // to fit whatever the building happens to be — a 40 m tower and a 6 m shophouse
+  // would show the same number of floor bands. Rescaling the UVs by each face's
+  // real dimensions pins the detail to a physical size instead. u/v are per-face,
+  // and BoxGeometry's face order is +x, -x, +y, -y, +z, -z (4 verts each).
+  const FACADE_TILE_M = 12;    // one texture tile = 12 m ≈ its 4 drawn floors
+  function scaleBoxUVs(geo, sx, sy, sz) {
+    const uv = geo.attributes.uv;
+    if (!uv) return;
+    const spans = [                       // [uSpan, vSpan] per face, in tiles
+      [sz, sy], [sz, sy],                 // +x, -x  (depth × height)
+      [sx, sz], [sx, sz],                 // +y, -y  (roof/underside)
+      [sx, sy], [sx, sy],                 // +z, -z  (width × height)
+    ];
+    for (let f = 0; f < 6; f++) {
+      const [us, vs] = spans[f];
+      for (let k = 0; k < 4; k++) {
+        const i = f * 4 + k;
+        uv.setXY(i, uv.getX(i) * us / FACADE_TILE_M, uv.getY(i) * vs / FACADE_TILE_M);
+      }
+    }
+    uv.needsUpdate = true;
+  }
+  // Tone jitter within a material's family. Kept narrow (±8% value, a touch of
+  // warm/cool) — enough that a row of buildings sharing one material stops
+  // reading as a repeated asset, small enough that the palette still holds.
+  const _tint = new THREE.Color();
+  function buildingTint() {
+    const v = rand(0.90, 1.08);
+    return _tint.setRGB(v * rand(0.98, 1.03), v, v * rand(0.97, 1.02));
   }
   // Bake a built (but not scene-added) Group of static meshes: resolve each
   // child's world matrix and feed it to the baker, grouped by its own material.
@@ -88,7 +121,7 @@ export function buildWorld(scene) {
   // ---- ground / asphalt ----
   const asphaltTex = makeAsphaltTextures();
   const sidewalkTex = makeSidewalkTexture();
-  const facadeGrimeTex = makeFacadeGrimeTexture();
+  const facadeDetailTex = makeFacadeDetailTexture();
   const groundMat = new THREE.MeshStandardMaterial({
     color: COLORS.asphalt, roughness: 0.9,
     map: asphaltTex.map, roughnessMap: asphaltTex.roughnessMap,
@@ -163,18 +196,26 @@ export function buildWorld(scene) {
   //  - painted:  warmer tinted renders, slightly rougher
   //  - glass:    cooler blue-grey, lower roughness + a touch of metalness so it
   //              catches the sky differently from the matte boxes
+  // vertexColors lets placeBuilding jitter each building's tone within its family
+  // without minting a material per building — the baker merges by material, so a
+  // new material would be a new draw call. See makeStaticBaker's `tint`.
   const concreteMat = COLORS.building.map(c => new THREE.MeshStandardMaterial({
-    color: c, roughness: 0.9, metalness: 0.0, map: facadeGrimeTex.map,
+    color: c, roughness: 0.9, metalness: 0.0, vertexColors: true,
+    map: facadeDetailTex.map, roughnessMap: facadeDetailTex.roughnessMap,
   }));
   const PAINTED_COLORS = [0xb7a98c, 0xc9b89a, 0xa89a8e, 0xbfa6a0, 0x9fb0a6, 0xc6b0a0];
   const paintedMat = PAINTED_COLORS.map(c => new THREE.MeshStandardMaterial({
-    color: c, roughness: 0.82, metalness: 0.0,
+    color: c, roughness: 0.82, metalness: 0.0, vertexColors: true,
+    map: facadeDetailTex.map, roughnessMap: facadeDetailTex.roughnessMap,
   }));
   const GLASS_COLORS = [0x8a96a6, 0x7f8c9e, 0x93a0ad, 0x6f8092, 0x9aa6b2];
   const glassMat = GLASS_COLORS.map(c => new THREE.MeshStandardMaterial({
     // glassy facades reflect the sky env map — lower roughness + metalness so the
-    // reflection reads; envMap stays cheap (only these materials sample it)
+    // reflection reads; envMap stays cheap (only these materials sample it).
+    // No detail map: curtain walls are mullions and glass, and the window planes
+    // already carry that. Tinting still varies tower to tower.
     color: c, roughness: 0.18, metalness: 0.6, envMap: G.envMap || null, envMapIntensity: 1.5,
+    vertexColors: true,
   }));
   // Pick a body material for a building of height h: tall ones lean glass, the
   // rest split between concrete and painted. Returns one of the shared materials.
@@ -186,13 +227,14 @@ export function buildWorld(scene) {
   // Thin parapet/roof-cap band — one shared dark-concrete material so every cap
   // merges into a single draw call. Caps the box silhouette so roofs don't look
   // like bare cut cubes.
-  const capMat = new THREE.MeshStandardMaterial({ color: 0x4a4a50, roughness: 0.9 });
+  const capMat = new THREE.MeshStandardMaterial({ color: 0x4a4a50, roughness: 0.9, vertexColors: true });
   // Shop-level (ground floor) palette — Bangkok shophouse fronts: cream, terracotta,
   // faded pink, dirty white, gray-blue. Different from upper-floor colors so each
   // building reads as having a distinct "shop band" at street level.
   const SHOP_COLORS = [0xe0c885, 0xa84a3a, 0xd49a92, 0xd9d2c7, 0x7a8fa0, 0xc9b48e, 0xb8a07a];
   const shopMatPool = SHOP_COLORS.map(c => new THREE.MeshStandardMaterial({
-    color: c, roughness: 0.95,
+    color: c, roughness: 0.95, vertexColors: true,
+    map: facadeDetailTex.map, roughnessMap: facadeDetailTex.roughnessMap,
   }));
   // windows: procedurally drawn grid, split into two textures sharing one cell
   // layout — a muted daytime albedo (glass tower in sunlight, not "lit at night")
@@ -273,15 +315,21 @@ export function buildWorld(scene) {
   // end of buildWorld) rather than added as individual meshes.
   // frontFaces: array of {ax: 'x'|'z', sign: +1|-1} for each road-facing face.
   function placeBuilding(bx, bz, dimX, dimZ, h, frontFaces) {
+    // One tint per building, shared by its tower, shop band and cap so the whole
+    // thing weathers as a unit rather than looking assembled from three buildings.
+    const tint = buildingTint().clone();
+
     const upperH = Math.max(0.1, h - SHOP_LEVEL_H);
     const upperMat = pickBodyMat(h);
     const upperGeo = new THREE.BoxGeometry(dimX, upperH, dimZ);
-    bake(baker, upperGeo, upperMat, bx, SHOP_LEVEL_H + upperH/2, bz, 0, 0, 0, true, true);
+    scaleBoxUVs(upperGeo, dimX, upperH, dimZ);
+    bake(baker, upperGeo, upperMat, bx, SHOP_LEVEL_H + upperH/2, bz, 0, 0, 0, true, true, tint);
     upperGeo.dispose();
 
     const shopMat = shopMatPool[irand(0, shopMatPool.length - 1)];
     const shopGeo = new THREE.BoxGeometry(dimX, SHOP_LEVEL_H, dimZ);
-    bake(baker, shopGeo, shopMat, bx, SHOP_LEVEL_H/2, bz, 0, 0, 0, true, true);
+    scaleBoxUVs(shopGeo, dimX, SHOP_LEVEL_H, dimZ);
+    bake(baker, shopGeo, shopMat, bx, SHOP_LEVEL_H/2, bz, 0, 0, 0, true, true, tint);
     shopGeo.dispose();
 
     // Parapet/roof cap — a thin slab slightly wider than the body that crowns the
@@ -290,7 +338,7 @@ export function buildWorld(scene) {
     if (h > 8) {
       const capH = 0.6, capOver = 0.25;
       const capGeo = new THREE.BoxGeometry(dimX + capOver, capH, dimZ + capOver);
-      bake(baker, capGeo, capMat, bx, h - capH/2, bz, 0, 0, 0, true, true);
+      bake(baker, capGeo, capMat, bx, h - capH/2, bz, 0, 0, 0, true, true, tint);
       capGeo.dispose();
     }
 
@@ -299,7 +347,7 @@ export function buildWorld(scene) {
     // facade cue). Reuses capMat → no extra draw call. Skipped on tiny buildings.
     if (dimX > 3 && dimZ > 3 && h > 10) {
       const ledgeGeo = new THREE.BoxGeometry(dimX + 0.2, 0.35, dimZ + 0.2);
-      bake(baker, ledgeGeo, capMat, bx, SHOP_LEVEL_H + 0.1, bz, 0, 0, 0, true, false);
+      bake(baker, ledgeGeo, capMat, bx, SHOP_LEVEL_H + 0.1, bz, 0, 0, 0, true, false, tint);
       ledgeGeo.dispose();
     }
 
@@ -391,7 +439,8 @@ export function buildWorld(scene) {
         const setZ = Math.max(2, dimZ * rand(0.55, 0.78));
         const setMat = pickBodyMat(h);
         const setGeo = new THREE.BoxGeometry(setX, setH, setZ);
-        bake(baker, setGeo, setMat, bx, roofY + setH/2, bz, 0, 0, 0, true, true);
+        scaleBoxUVs(setGeo, setX, setH, setZ);
+        bake(baker, setGeo, setMat, bx, roofY + setH/2, bz, 0, 0, 0, true, true, tint);
         setGeo.dispose();
         // parapet on the setback too
         const scapGeo = new THREE.BoxGeometry(setX + 0.25, 0.5, setZ + 0.25);
@@ -892,27 +941,78 @@ export function makeSidewalkTexture() {
   return { map };
 }
 
-export function makeFacadeGrimeTexture() {
-  const c = document.createElement('canvas'); c.width = c.height = 512;
+// Facade detail — the thing that separates a building from a coloured box.
+// Tiled at a real-world scale (see FACADE_TILE_M) rather than stretched once per
+// face, so a 40 m tower gets many floors of banding and a shophouse gets one or
+// two, instead of both getting the same gradient squashed to fit.
+//
+// Returns { map, roughnessMap }: the albedo carries slab bands, panel joints,
+// rain streaking and corner soiling; the roughness channel makes the streaks and
+// the weathered base read as *different material*, not just a darker paint —
+// which is most of why real concrete looks like concrete.
+export function makeFacadeDetailTexture() {
+  const S = 512;
+  const c = document.createElement('canvas'); c.width = c.height = S;
   const g = c.getContext('2d');
-  const base = g.createLinearGradient(0, 0, 0, 512);
-  base.addColorStop(0, '#d6d2c9');
-  base.addColorStop(0.62, '#b8b1a7');
-  base.addColorStop(1, '#7d776f');
-  g.fillStyle = base; g.fillRect(0, 0, 512, 512);
-  g.globalAlpha = 0.18;
-  for (let k = 0; k < 70; k++) {
-    const x = rand(0, 512), y = rand(60, 500), len = rand(30, 180);
-    g.strokeStyle = '#4e4a45';
-    g.lineWidth = rand(1, 5);
-    g.beginPath(); g.moveTo(x, y); g.bezierCurveTo(x + rand(-8, 8), y + len * 0.35, x + rand(-12, 12), y + len * 0.75, x + rand(-8, 8), Math.min(512, y + len)); g.stroke();
+  // White base, and every detail below only darkens. A `map` MULTIPLIES the
+  // material colour, so any base darker than white silently dims every building
+  // it is applied to — a mid-grey base halved the whole city's albedo. Weathering
+  // is subtractive in reality too: dirt darkens, it does not add light.
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, S, S);
+
+  // horizontal floor slabs — 4 per tile, the dominant rhythm on any real facade
+  const FLOORS = 4, fh = S / FLOORS;
+  for (let i = 0; i < FLOORS; i++) {
+    const y = i * fh;
+    g.fillStyle = 'rgba(40,38,34,0.42)'; g.fillRect(0, y, S, 4);            // slab shadow line
+    g.fillStyle = 'rgba(60,58,54,0.16)'; g.fillRect(0, y + 4, S, 3);        // soft falloff under it
   }
-  g.globalAlpha = 0.08;
-  g.fillStyle = '#101010';
-  for (let y = 70; y < 490; y += 64) g.fillRect(0, y, 512, rand(2, 5));
+  // vertical panel joints, irregularly spaced so the tile doesn't read as graph paper
+  g.fillStyle = 'rgba(50,48,44,0.26)';
+  for (let x = 0; x < S; x += 64) g.fillRect(x + irand(-6, 6), 0, 3, S);
+
+  // rain streaking below each slab — the most recognisable weathering cue on
+  // tropical concrete. Alpha tapers so streaks fade as they run.
+  for (let i = 0; i < FLOORS; i++) {
+    const y0 = i * fh + 6;
+    for (let k = 0; k < 30; k++) {
+      const x = rand(0, S), len = rand(fh * 0.3, fh * 0.95), w = rand(1, 5);
+      const grad = g.createLinearGradient(0, y0, 0, y0 + len);
+      grad.addColorStop(0, 'rgba(56,52,46,0.34)');
+      grad.addColorStop(1, 'rgba(56,52,46,0)');
+      g.fillStyle = grad; g.fillRect(x, y0, w, len);
+    }
+  }
+  // Fine mottling, heavier toward the bottom of the tile. Kept small and dense:
+  // at a 12 m tile a 30 px blob is nearly a metre across, which reads as polka
+  // dots on the wall rather than as soiling.
+  for (let k = 0; k < 420; k++) {
+    const x = rand(0, S), y = rand(0, S), r = rand(2, 11);
+    g.globalAlpha = 0.03 + 0.06 * (y / S);
+    g.fillStyle = '#5d574e';
+    g.beginPath(); g.ellipse(x, y, r, r * rand(0.6, 2.2), 0, 0, TAU); g.fill();
+  }
+  g.globalAlpha = 1;
+
+  // Roughness: white = leave material.roughness alone (it is a multiplier), and
+  // darken where the albedo is dirty so grime reads as a rougher surface rather
+  // than just darker paint. That difference is most of why concrete looks like
+  // concrete instead of coloured plastic.
+  const rc = document.createElement('canvas'); rc.width = rc.height = S;
+  const rg = rc.getContext('2d');
+  rg.drawImage(c, 0, 0);
+  const img = rg.getImageData(0, 0, S, S);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const lum = (img.data[i] + img.data[i + 1] + img.data[i + 2]) / 3;
+    const v = clamp(160 + lum * 0.37, 160, 255);   // dirty → rougher, but never mirror-smooth
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+  }
+  rg.putImageData(img, 0, 0);
+
   const map = canvasTex(c, true);
-  map.repeat.set(1, 1);
-  return { map };
+  const roughnessMap = canvasTex(rc, false);   // data, not colour — must not be sRGB-decoded
+  for (const t of [map, roughnessMap]) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, 1); }
+  return { map, roughnessMap };
 }
 
 export function makeMinimapBase(world) {

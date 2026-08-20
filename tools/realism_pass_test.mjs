@@ -85,7 +85,28 @@ async function main() {
       const txt = document.getElementById('perf').textContent;
       const lod = G.lodStats || {};
       const snap = G.perf && G.perf.snapshot;
-      return { txt, lod, snap, passEval, failEval };
+      // Static-only pass: pin the camera to a fixed transform, hide every spawned
+      // entity, re-render. Both halves matter — peds/traffic/dogs spawn at random
+      // (~40% swing in the live totals) and the camera is wherever the previous
+      // probe left it (which changes what frustum culling keeps). With both
+      // pinned, what's left is the baked city plus the instanced prop batches
+      // from one fixed viewpoint, which is identical every boot and can therefore
+      // carry a tight bound instead of a noise-proof loose one.
+      const ents = [];
+      for (const arr of [G.peds, G.vehicles, G.dogs, G.cops]) {
+        for (const e of (arr || [])) if (e && e.mesh && e.mesh.visible) { ents.push(e.mesh); e.mesh.visible = false; }
+      }
+      const camSave = { p: G.camera.position.clone(), q: G.camera.quaternion.clone() };
+      G.camera.position.set(2, 6, 48);
+      G.camera.quaternion.identity();
+      G.camera.rotateY(Math.PI);
+      G.camera.updateMatrixWorld(true);
+      G.renderer.render(G.scene, G.camera);
+      const staticInfo = { calls: G.renderer.info.render.calls, triangles: G.renderer.info.render.triangles };
+      G.camera.position.copy(camSave.p); G.camera.quaternion.copy(camSave.q);
+      G.camera.updateMatrixWorld(true);
+      for (const m of ents) m.visible = true;
+      return { txt, lod, snap, passEval, failEval, staticInfo };
     });
     assert(/VISUAL BUDGET/.test(budget.txt) && /draw calls/.test(budget.txt) && /entities/.test(budget.txt), 'budget overlay exposes FPS/draw calls/entities');
     assert((budget.snap && budget.snap.drawCalls > 0 && budget.snap.visibleMeshes > 0), 'budget snapshot has live render and mesh counts');
@@ -93,6 +114,30 @@ async function main() {
     assert(budget.passEval && budget.passEval.pass === true && budget.passEval.status === 'ok', 'budget evaluator passes an in-budget synthetic scene');
     assert(budget.failEval && budget.failEval.pass === false && budget.failEval.status === 'bad' && budget.failEval.fps.pass === false, 'budget evaluator fails an over-budget synthetic scene');
     assert((budget.lod.vehicleLow || 0) > 0 || (budget.lod.pedLow || 0) > 0, 'near/far LOD counters are active');
+
+    // --- live scene against the real budget ---
+    // Everything above this point tests the budget *evaluator* on synthetic
+    // numbers; nothing tested the actual scene. That is how the live triangle
+    // count drifted to ~575k against a documented 450k ceiling without any build
+    // going red — and it stayed invisible because smoke.mjs was reading
+    // renderer.info AFTER the bloom composite and printing "1".
+    console.log(`    live scene: ${budget.snap.drawCalls} draw calls, ${budget.snap.triangles} triangles`);
+    assert(budget.snap.triangles <= 450000, `live triangle count within budget (${budget.snap.triangles} <= 450000)`);
+    // Draw calls are NOT within the documented 900 target — the live figure here
+    // ranges ~800-1420 depending on how the crowd happened to spawn, and a 4-star
+    // night chase reaches ~1.6k. This bound is a regression ratchet, not a claim
+    // the budget is met; see README "Performance" for the open gap, and lower it
+    // as the gap closes rather than raising it to make a change fit. It sits well
+    // clear of the observed spread on purpose: a bound inside the noise is a test
+    // that fails at random, which is worse than no test. The tight guard is the
+    // static one below, which does not move between runs.
+    assert(budget.snap.drawCalls <= 1800, `live draw calls no worse than the current ratchet (${budget.snap.drawCalls} <= 1800, target is 900)`);
+    console.log(`    static city: ${budget.staticInfo.calls} draw calls, ${budget.staticInfo.triangles} triangles`);
+    // The tight guards. Bounds sit ~10-20% above the observed spread because the
+    // city itself is procedurally generated per boot (building heights, parked-bike
+    // cluster counts), so even a pinned camera moves by a couple of percent.
+    assert(budget.staticInfo.calls <= 400, `static city draw calls held (${budget.staticInfo.calls} <= 400)`);
+    assert(budget.staticInfo.triangles <= 420000, `static city triangles held (${budget.staticInfo.triangles} <= 420000)`);
 
     console.log('\n[2] showcase mode');
     const showcase = await page.evaluate(() => {
@@ -326,7 +371,20 @@ async function main() {
       const G = window.GAME, main = window.__REALISM_MAIN;
       const down = code => window.dispatchEvent(new KeyboardEvent('keydown', { code }));
       const up = code => window.dispatchEvent(new KeyboardEvent('keyup', { code }));
-      const car = G.player.inVehicle;
+      // Spawn a known car rather than inheriting whatever the driving probe's
+      // `find` happened to land on. The eligible kinds are not interchangeable —
+      // a tuktuk is 350 kg and turns at 2.0, a hilux is 1800 kg and turns at 1.6,
+      // and reset(16) is top speed for one and mid-range for the other. Which one
+      // spawned first is down to random traffic, so the friction-circle numbers
+      // moved run to run (coasting seen anywhere from 0.115 to 0.270) and the
+      // braking-vs-coasting ordering occasionally inverted. Pinning the kind is
+      // what makes this section reproducible.
+      const car = main.makeVehicle('camry', G.scene);
+      car.driver = 'player'; car.npc = null; car.dead = false; car.hp = 100;
+      car.pos.set(0, 0, -140); car.heading = 0;
+      if (car.mesh) { car.mesh.position.copy(car.pos); car.mesh.rotation.y = 0; }
+      G.player.inVehicle = car;
+      G.player.group.visible = false;
       const spec = car.spec;
       const reset = v => {
         car.pos.set(0, 0, -140); car.heading = 0; car.vel = v;

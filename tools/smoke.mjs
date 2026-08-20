@@ -186,8 +186,19 @@ async function main() {
       await waitFrames(page, (shot.festival || shot.waypoint || shot.tabmap || shot.mall || shot.bts || shot.heli || shot.river || shot.bank) ? 20 : 12);  // let day/night + camera settle
       await page.screenshot({ path: path.join(ROOT, shot.name), timeout: 120_000 });
       const size = fs.statSync(path.join(ROOT, shot.name)).size;
-      const calls = await page.evaluate(() => window.GAME.renderer.info.render.calls);
-      console.log(`${shot.name}: ${(size / 1024).toFixed(0)} KB, draw calls = ${calls}`);
+      // renderer.info.render.calls reflects the LAST render of the frame, and the
+      // frame now ends with the bloom composite — a single fullscreen quad — so
+      // reading it straight reported "1" for every shot. G.perf.sceneCalls is
+      // captured in renderBloom right after the scene render, which is the number
+      // that actually means anything. Fall back for the no-bloom path.
+      const stats = await page.evaluate(() => {
+        const g = window.GAME, p = g.perf || {};
+        return {
+          calls: p.sceneCalls != null ? p.sceneCalls : g.renderer.info.render.calls,
+          tris: p.sceneTriangles != null ? p.sceneTriangles : g.renderer.info.render.triangles,
+        };
+      });
+      console.log(`${shot.name}: ${(size / 1024).toFixed(0)} KB, draw calls = ${stats.calls}, triangles = ${stats.tris}`);
       if (size < 20_480) errors.push(`${shot.name} is suspiciously small (${size} bytes)`);
     }
   } catch (err) {
