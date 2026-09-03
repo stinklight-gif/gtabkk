@@ -100,6 +100,7 @@ export function updateDayNight(dt) {
   G.scene.fog.density = lerp(0.0012, 0.0035, 1 - dayK) + G.time.rainStrength * 0.004;
   G.sun.color.setHex(0xffe0a0);
   G._hazeK = 0;
+  G.time.pm25 = 0;
   if (G.time.weather === 'overcast') {
     G.sun.intensity *= 0.55;
     G.hemi.intensity *= 0.82;
@@ -118,7 +119,8 @@ export function updateDayNight(dt) {
     G.scene.fog.color.setHex(0xb8945a);
     G.scene.fog.density = 0.0048 + noonDirty * 0.0062 + G.time.rainStrength * 0.002;
     G.scene.background.lerp(new THREE.Color(0xc4a070), 0.58 + noonDirty * 0.22);
-    if (G.hud && G.hud.setWeather) G.hud.setWeather('HAZE · 34°C');
+    G.time.pm25 = Math.round(145 + noonDirty * 95);
+    if (G.hud && G.hud.setWeather) G.hud.setWeather(`HAZE · PM2.5 ${G.time.pm25} · 34°C`);
   }
 
   // neon/lamp/window emissive + accent lights: brighter at night.
@@ -155,8 +157,8 @@ export function updateDayNight(dt) {
       } else if (GAMEPLAY.burningHaze && roll < 0.78) {
         G.time.weather = 'haze';
         G._rainTarget = 0;
-        G.hud.setWeather('HAZE · 34°C');
-        G.hud.showNotif('Burning-season haze rolls in.');
+        G.hud.setWeather('HAZE · PM2.5 180 · 34°C');
+        G.hud.showNotif('Burning-season haze rolls in — PM2.5 spikes.');
         G._weatherUntil = G._weatherT + rand(50, 110);
       } else {
         G.time.weather = 'overcast';

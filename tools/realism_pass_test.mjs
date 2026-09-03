@@ -929,6 +929,59 @@ async function main() {
     assert(haze.hazeHead > 0.85 && haze.hazeHead > haze.clearHead, `headlights come on in the haze (${haze.clearHead.toFixed(2)} → ${haze.hazeHead.toFixed(2)})`);
     assert(haze.hazeSun < haze.clearSun * 0.75, `noon sun is dirtier in haze (${haze.clearSun.toFixed(2)} → ${haze.hazeSun.toFixed(2)})`);
     assert(/HAZE/.test(haze.tag), `weather tag reads haze ("${haze.tag}")`);
+
+    console.log('\n[28] haze as city weather');
+    const city = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      G.player.inVehicle = null;
+      G.player.group.position.set(0, 0, -50);
+      G.player.group.visible = true;
+      let cop = G.cops.find(c => c && !c.dead);
+      if (!cop) cop = main.spawnCop(G.scene, new G.THREE.Vector3(0, 0, -72));
+      cop.mesh.position.set(0, 0, -72);
+      cop.dead = false;
+      cop.state = 'seeking';
+      G.wanted.stars = 1;
+      G.time.weather = 'clear';
+      G.time.rainStrength = 0;
+      G._weatherUntil = 1e9;
+      main.updateDayNight(0.05);
+      G.wanted.lastSeenAt = 0;
+      cop._losT = 0;
+      main.updateWanted(0.25);
+      const clearSeen = G.wanted.lastSeenAt > 0;
+      G.time.weather = 'haze';
+      main.updateDayNight(0.05);
+      G.wanted.lastSeenAt = 0;
+      cop._losT = 0;
+      main.updateWanted(0.25);
+      const hazeSeen = G.wanted.lastSeenAt > 0;
+      const tag = document.getElementById('weather-tag').textContent;
+      const pm25 = G.time.pm25;
+      const car = G.vehicles.find(v => v && v.npc && v.spec && v.spec.kind === 'camry') || main.makeVehicle('camry', G.scene);
+      if (!car.npc) car.npc = { kind: 'traffic', cruiseSpeed: 12, followMul: 1, dir: 0 };
+      const cruise = car.npc.cruiseSpeed;
+      car.pos.set(2.5, 0, -80); car.heading = 0; car.vel = cruise;
+      if (car.mesh) { car.mesh.position.copy(car.pos); car.mesh.rotation.y = 0; }
+      G.time.weather = 'haze';
+      main.updateDayNight(0.05);
+      for (let i = 0; i < 24; i++) main.updateTrafficCar(car, 0.1);
+      const hazeVel = car.vel;
+      G.time.weather = 'clear';
+      G.wanted.stars = 0;
+      main.updateDayNight(0.05);
+      return {
+        pm25,
+        tag,
+        clearSeen,
+        hazeSeen,
+        cruise,
+        hazeVel,
+      };
+    });
+    assert(/PM2\.5/.test(city.tag) && city.pm25 > 100, `haze HUD reports PM2.5 ("${city.tag}")`);
+    assert(city.clearSeen && !city.hazeSeen, 'cops lose you at 22m in the haze, not in clear air');
+    assert(city.hazeVel < city.cruise * 0.9, `cars crawl in the haze (${city.hazeVel.toFixed(1)} of cruise ${city.cruise.toFixed(1)})`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

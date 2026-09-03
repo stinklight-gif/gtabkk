@@ -591,6 +591,10 @@ export function updateTrafficCar(v, dt) {
     if (npc.stopT > 0 && npc.stopT < 2.4) obstacleTarget = Math.min(obstacleTarget, 0);
     if (npc.stopT <= 0) npc.stopT = rand(12, 22);
   }
+  if (GAMEPLAY.burningHaze && G.time.weather === 'haze' && v.spec.kind !== 'bike') {
+    obstacleTarget = Math.min(obstacleTarget, npc.cruiseSpeed * 0.68);
+    signalTarget = Math.min(signalTarget, npc.cruiseSpeed * 0.68);
+  }
   if (GAMEPLAY.yaowaratCarHostility && v.spec.kind !== 'bike' && v.spec.kind !== 'tuktuk' && inYaowarat(v.pos.x, v.pos.z)) {
     obstacleTarget = Math.min(obstacleTarget, 5);
   }
