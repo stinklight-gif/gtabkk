@@ -200,21 +200,26 @@ async function main() {
         if (GAME.resyncCrowd) GAME.resyncCrowd();                // snap crowd to this hour (busy noon vs dead 3am)
       }, shot);
       await waitFrames(page, (shot.festival || shot.waypoint || shot.tabmap || shot.mall || shot.bts || shot.heli || shot.river || shot.bank) ? 20 : 12);  // let day/night + camera settle
-      // Present one static frame, then stop the rAF GPU path so CDP
-      // captureScreenshot is not deadlocking SwiftShader mid-draw (CI hung
-      // 120s after "fonts loaded" on the first noon shot).
-      await page.evaluate(async () => {
+      // Do not use Playwright page.screenshot: after living-city, CDP
+      // captureScreenshot deadlocks SwiftShader (fonts loaded, then 120s hang).
+      // Read the presented canvas in-page after one explicit render.
+      const dataUrl = await page.evaluate(({ tabmap }) => {
         const GAME = window.GAME;
         GAME.noBloom = true;
-        if (GAME.renderer && GAME.scene && GAME.camera) {
-          GAME.renderer.setRenderTarget(null);
-          GAME.renderer.render(GAME.scene, GAME.camera);
-        }
-        if (GAME.hud && GAME.hud.drawWaypoint) GAME.hud.drawWaypoint();
         GAME._holdFrame = true;
-        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-      });
-      await page.screenshot({ path: path.join(ROOT, shot.name), timeout: 60_000, animations: 'disabled', caret: 'hide' });
+        if (tabmap) {
+          const c = document.getElementById('fullmap');
+          if (!c) throw new Error('fullmap canvas missing');
+          return c.toDataURL('image/png');
+        }
+        if (!GAME.renderer || !GAME.scene || !GAME.camera) throw new Error('renderer missing');
+        GAME.renderer.setRenderTarget(null);
+        GAME.renderer.render(GAME.scene, GAME.camera);
+        if (GAME.hud && GAME.hud.drawWaypoint) GAME.hud.drawWaypoint();
+        return GAME.renderer.domElement.toDataURL('image/png');
+      }, { tabmap: !!shot.tabmap });
+      if (!dataUrl || !dataUrl.startsWith('data:image/png')) throw new Error(`canvas capture failed for ${shot.name}`);
+      fs.writeFileSync(path.join(ROOT, shot.name), Buffer.from(dataUrl.split(',')[1], 'base64'));
       await page.evaluate(() => { window.GAME._holdFrame = false; });
       const size = fs.statSync(path.join(ROOT, shot.name)).size;
       const calls = await page.evaluate(() => window.GAME.renderer.info.render.calls);
