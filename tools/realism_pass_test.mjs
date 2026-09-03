@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -665,6 +665,45 @@ async function main() {
     assert(more.cover && more.clinch && more.gym && more.cleaver && more.bottle, 'cover, clinch, gym, cleaver, bottle exist');
     assert(more.morlam && more.cowboy, 'Mor Lam and Soi Cowboy stations exist');
     assert(more.nightSoi && more.fireAtTen && more.rapierOff, 'night race + fire-at-10 + rapier off');
+
+    console.log('\n[19] Suvarnabhumi pocket + ground taxi');
+    const bkk = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const plane = G.vehicles.find(v => v && v.kind === 'airliner' && v.playerJet) || G.vehicles.find(v => v && v.kind === 'airliner');
+      const n = G.vehicles.filter(v => v && v.kind === 'airliner' && !v.dead).length;
+      G.player.group.position.set(220, 0, 0);
+      main.updateDistrict();
+      let moved = 0, turned = 0;
+      if (plane) {
+        G.player.inVehicle = plane; plane.driver = 'player'; plane.npc = null;
+        plane.pos.set(237, 0, -40); plane.heading = 0; plane.vel = 0; plane.hp = 220;
+        plane.throttle = 1; plane.steerAngle = 0; plane.yawRate = 0; plane.latVel = 0;
+        plane.mesh.position.copy(plane.pos); plane.mesh.rotation.y = 0;
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }));
+        for (let i = 0; i < 20; i++) main.updatePlayerInVehicle(0.1);
+        moved = plane.pos.z + 40;
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyA' }));
+        plane.steerInput = 1;
+        for (let i = 0; i < 16; i++) main.updatePlayerInVehicle(0.1);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' }));
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyA' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        turned = Math.abs(plane.heading);
+      }
+      return {
+        flag: !!(G.gameplay && G.gameplay.airport),
+        poi: !!(G.world.poi && G.world.poi.suvarnabhumi),
+        district: G._districtName,
+        n,
+        moved,
+        turned,
+        kind: plane && plane.spec && plane.spec.kind,
+      };
+    });
+    assert(bkk.flag && bkk.poi && bkk.district === 'Suvarnabhumi', `Suvarnabhumi banner/POI (${bkk.district})`);
+    assert(bkk.n >= 3 && bkk.kind === 'airliner', `parked airliners exist (${bkk.n})`);
+    assert(bkk.moved > 1.5, `player can taxi an airliner on the ground (dz ${bkk.moved.toFixed(1)})`);
+    assert(bkk.turned > 0.04, `player can steer an airliner on the ground (heading ${bkk.turned.toFixed(3)})`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
