@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -1323,6 +1323,32 @@ async function main() {
     assert(pack.flag && pack.packed >= 8 && pack.stoolHidden && pack.parasolTilt, `stalls pack in the rain (${pack.packed})`);
     assert(pack.foodQ === 0, 'food queues empty when packed');
     assert(pack.open === 0 && pack.stoolBack, 'stalls unpack when it dries');
+
+    console.log('\n[41] BTS songthaew rank');
+    const song = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      main.updateVehicles(0.016);
+      const rec = G.world && G.world.btsSongthaew;
+      const bts = G.world && G.world.bts;
+      const v = rec && rec.vehicle || (G.vehicles || []).find(x => x && x.btsSongthaew);
+      const px = v && v.pos && v.pos.x;
+      const pz = v && v.pos && v.pos.z;
+      const dist = (v && bts && px != null) ? Math.hypot(px - bts.x, pz - (bts.z || 0)) : null;
+      const waiter = rec && rec.waiter;
+      return {
+        flag: !!(G.gameplay && G.gameplay.btsSongthaew),
+        rec: !!rec, hasV: !!v,
+        kind: v && (v.kind || (v.spec && v.spec.kind)),
+        stand: !!(v && v.btsSongthaew && v.driver !== 'player'),
+        near: dist != null && dist < 40,
+        dist, px, pz, btsX: bts && bts.x, btsZ: bts && (bts.z || 0),
+        home: rec && rec.x != null ? { x: rec.x, z: rec.z } : null,
+        npc: !!(v && v.npc), driver: v && v.driver,
+        waiter: !!(waiter && waiter.btsSongthaew && waiter.anchor),
+      };
+    });
+    assert(song.flag && song.kind === 'songthaew' && song.near, `a songthaew waits at the BTS (${song.dist && song.dist.toFixed(1)}m)`);
+    assert(song.stand && song.waiter, 'BTS songthaew is enterable and has a hawker');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

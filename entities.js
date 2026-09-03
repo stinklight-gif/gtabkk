@@ -1302,6 +1302,7 @@ export function spawnMotosaiStands(scene) {
     bike.driver = null;
     bike.vel = 0;
     bike.motosaiStand = true;
+    bike._standHome = { x, z, heading };
     const rider = spawnPed(scene, new THREE.Vector3(x + (alongZ ? 1.15 : 0), 0, z + (alongZ ? 0 : 1.15)));
     dressMotosaiVest(rider);
     wearBikeHelmet(rider, 0xffcf2a);
@@ -1325,6 +1326,7 @@ export function spawnMotosaiStands(scene) {
     bike.driver = null;
     bike.vel = 0;
     bike.motosaiStand = true;
+    bike._standHome = { x, z, heading };
     const rider = spawnPed(scene, new THREE.Vector3(x + 1.15, 0, z));
     dressMotosaiVest(rider);
     wearBikeHelmet(rider, 0xffcf2a);
@@ -1338,6 +1340,28 @@ export function spawnMotosaiStands(scene) {
     bike.standRider = rider;
     G.world.motosaiStands.push({ bike, rider, waiter, soi: null, x, z, bts: true });
   }
+}
+
+export function spawnBtsSongthaew(scene) {
+  if (!GAMEPLAY.btsSongthaew) return;
+  const bts = G.world && G.world.bts;
+  if (!bts) return;
+  const x = bts.x + 11.5, z = -22, heading = PI / 2;
+  const v = makeVehicle('songthaew', scene);
+  v.pos.set(x, 0, z);
+  v.heading = heading;
+  v.mesh.position.copy(v.pos);
+  v.mesh.rotation.y = heading;
+  v.driver = null;
+  v.vel = 0;
+  v.btsSongthaew = true;
+  v._standHome = { x, z, heading };
+  const waiter = spawnPed(scene, new THREE.Vector3(x + 2.4, 0, z + 0.4), 'laborer');
+  waiter.anchor = { slot: waiter.mesh.position.clone(), facing: heading + PI };
+  waiter.btsSongthaew = true;
+  waiter.speed = 0;
+  waiter.state = 'idle';
+  G.world.btsSongthaew = { vehicle: v, waiter, x, z };
 }
 
 // A handful of parked, enterable cars at the curb so there's always a ride (and a

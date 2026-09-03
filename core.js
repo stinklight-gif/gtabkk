@@ -268,6 +268,7 @@ export const GAMEPLAY = {
   crossingGuard: true,    // yellow-vest stop-paddle at Asok during the school walk
   btsMotosai: true,       // extra orange-vest stand at the Asok BTS escalator mouth
   rainPack: true,         // food stalls pack tarps and queues when the rain hits
+  btsSongthaew: true,     // parked songthaew + hawker at the Asok BTS exit
 };
 G.gameplay = GAMEPLAY;
 

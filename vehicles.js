@@ -365,6 +365,15 @@ export function killPed(ped) {
 export function updateVehicles(dt) {
   for (const v of G.vehicles) {
     if (v.dead) continue;
+    if ((v.btsSongthaew || v.motosaiStand) && v.driver !== 'player' && v._standHome) {
+      v.pos.set(v._standHome.x, 0, v._standHome.z);
+      v.heading = v._standHome.heading;
+      v.vel = 0; v.latVel = 0; v.yawRate = 0;
+      v._impactVX = 0; v._impactVZ = 0; v._impactSpin = 0;
+      if (v.mesh) { v.mesh.position.copy(v.pos); v.mesh.rotation.y = v.heading; }
+      if (GAMEPLAY.bikeHelmets && v.spec && v.spec.kind === 'bike') syncBikeRider(v);
+      continue;
+    }
     if (GAMEPLAY.bikeHelmets && v.spec && v.spec.kind === 'bike') syncBikeRider(v);
     if (v.lights) {
       const hazeOn = GAMEPLAY.burningHaze && G.time.weather === 'haze';
