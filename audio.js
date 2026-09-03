@@ -58,10 +58,17 @@ export function makeAudio() {
     o1.connect(lp); o2.connect(lp); lp.connect(g).connect(engineBus);
     o1.start(); o2.start();
     return {
-      set(speed01, on) {
-        const target = on ? 0.10 + speed01 * 0.18 : 0;
+      set(speed01, on, throttle = 0) {
+        const gp = window.GAME && window.GAME.gameplay;
+        let rpm01 = Math.max(0, Math.min(1, speed01 * 0.65 + (on ? 0.12 : 0) + throttle * 0.28));
+        if (gp && gp.fakeRpm) {
+          const gears = 5, gIdx = Math.min(gears - 1, Math.floor(speed01 * gears));
+          const inGear = speed01 * gears - gIdx;
+          rpm01 = Math.max(0, Math.min(1, 0.18 + gIdx * 0.08 + inGear * 0.55 + throttle * 0.2));
+        }
+        const target = on ? 0.08 + rpm01 * 0.20 : 0;
         g.gain.setTargetAtTime(target, ctx.currentTime, 0.1);
-        const f = rpmBase + speed01 * (harsh ? 380 : 180);
+        const f = rpmBase + rpm01 * (harsh ? 420 : 220);
         o1.frequency.setTargetAtTime(f, ctx.currentTime, 0.08);
         o2.frequency.setTargetAtTime(f * 0.5, ctx.currentTime, 0.08);
       },
@@ -80,19 +87,26 @@ export function makeAudio() {
     o.connect(lp).connect(g).connect(engineBus);
     o.start(); lfo.start();
     return {
-      set(speed01, on) {
-        const target = on ? 0.10 + speed01 * 0.18 : 0;
+      set(speed01, on, throttle = 0) {
+        const rpm01 = Math.max(0, Math.min(1, speed01 * 0.7 + throttle * 0.3));
+        const target = on ? 0.10 + rpm01 * 0.18 : 0;
         g.gain.setTargetAtTime(target, ctx.currentTime, 0.1);
-        const f = 50 + speed01 * 80;
+        const f = 50 + rpm01 * 90;
         o.frequency.setTargetAtTime(f, ctx.currentTime, 0.08);
-        lfo.frequency.setTargetAtTime(15 + speed01 * 22, ctx.currentTime, 0.1);
+        lfo.frequency.setTargetAtTime(15 + rpm01 * 22, ctx.currentTime, 0.1);
       },
       kill() { try { o.stop(); lfo.stop(); g.disconnect(); } catch {} }
     };
   }
 
   // Footstep, punch, pistol shot, hit, ricochet, siren
-  function step(wet=false)  { noise(0.05, wet ? 0.18 : 0.10, wet ? 4000 : 1200); }
+  function step(wet=false, hard=false)  { noise(0.05, wet ? 0.18 : hard ? 0.14 : 0.10, hard ? 5200 : wet ? 4000 : 1200); }
+  function scrape() { noise(0.10, 0.10, 900); }
+  function btsChime() {
+    blip({freq: 784, dur: 0.12, type: 'sine', gain: 0.14, release: 0.18});
+    setTimeout(() => blip({freq: 988, dur: 0.16, type: 'sine', gain: 0.12, release: 0.22}), 140);
+    setTimeout(() => noise(0.18, 0.08, 900), 280);
+  }
   function punch()           { noise(0.06, 0.25, 800); blip({freq:120, dur:0.06, type:'sine', gain:0.18, freqEnd:60}); }
   function kick()            { noise(0.10, 0.30, 600); blip({freq:90, dur:0.10, type:'sine', gain:0.22, freqEnd:40}); }
   function hit()             { noise(0.08, 0.30, 1500); blip({freq:200, dur:0.05, type:'triangle', gain:0.15, freqEnd:80}); }
@@ -196,11 +210,18 @@ export function makeAudio() {
       // ad "ding" mid-loop
       if (b === 20) { tone(t, nt(19), 0.2, 'sine', 0.18); tone(t + 0.18, nt(14), 0.28, 'sine', 0.16); }
     }
+    function watRadio(step, t) {
+      const b = step % 16;
+      if (b === 0) tone(t, nt(-12), 1.1, 'sine', 0.07);
+      if (b === 8) tone(t, nt(-5), 0.9, 'sine', 0.05);
+      if (b === 0) tone(t, nt(19), 0.7, 'sine', 0.05);
+    }
     const STATIONS = [
       { name: 'RADIO OFF', bpm: 0, pattern: null },
       { name: 'LUK THUNG FM', bpm: 104, pattern: lukThung },
       { name: 'BANGKOK BARS 97.5', bpm: 88, pattern: bangkokBars },
       { name: 'TALK RADIO AM', bpm: 100, pattern: talkRadio },
+      { name: 'WAT RADIO', bpm: 52, pattern: watRadio },
     ];
     let station = 1, step = 0, nextTime = 0;
     function reset() { step = 0; nextTime = 0; }
@@ -377,9 +398,81 @@ export function makeAudio() {
     }
   }
 
+  const districtGain = ctx.createGain(); districtGain.gain.value = 0; districtGain.connect(master);
+  const distOsc = ctx.createOscillator(); distOsc.type = 'sine'; distOsc.frequency.value = 68;
+  distOsc.connect(districtGain); distOsc.start();
+  const rumbleGain = ctx.createGain(); rumbleGain.gain.value = 0; rumbleGain.connect(master);
+  const rumbleOsc = ctx.createOscillator(); rumbleOsc.type = 'sawtooth'; rumbleOsc.frequency.value = 42;
+  const rumbleLp = ctx.createBiquadFilter(); rumbleLp.type = 'lowpass'; rumbleLp.frequency.value = 90;
+  rumbleOsc.connect(rumbleLp).connect(rumbleGain); rumbleOsc.start();
+  let lastWhoop = 0, lastKind = '';
+  function updateWorld() {
+    const G = window.GAME; if (!G || G.state !== 'playing') {
+      districtGain.gain.setTargetAtTime(0, ctx.currentTime, 0.4);
+      rumbleGain.gain.setTargetAtTime(0, ctx.currentTime, 0.4);
+      return;
+    }
+    const gp = G.gameplay || {};
+    const p = G.player && (G.player.inVehicle ? G.player.inVehicle.pos : G.player.group.position);
+    if (gp.districtBeds) {
+      const kind = G._districtName || 'Sukhumvit';
+      if (kind !== lastKind) {
+        lastKind = kind;
+        const freq = kind === 'Yaowarat' ? 92 : kind === 'The Wat' ? 54 : kind === 'Riverside' ? 48 : kind === 'Asok' ? 62 : 68;
+        distOsc.frequency.setTargetAtTime(freq, ctx.currentTime, 0.5);
+      }
+      const night = G.nightK || 0;
+      const lvl = kind === 'The Wat' ? 0.018 : kind === 'Riverside' ? 0.022 + night * 0.01 : kind === 'Yaowarat' ? 0.032 : 0.026;
+      districtGain.gain.setTargetAtTime(lvl, ctx.currentTime, 0.6);
+    }
+    if (p) {
+      let near = 0;
+      for (const v of G.vehicles) {
+        if (!v || v.dead || v.driver === 'player') continue;
+        const dx = v.pos.x - p.x, dz = v.pos.z - p.z;
+        if (dx * dx + dz * dz < 28 * 28) near++;
+      }
+      rumbleGain.gain.setTargetAtTime(Math.min(0.07, near * 0.01), ctx.currentTime, 0.3);
+    }
+    if (gp.spatialSiren && G.wanted && G.wanted.stars > 0 && p) {
+      let nd = 999, nearest = null;
+      for (const v of G.vehicles) {
+        if (!v.isCop || v.dead || !v.driver) continue;
+        const d = Math.hypot(v.pos.x - p.x, v.pos.z - p.z);
+        if (d < nd) { nd = d; nearest = v; }
+      }
+      if (G.heli) { const d = Math.hypot(G.heli.mesh.position.x - p.x, G.heli.mesh.position.z - p.z); if (d < nd) nd = d; }
+      const now = ctx.currentTime;
+      if (nearest && nd < 50 && now - lastWhoop > 0.95) {
+        lastWhoop = now;
+        siren();
+      }
+    }
+    if (G.audio && G.audio.rainBed && (G.time.rainStrength || 0) > 0.25 && p) {
+      let under = false;
+      const cells = G.world && G.world.buildingCells && buildingsNearSafe(p.x, p.z);
+      if (cells) for (const b of cells) {
+        const dx = Math.abs(p.x - b.pos.x) - b.size.x / 2;
+        const dz = Math.abs(p.z - b.pos.z) - b.size.z / 2;
+        if (dx < 2.4 && dz < 2.4 && (dx > -0.2 || dz > -0.2)) { under = true; break; }
+      }
+      G.audio.rainBed.setLevel((G.time.rainStrength || 0) * (under ? 0.28 : 0.18));
+    }
+  }
+  function buildingsNearSafe(x, z) {
+    const cells = G.world && G.world.buildingCells;
+    if (!cells) return (G.world && G.world.buildings) || [];
+    const BLOCK = 50;
+    const i = Math.round(x / BLOCK), j = Math.round(z / BLOCK);
+    const out = [];
+    const list = cells.get(i + ',' + j);
+    if (list) for (const b of list) out.push(b);
+    return out;
+  }
+
   const audio = {
     ctx, master, chime, bell, step, punch, kick, hit, shot, ricochet, reload,
-    whistle, siren, thunder, rumble, honk, bark,
+    whistle, siren, thunder, rumble, honk, bark, scrape, btsChime,
     // new SFX
     vaultAlarm, boatMotor, whack, cashBoom,
     engineLoop, tukTukLoop, blip, rainBed: null, ambienceBed: null,
@@ -387,6 +480,7 @@ export function makeAudio() {
     // dynamic-music tick — call once per frame from the loop's playing path.
     // It self-gates on G.state and ducks under SFX via its own bus.
     updateMusic: (dt) => { if (audio.music) audio.music.update((window.GAME && window.GAME.state) === 'playing'); },
+    updateWorld,
     duckEngine: on => engineBus.gain.setTargetAtTime(on ? 0.4 : 1.0, ctx.currentTime, 0.2),
     setVolume: v => { master.gain.value = v; },
   };

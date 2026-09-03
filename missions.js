@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, onSoi, inFlood, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { raiseWanted, recolorTorso, spawnPed } from './main.js';
 import { makeVehicle } from './entities.js';   // fleeing target car (Repo Run chase)
@@ -118,6 +118,9 @@ export function makeMissionSystem() {
         this.stage = 1;
         this.cp = 0;
         this.timeLeft = 0;
+        if (G.world.sois && G.world.sois.length) {
+          this.route = G.world.sois.slice(0, 5).map(s => new THREE.Vector3((s.x0 + s.x1) / 2, 0, (s.z0 + s.z1) / 2));
+        }
         G.hud.setMissionText('Soi Run');
         G.hud.showSubtitle("Soi Run: race the checkpoints. Get to the green start line.", "ซิ่งซอย — ไปจุดสตาร์ท");
         this.markerPos = this.startLine.clone();
@@ -137,7 +140,13 @@ export function makeMissionSystem() {
         } else if (this.stage === 2) {
           this.timeLeft -= dt;
           if (this.timeLeft <= 0) { this.fail(); return; }
-          G.hud.showPrompt(`SOI RUN &nbsp; ⏱ ${this.timeLeft.toFixed(1)}s &nbsp;·&nbsp; CP ${this.cp + 1}/${this.route.length}`, 0.4);
+          const v = G.player.inVehicle;
+          if (v && v.spec && !['bike', 'tuktuk', 'boat'].includes(v.spec.kind) && onSoi(v.pos.x, v.pos.z)) {
+            if (Math.abs(v.vel) > 6) v.vel = Math.min(v.vel, 5);
+            G.hud.showPrompt('SOI too tight — use a bike', 0.4);
+          } else {
+            G.hud.showPrompt(`SOI RUN &nbsp; ⏱ ${this.timeLeft.toFixed(1)}s &nbsp;·&nbsp; CP ${this.cp + 1}/${this.route.length}`, 0.4);
+          }
           if (dist2(G.player.group.position, this.markerPos) < 8*8) {
             this.cp++;
             if (this.cp >= this.route.length) { this.win(); return; }
@@ -714,6 +723,7 @@ export function makeMissionSystem() {
       markerPos: null,
       stage: 0,
       armed: false,
+      nextJob: null,
       foes: [],
       holdT: 0,
       spawnT: 0,
@@ -764,8 +774,9 @@ export function makeMissionSystem() {
           const d2 = dist2(pp, this.markerPos);
           if (!this.armed && d2 > 18 * 18) this.armed = true;
           if (this.armed) {
-            G.hud.showPrompt('Return to the <b>marker</b> to hold the <b>yard</b> again', 0.4);
-            if (d2 < 8 * 8) { this.armed = false; this.onStart(); }
+            const label = this.nextJob ? 'start <b>Lumpinee Bout</b>' : 'hold the <b>yard</b> again';
+            G.hud.showPrompt('Return to the <b>marker</b> to ' + label, 0.4);
+            if (d2 < 8 * 8) { this.armed = false; if (this.nextJob) sys.start(this.nextJob); else this.onStart(); }
           }
         }
       },
@@ -781,6 +792,7 @@ export function makeMissionSystem() {
         this.clearFoes();
         this.stage = 5; this.armed = false;
         G._holdYardDone = true;
+        this.nextJob = 'bout';
         G.cash += this.reward; G.hud.setCash(G.cash); G.hud.cashPop(this.reward);
         G.hud.showNotif(`Yard held: +฿${this.reward.toLocaleString()}`);
         G.hud.showSubtitle("Nong: \"The yard's ours. You're the real deal — that's the lot for now.\"", "นง: \"ลานนี้ของเราแล้ว เก่งจริง\"");
@@ -789,12 +801,150 @@ export function makeMissionSystem() {
         setBeam(this.markerPos, 0xff2a86);
       },
     },
+
+    bout: {
+      name: 'Lumpinee Bout',
+      th: 'มวยลุมพินี',
+      markerPos: null,
+      stage: 0,
+      armed: false,
+      nextJob: null,
+      foes: [],
+      wave: 0,
+      center: new THREE.Vector3(80, 0, 80),
+      reward: 5000,
+      onStart() {
+        this.stage = 1; this.wave = 0; this.foes = []; this.clearFoes();
+        this.center = (G.world.poi.temple ? G.world.poi.temple.clone() : this.center);
+        this.center.x += 18; this.center.z += 8;
+        this.markerPos = this.center.clone();
+        setBeam(this.markerPos, 0x39ff7a);
+        G.hud.setMissionText('Lumpinee Bout');
+        G.hud.showSubtitle("Uncle Seng: \"Three rounds. Fists only. Don't gas out.\"", "ลุงเซ้ง: \"สามยก หมัดอย่างเดียว\"");
+        G.hud.showPrompt('Reach the <b>ring</b> — fists only', 3);
+      },
+      spawnWave() {
+        this.wave++;
+        for (let i = 0; i < this.wave + 1; i++) {
+          const a = rand(0, TAU), r = 6;
+          const f = spawnPed(G.scene, new THREE.Vector3(this.center.x + Math.cos(a) * r, 0, this.center.z + Math.sin(a) * r));
+          f.gang = true; f.hp = 28 + this.wave * 6; f.speed = 2.4; f._notedAggression = true;
+          this.foes.push(f);
+        }
+      },
+      update(dt) {
+        const pp = G.player.group.position;
+        if (this.stage === 1) {
+          if (dist2(pp, this.center) < 10 * 10) {
+            this.stage = 2; this.spawnWave();
+            G.player.activeWeapon = 'fists';
+            G.hud.showNotif('Round 1 — jab, jab, cross. Block with Ctrl.');
+            setBeam(this.center, 0xff2a86);
+          }
+        } else if (this.stage === 2) {
+          G.player.activeWeapon = 'fists';
+          this.foes = this.foes.filter(f => !f.dead);
+          G.hud.showPrompt(`BOUT &nbsp; round ${this.wave}/3 &nbsp;·&nbsp; stam ${Math.round(G.player.stam)}`, 0.4);
+          if (!this.foes.length) {
+            if (this.wave >= 3) { this.win(); return; }
+            this.spawnWave();
+            G.hud.showNotif('Round ' + this.wave);
+            G.audio.whistle();
+          }
+        } else if (this.stage === 5) {
+          const d2 = dist2(pp, this.markerPos);
+          if (!this.armed && d2 > 18 * 18) this.armed = true;
+          if (this.armed) {
+            const label = this.nextJob ? 'start <b>Monsoon</b>' : 'fight the <b>bout</b> again';
+            G.hud.showPrompt('Return to the <b>marker</b> to ' + label, 0.4);
+            if (d2 < 8 * 8) { this.armed = false; if (this.nextJob) sys.start(this.nextJob); else this.onStart(); }
+          }
+        }
+      },
+      clearFoes() {
+        for (const f of this.foes) {
+          if (f.dead) continue;
+          f.dead = true; G.scene.remove(f.mesh); disposeObject(f.mesh);
+          const i = G.peds.indexOf(f); if (i >= 0) G.peds.splice(i, 1);
+        }
+        this.foes = [];
+      },
+      win() {
+        this.clearFoes();
+        this.stage = 5; this.armed = false; this.nextJob = 'monsoon';
+        G._boutDone = true;
+        G.cash += this.reward; G.hud.setCash(G.cash); G.hud.cashPop(this.reward);
+        G.hud.showNotif(`Bout won: +฿${this.reward.toLocaleString()}`);
+        G.hud.showSubtitle("Uncle Seng: \"Hands like that, you can work a storm.\"", "ลุงเซ้ง: \"หมัดดี มีงานหน้าฝน\"");
+        G.hud.setMissionText('Free Roam · Sukhumvit');
+        this.markerPos = this.center.clone();
+        setBeam(this.center, 0xff2a86);
+      },
+    },
+
+    monsoon: {
+      name: 'Monsoon',
+      th: 'มรสุม',
+      markerPos: null,
+      stage: 0,
+      armed: false,
+      pickup: null,
+      drop: null,
+      reward: 7000,
+      onStart() {
+        this.stage = 1;
+        G.time.weather = 'rain'; G._rainTarget = 0.85; G.time.rainStrength = 0.85;
+        const fl = (G.world.flood && G.world.flood[0]) || { x0: 60, x1: 80, z0: 60, z1: 80 };
+        this.pickup = new THREE.Vector3((fl.x0 + fl.x1) / 2, 0, (fl.z0 + fl.z1) / 2);
+        this.drop = (G.world.poi.pier ? G.world.poi.pier.clone() : new THREE.Vector3(-220, 0, -50));
+        this.markerPos = this.pickup.clone();
+        setBeam(this.markerPos, 0x39ff7a);
+        G.hud.setMissionText('Monsoon');
+        G.hud.showSubtitle("Uncle Seng: \"The soi's under. Get to the water, then the pier.\"", "ลุงเซ้ง: \"ซอยท่วม ไปท่าเรือ\"");
+        G.hud.showPrompt('Reach the flooded soi — a car will stall', 3);
+      },
+      update(dt) {
+        const pp = G.player.group.position;
+        if (this.stage === 1) {
+          if (dist2(pp, this.pickup) < 10 * 10) {
+            this.stage = 2;
+            this.markerPos = this.drop.clone();
+            setBeam(this.drop, 0x21f0ff);
+            G.hud.showNotif('Get to the pier — take the longtail if you can');
+          }
+        } else if (this.stage === 2) {
+          G.hud.showPrompt('MONSOON &nbsp;→&nbsp; the pier', 0.4);
+          if (dist2(pp, this.drop) < 12 * 12) { this.win(); return; }
+        } else if (this.stage === 5) {
+          const d2 = dist2(pp, this.markerPos);
+          if (!this.armed && d2 > 18 * 18) this.armed = true;
+          if (this.armed) {
+            G.hud.showPrompt('Return to the <b>marker</b> to run <b>Monsoon</b> again', 0.4);
+            if (d2 < 8 * 8) { this.armed = false; this.onStart(); }
+          }
+        }
+      },
+      win() {
+        this.stage = 5; this.armed = false;
+        G._monsoonDone = true;
+        G.cash += this.reward; G.hud.setCash(G.cash); G.hud.cashPop(this.reward);
+        G.hud.showNotif(`Monsoon done: +฿${this.reward.toLocaleString()}`);
+        G.hud.showSubtitle("Uncle Seng: \"That's the city, kid. Wet and still moving.\"", "ลุงเซ้ง: \"นี่แหละกรุงเทพ\"");
+        G.hud.setMissionText('Free Roam · Sukhumvit');
+        this.markerPos = this.drop.clone();
+        setBeam(this.drop, 0xff2a86);
+      },
+    },
   };
   sys.start = id => {
     sys.active = missions[id];
     sys.active.onStart();
   };
-  sys.update = dt => { if (sys.active && sys.active.update) sys.active.update(dt); };
+  sys.update = dt => {
+    if (sys.active && sys.active.update) sys.active.update(dt);
+    if (beam) beam.visible = G.state === 'playing';
+  };
+  sys.missions = missions;
   // Resume from a save: if the intro was done, drop straight into free roam with
   // Soi Run available at its marker (instead of replaying the welcome delivery).
   sys.resume = welcomeDone => {

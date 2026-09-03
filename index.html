@@ -275,6 +275,8 @@
   #phone .ph-head { color: #ffcf4a; letter-spacing: 2px; font-size: 11px; margin: 4px 0 3px; opacity: .9; }
   #ph-activities { display: flex; flex-direction: column; gap: 3px; margin-bottom: 6px; }
   #ph-activities .act { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; line-height: 1.45; }
+  #ph-activities .act.job { cursor: pointer; }
+  #ph-activities .act.job:hover { color: var(--gold); }
   #ph-activities .act .a-name { color: #eaf6f2; }
   #ph-activities .act .a-meta { color: #9fe0ff; opacity: .85; white-space: nowrap; }
   #phone .row { padding: 6px 0; border-top: 1px solid #2a2d33; }
@@ -432,6 +434,7 @@
         <div class="bar-label">CAR</div>
         <div class="bar-outer"><div id="veh-fill" class="bar-fill"></div></div>
       </div>
+      <div id="speedo" style="display:none;margin-top:4px;font-size:13px;letter-spacing:2px;opacity:.85">0 km/h</div>
     </div>
   </div>
 

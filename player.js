@@ -126,7 +126,7 @@ export function updatePlayer(dt) {
     if (p.pelvis) p.pelvis.position.y = 0.82 - hipDrop * 0.6;
     // footstep audio
     p._stepPhase = (p._stepPhase||0) + dt * speed;
-    if (p._stepPhase > 0.6) { p._stepPhase = 0; G.audio.step(G.time.rainStrength > 0.3); }
+    if (p._stepPhase > 0.6) { p._stepPhase = 0; G.audio.step(G.time.rainStrength > 0.3, (p.group.position.y || 0) > 0.4); }
   } else {
     if (parts && parts.legL && parts.legR) {
       parts.legL.rotation.x *= 0.85;
@@ -196,6 +196,10 @@ export function updateBTS(dt) {
   const dx = b.mesh.position.x - G.player.group.position.x;
   if ((b._dxPrev || 0) * dx < 0 && Math.abs(G.player.group.position.z) < 45 && G.audio.rumble) G.audio.rumble();
   b._dxPrev = dx;
+  const stationX = (G.world.bts && G.world.bts.x) || -50;
+  if (Math.abs(b.mesh.position.x - stationX) < 6) {
+    if (!b._announced && G.audio.btsChime) { G.audio.btsChime(); b._announced = true; }
+  } else b._announced = false;
 }
 
 // Spin/bob the hidden amulets and collect them on touch.

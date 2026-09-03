@@ -12,7 +12,7 @@ import {
 } from './player.js';
 export * from './vehicles.js';
 import {
-  STORABLE, collectPaintMats, currentBodyColor, isNearGridLine, killPed, randomPlate, repaintVehicle, respawnTraffic, retrieveVehicle, setVehicleColor, storeVehicle, storedLabel, updateCamera, updateGarage, updateGarageOwnership, updatePlayerInVehicle, updateTrafficCar, updateVehicles, closeUpgrades, applyUpgrades
+  STORABLE, collectPaintMats, currentBodyColor, isNearGridLine, killPed, randomPlate, repaintVehicle, respawnTraffic, retrieveVehicle, setVehicleColor, storeVehicle, storedLabel, updateCamera, updateGarage, updateGarageOwnership, updatePlayerInVehicle, updateTrafficCar, updateTrafficPopulation, updateVehicles, closeUpgrades, applyUpgrades
 } from './vehicles.js';
 export * from './world.js';
 import {
@@ -442,8 +442,8 @@ async function init() {
     const blurMat = new THREE.ShaderMaterial({ uniforms: { tDiffuse: { value: null }, dir: { value: new THREE.Vector2() }, res: { value: new THREE.Vector2(hw, hh) } }, vertexShader: vsrc, fragmentShader:
       'uniform sampler2D tDiffuse; uniform vec2 dir; uniform vec2 res; varying vec2 vUv; void main(){ vec2 o = dir / res; vec3 s = texture2D(tDiffuse, vUv).rgb * 0.2270; s += (texture2D(tDiffuse, vUv + o*1.3846).rgb + texture2D(tDiffuse, vUv - o*1.3846).rgb) * 0.3162; s += (texture2D(tDiffuse, vUv + o*3.2308).rgb + texture2D(tDiffuse, vUv - o*3.2308).rgb) * 0.0703; gl_FragColor = vec4(s, 1.0); }' });
     // composite: add bloom in linear, apply exposure + ACES tone map + sRGB encode
-    const compMat = new THREE.ShaderMaterial({ uniforms: { tScene: { value: null }, tBloom: { value: null }, strength: { value: 0.7 }, exposure: { value: 1.0 } }, vertexShader: vsrc, fragmentShader:
-      'uniform sampler2D tScene; uniform sampler2D tBloom; uniform float strength; uniform float exposure; varying vec2 vUv; vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14), 0.0, 1.0); } void main(){ vec3 c = (texture2D(tScene, vUv).rgb + texture2D(tBloom, vUv).rgb * strength) * exposure; c = aces(c); c = pow(c, vec3(1.0/2.2)); gl_FragColor = vec4(c, 1.0); }' });
+    const compMat = new THREE.ShaderMaterial({ uniforms: { tScene: { value: null }, tBloom: { value: null }, strength: { value: 0.7 }, exposure: { value: 1.0 }, haze: { value: 0.0 } }, vertexShader: vsrc, fragmentShader:
+      'uniform sampler2D tScene; uniform sampler2D tBloom; uniform float strength; uniform float exposure; uniform float haze; varying vec2 vUv; vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14), 0.0, 1.0); } void main(){ vec2 uv = vUv; if (haze > 0.001) { float n = sin(uv.y * 80.0 + uv.x * 40.0) * 0.002 * haze; uv += vec2(n, n * 0.6); } vec3 c = (texture2D(tScene, uv).rgb + texture2D(tBloom, uv).rgb * strength) * exposure; c = aces(c); c = pow(c, vec3(1.0/2.2)); gl_FragColor = vec4(c, 1.0); }' });
     const quadScene = new THREE.Scene();
     const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), brightMat);
     quadScene.add(quad);
@@ -486,6 +486,12 @@ async function init() {
   spawnPeds(scene, 60);
   spawnDogs(scene, 16);
   buildClusterAnchors();
+  for (const f of (G.world.foodStalls || [])) {
+    const sp = f.pos.clone(); sp.y = 1.15;
+    f.smoke = makeSmokeEmitter(sp, 0.28);
+    f.smoke.life = 1e9;
+    if (f.smoke.mat) { f.smoke.mat.size = 0.7; f.smoke.mat.color.setHex(0x887766); }
+  }
   setProgress(88);
 
   // A parked motorbike right next to the player so they can grab it immediately
@@ -1389,6 +1395,11 @@ function renderBloom() {
   }
   b.quad.material = b.compMat; b.compMat.uniforms.tScene.value = b.sceneRT.texture; b.compMat.uniforms.tBloom.value = b.bloomA.texture;
   b.compMat.uniforms.exposure.value = r.toneMappingExposure;   // day/night exposure (set each frame by daynight.js)
+  if (b.compMat.uniforms.haze) {
+    const dayK = 1 - (G.nightK || 0);
+    const rain = (G.time && G.time.rainStrength) || 0;
+    b.compMat.uniforms.haze.value = (GAMEPLAY.heatHaze && dayK > 0.7 && rain < 0.15 && !G._inMall) ? (dayK - 0.7) / 0.3 : 0;
+  }
   r.setRenderTarget(null); r.render(b.quadScene, b.quadCam);
 }
 
@@ -1490,6 +1501,7 @@ export function loop() {
     updateQuickDelivery(dt);
     updateTrafficLights(dt);   // advance the signal phase before cars/peds read it
     updateVehicles(dt);
+    updateTrafficPopulation(dt);
     updatePeds(dt);
     updateEntityLod();
     updateClusters(dt);
@@ -1508,6 +1520,7 @@ export function loop() {
     updateCamera(dt);
     updateBTS(dt);
     updateDayNight(dt);
+    if (G.audio && G.audio.updateWorld) G.audio.updateWorld(dt);
     updateFestival(dt);
     // distant daytime traffic honks (ambient flavor)
     if (Math.random() < (1 - Math.exp(-0.24 * dt)) * (1 - (G.nightK || 0))) G.audio.blip({ freq: 360, dur: 0.2, type: 'square', gain: 0.03, freqEnd: 330 });
@@ -1534,6 +1547,7 @@ export function loop() {
     G.hud.update(dt);
     G.hud.setBars(G.player.hp, G.player.armor, G.player.stam);
     G.hud.setVehicle(G.player.inVehicle ? G.player.inVehicle.hp : 0, !!G.player.inVehicle);
+    if (G.hud.setSpeed) G.hud.setSpeed(G.player.inVehicle ? G.player.inVehicle.vel : 0, !!G.player.inVehicle);
     G.hud.setCash(G.cash);
     G.hud.drawMinimap(G.player);
     if (G.input.endFrame) G.input.endFrame();
