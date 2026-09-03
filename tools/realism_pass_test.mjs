@@ -446,6 +446,137 @@ async function main() {
     assert(foot.hpStepDown === foot.hpMax, 'a step down off a kerb costs nothing');
     assert(foot.hpJump === foot.hpMax, 'a normal jump costs nothing');
     assert(Math.abs(foot.fast - foot.slow) < Math.max(0.35, foot.fast * 0.08), `on-foot acceleration is frame-rate independent (${foot.fast.toFixed(2)} at 60 Hz vs ${foot.slow.toFixed(2)} at 15 Hz)`);
+
+    console.log('\n[7] P0 gameplay flags default on');
+    const flags = await page.evaluate(() => {
+      const g = window.GAME.gameplay || {};
+      return g;
+    });
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad']) {
+      assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
+    }
+
+    console.log('\n[8] P1 pedestrians vs buildings + walkways');
+    const peds = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const ways = (G.world.walkways || []).length;
+      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget);
+      const b = G.world.buildings.find(x => x.size.y > 8 && x.size.x > 4 && x.size.z > 4) || G.world.buildings[0];
+      const insideBefore = wanderer && b && Math.abs(wanderer.mesh.position.x - b.pos.x) < b.size.x / 2 && Math.abs(wanderer.mesh.position.z - b.pos.z) < b.size.z / 2;
+      if (wanderer && b) {
+        wanderer.mesh.position.set(b.pos.x, 0, b.pos.z);
+        wanderer.anchor = null; wanderer.panicT = 0; wanderer.gang = false;
+        main.updatePeds(0.05);
+      }
+      const p = wanderer && wanderer.mesh.position;
+      const outside = p && b && (Math.abs(p.x - b.pos.x) >= b.size.x / 2 - 0.02 || Math.abs(p.z - b.pos.z) >= b.size.z / 2 - 0.02);
+      return { ways, outside, hadPed: !!wanderer, insideBefore };
+    });
+    assert(peds.ways > 20, `walkways authored (${peds.ways})`);
+    assert(peds.hadPed && peds.outside, 'wanderer pushed out of a building AABB');
+
+    console.log('\n[9] P2 traffic density vs time of day');
+    const traf = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const count = () => G.vehicles.filter(v => v && v.npc && v.npc.kind === 'traffic' && !v.isCop && v.driver !== 'player' && !v.dead).length;
+      G.time.dayT = 0.13;
+      for (let i = 0; i < 40; i++) main.updateTrafficPopulation(0.2);
+      const n3 = count();
+      G.time.dayT = 0.35;
+      for (let i = 0; i < 40; i++) main.updateTrafficPopulation(0.2);
+      const n8 = count();
+      return { n3, n8 };
+    });
+    assert(traf.n8 > traf.n3, `rush hour has more ambient cars than 3am (${traf.n8} vs ${traf.n3})`);
+
+    console.log('\n[10] P3 per-kind feel + limp');
+    const feel = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const specs = {};
+      for (const kind of ['tuktuk', 'camry', 'supercar', 'bike']) {
+        let v = G.vehicles.find(x => x && x.spec && x.spec.kind === kind);
+        if (!v) { v = main.makeVehicle(kind, G.scene); v.pos.set(-200, 0, -200); }
+        specs[kind] = { floor: v.spec.frictionFloor, powerYaw: v.spec.powerYaw, grip: v.spec.grip };
+      }
+      const car = G.player.inVehicle || G.vehicles.find(v => v.spec && v.spec.kind !== 'boat');
+      car.hp = 20; car.pos.set(0, 0, -140); car.heading = 0; car.vel = 0; car.throttle = 1;
+      G.player.inVehicle = car; car.driver = 'player';
+      const down = code => window.dispatchEvent(new KeyboardEvent('keydown', { code }));
+      const up = code => window.dispatchEvent(new KeyboardEvent('keyup', { code }));
+      down('KeyW');
+      for (let i = 0; i < 20; i++) {
+        main.updatePlayerInVehicle(0.1);
+        car.pos.set(0, 0, -140); car.heading = 0;
+      }
+      const limpVel = car.vel;
+      up('KeyW'); if (G.input && G.input.endFrame) G.input.endFrame();
+      car.hp = 100; car.vel = 0; car.throttle = 0;
+      return { specs, limpVel, top: car.spec.topSpeed };
+    });
+    assert(feel.specs.tuktuk && feel.specs.supercar && feel.specs.tuktuk.floor > feel.specs.supercar.floor, 'tuk-tuk friction floor is more forgiving than supercar');
+    assert(feel.specs.tuktuk.powerYaw > 0, 'tuk-tuk has power-oversteer yaw');
+    assert(feel.limpVel < feel.top * 0.7, `limping car is slower than spec top (${feel.limpVel.toFixed(1)} of ${feel.top})`);
+
+    console.log('\n[11] P4 sois + flood');
+    const world = await page.evaluate(() => {
+      const G = window.GAME;
+      return {
+        sois: (G.world.sois || []).length,
+        flood: (G.world.flood || []).length,
+        walkways: (G.world.walkways || []).length,
+      };
+    });
+    assert(world.sois >= 4, `sois cut through blocks (${world.sois})`);
+    assert(world.flood >= 2, `flood patches exist (${world.flood})`);
+
+    console.log('\n[12] P5 audio world API');
+    const aud = await page.evaluate(() => {
+      const a = window.GAME.audio || {};
+      return {
+        updateWorld: typeof a.updateWorld === 'function',
+        btsChime: typeof a.btsChime === 'function',
+        scrape: typeof a.scrape === 'function',
+        stations: (a.radio && a.radio.names) || [],
+      };
+    });
+    assert(aud.updateWorld && aud.btsChime && aud.scrape, 'spatial/district/BTS/scrape audio hooks exist');
+    assert(aud.stations.indexOf('WAT RADIO') >= 0, 'Wat Radio station exists');
+
+    console.log('\n[13] P6 missions use the city');
+    const miss = await page.evaluate(() => {
+      const G = window.GAME;
+      const names = G.mission && G.mission.missions ? Object.keys(G.mission.missions) : [];
+      G.mission.start('bout');
+      const bout = G.mission.active && G.mission.active.name;
+      G.mission.start('monsoon');
+      const monsoon = G.mission.active && G.mission.active.name;
+      const rain = G.time.rainStrength;
+      return { names, bout, monsoon, rain };
+    });
+    assert(miss.names.indexOf('bout') >= 0 && miss.names.indexOf('monsoon') >= 0, 'Lumpinee and Monsoon missions exist');
+    assert(/Lumpinee|Bout/i.test(miss.bout), `bout starts (${miss.bout})`);
+    assert(/Monsoon/i.test(miss.monsoon) && miss.rain > 0.5, `monsoon starts and forces rain (${miss.monsoon}, rain ${miss.rain})`);
+
+    console.log('\n[14] P7 honest ammo HUD + speedo');
+    const ui = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      G.player.weapons.pistol = true; G.player.activeWeapon = 'pistol';
+      G.player.pistolAmmo = 12; G.player.pistolReserve = 36;
+      main.updateAmmoHud();
+      const ammo = document.getElementById('ammo-line').textContent;
+      const sub = document.getElementById('ammo-sub').textContent;
+      const v = G.vehicles.find(x => x && x.spec && x.spec.kind !== 'boat');
+      G.player.inVehicle = v; v.driver = 'player'; v.vel = 10;
+      if (G.hud.setSpeed) G.hud.setSpeed(v.vel, true);
+      const speedo = document.getElementById('speedo');
+      return {
+        ammo, sub,
+        speedShown: speedo && speedo.style.display !== 'none',
+        speedText: speedo && speedo.textContent,
+      };
+    });
+    assert(/12/.test(ui.ammo) && /36/.test(ui.ammo), `ammo HUD shows mag | reserve ("${ui.ammo}")`);
+    assert(ui.speedShown && /km\/h/.test(ui.speedText), `speedo shows km/h ("${ui.speedText}")`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
