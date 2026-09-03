@@ -437,6 +437,7 @@ export function buildLandmarks(env) {
   }
 
   // ---- Shrines (spirit houses) — small gold structures ----
+  world.shrines = [];
   for (let n = 0; n < 6; n++) {
     const sp = new THREE.Vector3(rand(-HALF+40, HALF-40), 0, rand(-HALF+40, HALF-40));
     // snap inside a block, not on a road
@@ -453,6 +454,7 @@ export function buildLandmarks(env) {
     pl.position.y = 2; shrine.add(pl);
     shrine.position.copy(sp);
     scene.add(shrine);
+    world.shrines.push({ pos: sp.clone(), mesh: shrine, readyAt: 0 });
   }
 
   // ---- Mission marker: Uncle Seng's gold shop (yellow pillar of light) ----

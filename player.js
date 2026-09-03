@@ -349,6 +349,13 @@ export function updateCollectibles(dt) {
 export function updateInteraction(dt) {
   const p = G.player;
   if (p.inVehicle || G._btsRide || G._eating) return;
+  const pp0 = p.group.position;
+  if (GAMEPLAY.stallSit && G.world.foodStalls) {
+    for (const f of G.world.foodStalls) if (dist2(f.pos, pp0) < 2.4 * 2.4) return;
+  }
+  if (GAMEPLAY.spiritWai && G.world.shrines) {
+    for (const s of G.world.shrines) if (dist2(s.pos, pp0) < 3.2 * 3.2) return;
+  }
 
   const crate = G.world.yaowaratCrate;
   if (crate && !crate.taken && dist2(p.group.position, crate.pos) < 2.6 * 2.6) {

@@ -601,6 +601,29 @@ export function updateFoodStalls(dt) {
   }
 }
 
+export function updateShrines(dt) {
+  if (!GAMEPLAY.spiritWai || G.player.inVehicle || G._eating) return;
+  const list = G.world && G.world.shrines;
+  if (!list || !list.length) return;
+  const pp = G.player.group.position;
+  const now = performance.now();
+  for (const s of list) {
+    if (dist2(s.pos, pp) > 3.2 * 3.2) continue;
+    G.hud.showPrompt('Press <b>E</b> to wai · ฿10 incense', 0.4);
+    if (G.input.pressed('KeyE')) {
+      if (s.readyAt && now < s.readyAt) { G.hud.showNotif('The incense is still burning'); return; }
+      if (G.cash < 10) { G.hud.showNotif('Need ฿10 for incense'); return; }
+      G.cash -= 10; G.hud.setCash(G.cash);
+      s.readyAt = now + 16000;
+      G.wanted.lastSeenAt = Math.max(0, (G.wanted.lastSeenAt || now) - 16000);
+      G._waiCount = (G._waiCount || 0) + 1;
+      G.hud.showNotif('The spirit house accepts your wai');
+      if (G.audio && G.audio.bell) G.audio.bell();
+    }
+    return;
+  }
+}
+
 export function updateMuggings(dt) {
   const m = G.mugging;
   if (m) {

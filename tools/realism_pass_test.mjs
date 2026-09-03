@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -1075,6 +1075,34 @@ async function main() {
     });
     assert(eat.flag && eat.stools >= 4, 'stallSit flag on and stalls exist');
     assert(eat.sitting && eat.paid && eat.healed && eat.visited && eat.done, 'E sits you down, ฿40, heal, first visit ticks');
+
+    console.log('\n[32] wai at a spirit house');
+    const wai = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const s = (G.world.shrines || [])[0];
+      if (!s) return { flag: false };
+      G._eating = null;
+      G.player.inVehicle = null;
+      G.player.group.position.copy(s.pos);
+      G.cash = 50;
+      G.wanted.stars = 2;
+      G.wanted.lastSeenAt = performance.now();
+      s.readyAt = 0;
+      const seen0 = G.wanted.lastSeenAt;
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+      main.updateShrines(0.016);
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      return {
+        flag: !!(G.gameplay && G.gameplay.spiritWai),
+        n: (G.world.shrines || []).length,
+        paid: G.cash === 40,
+        cooled: G.wanted.lastSeenAt < seen0 - 1000,
+        count: G._waiCount,
+      };
+    });
+    assert(wai.flag && wai.n >= 4, `spirit houses exist (${wai.n})`);
+    assert(wai.paid && wai.cooled && wai.count >= 1, 'wai costs ฿10 and cools wanted contact');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
