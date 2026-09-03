@@ -89,6 +89,7 @@ async function main() {
     // 1024×576 keeps the screenshots clear while cutting ~40% of the per-frame
     // SwiftShader render cost — needed now that the suite has 10 shots.
     const page = await browser.newPage({ viewport: { width: 854, height: 480 } });
+    page.setDefaultTimeout(90_000);
     page.on('pageerror', err => errors.push(`pageerror: ${err.message}`));
     page.on('console', msg => {
       if (msg.type() !== 'error') return;
