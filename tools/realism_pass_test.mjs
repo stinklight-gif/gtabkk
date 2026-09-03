@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -465,7 +465,7 @@ async function main() {
     const peds = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
       const ways = (G.world.walkways || []).length;
-      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait);
+      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute);
       const b = G.world.buildings.find(x => x.size.y > 8 && x.size.x > 4 && x.size.z > 4) || G.world.buildings[0];
       const insideBefore = wanderer && b && Math.abs(wanderer.mesh.position.x - b.pos.x) < b.size.x / 2 && Math.abs(wanderer.mesh.position.z - b.pos.z) < b.size.z / 2;
       if (wanderer && b) {
@@ -1195,6 +1195,36 @@ async function main() {
     assert(lids.standHelm && lids.pillionHelm, 'stand riders and pillions wear helmets');
     assert(lids.npcRider, 'traffic bikes show a helmeted rider');
     assert(lids.playerRider && lids.hoppedOff, 'player bike shows a helmeted rider that hides on foot');
+
+    console.log('\n[36] evening office commute');
+    const commute = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      G.time.dayT = 18.2 / 24;
+      G.time.weather = 'clear';
+      main.updateOfficeCommute(0.05);
+      const list = G._officeCommute || [];
+      const n = list.filter(p => p && p.commute && p.kind === 'office' && !p.dead).length;
+      const bts = G.world.bts;
+      const dest = { x: bts ? bts.x : 0, z: (bts && bts.z) || 0 };
+      let toward = 0;
+      for (const p of list) {
+        if (!p || !p.mesh) continue;
+        const dx = dest.x - p.mesh.position.x, dz = dest.z - p.mesh.position.z;
+        const want = Math.atan2(dx, dz);
+        let d = Math.abs(p.heading - want);
+        while (d > Math.PI) d = Math.abs(d - Math.PI * 2);
+        if (d < 0.6 || Math.hypot(dx, dz) < 10) toward++;
+      }
+      const shirt = list[0] && list[0].mesh && list[0].mesh.userData.parts && list[0].mesh.userData.parts.torso;
+      const pale = shirt && shirt.material && shirt.material.color.getHex() > 0xc0c0c0;
+      G.time.dayT = 12 / 24;
+      main.updateOfficeCommute(0.05);
+      const gone = !(G._officeCommute && G._officeCommute.length);
+      return { flag: !!(G.gameplay && G.gameplay.officeCommute), n, toward, pale, gone, bts: !!(bts) };
+    });
+    assert(commute.flag && commute.bts, 'officeCommute flag on and BTS exists');
+    assert(commute.n >= 5 && commute.toward >= 4 && commute.pale, `evening office crowd walks toward the BTS (${commute.n})`);
+    assert(commute.gone, 'office commute disperses after evening');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

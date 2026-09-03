@@ -263,6 +263,7 @@ export const GAMEPLAY = {
   soiCats: true,          // cats loaf at food stalls and bolt when you get close
   btsPlatform: true,      // commuters wait on Asok / Phrom Phong; PA when the train pulls in
   bikeHelmets: true,      // helmeted riders on bikes; stand/pillion heads get lids too
+  officeCommute: true,    // evening office crowd walking the sois toward the BTS
 };
 G.gameplay = GAMEPLAY;
 

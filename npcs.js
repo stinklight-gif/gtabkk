@@ -197,14 +197,14 @@ export function resyncCrowd() {
   // pull stray wanderers onto nearby sidewalks so the count near the camera
   // reflects the hour immediately (harness-only; gameplay distributes gradually)
   for (const ped of G.peds) {
-    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait) continue;
+    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute) continue;
     if (dist2(ped.mesh.position, pp) > 95 * 95) ped.mesh.position.copy(sidewalkPos(pp.x, pp.z, 88));
   }
   for (let guard = 0; G.peds.length > target && guard < 500; guard++) {
     let fi = -1, fd = -1;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute) continue;
       const d = dist2(ped.mesh.position, pp);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -441,7 +441,7 @@ export function updatePeds(dt) {
 
     // recycle a wanderer that strayed too far back onto a sidewalk in view
     // (anchored cluster peds stay put — they belong to a stall/store)
-    if (!ped.anchor && dist2(ped.mesh.position, playerPos) > 170*170) {
+    if (!ped.anchor && !ped.school && !ped.commute && dist2(ped.mesh.position, playerPos) > 170*170) {
       ped.mesh.position.copy(sidewalkPos(playerPos.x, playerPos.z, 75));
       if (ped.social) {
         ped.social = null;
@@ -468,7 +468,7 @@ export function updatePeds(dt) {
     let fi = -1, fd = 60 * 60;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute) continue;
       const d = dist2(ped.mesh.position, playerPos);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -982,6 +982,41 @@ function spawnBtsWaiter(stop) {
   return ped;
 }
 
+export function updateOfficeCommute(dt) {
+  if (!GAMEPLAY.officeCommute) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const bts = G.world && G.world.bts;
+  const dest = { x: bts ? bts.x : -50, z: (bts && bts.z) || 0 };
+  if (h >= 17 && h < 19.6) {
+    G._officeCommute = G._officeCommute || [];
+    while (G._officeCommute.length < 6) {
+      const ang = rand(0, TAU), r = rand(28, 90);
+      const pos = new THREE.Vector3(
+        clamp(dest.x + Math.cos(ang) * r, -HALF + 8, HALF - 8), 0,
+        clamp(dest.z + Math.sin(ang) * r, -HALF + 8, HALF - 8));
+      const ped = spawnPed(G.scene, pos, 'office');
+      ped.commute = true;
+      ped.anchor = null;
+      ped.state = 'walking';
+      ped.heading = Math.atan2(dest.x - pos.x, dest.z - pos.z);
+      G._officeCommute.push(ped);
+    }
+    for (const ped of G._officeCommute) {
+      if (!ped || ped.dead) continue;
+      const dx = dest.x - ped.mesh.position.x, dz = dest.z - ped.mesh.position.z;
+      const d = Math.hypot(dx, dz);
+      if (d > 8) { ped.heading = Math.atan2(dx, dz); ped.speed = 1.45; ped.state = 'walking'; }
+      else { ped.speed = 0.2; ped.state = 'idle'; }
+    }
+  } else if (G._officeCommute && G._officeCommute.length) {
+    for (const ped of G._officeCommute) {
+      if (!ped || ped.dead) continue;
+      ped.commute = false;
+    }
+    G._officeCommute = [];
+  }
+}
+
 export function updateBtsPlatform(dt) {
   if (!GAMEPLAY.btsPlatform) return;
   const stops = btsStopList();
@@ -1038,7 +1073,7 @@ export function updateSeekShade(dt) {
   let n = 0;
   for (const ped of G.peds) {
     if (n >= 22) break;
-    if (!ped || ped.dead || ped.anchor || ped.gang || ped.pillion || ped.alms || ped.school || ped.btsWait || ped.panicT > 0) continue;
+    if (!ped || ped.dead || ped.anchor || ped.gang || ped.pillion || ped.alms || ped.school || ped.btsWait || ped.commute || ped.panicT > 0) continue;
     if (ped.social || ped.isMugger || ped.isTarget || ped.motosaiRider || ped.motosaiWait) continue;
     const w = nearestWalkway(ped.mesh.position.x, ped.mesh.position.z);
     if (!w) continue;
