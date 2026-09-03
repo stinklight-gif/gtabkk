@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, inWat, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { CRIME_THRESHOLDS, abortHeist, animateWalk, damagePlayer, hasLineOfSight, makePedMesh, makeVehicle, onCopKilled, raiseWanted, updateVehicleVisuals } from './main.js';
 
@@ -119,13 +119,13 @@ export function updateWanted(dt) {
       const flash = Math.sin(t) > 0;
       v.mesh.userData.copLamps[0].material.color.setHex(flash ? 0xff2222 : 0x441111);
       v.mesh.userData.copLamps[1].material.color.setHex(flash ? 0x2266ff : 0x111144);
-      if (Math.random() < 1 - Math.exp(-0.3 * dt)) G.audio.siren();   // per-second rate, not per-frame
+      if (!GAMEPLAY.spatialSiren && Math.random() < 1 - Math.exp(-0.3 * dt)) G.audio.siren();
     }
   }
 
   // spawn cops based on stars — foot cops live in G.cops, cop cars in G.vehicles
   const nightBonus = (G.nightK > 0.5 && G.wanted.stars > 0) ? 1 : 0;  // hotter at night
-  const desiredCops = (G.wanted.stars >= 4 ? 8 : G.wanted.stars >= 3 ? 6 : G.wanted.stars >= 2 ? 4 : G.wanted.stars >= 1 ? 2 : 0) + nightBonus;
+  const desiredCops = (G.wanted.stars >= 5 ? 10 : G.wanted.stars >= 4 ? 8 : G.wanted.stars >= 3 ? 6 : G.wanted.stars >= 2 ? 4 : G.wanted.stars >= 1 ? 2 : 0) + nightBonus;
   let alive = 0;
   for (const c of G.cops) if (!c.dead && c.state !== 'bribed') alive++;   // bribed cops aren't pursuers
   for (const v of G.vehicles) if (v.isCop && !v.dead && v.driver) alive++;
@@ -137,7 +137,10 @@ export function updateWanted(dt) {
     const r = rand(35, 60);
     const sx = clamp(p.x + Math.cos(ang) * r, -HALF + 5, HALF - 5);
     const sz = clamp(p.z + Math.sin(ang) * r, -HALF + 5, HALF - 5);
-    if (G.wanted.stars >= 4 && Math.random() < 0.5) {
+    if (G.wanted.stars >= 5 && Math.random() < 0.7) {
+      const s = spawnSwat(G.scene, new THREE.Vector3(sx, 0, sz));
+      s.vel = 7;
+    } else if (G.wanted.stars >= 4 && Math.random() < 0.5) {
       const s = spawnSwat(G.scene, new THREE.Vector3(sx, 0, sz));
       s.vel = 6;
     } else if (G.wanted.stars >= 3 && Math.random() < 0.6) {
@@ -174,7 +177,8 @@ export function updateWanted(dt) {
 
   // wanted decay once out of sight long enough
   const sinceSeen = (performance.now() - G.wanted.lastSeenAt) / 1000;
-  if (G.wanted.stars > 0 && sinceSeen > 35) {
+  const decayNeed = (GAMEPLAY.watHeatSink && inWat(p.x, p.z)) ? 17 : 35;
+  if (G.wanted.stars > 0 && sinceSeen > decayNeed) {
     G.wanted.stars = Math.max(0, G.wanted.stars - 1);
     // drop the accumulator to the new star's floor, or the pile of points behind a
     // massacre would instantly re-derive the star you just shed
@@ -416,6 +420,19 @@ export function updateFootCops(dt) {
     // to 'seeking' and head for where you were last seen (lastSeenPos is already
     // maintained by raiseWanted) instead of tracking you through a wall.
     const sees = copSeesPlayer(c, dt);
+    if (GAMEPLAY.watHeatSink && inWat(p.group.position.x, p.group.position.z) && G.wanted.stars <= 2) {
+      const temple = G.world.poi.temple;
+      const td = Math.hypot(c.mesh.position.x - temple.x, c.mesh.position.z - temple.z);
+      if (td < 42) {
+        const away = Math.atan2(c.mesh.position.x - temple.x, c.mesh.position.z - temple.z);
+        c.heading = away;
+        c.mesh.position.x += Math.sin(away) * c.speed * dt;
+        c.mesh.position.z += Math.cos(away) * c.speed * dt;
+        c.mesh.rotation.y = away;
+        animateWalk(c.mesh, c.speed, dt, true);
+        continue;
+      }
+    }
     c.state = sees ? 'engaging' : 'seeking';
     if (!sees) {
       const lp = G.wanted.lastSeenPos;

@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, TURFS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
-import { animateWalk, damagePlayer, recolorTorso, saveGame, sidewalkPos, spawnPed, spawnWalkingPair } from './main.js';
+import { animateWalk, damagePlayer, recolorTorso, resolvePedVsBuildings, saveGame, sidewalkPos, spawnPed, spawnWalkingPair } from './main.js';
 import { lightFor } from './traffic.js';
 
 // 13. PEDESTRIANS + DOGS
@@ -16,12 +16,44 @@ import { lightFor } from './traffic.js';
 // True only when the *next* step crosses from sidewalk into the live road; peds
 // already on the road (clearing it) and peds whose light is red are free to go.
 const _RW2 = ROAD_WIDTH / 2;
+function roadAboutToEnter(cx, cz, nx, nz) {
+  const gx = Math.round(nx / BLOCK) * BLOCK;
+  if (Math.abs(cx - gx) >= _RW2 && Math.abs(nx - gx) < _RW2 + 0.3) return { axis: 'x', center: gx, dir: 0 };
+  const gz = Math.round(nz / BLOCK) * BLOCK;
+  if (Math.abs(cz - gz) >= _RW2 && Math.abs(nz - gz) < _RW2 + 0.3) return { axis: 'z', center: gz, dir: 1 };
+  return null;
+}
 function steppingIntoLiveRoad(cx, cz, nx, nz) {
-  const gx = Math.round(nx / BLOCK) * BLOCK;          // nearest N/S road (cars run N/S → dir 0)
-  if (Math.abs(cx - gx) >= _RW2 && Math.abs(nx - gx) < _RW2 + 0.3 && lightFor(0) === 'green') return true;
-  const gz = Math.round(nz / BLOCK) * BLOCK;          // nearest E/W road (cars run E/W → dir 1)
-  if (Math.abs(cz - gz) >= _RW2 && Math.abs(nz - gz) < _RW2 + 0.3 && lightFor(1) === 'green') return true;
-  return false;
+  const r = roadAboutToEnter(cx, cz, nx, nz);
+  return !!(r && lightFor(r.dir) === 'green');
+}
+function nearestWalkway(x, z) {
+  const list = G.world && G.world.walkways;
+  if (!list || !list.length) return null;
+  let best = null, bd = 1e9;
+  for (let i = 0; i < list.length; i++) {
+    const w = list[i];
+    const cx = clamp(x, w.x0, w.x1), cz = clamp(z, w.z0, w.z1);
+    const d = (x - cx) * (x - cx) + (z - cz) * (z - cz);
+    if (d < bd) { bd = d; best = w; }
+  }
+  return best;
+}
+function pullOntoWalkway(ped, dt) {
+  if (!GAMEPLAY.pedWalkways || ped.anchor || ped.gang || ped.panicT > 0 || ped.social || ped.state === 'crossing') return;
+  if (ped.pair && !ped.pair.leader) return;
+  const w = (ped.walkway && ped.walkway.axis) ? ped.walkway : nearestWalkway(ped.mesh.position.x, ped.mesh.position.z);
+  if (!w) return;
+  ped.walkway = w;
+  const p = ped.mesh.position;
+  const ease = 1 - Math.pow(0.12, dt);
+  if (w.axis === 'z') {
+    p.x = lerp(p.x, (w.x0 + w.x1) * 0.5, ease);
+    if (Math.abs(Math.sin(ped.heading)) > 0.72) ped.heading = Math.cos(ped.heading) >= 0 ? 0 : PI;
+  } else {
+    p.z = lerp(p.z, (w.z0 + w.z1) * 0.5, ease);
+    if (Math.abs(Math.cos(ped.heading)) > 0.72) ped.heading = Math.sin(ped.heading) >= 0 ? PI / 2 : -PI / 2;
+  }
 }
 
 function localBearingTo(ped, target) {
@@ -171,6 +203,7 @@ export function updatePeds(dt) {
         const d = Math.sqrt(d2) || 1;
         ped.heading = Math.atan2(dx, dz);
         ped.panicT = Math.max(ped.panicT, 2.8);
+        ped.panicFrom = { x: v.pos.x, z: v.pos.z };
         ped.knockX = (ped.knockX || 0) + dx / d * Math.min(2.6, Math.abs(v.vel) * 0.08);
         ped.knockZ = (ped.knockZ || 0) + dz / d * Math.min(2.6, Math.abs(v.vel) * 0.08);
         if ((!G.barks || G.barks.length < 8) && Math.random() < 0.08) spawnBark(ped);
@@ -202,9 +235,9 @@ export function updatePeds(dt) {
     if (ped.panicT > 0) {
       ped.panicT -= dt;
       ped.speed = 3.0;
-      // run away from player
-      const dx = ped.mesh.position.x - playerPos.x;
-      const dz = ped.mesh.position.z - playerPos.z;
+      const src = ped.panicFrom || playerPos;
+      const dx = ped.mesh.position.x - src.x;
+      const dz = ped.mesh.position.z - src.z;
       ped.heading = Math.atan2(dx, dz);
       // occasional reaction bark (capped, so a panicked crowd doesn't spam)
       ped._barkCD = (ped._barkCD || 0) - dt;
@@ -234,13 +267,35 @@ export function updatePeds(dt) {
       }
     } else if (ped.state === 'waitingCrossing') {
       ped.speed = 0;
-      const probeSpeed = 1.1;
-      const nx = ped.mesh.position.x + Math.sin(ped.heading) * probeSpeed * dt;
-      const nz = ped.mesh.position.z + Math.cos(ped.heading) * probeSpeed * dt;
-      if (!steppingIntoLiveRoad(ped.mesh.position.x, ped.mesh.position.z, nx, nz)) {
+      const road = ped.crossRoad;
+      if (GAMEPLAY.pedCrosswalks && road && lightFor(road.dir) !== 'green') {
+        ped.state = 'crossing';
+        ped.speed = 1.45;
+        if (road.axis === 'x') ped.heading = ped.mesh.position.x < road.center ? PI / 2 : -PI / 2;
+        else ped.heading = ped.mesh.position.z < road.center ? 0 : PI;
+      } else {
+        const probeSpeed = 1.1;
+        const nx = ped.mesh.position.x + Math.sin(ped.heading) * probeSpeed * dt;
+        const nz = ped.mesh.position.z + Math.cos(ped.heading) * probeSpeed * dt;
+        if (!steppingIntoLiveRoad(ped.mesh.position.x, ped.mesh.position.z, nx, nz)) {
+          ped.state = 'walking';
+          ped.speed = rand(0.9, 1.7) * (ped.speedMul || 1);
+          ped.waitT = rand(1.0, 2.4);
+        }
+      }
+    } else if (ped.state === 'crossing') {
+      ped.speed = 1.45;
+      const road = ped.crossRoad;
+      if (road) {
+        const along = road.axis === 'x' ? ped.mesh.position.x : ped.mesh.position.z;
+        if (Math.abs(along - road.center) > _RW2 + 1.7) {
+          ped.state = 'walking';
+          ped.speed = rand(0.9, 1.7) * (ped.speedMul || 1);
+          ped.walkway = nearestWalkway(ped.mesh.position.x, ped.mesh.position.z);
+          ped.crossRoad = null;
+        }
+      } else {
         ped.state = 'walking';
-        ped.speed = rand(0.9, 1.7) * (ped.speedMul || 1);
-        ped.waitT = rand(1.0, 2.4);
       }
     } else if (ped.state === 'walking') {
       // light wander, mostly on sidewalk side of block
@@ -277,9 +332,11 @@ export function updatePeds(dt) {
     if (ped.state === 'walking' && ped.speed > 0.05 && !ped.gang && ped.panicT <= 0 && !ped.anchor && !ped.isMugger && !ped.isTarget) {
       const nx = ped.mesh.position.x + Math.sin(ped.heading) * ped.speed * dt;
       const nz = ped.mesh.position.z + Math.cos(ped.heading) * ped.speed * dt;
-      if (steppingIntoLiveRoad(ped.mesh.position.x, ped.mesh.position.z, nx, nz)) {
+      const road = roadAboutToEnter(ped.mesh.position.x, ped.mesh.position.z, nx, nz);
+      if (road && lightFor(road.dir) === 'green') {
         ped.speed = 0;
         ped.state = 'waitingCrossing';
+        ped.crossRoad = road;
       }
     }
     if (!ped.gang && ped.panicT <= 0 && !ped.anchor) {
@@ -302,6 +359,8 @@ export function updatePeds(dt) {
     }
     ped.mesh.position.x += Math.sin(ped.heading) * ped.speed * dt;
     ped.mesh.position.z += Math.cos(ped.heading) * ped.speed * dt;
+    pullOntoWalkway(ped, dt);
+    resolvePedVsBuildings(ped);
     // knockback impulse — a short shove that decays fast
     if (ped.knockX || ped.knockZ) {
       ped.mesh.position.x += ped.knockX * dt;
@@ -693,18 +752,44 @@ export function updateDogs(dt) {
     dog.timer -= dt;
     const d = Math.sqrt(dist2(dog.mesh.position, playerPos));
 
+    if (GAMEPLAY.dogRoadLife && dog.state !== 'chasing' && dog.state !== 'fleeing' && !G._dogChase) {
+      for (const v of G.vehicles) {
+        if (!v || v.dead || !v.spec || v.spec.kind !== 'bike' || Math.abs(v.vel) < 6) continue;
+        if (dist2(dog.mesh.position, v.pos) < 16) {
+          dog.state = 'chasing'; dog.timer = 1.5; dog.speed = 4.2;
+          dog.heading = v.heading; G._dogChase = dog; G.audio.bark();
+          break;
+        }
+      }
+    }
+
     if (dog.state === 'lying') {
-      if (d < 6) { dog.state = 'fleeing'; dog.timer = 2.5; G.audio.bark(); }
+      if (d < 6) { dog.state = 'fleeing'; dog.timer = 2.5; dog._lie = { x: dog.mesh.position.x, z: dog.mesh.position.z }; G.audio.bark(); }
       else if (dog.timer <= 0) { dog.state = Math.random()<0.5 ? 'walking' : 'lying'; dog.timer = rand(2, 8); dog.heading = rand(0,TAU); }
     } else if (dog.state === 'walking') {
-      if (d < 5) { dog.state = 'fleeing'; dog.timer = 2.5; G.audio.bark(); }
+      if (d < 5) { dog.state = 'fleeing'; dog.timer = 2.5; dog._lie = { x: dog.mesh.position.x, z: dog.mesh.position.z }; G.audio.bark(); }
       else if (dog.timer <= 0) { dog.state = Math.random()<0.4 ? 'lying' : 'walking'; dog.timer = rand(3, 8); dog.heading = rand(0,TAU); }
     } else if (dog.state === 'fleeing') {
       const dx = dog.mesh.position.x - playerPos.x;
       const dz = dog.mesh.position.z - playerPos.z;
       dog.heading = Math.atan2(dx, dz);
       dog.speed = 3.5;
-      if (d > 14 || dog.timer <= 0) { dog.state = 'walking'; dog.speed = 0.9; dog.timer = rand(3, 7); }
+      if (d > 14 || dog.timer <= 0) {
+        if (GAMEPLAY.dogRoadLife && dog._lie) {
+          dog.state = 'regroup'; dog.speed = 1.1; dog.timer = 6;
+        } else { dog.state = 'walking'; dog.speed = 0.9; dog.timer = rand(3, 7); }
+      }
+    } else if (dog.state === 'regroup') {
+      const t = dog._lie;
+      if (!t) { dog.state = 'walking'; }
+      else {
+        const dx = t.x - dog.mesh.position.x, dz = t.z - dog.mesh.position.z;
+        const dd = Math.hypot(dx, dz);
+        dog.heading = Math.atan2(dx, dz); dog.speed = 1.2;
+        if (dd < 0.8 || dog.timer <= 0) { dog.state = 'lying'; dog.speed = 0; dog.timer = rand(3, 8); }
+      }
+    } else if (dog.state === 'chasing') {
+      if (dog.timer <= 0) { dog.state = 'walking'; dog.speed = 0.9; if (G._dogChase === dog) G._dogChase = null; }
     }
 
     if (dog.state !== 'lying') {

@@ -186,7 +186,11 @@ export function bindHud() {
     const poi = (G.world && G.world.poi) || {};
     const out = [];
     const m = G.mission && G.mission.active;
-    out.push({ name: 'Jobs · Uncle Seng', status: (m && m.markerPos) ? `active: ${m.name}` : 'available', dist: d(poi.goldShop) });
+    const nextJob = !G._welcomeDone ? 'welcome' : !G._soiRunWon ? 'soiRun' : !G._hitDone ? 'hit' : !G._deliveryDone ? 'delivery' : !G._mallJobDone ? 'mallJob' : !G._getawayDone ? 'getaway' : !G._repoRunDone ? 'repoRun' : !G._courierDone ? 'courier' : !G._holdYardDone ? 'holdYard' : !G._boutDone ? 'bout' : 'monsoon';
+    out.push({ name: 'Jobs · Uncle Seng', status: (m && m.markerPos) ? `active: ${m.name}` : 'available', dist: d(poi.goldShop), job: nextJob });
+    if (G._welcomeDone) out.push({ name: 'Soi Run', status: G._soiRunWon ? 'done · replay' : 'available', job: 'soiRun', dist: null });
+    if (G._holdYardDone) out.push({ name: 'Lumpinee Bout', status: G._boutDone ? 'done · replay' : 'available', job: 'bout', dist: d(poi.temple) });
+    if (G._boutDone) out.push({ name: 'Monsoon', status: G._monsoonDone ? 'done · replay' : 'available', job: 'monsoon', dist: d(poi.pier) });
     if (G.world && G.world.bank) {
       const h = G.heist;
       const st = (h && h.active) ? 'in progress' : (h && performance.now() < h.cooldownUntil) ? `cooldown ${Math.ceil((h.cooldownUntil - performance.now()) / 1000)}s` : 'ready';
@@ -212,8 +216,20 @@ export function bindHud() {
   }
   function setPhoneStats() {
     const actEl = document.getElementById('ph-activities');
-    if (actEl) actEl.innerHTML = phoneActivities().map(a =>
-      `<div class="act"><span class="a-name">${a.name}</span><span class="a-meta">${a.status}${a.dist != null ? ` · ${a.dist}m` : ''}</span></div>`).join('');
+    if (actEl) {
+      actEl.innerHTML = phoneActivities().map(a =>
+        `<div class="act${a.job ? ' job' : ''}" ${a.job ? `data-job="${a.job}"` : ''}><span class="a-name">${a.name}</span><span class="a-meta">${a.status}${a.dist != null ? ` · ${a.dist}m` : ''}</span></div>`).join('');
+      actEl.onclick = e => {
+        const row = e.target.closest('[data-job]');
+        if (!row || !G.mission || !G.mission.start) return;
+        const job = row.getAttribute('data-job');
+        if (!job) return;
+        G.mission.start(job);
+        phone.classList.remove('open');
+        G.state = 'playing';
+        if (G.input && G.input.requestLock) G.input.requestLock();
+      };
+    }
     const total = (G.world && G.world.collectibles) ? G.world.collectibles.length : 0;
     document.getElementById('ph-amulets').textContent = `${G.collected || 0} / ${total}`;
     document.getElementById('ph-fares').textContent = (G.taxi && G.taxi.fares) || 0;
@@ -247,6 +263,13 @@ export function bindHud() {
     if (!row) return;
     row.style.display = show ? '' : 'none';
     if (show) document.getElementById('veh-fill').style.width = clamp(hp, 0, 100) + '%';
+  }
+  function setSpeed(vel, show) {
+    const el = document.getElementById('speedo');
+    if (!el) return;
+    const on = !!(show && GAMEPLAY.speedo);
+    el.style.display = on ? '' : 'none';
+    if (on) el.textContent = Math.round(Math.abs(vel || 0) * 3.6) + ' km/h';
   }
   function setClock(s) { document.getElementById('clock').textContent = s; document.getElementById('ph-time').textContent = s; }
   function setWeather(t) { document.getElementById('weather-tag').textContent = t; }
@@ -499,7 +522,7 @@ export function bindHud() {
   }
 
   return {
-    setStars, flashWanted, setCash, cashPop, flashScreen, setBars, setAmmo, setMissionText, setClock, setWeather, setCrosshair, hitMarker, setPhoneStats, setVehicle,
+    setStars, flashWanted, setCash, cashPop, flashScreen, setBars, setAmmo, setMissionText, setClock, setWeather, setCrosshair, hitMarker, setPhoneStats, setVehicle, setSpeed,
     showSubtitle, showPrompt, showNotif, togglePhone, update, drawMinimap, drawWaypoint, setRadioChip
   };
 }

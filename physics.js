@@ -3,12 +3,29 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, buildingsNear, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { scarePeds } from './main.js';
 
 // 11. PHYSICS / COLLISIONS (lightweight)
 // =============================================================================
+
+// Ped vs buildings: same shortest-axis pushout as the player, but only tests the
+// 3×3 block neighbourhood so 80 peds don't walk the full building list.
+export function resolvePedVsBuildings(ped) {
+  if (!GAMEPLAY.pedBuildingCollision || !ped || ped.dead) return;
+  const p = ped.mesh.position, r = 0.35;
+  const list = buildingsNear(p.x, p.z);
+  for (const b of list) {
+    const hx = b.size.x / 2 + r, hz = b.size.z / 2 + r;
+    const dx = p.x - b.pos.x, dz = p.z - b.pos.z;
+    if (Math.abs(dx) < hx && Math.abs(dz) < hz) {
+      const px = hx - Math.abs(dx), pz = hz - Math.abs(dz);
+      if (px < pz) p.x = b.pos.x + (Math.sign(dx) || 1) * hx;
+      else p.z = b.pos.z + (Math.sign(dz) || 1) * hz;
+    }
+  }
+}
 
 // Player vs buildings: simple AABB pushback
 export function resolvePlayerVsBuildings(player) {
@@ -210,6 +227,8 @@ export function resolveVehicleVsBuildings(v) {
       G.camRig.shake = Math.min(0.4, normalSpeed * 0.02);
       G.audio.hit();
       spawnDust(p.x, p.z, 16);                 // impact puff
+    } else if (normalSpeed > 0.8 && G.audio && G.audio.scrape) {
+      G.audio.scrape();
     }
   }
   // bounds

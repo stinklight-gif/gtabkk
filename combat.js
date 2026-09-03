@@ -174,7 +174,7 @@ export function updateCombat(dt) {
       // chain jab -> jab -> cross finisher; press in rhythm to advance the step
       const combo = ['jab', 'jab', 'cross'];
       const step = p.comboStep % combo.length;
-      const kind = step === 2 ? pick(['cross', 'kick']) : combo[step];   // finisher: cross or kick
+      const kind = step === 2 ? pick(['cross', 'kick', 'teep']) : combo[step];
       const finisher = step === 2;
       p.attackKind = kind;
       p.attackTimer = p.attackDur = finisher ? 0.28 : 0.22;
@@ -194,6 +194,8 @@ export function updateCombat(dt) {
         p.armR.rotation.x = -Math.sin(t * PI) * 1.6;
       } else if (p.attackKind === 'kick') {
         p.legs.rotation.x = Math.sin(t * PI) * 1.2;
+      } else if (p.attackKind === 'teep') {
+        p.legs.rotation.x = Math.sin(t * PI) * 1.05;
       }
     }
     G.hud.setCrosshair(false);
@@ -204,8 +206,7 @@ export function updateCombat(dt) {
 
     const firing = gunTriggerDown();
     G.hud.setCrosshair(G.input.rightDown || firing);
-    if (firing && p.attackCooldown <= 0) {
-      firePistol();
+    if (firing && p.attackCooldown <= 0 && firePistol()) {
       p.attackCooldown = 0.18;
       p.gunRecoil = 1;
     }
@@ -215,8 +216,7 @@ export function updateCombat(dt) {
     setHeldGunPose('smg', recoil);
     const firing = gunTriggerDown();
     G.hud.setCrosshair(G.input.rightDown || firing);
-    if (firing && p.attackCooldown <= 0) {
-      fireSMG();
+    if (firing && p.attackCooldown <= 0 && fireSMG()) {
       p.attackCooldown = 0.07;   // fast, full-auto
       p.gunRecoil = 1;
     }
@@ -225,20 +225,33 @@ export function updateCombat(dt) {
     setHeldGunPose('shotgun', recoil);
     const firing = gunTriggerDown();
     G.hud.setCrosshair(G.input.rightDown || firing);
-    if (firing && p.attackCooldown <= 0) {
-      fireShotgun();
+    if (firing && p.attackCooldown <= 0 && fireShotgun()) {
       p.attackCooldown = 0.8;   // slow, punchy
       p.gunRecoil = 1;
     }
   }
 }
 
+function takeAmmo(gun) {
+  if (!GAMEPLAY.honestAmmo) return true;
+  const p = G.player;
+  const mag = gun === 'smg' ? 'smgAmmo' : gun === 'shotgun' ? 'shotgunAmmo' : 'pistolAmmo';
+  if ((p[mag] || 0) <= 0) { if (G.audio && G.audio.reload) G.audio.reload(); return false; }
+  p[mag] -= 1;
+  updateAmmoHud();
+  return true;
+}
+
 export function updateAmmoHud() {
   const p = G.player;
   if (p.activeWeapon === 'fists') G.hud.setAmmo('FISTS', 'MUAY THAI');
-  else if (p.activeWeapon === 'smg') G.hud.setAmmo('∞', 'SMG');
-  else if (p.activeWeapon === 'shotgun') G.hud.setAmmo('∞', 'SHOTGUN');
-  else G.hud.setAmmo('∞', '9MM PISTOL');
+  else if (!GAMEPLAY.honestAmmo) {
+    if (p.activeWeapon === 'smg') G.hud.setAmmo('∞', 'SMG');
+    else if (p.activeWeapon === 'shotgun') G.hud.setAmmo('∞', 'SHOTGUN');
+    else G.hud.setAmmo('∞', '9MM PISTOL');
+  } else if (p.activeWeapon === 'smg') G.hud.setAmmo(`${p.smgAmmo} | ${p.smgReserve}`, 'SMG');
+  else if (p.activeWeapon === 'shotgun') G.hud.setAmmo(`${p.shotgunAmmo} | ${p.shotgunReserve}`, 'SHOTGUN');
+  else G.hud.setAmmo(`${p.pistolAmmo} | ${p.pistolReserve}`, '9MM PISTOL');
 }
 
 export function triggerHitStop(s) { G.hitStop = Math.max(G.hitStop || 0, s); }
@@ -258,8 +271,9 @@ export function doMeleeHit(kind, finisher = false) {
       const d2 = tx*tx + tz*tz;
       if (fwd > 0 && fwd < 1.7 && Math.abs(side) < 1.0 && d2 < 4) {
         // finisher hits harder; kick/cross outdamage the jab
-        let dmg = (kind === 'kick' ? 22 : kind === 'cross' ? 18 : 12);
+        let dmg = (kind === 'kick' ? 22 : kind === 'cross' ? 18 : kind === 'teep' ? 16 : 12);
         if (finisher) dmg = Math.round(dmg * 1.6);
+        if (kind === 'teep' && list === G.peds) { target.knockX = fx * 5; target.knockZ = fz * 5; }
         target.hp -= dmg;
         target.panicT = 6;
         target.flinchT = 0.18;                              // stagger on the AI side
@@ -277,6 +291,7 @@ export function doMeleeHit(kind, finisher = false) {
           else killPed(target);
         }
         // bumping a ped raises minor heat once
+        noteMonkCrime(target);
         if (!target._notedAggression) {
           target._notedAggression = true;
           if (G.wanted.stars < 1) {
@@ -301,6 +316,7 @@ export function scarePeds(pos, radius) {
       const dx = ped.mesh.position.x - pos.x, dz = ped.mesh.position.z - pos.z;
       const d = Math.hypot(dx, dz) || 1;
       ped.heading = Math.atan2(dx, dz);
+      ped.panicFrom = { x: pos.x, z: pos.z };
       ped.panicT = Math.max(ped.panicT, 5.5);
       ped.knockX = (ped.knockX || 0) + dx / d * 1.2;
       ped.knockZ = (ped.knockZ || 0) + dz / d * 1.2;
@@ -310,7 +326,17 @@ export function scarePeds(pos, radius) {
   }
 }
 
+function noteMonkCrime(target) {
+  if (!GAMEPLAY.monkHeat || !target) return;
+  const kind = target.kind || (target.mesh && target.mesh.userData && target.mesh.userData.kind);
+  if (kind !== 'monk' || target._monkNoted) return;
+  target._monkNoted = true;
+  raiseWanted(2, 5);
+  G.hud.showNotif('You hit a monk — ★★');
+}
+
 export function firePistol() {
+  if (!takeAmmo('pistol')) return false;
   const origin = getMuzzleWorld();
   G.camera.getWorldDirection(_fireDir);
   // pistol stays accurate — only a whisper of spread so it's not laser-perfect
@@ -332,9 +358,11 @@ export function firePistol() {
   G.camRig.shake = Math.max(G.camRig.shake, 0.07);
   if (doBulletRaycast(G.camera.position, _fireDir)) { hitMarker(); G.audio.hit(); }
   scarePeds(origin, 14);
+  return true;
 }
 
 export function fireSMG() {
+  if (!takeAmmo('smg')) return false;
   const origin = getMuzzleWorld();
   G.camera.getWorldDirection(_fireDir);
   // sprayier than the pistol — a wide, full-auto cone you have to fight
@@ -354,9 +382,11 @@ export function fireSMG() {
   G.camRig.shake = Math.max(G.camRig.shake, 0.05);
   if (doBulletRaycast(G.camera.position, _fireDir, 20)) { hitMarker(); G.audio.hit(); }
   scarePeds(origin, 14);
+  return true;
 }
 
 export function fireShotgun() {
+  if (!takeAmmo('shotgun')) return false;
   const origin = getMuzzleWorld();
   if (!_muzzleLight) { _muzzleLight = new THREE.PointLight(0xffd577, 0, 6, 2); G.scene.add(_muzzleLight); }
   _muzzleLight.position.copy(origin);
@@ -381,6 +411,7 @@ export function fireShotgun() {
   }
   if (connected) { hitMarker(); G.audio.hit(); }   // one marker per blast, not per pellet
   scarePeds(origin, 16);
+  return true;
 }
 
 export function doBulletRaycast(origin, dir, dmg = 35) {
@@ -435,6 +466,7 @@ export function doBulletRaycast(origin, dir, dmg = 35) {
       triggerHitStop(0.035);                 // tiny freeze so a connecting shot reads
       connected = true;
       const killed = t.obj.hp <= 0;
+      noteMonkCrime(t.obj);
       if (killed) {
         if (G.cops.includes(t.obj)) killCop(t.obj);   // killCop books its own, heavier heat
         else killPed(t.obj);

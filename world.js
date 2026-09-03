@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, indexBuilding, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { buildLandmarks } from './worldLandmarks.js';
 import { updateDayNight } from './main.js';
@@ -26,6 +26,10 @@ export function buildWorld(scene) {
     poi: {},             // points of interest (mission markers)
     sevenElevens: [],
     minimap: null,       // canvas-rendered base layer
+    walkways: [],
+    sois: [],
+    flood: [],
+    buildingCells: new Map(),
   };
 
   // Day/night caches — populated below, consumed by updateDayNight() so it never
@@ -151,6 +155,21 @@ export function buildWorld(scene) {
   }
   swLong.dispose(); swShort.dispose();
 
+  // Sidewalk occupancy bands — peds walk these instead of heading-jittering through walls.
+  {
+    const sw = ROAD_W / 2, band = 2.8;
+    for (let i = -GRID / 2 + 1; i <= GRID / 2; i++) {
+      const roadX = i * BLOCK;
+      world.walkways.push({ x0: roadX - sw - band, x1: roadX - sw - 0.25, z0: -HALF + 2, z1: HALF - 2, axis: 'z' });
+      world.walkways.push({ x0: roadX + sw + 0.25, x1: roadX + sw + band, z0: -HALF + 2, z1: HALF - 2, axis: 'z' });
+    }
+    for (let j = -GRID / 2; j <= GRID / 2; j++) {
+      const roadZ = j * BLOCK;
+      world.walkways.push({ x0: -HALF + 12, x1: HALF - 2, z0: roadZ - sw - band, z1: roadZ - sw - 0.25, axis: 'x' });
+      world.walkways.push({ x0: -HALF + 12, x1: HALF - 2, z0: roadZ + sw + 0.25, z1: roadZ + sw + band, axis: 'x' });
+    }
+  }
+
   // ---- buildings ----
   // Buildings flank the road on all 4 sides of each block, forming a street canyon.
   // Each block: 4 corner buildings + a row of shop-houses marching along each side
@@ -266,6 +285,17 @@ export function buildWorld(scene) {
     return m;
   };
   const hangArmMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
+  const thaiAtlas = makeThaiSignAtlas();
+  const thaiSignMat = new THREE.MeshBasicMaterial({ map: thaiAtlas, toneMapped: false });
+  const doorRecessMat = new THREE.MeshStandardMaterial({ color: 0x2a2420, roughness: 0.95 });
+  function thaiSignPlane(w, h, idx) {
+    const g = new THREE.PlaneGeometry(w, h);
+    const col = idx % 4, row = (idx >> 2) & 1;
+    const uv = g.attributes.uv;
+    for (let k = 0; k < uv.count; k++) uv.setXY(k, col * 0.25 + uv.getX(k) * 0.25, (1 - row * 0.5) - (1 - uv.getY(k)) * 0.5);
+    uv.needsUpdate = true;
+    return g;
+  }
 
   // placeBuilding: shop band on bottom 4m + upper floors above, plus optional
   // window strips and neon sign on the faces that look toward a road. All of the
@@ -309,6 +339,16 @@ export function buildWorld(scene) {
       pos: new THREE.Vector3(bx, h/2, bz),
       size: new THREE.Vector3(dimX, h, dimZ),
     });
+
+    // Door recess on a fraction of shop fronts so the podium isn't a flush slab.
+    if (h < 28 && Math.random() < 0.42 && frontFaces.length > 0) {
+      const face = frontFaces[0];
+      const dw = 1.15, dh = 2.2;
+      const g = new THREE.PlaneGeometry(dw, dh);
+      if (face.ax === 'z') bake(baker, g, doorRecessMat, bx, 1.15, bz + face.sign * (dimZ / 2 + 0.03), face.sign < 0 ? PI : 0, 0, 0, false, false);
+      else bake(baker, g, doorRecessMat, bx + face.sign * (dimX / 2 + 0.03), 1.15, bz, face.sign > 0 ? PI / 2 : -PI / 2, 0, 0, false, false);
+      g.dispose();
+    }
 
     // window strip on mid/tall buildings — emissive panels on each road-facing
     // face. Lowered the threshold from 22 to 16 so mid-rises get windows too; the
@@ -461,28 +501,25 @@ export function buildWorld(scene) {
       }
     }
 
-    // perpendicular hanging sign — sticks out from the facade (Thai-shophouse style)
+    // perpendicular hanging sign — Thai-script atlas on a shared material (one draw call)
     if (h > 8 && Math.random() < 0.35 && frontFaces.length > 0) {
       const face = frontFaces[0];
       const armLen = 1.2;
       const signW = rand(1.0, 1.6), signH = rand(0.5, 0.9);
-      const signMat = getHangSignMat(pick([0xa84a3a, 0xcfa83a, 0xe0c885, 0x3a8a5a, 0x1a1a1a, 0xb24bff]));
       const heightY = Math.min(h - 1, rand(4.5, 7));
+      const gs = thaiSignPlane(signW, signH, irand(0, 7));
       if (face.ax === 'z') {
         const ga = new THREE.BoxGeometry(0.05, 0.05, armLen);
         bake(baker, ga, hangArmMat, bx, heightY, bz + face.sign * (dimZ/2 + armLen/2), 0, 0, 0, false, false);
         ga.dispose();
-        const gs = new THREE.BoxGeometry(signW, signH, 0.05);
-        bake(baker, gs, signMat, bx, heightY - signH/2 - 0.05, bz + face.sign * (dimZ/2 + armLen), 0, 0, 0, false, false);
-        gs.dispose();
+        bake(baker, gs, thaiSignMat, bx, heightY - signH/2 - 0.05, bz + face.sign * (dimZ/2 + armLen), face.sign < 0 ? PI : 0, 0, 0, false, false);
       } else {
         const ga = new THREE.BoxGeometry(armLen, 0.05, 0.05);
         bake(baker, ga, hangArmMat, bx + face.sign * (dimX/2 + armLen/2), heightY, bz, 0, 0, 0, false, false);
         ga.dispose();
-        const gs = new THREE.BoxGeometry(0.05, signH, signW);
-        bake(baker, gs, signMat, bx + face.sign * (dimX/2 + armLen), heightY - signH/2 - 0.05, bz, 0, 0, 0, false, false);
-        gs.dispose();
+        bake(baker, gs, thaiSignMat, bx + face.sign * (dimX/2 + armLen), heightY - signH/2 - 0.05, bz, face.sign > 0 ? PI/2 : -PI/2, 0, 0, false, false);
       }
+      gs.dispose();
     }
   }
 
@@ -495,6 +532,21 @@ export function buildWorld(scene) {
   const SAFE_I = -1, SAFE_J = 1;  // block reserved for the buyable safehouse (≈ -25, 75)
   const MALL_I = -1, MALL_J = 0;  // block reserved for Terminal 21 at Asok (≈ -25, 25)
   const BANK_I = 1, BANK_J = -2;  // block reserved for the Krung Thep Bank (≈ 75, -75)
+  const SOI_SPECS = GAMEPLAY.sois ? [
+    { i: 0, j: -3, axis: 'z' }, { i: 1, j: -3, axis: 'x' },
+    { i: 2, j: 1, axis: 'z' }, { i: -3, j: 0, axis: 'x' },
+    { i: 3, j: 2, axis: 'z' }, { i: 0, j: 2, axis: 'x' },
+    { i: -3, j: -3, axis: 'z' }, { i: 1, j: 3, axis: 'x' },
+  ] : [];
+  function soiCorridor(i, j, spec) {
+    const cx = (i + 0.5) * BLOCK, cz = (j + 0.5) * BLOCK, half = 2.6;
+    if (spec.axis === 'z') return { x0: cx - half, x1: cx + half, z0: cz - SIDEWALK_EDGE - 1, z1: cz + SIDEWALK_EDGE + 1, axis: 'z' };
+    return { x0: cx - SIDEWALK_EDGE - 1, x1: cx + SIDEWALK_EDGE + 1, z0: cz - half, z1: cz + half, axis: 'x' };
+  }
+  function overlapsSoi(bx, bz, dimX, dimZ, c) {
+    if (!c) return false;
+    return (bx - dimX / 2) < c.x1 && (bx + dimX / 2) > c.x0 && (bz - dimZ / 2) < c.z1 && (bz + dimZ / 2) > c.z0;
+  }
 
   for (let i = -GRID/2; i < GRID/2; i++) {
     for (let j = -GRID/2; j < GRID/2; j++) {
@@ -508,6 +560,9 @@ export function buildWorld(scene) {
       if (i === BANK_I && j === BANK_J) continue; // Krung Thep Bank block
       const cx = (i + 0.5) * BLOCK;
       const cz = (j + 0.5) * BLOCK;
+      const soiSpec = SOI_SPECS.find(s => s.i === i && s.j === j);
+      const soiC = soiSpec ? soiCorridor(i, j, soiSpec) : null;
+      if (soiC) world.sois.push(soiC);
 
       // Tall-building bias: central blocks more likely to have skyscrapers,
       // outer blocks more likely to be shop-houses.
@@ -519,6 +574,7 @@ export function buildWorld(scene) {
         const csx = rand(7, 9), csz = rand(7, 9);
         const bx = cx + sx * (SIDEWALK_EDGE - csx/2);
         const bz = cz + sz * (SIDEWALK_EDGE - csz/2);
+        if (overlapsSoi(bx, bz, csx, csz, soiC)) continue;
         const isTall = Math.random() < tallChance * 1.4;
         const h = isTall ? rand(45, 95) : rand(10, 26);
         placeBuilding(bx, bz, csx, csz, h, [
@@ -556,11 +612,44 @@ export function buildWorld(scene) {
             bx = cx + side.sign * (SIDEWALK_EDGE - d/2);
             dimX = d; dimZ = w;
           }
+          if (overlapsSoi(bx, bz, dimX, dimZ, soiC)) { cursor += w + 0.2; continue; }
           placeBuilding(bx, bz, dimX, dimZ, h, [{ ax: side.ax, sign: side.sign }]);
 
           cursor += w + rand(0.0, 0.8);
         }
       }
+    }
+  }
+
+  // Paint a thin carriageway down each soi so bikes can read the alley as a street.
+  {
+    const soiMat = new THREE.MeshStandardMaterial({
+      color: 0x3a3d42, roughness: 0.85, map: asphaltTex.map, roughnessMap: asphaltTex.roughnessMap,
+    });
+    world.surfaceMaterials.road.push(soiMat);
+    for (const s of world.sois) {
+      const w = s.x1 - s.x0, d = s.z1 - s.z0;
+      const g = new THREE.PlaneGeometry(w, d);
+      bake(flatBaker, g, soiMat, (s.x0 + s.x1) / 2, 0.03, (s.z0 + s.z1) / 2, 0, -PI / 2, 0, false, false);
+      g.dispose();
+    }
+  }
+
+  // Downpour flood patches sit in a few courtyards — cars stall, bikes don't.
+  if (GAMEPLAY.floodPatches) {
+    const floodMat = new THREE.MeshStandardMaterial({
+      color: 0x1a3040, roughness: 0.08, metalness: 0.35, transparent: true, opacity: 0,
+      envMap: G.envMap || null, envMapIntensity: 1.1, depthWrite: false,
+    });
+    world.surfaceMaterials.floodMat = floodMat;
+    const spots = [[1, 1], [-3, -2], [2, 3]];
+    for (const [bi, bj] of spots) {
+      const cx = (bi + 0.5) * BLOCK, cz = (bj + 0.5) * BLOCK;
+      const hw = 7, hd = 7;
+      world.flood.push({ x0: cx - hw, x1: cx + hw, z0: cz - hd, z1: cz + hd });
+      const g = new THREE.PlaneGeometry(hw * 2, hd * 2);
+      bake(flatBaker, g, floodMat, cx, 0.06, cz, 0, -PI / 2, 0, false, false);
+      g.dispose();
     }
   }
 
@@ -757,6 +846,8 @@ export function buildWorld(scene) {
 
 
   buildLandmarks({ scene, world, _m, _m2, _p, _q, _s, _e, addInstanced, bakeGroup, TEMPLE_I, TEMPLE_J, GARAGE_I, GARAGE_J, SAFE_I, SAFE_J, RIVER_I, YAO_I, YAO_J0, YAO_J1, GUN_I, GUN_J, MALL_I, MALL_J, BANK_I, BANK_J, SIDEWALK_EDGE });
+  world.buildingCells = new Map();
+  for (const b of world.buildings) indexBuilding(world, b);
   // ---- Flush static-geometry bakers → a handful of merged meshes ----
   // Everything routed through `baker`/`flatBaker` above (road stripes, sidewalks,
   // building/shop/setback boxes, window + neon planes) collapses here into one
@@ -769,6 +860,25 @@ export function buildWorld(scene) {
   world.minimap = makeMinimapBase(world);
 
   return world;
+}
+
+function makeThaiSignAtlas() {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 256;
+  const g = c.getContext('2d');
+  const names = ['ทอง', 'ส้มตำ', 'ซักรีด', 'ก๋วยเตี๋ยว', 'ยาดม', 'นวดแผนไทย', 'กาแฟ', 'ตัดผม'];
+  const colors = ['#a84a3a', '#cfa83a', '#3a8a5a', '#c26b3a', '#1a1a1a', '#7a3a8a', '#3a5a8a', '#b04030'];
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  for (let i = 0; i < 8; i++) {
+    const col = i % 4, row = i >> 2;
+    g.fillStyle = colors[i]; g.fillRect(col * 128, row * 128, 128, 128);
+    g.fillStyle = '#f5e9c8';
+    g.font = 'bold 32px "Noto Sans Thai", "Sarabun", system-ui, sans-serif';
+    g.fillText(names[i], col * 128 + 64, row * 128 + 64);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
 }
 
 export function makeWindowTexture() {
@@ -931,13 +1041,20 @@ export function makeMinimapBase(world) {
       g.fillRect(x, y, s, s);
     }
   }
-  // roads
-  g.strokeStyle = '#ffcf4a'; g.lineWidth = 3;
+  // arterials (yellow) + sois (gray) + khlong/river (blue) — Bangkok map legend
+  g.strokeStyle = '#e0b020'; g.lineWidth = 3;
   for (let i = -GRID/2; i <= GRID/2; i++) {
     g.beginPath();
     g.moveTo(mapW(-HALF), mapW(i*BLOCK)); g.lineTo(mapW(HALF), mapW(i*BLOCK)); g.stroke();
     g.beginPath();
     g.moveTo(mapW(i*BLOCK), mapW(-HALF)); g.lineTo(mapW(i*BLOCK), mapW(HALF)); g.stroke();
+  }
+  g.strokeStyle = '#8a8d92'; g.lineWidth = 1.6;
+  for (const s of (world.sois || [])) {
+    g.beginPath();
+    if (s.axis === 'z') { g.moveTo(mapW((s.x0 + s.x1) / 2), mapW(s.z0)); g.lineTo(mapW((s.x0 + s.x1) / 2), mapW(s.z1)); }
+    else { g.moveTo(mapW(s.x0), mapW((s.z0 + s.z1) / 2)); g.lineTo(mapW(s.x1), mapW((s.z0 + s.z1) / 2)); }
+    g.stroke();
   }
   // BTS line
   g.strokeStyle = '#21f0ff'; g.lineWidth = 2; g.setLineDash([4,3]);
@@ -945,7 +1062,7 @@ export function makeMinimapBase(world) {
   g.setLineDash([]);
 
   // Chao Phraya river along the west edge
-  g.fillStyle = '#3a5550';
+  g.fillStyle = '#3a6a88';
   const rvX = mapW(-HALF);
   const rvW = mapW(-HALF + BLOCK - 8) - rvX;
   g.fillRect(rvX, 0, rvW, SIZE);

@@ -192,6 +192,24 @@ async function main() {
     const cycled = await readChip();
     assert(cycled.station !== driving.station, `M cycles the station live (${driving.station} → ${cycled.station})`);
     assert(cycled.text !== driving.text, `radio chip text updated on M ("${cycled.text}")`);
+
+    console.log('\n[4] ammo HUD + speedo');
+    const ammoUi = await page.evaluate(() => {
+      const GAME = window.GAME;
+      GAME.player.weapons.pistol = true; GAME.player.activeWeapon = 'pistol';
+      GAME.player.pistolAmmo = 9; GAME.player.pistolReserve = 24;
+      return import('./main.js').then(main => {
+        main.updateAmmoHud();
+        GAME.hud.setSpeed(20, true);
+        return {
+          ammo: document.getElementById('ammo-line').textContent,
+          speed: document.getElementById('speedo').textContent,
+          speedShown: document.getElementById('speedo').style.display !== 'none',
+        };
+      });
+    });
+    assert(/9/.test(ammoUi.ammo) && /24/.test(ammoUi.ammo), `honest ammo HUD ("${ammoUi.ammo}")`);
+    assert(ammoUi.speedShown && /km\/h/.test(ammoUi.speed), `speedo visible ("${ammoUi.speed}")`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

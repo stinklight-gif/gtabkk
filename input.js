@@ -4,7 +4,7 @@
 // game is playable from a phone. All gameplay polls down()/pressed(), so the
 // touch UI just feeds a parallel set of "virtual keys" + the same look delta.
 // =============================================================================
-import { G } from './core.js';
+import { G, GAMEPLAY } from './core.js';
 
 export function makeInput() {
   const keys = new Set();
@@ -120,6 +120,31 @@ export function makeInput() {
   }
   if (isTouch) setupTouch();
 
+  let gpFire = false, gpAim = false;
+  function pollGamepad() {
+    if (!GAMEPLAY.gamepad || !navigator.getGamepads) return;
+    const gp = navigator.getGamepads()[0];
+    if (!gp) return;
+    vk('KeyW', (gp.axes[1] || 0) < -0.35); vk('KeyS', (gp.axes[1] || 0) > 0.35);
+    vk('KeyA', (gp.axes[0] || 0) < -0.35); vk('KeyD', (gp.axes[0] || 0) > 0.35);
+    vk('Space', !!(gp.buttons[0] && gp.buttons[0].pressed));
+    vk('ShiftLeft', !!(gp.buttons[1] && gp.buttons[1].pressed) || !!(gp.buttons[10] && gp.buttons[10].pressed));
+    vk('KeyE', !!(gp.buttons[3] && gp.buttons[3].pressed));
+    vk('KeyF', !!(gp.buttons[2] && gp.buttons[2].pressed));
+    vk('KeyQ', !!(gp.buttons[4] && gp.buttons[4].pressed));
+    vk('KeyR', !!(gp.buttons[5] && gp.buttons[5].pressed));
+    const rt = !!(gp.buttons[7] && gp.buttons[7].value > 0.4);
+    const lt = !!(gp.buttons[6] && gp.buttons[6].value > 0.4);
+    if (rt) { mouseDown = true; gpFire = true; }
+    else if (gpFire) { mouseDown = false; gpFire = false; }
+    if (lt) { rightDown = true; gpAim = true; }
+    else if (gpAim) { rightDown = false; gpAim = false; }
+    if (G.state === 'playing') {
+      mouseDX += (gp.axes[2] || 0) * 14;
+      mouseDY += (gp.axes[3] || 0) * 14;
+    }
+  }
+
   return {
     isTouch,
     down: c => keys.has(c) || vkeys.has(c),
@@ -138,6 +163,9 @@ export function makeInput() {
         } catch (_) {}
       }
     },
-    endFrame() { prevKeys = new Set(keys); prevVkeys = new Set(vkeys); pressedKeys.clear(); pressedVkeys.clear(); },
+    endFrame() {
+      pollGamepad();
+      prevKeys = new Set(keys); prevVkeys = new Set(vkeys); pressedKeys.clear(); pressedVkeys.clear();
+    },
   };
 }
