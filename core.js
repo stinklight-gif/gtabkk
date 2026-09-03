@@ -194,6 +194,7 @@ window.GAME = G; // for poking around in the console
 // -----------------------------------------------------------------------------
 export const ROAD_WIDTH = 12;          // matches buildWorld's local ROAD_W
 export const PED_TARGET = 82;          // peak crowd cap; scaled by crowdFactor(dayT) per time of day
+export const TRAFFIC_TARGET = 28;      // peak ambient cars; scaled by trafficFactor(dayT)
 
 export const GAMEPLAY = {
   armor: true,            // armor soaks damage before HP
@@ -201,7 +202,123 @@ export const GAMEPLAY = {
   pistolOnCopKill: true,  // first cop kill grants the 9mm (per README)
   wantedLOS: true,        // stars only decay once no cop is within sight
   fallDamage: true,       // long drops hurt (threshold ~2.8 m; a normal jump is free)
+  // P1 — pedestrians occupy the city
+  pedWalkways: true,
+  pedBuildingCollision: true,
+  pedCrosswalks: true,
+  monkHeat: true,
+  dogRoadLife: true,
+  // P2 — traffic as a time-of-day city
+  trafficDensity: true,
+  trafficDestinations: true,
+  bikeFilterWide: true,
+  // P3 — driving feel (still arcade)
+  vehicleKindFeel: true,
+  fakeRpm: true,
+  vehicleLimp: true,
+  kerbScrub: true,
+  // P4 — street-level world
+  sois: true,
+  yaowaratCarHostility: true,
+  floodPatches: true,
+  heatHaze: true,
+  // P5 — audio occupies space
+  spatialSiren: true,
+  districtBeds: true,
+  // P6 — missions that use the city
+  watHeatSink: true,
+  // P7 — honest UI
+  honestAmmo: true,
+  speedo: true,
+  gamepad: true,
 };
+G.gameplay = GAMEPLAY;
+
+export function indexBuilding(world, b) {
+  if (!world.buildingCells) world.buildingCells = new Map();
+  const i0 = Math.floor((b.pos.x - b.size.x / 2) / BLOCK);
+  const i1 = Math.floor((b.pos.x + b.size.x / 2) / BLOCK);
+  const j0 = Math.floor((b.pos.z - b.size.z / 2) / BLOCK);
+  const j1 = Math.floor((b.pos.z + b.size.z / 2) / BLOCK);
+  for (let i = i0; i <= i1; i++) {
+    for (let j = j0; j <= j1; j++) {
+      const k = i + ',' + j;
+      let list = world.buildingCells.get(k);
+      if (!list) { list = []; world.buildingCells.set(k, list); }
+      list.push(b);
+    }
+  }
+}
+
+export function buildingsNear(x, z) {
+  const cells = G.world && G.world.buildingCells;
+  if (!cells) return (G.world && G.world.buildings) || [];
+  const i = Math.round(x / BLOCK), j = Math.round(z / BLOCK);
+  const out = [], seen = new Set();
+  for (let di = -1; di <= 1; di++) {
+    for (let dj = -1; dj <= 1; dj++) {
+      const list = cells.get((i + di) + ',' + (j + dj));
+      if (!list) continue;
+      for (const b of list) {
+        if (seen.has(b)) continue;
+        seen.add(b);
+        out.push(b);
+      }
+    }
+  }
+  return out;
+}
+
+export const TRAFFIC_CURVE = [
+  [0, 0.28], [2, 0.18], [5, 0.22], [7, 0.70], [8.5, 1.0], [11, 0.75],
+  [14, 0.70], [16, 0.85], [18.5, 1.0], [21, 0.80], [23, 0.45], [24, 0.28],
+];
+export function trafficFactor(dayT) {
+  const h = ((dayT % 1) + 1) % 1 * 24;
+  for (let i = 0; i < TRAFFIC_CURVE.length - 1; i++) {
+    const a = TRAFFIC_CURVE[i], b = TRAFFIC_CURVE[i + 1];
+    if (h >= a[0] && h <= b[0]) return lerp(a[1], b[1], (h - a[0]) / (b[0] - a[0]));
+  }
+  return TRAFFIC_CURVE[0][1];
+}
+export function trafficTarget() {
+  if (!GAMEPLAY.trafficDensity) return TRAFFIC_TARGET;
+  return Math.max(6, Math.round(TRAFFIC_TARGET * trafficFactor(G.time.dayT)));
+}
+
+export function inYaowarat(x, z) {
+  const p = G.world && G.world.poi && G.world.poi.yaowarat;
+  if (!p) return false;
+  const dx = x - p.x, dz = z - p.z;
+  return dx * dx + dz * dz < 62 * 62;
+}
+export function inWat(x, z) {
+  const p = G.world && G.world.poi && G.world.poi.temple;
+  if (!p) return false;
+  const dx = x - p.x, dz = z - p.z;
+  return dx * dx + dz * dz < 40 * 40;
+}
+export function inFlood(x, z) {
+  const floods = G.world && G.world.flood;
+  if (!floods) return false;
+  for (const f of floods) {
+    if (x >= f.x0 && x <= f.x1 && z >= f.z0 && z <= f.z1) return true;
+  }
+  return false;
+}
+export function onSoi(x, z) {
+  const sois = G.world && G.world.sois;
+  if (!sois) return false;
+  for (const s of sois) {
+    if (x >= s.x0 && x <= s.x1 && z >= s.z0 && z <= s.z1) return true;
+  }
+  return false;
+}
+export function onCarriageway(x, z) {
+  const mx = ((x + HALF) % BLOCK) - BLOCK / 2;
+  const mz = ((z + HALF) % BLOCK) - BLOCK / 2;
+  return Math.abs(mx) < ROAD_WIDTH / 2 + 0.35 || Math.abs(mz) < ROAD_WIDTH / 2 + 0.35 || onSoi(x, z);
+}
 
 // pooled scratch objects (never returned/stored — copy out before reuse)
 export const _camTarget = new THREE.Vector3();
