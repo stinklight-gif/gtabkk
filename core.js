@@ -253,6 +253,7 @@ export const GAMEPLAY = {
   yaowaratNight: true,
   boatHijack: true,
   sevenInterior: true,
+  motosai: true,          // pillion motorcycle taxi, soi-only, pays more if you filter traffic
 };
 G.gameplay = GAMEPLAY;
 

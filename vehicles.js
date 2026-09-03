@@ -335,7 +335,7 @@ export function updatePlayerInVehicle(dt) {
 
   // ramming peds
   for (const ped of G.peds) {
-    if (ped.dead) continue;
+    if (ped.dead || ped.pillion) continue;
     if (dist2(ped.mesh.position, v.pos) < 1.6*1.6 && Math.abs(v.vel) > 4) {
       killPed(ped);
       raiseWanted(2, 5);

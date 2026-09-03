@@ -212,6 +212,7 @@ export function bindHud() {
     out.push({ name: 'Arcade · Tuk-Tuk Dash', status: 'mall floor 1', dist: d(poi.terminal) });
     out.push({ name: 'Riverside boats', status: 'longtails', dist: d(poi.pier) });
     out.push({ name: 'Taxi · press J', status: (G.taxi && G.taxi.stage && G.taxi.stage !== 'idle') ? 'fare active' : 'available', dist: null });
+    out.push({ name: 'Motosai · press J', status: (G.motosai && G.motosai.stage && G.motosai.stage !== 'idle') ? 'fare active' : 'bike · sois', dist: null });
     const qd = G.quickDrop;
     const qdStatus = qd && qd.stage !== 'idle'
       ? (qd.stage === 'toPickup' ? 'pickup' : `drop-off · streak ${qd.streak || 0}`)
@@ -358,6 +359,12 @@ export function bindHud() {
       mctx.fillStyle = G.taxi.stage === 'toDropoff' ? '#39ff7a' : '#ffcf4a';
       mctx.beginPath(); mctx.arc(tx - ppx, ty - ppy, 4, 0, TAU); mctx.fill();
     }
+    if (G.motosai && G.motosai.stage !== 'idle' && G.motosai.markerPos) {
+      const mx = (G.motosai.markerPos.x + HALF) * (256 / (HALF*2));
+      const my = (G.motosai.markerPos.z + HALF) * (256 / (HALF*2));
+      mctx.fillStyle = G.motosai.stage === 'toDropoff' ? '#39ff7a' : '#ff7a1a';
+      mctx.beginPath(); mctx.arc(mx - ppx, my - ppy, 4, 0, TAU); mctx.fill();
+    }
     if (G.quickDrop && G.quickDrop.stage !== 'idle' && G.quickDrop.markerPos) {
       const qx = (G.quickDrop.markerPos.x + HALF) * (256 / (HALF*2));
       const qy = (G.quickDrop.markerPos.z + HALF) * (256 / (HALF*2));
@@ -425,6 +432,8 @@ export function bindHud() {
       target = G.vigilante.markerPos; targetLabel = 'TARGET'; targetColor = '#ff3333';
     } else if (G.quickDrop && G.quickDrop.stage !== 'idle' && G.quickDrop.markerPos) {
       target = G.quickDrop.markerPos; targetLabel = G.quickDrop.stage === 'toPickup' ? 'PICK' : 'DROP'; targetColor = G.quickDrop.stage === 'toPickup' ? '#ffcf4a' : '#21f0ff';
+    } else if (G.motosai && G.motosai.stage && G.motosai.stage !== 'idle' && G.motosai.markerPos) {
+      target = G.motosai.markerPos; targetLabel = G.motosai.stage === 'toDropoff' ? 'DROP' : 'SAI'; targetColor = G.motosai.stage === 'toDropoff' ? '#39ff7a' : '#ff7a1a';
     } else if (G.taxi && G.taxi.stage && G.taxi.stage !== 'idle' && G.taxi.markerPos) {
       target = G.taxi.markerPos; targetLabel = G.taxi.stage === 'toDropoff' ? 'DROP' : 'TAXI'; targetColor = G.taxi.stage === 'toDropoff' ? '#39ff7a' : '#ffcf4a';
     } else if (G.mission && G.mission.active && G.mission.active.markerPos) {
@@ -480,6 +489,8 @@ export function bindHud() {
       target = G.vigilante.markerPos; color = '#ff3333'; label = `Vigilante target · ${Math.ceil(G.vigilante.timeLeft || 0)}s`;
     } else if (G.quickDrop && G.quickDrop.stage !== 'idle' && G.quickDrop.markerPos) {
       target = G.quickDrop.markerPos; color = G.quickDrop.stage === 'toPickup' ? '#ffcf4a' : '#21f0ff'; label = G.quickDrop.stage === 'toDropoff' ? 'Moto drop' : 'Moto pickup';
+    } else if (G.motosai && G.motosai.stage && G.motosai.stage !== 'idle' && G.motosai.markerPos) {
+      target = G.motosai.markerPos; color = G.motosai.stage === 'toDropoff' ? '#39ff7a' : '#ff7a1a'; label = G.motosai.stage === 'toDropoff' ? 'Motosai drop' : 'Motosai pick-up';
     } else if (G.taxi && G.taxi.stage && G.taxi.stage !== 'idle' && G.taxi.markerPos) {
       target = G.taxi.markerPos; color = '#39ff7a'; label = G.taxi.stage === 'toDropoff' ? 'Drop-off' : 'Pick-up';
     } else if (m && m.markerPos) { target = m.markerPos; color = '#ff2a86'; label = m.name || 'Objective'; }

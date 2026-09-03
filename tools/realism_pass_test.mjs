@@ -132,9 +132,9 @@ async function main() {
     const pickup = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
       G.state = 'playing';
-      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyJ' }));
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyY' }));
       main.updateQuickDelivery(0.016);
-      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyJ' }));
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyY' }));
       if (G.input && G.input.endFrame) G.input.endFrame();
       main.updateQuickDelivery(0.016);
       const q = G.quickDrop;
@@ -196,9 +196,9 @@ async function main() {
     const failed = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN, v = G.player.inVehicle;
       G.wanted.stars = 0;
-      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyJ' }));
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyY' }));
       main.updateQuickDelivery(0.016);
-      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyJ' }));
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyY' }));
       if (G.input && G.input.endFrame) G.input.endFrame();
       main.updateQuickDelivery(0.016);
       const q = G.quickDrop;
@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -781,6 +781,69 @@ async function main() {
       };
     });
     assert(seven.walkIn && seven.pos, 'walk-in 7-Eleven has ATM, microwave, clerk, shelves');
+
+    console.log('\n[25] Motosai pillion taxi');
+    const sai = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const onSoi = (x, z) => {
+        const sois = (G.world && G.world.sois) || [];
+        for (const s of sois) if (x >= s.x0 && x <= s.x1 && z >= s.z0 && z <= s.z1) return true;
+        return false;
+      };
+      const bike = G.vehicles.find(v => v && v.spec && v.spec.kind === 'bike' && !v.dead) || main.makeVehicle('bike', G.scene);
+      G.player.inVehicle = bike; bike.driver = 'player'; bike.npc = null;
+      bike.pos.set(0, 0, -130); bike.heading = 0; bike.vel = 0;
+      bike.mesh.position.copy(bike.pos); bike.mesh.rotation.y = 0;
+      G.player.group.position.copy(bike.pos); G.player.group.visible = false;
+      if (G.quickDrop) G.quickDrop.stage = 'idle';
+      if (G.motosai) { G.motosai.stage = 'idle'; G.motosai.pillion = null; }
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyJ' }));
+      main.updateMotosai(0.016);
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyJ' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      main.updateMotosai(0.016);
+      const m = G.motosai;
+      const pickupOnSoi = !!(m && m.markerPos && onSoi(m.markerPos.x, m.markerPos.z));
+      if (m && m.markerPos) {
+        bike.pos.copy(m.markerPos); bike.mesh.position.copy(bike.pos);
+        G.player.group.position.copy(bike.pos);
+      }
+      main.updateMotosai(0.05);
+      const pillionOn = !!(m && m.pillion && m.pillion.mesh && m.pillion.mesh.parent === bike.mesh);
+      const destOnSoi = !!(m && m.dest && onSoi(m.dest.x, m.dest.z));
+      const base = m && m.fareValue;
+      const car = G.vehicles.find(v => v && v.spec && v.spec.kind === 'camry' && v !== bike) || main.makeVehicle('camry', G.scene);
+      bike.pos.set(0, 0, -110); bike.vel = 12; bike.mesh.position.copy(bike.pos);
+      car.pos.set(1.4, 0, -110); car.vel = 4; if (car.mesh) car.mesh.position.copy(car.pos);
+      for (let i = 0; i < 8; i++) main.updateMotosai(0.1);
+      const filtered = (m && m.filterT) > 0.3 && (m && m.filterBonus) > 0;
+      const cash0 = G.cash;
+      if (m && m.dest) {
+        bike.pos.copy(m.dest); bike.mesh.position.copy(bike.pos);
+        G.player.group.position.copy(bike.pos);
+      }
+      main.updateMotosai(0.05);
+      return {
+        flag: !!(G.gameplay && G.gameplay.motosai),
+        started: pickupOnSoi,
+        pillionOn,
+        destOnSoi,
+        filtered,
+        paidMore: G.cash > cash0 && (G.cash - cash0) > base,
+        payout: G.cash - cash0,
+        base,
+        bonus: m && m.filterBonus,
+        fares: m && m.fares,
+        idle: m && m.stage === 'idle',
+        pillionOff: !(m && m.pillion),
+        sois: (G.world.sois || []).length,
+      };
+    });
+    assert(sai.flag && sai.sois >= 4, `motosai flag on and sois exist (${sai.sois})`);
+    assert(sai.started && sai.destOnSoi, 'motosai pickup and drop are on sois');
+    assert(sai.pillionOn, 'pillion rider sits on the bike after pickup');
+    assert(sai.filtered, 'filtering traffic raises the motosai bonus');
+    assert(sai.paidMore && sai.idle && sai.pillionOff && sai.fares >= 1, `motosai pays base+filter and hops off (฿${sai.payout})`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

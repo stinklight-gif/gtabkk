@@ -59,8 +59,8 @@ of sight, wanted-heat accumulation, fall damage, and frame-rate independence.
 | B | Bribe a nearby cop (฿1,000) at 1–2★ |
 | H | Honk (in vehicle) |
 | M | Car radio — cycle stations (Luk Thung / Bangkok Bars / Talk Radio / off) |
-| J | Start a taxi fare (in a songthaew) |
-| Y / J | Start Moto Drop (on a motorbike or tuk-tuk) |
+| J | Start a taxi fare (in a songthaew) · start a motosai (on a bike) |
+| Y / J | Start Moto Drop (Y on a bike, Y/J on a tuk-tuk) |
 | T | Phone — pauses pointer lock and shows menu |
 | +/- / 0 | Zoom / reset the full map while TAB map is open |
 | P | Photo mode — free-fly camera + hidden HUD (WASD/Space/Ctrl to fly, Shift faster) |
