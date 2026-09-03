@@ -194,6 +194,7 @@ export function bindHud() {
     if (G._monsoonDone) out.push({ name: 'Customs Issue', status: G._customsDone ? 'done · replay' : 'available', job: 'customs', dist: d(poi.klongToey) });
     out.push({ name: '2 AM Soi Race', status: G._nightSoiDone ? 'done · replay' : 'bikes · night', job: 'nightSoi', dist: null });
     if (poi.gym) out.push({ name: 'Muay Thai gym', status: `melee ${((G.econ.upgrades && G.econ.upgrades.melee) || 0)}/3`, dist: d(poi.gym) });
+    if (poi.suvarnabhumi) out.push({ name: 'Suvarnabhumi', status: 'taxi an airliner', dist: d(poi.suvarnabhumi) });
     if (G.world && G.world.bank) {
       const h = G.heist;
       const st = (h && h.active) ? 'in progress' : (h && performance.now() < h.cooldownUntil) ? `cooldown ${Math.ceil((h.cooldownUntil - performance.now()) / 1000)}s` : 'ready';
@@ -435,6 +436,7 @@ export function bindHud() {
     for (const shop of ((G.world.gunShops && G.world.gunShops.length) ? G.world.gunShops : (G.world.gunShop ? [{ pos: G.world.gunShop }] : []))) drawMiniBadge(shop.pos || shop, 'GUN', '#ff3344');
     if (G.world.poi && G.world.poi.bank) drawMiniBadge(G.world.poi.bank, 'BANK', BANK_COLOR);
     if (G.world.bts) drawMiniBadge({ x: G.world.bts.x, z: G.world.bts.z || 0 }, 'BTS', BTS_COLOR);
+    if (G.world.poi && G.world.poi.suvarnabhumi) drawMiniBadge(G.world.poi.suvarnabhumi, 'BKK', '#c9a020');
 
     // player blip (always center, facing up)
     mctx.save();

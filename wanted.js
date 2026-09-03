@@ -244,7 +244,7 @@ function copWitness(dt) {
 
 export function updateTrafficOffences(dt) {
   const v = G.player.inVehicle;
-  if (!v || !v.spec || v.spec.kind === 'boat' || Math.abs(v.vel || 0) < 6) { G._inJunction = false; return; }
+  if (!v || !v.spec || v.spec.kind === 'boat' || v.spec.kind === 'airliner' || Math.abs(v.vel || 0) < 6) { G._inJunction = false; return; }
   // dominant travel axis — same dir convention as updateTrafficCar (even = along z)
   const alongZ = Math.abs(Math.cos(v.heading)) >= Math.abs(Math.sin(v.heading));
   const coord = alongZ ? v.pos.z : v.pos.x;

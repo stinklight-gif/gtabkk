@@ -247,6 +247,7 @@ export const GAMEPLAY = {
   btsHijack: true,
   fireAtTen: true,
   allRed: true,
+  airport: true,
 };
 G.gameplay = GAMEPLAY;
 
@@ -330,6 +331,12 @@ export function onSoi(x, z) {
   }
   return false;
 }
+export function inAirport(x, z) {
+  if (!GAMEPLAY.airport) return false;
+  const b = G.world && G.world.airport;
+  if (b) return x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1;
+  return x >= 200 && x <= 248 && z >= -220 && z <= 220;
+}
 export function onCarriageway(x, z) {
   // Roads are authored on the grid lines (x = i*BLOCK, z = j*BLOCK). Measure
   // distance to the nearest line, wrapping the JS negative-mod case.
@@ -337,7 +344,7 @@ export function onCarriageway(x, z) {
   const rz = ((z % BLOCK) + BLOCK) % BLOCK;
   const dx = Math.min(rx, BLOCK - rx);
   const dz = Math.min(rz, BLOCK - rz);
-  return dx < ROAD_WIDTH / 2 + 0.35 || dz < ROAD_WIDTH / 2 + 0.35 || onSoi(x, z);
+  return dx < ROAD_WIDTH / 2 + 0.35 || dz < ROAD_WIDTH / 2 + 0.35 || onSoi(x, z) || inAirport(x, z);
 }
 
 // pooled scratch objects (never returned/stored — copy out before reuse)

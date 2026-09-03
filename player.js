@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, bizRate, bizCap, bizUpgradeCost, bizManagerCost, bizSaleValue, BANK_INTEREST, BANK_INTEREST_CAP, WEALTH_TIERS, netWorth, wealthRank, rankDiscount, ROAD_WIDTH, PED_TARGET, GAMEPLAY, buildingsNear, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, bizRate, bizCap, bizUpgradeCost, bizManagerCost, bizSaleValue, BANK_INTEREST, BANK_INTEREST_CAP, WEALTH_TIERS, netWorth, wealthRank, rankDiscount, ROAD_WIDTH, PED_TARGET, GAMEPLAY, buildingsNear, inAirport, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { tip, damagePlayer, resolvePlayerVsBuildings, resolvePlayerVsVehicles, resolvePlayerVsPlatforms, worldSupportY, saveGame, startArcade, applyUpgrades, raiseWanted, makeVehicle, updateAmmoHud, updateCombat, updatePlayerInVehicle } from './main.js';
 
@@ -175,7 +175,8 @@ export function updateDistrict() {
   const p = G.player.group.position;
   const poi = G.world.poi;
   let zone;
-  if (poi.klongToey && dist2(p, poi.klongToey) < 48 * 48) zone = { en: 'Klong Toey', th: 'คลองเตย' };
+  if (GAMEPLAY.airport && inAirport(p.x, p.z)) zone = { en: 'Suvarnabhumi', th: 'สุวรรณภูมิ' };
+  else if (poi.klongToey && dist2(p, poi.klongToey) < 48 * 48) zone = { en: 'Klong Toey', th: 'คลองเตย' };
   else if (p.x < -185) zone = { en: 'Riverside', th: 'ริมแม่น้ำ' };
   else if (poi.yaowarat && dist2(p, poi.yaowarat) < 62*62) zone = { en: 'Yaowarat', th: 'เยาวราช' };
   else if (poi.temple && dist2(p, poi.temple) < 46*46) zone = { en: 'The Wat', th: 'วัด' };
@@ -346,7 +347,8 @@ export function updateInteraction(dt) {
   for (const v of G.vehicles) {
     if (v.driver || v.dead) continue; // occupied/cop/player, or a wreck about to despawn
     const d2 = dist2(v.pos, p.group.position);
-    if (d2 < 8 * 8 && d2 < nd) { nd = d2; near = v; }   // dist2 is squared → compare against radius²
+    const reach = (v.spec && v.spec.kind === 'airliner') ? 16 : 8;
+    if (d2 < reach * reach && d2 < nd) { nd = d2; near = v; }   // dist2 is squared → compare against radius²
   }
   if (near) {
     G.hud.showPrompt('Press <b>E</b> to enter ' + vehicleName(near.kind), 0.5);
@@ -967,5 +969,5 @@ export function updateGunShop(dt) {
 }
 
 export function vehicleName(k) {
-  return { bike: 'motorbike', tuktuk: 'tuk-tuk', hilux: 'pickup', camry: 'car', sedan: 'sedan', cop: 'cop pickup', fortuner: 'unmarked SUV', swat: 'SWAT van', songthaew: 'songthaew', boat: 'longtail boat', bus: 'bus', luxsedan: 'luxury sedan', supercar: 'supercar' }[k] || k;
+  return { bike: 'motorbike', tuktuk: 'tuk-tuk', hilux: 'pickup', camry: 'car', sedan: 'sedan', cop: 'cop pickup', fortuner: 'unmarked SUV', swat: 'SWAT van', songthaew: 'songthaew', boat: 'longtail boat', bus: 'bus', luxsedan: 'luxury sedan', supercar: 'supercar', airliner: 'airliner' }[k] || k;
 }

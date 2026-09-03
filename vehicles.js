@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, UPGRADES, rankDiscount, ROAD_WIDTH, PED_TARGET, GAMEPLAY, trafficTarget, inYaowarat, inFlood, onSoi, onCarriageway, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, UPGRADES, rankDiscount, ROAD_WIDTH, PED_TARGET, GAMEPLAY, trafficTarget, inYaowarat, inFlood, onSoi, onCarriageway, inAirport, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { tip, cycleWeapon, damagePlayer, firePistol, fireSMG, fireShotgun, makeExplosion, makeSmokeEmitter, makeVehicle, onCopKilled, raiseWanted, resolveVehicleVsBuildings, resolveVehicleVsVehicles, saveGame, spawnSkid, updateCop, vehicleName } from './main.js';
 import { lightFor } from './traffic.js';
@@ -42,12 +42,12 @@ function applyLooseImpactMotion(v, dt) {
 }
 
 function exciteVehicleKerb(v) {
-  if (!v || !v.spec || v.spec.kind === 'boat') return;
+  if (!v || !v.spec || v.spec.kind === 'boat' || v.spec.kind === 'airliner') return;
   v._suspVel = (v._suspVel || 0) + 0.28;
 }
 
 function applyVehicleSuspensionVisual(v, dt, opts = {}) {
-  if (!v || !v.mesh || !v.spec || v.spec.kind === 'boat' || dt <= 0) return;
+  if (!v || !v.mesh || !v.spec || v.spec.kind === 'boat' || v.spec.kind === 'airliner' || dt <= 0) return;
   const spec = v.spec;
   const accelForward = opts.accelForward != null
     ? opts.accelForward
@@ -133,7 +133,7 @@ export function updatePlayerInVehicle(dt) {
   const inputEase = 1 - Math.pow(0.035, dt);
   v.throttle = lerp(v.throttle || 0, forward > 0 ? 1 : 0, inputEase);
   v.brakeInput = lerp(v.brakeInput || 0, forward < 0 ? 1 : 0, inputEase);
-  const roadVehicle = spec.kind !== 'boat';
+  const roadVehicle = spec.kind !== 'boat' && spec.kind !== 'airliner';
   const steerEase = roadVehicle ? (1 - Math.pow(0.0035, dt)) : (1 - Math.pow(0.02, dt));
   v.steerInput = lerp(v.steerInput || 0, steer, steerEase);
   const mass = spec.mass || 1500;
@@ -166,11 +166,11 @@ export function updatePlayerInVehicle(dt) {
   }
   const limp = (GAMEPLAY.vehicleLimp && v.hp < 30) ? 0.55 : 1;
   const speedMul = (v.tiresBlown ? 0.5 : 1) * limp;
-  v.vel = clamp(v.vel, -spec.topSpeed * 0.4 * speedMul, spec.topSpeed * (boost ? (spec.nitroTop || 1.15) : 1) * speedMul);
-  if (GAMEPLAY.floodPatches && (G.time.rainStrength || 0) > 0.7 && inFlood(v.pos.x, v.pos.z) && spec.kind !== 'bike' && spec.kind !== 'boat') {
+  v.vel = clamp(v.vel, -spec.topSpeed * (spec.kind === 'airliner' ? 0.22 : 0.4) * speedMul, spec.topSpeed * (boost ? (spec.nitroTop || 1.15) : 1) * speedMul);
+  if (GAMEPLAY.floodPatches && (G.time.rainStrength || 0) > 0.7 && inFlood(v.pos.x, v.pos.z) && spec.kind !== 'bike' && spec.kind !== 'boat' && spec.kind !== 'airliner') {
     if (v.vel > 4) v.vel = lerp(v.vel, 4, 1 - Math.pow(0.2, dt));
   }
-  if (GAMEPLAY.yaowaratCarHostility && spec.kind !== 'bike' && spec.kind !== 'tuktuk' && spec.kind !== 'boat' && inYaowarat(v.pos.x, v.pos.z)) {
+  if (GAMEPLAY.yaowaratCarHostility && spec.kind !== 'bike' && spec.kind !== 'tuktuk' && spec.kind !== 'boat' && spec.kind !== 'airliner' && inYaowarat(v.pos.x, v.pos.z)) {
     v.vel = clamp(v.vel, -6, 6);
     v._yaoHonk = (v._yaoHonk || 0) - dt;
     if (v._yaoHonk <= 0) { G.audio.honk(); v._yaoHonk = 1.3; }
@@ -187,8 +187,8 @@ export function updatePlayerInVehicle(dt) {
   v.steerAngle = lerp(v.steerAngle || 0, v.steerInput * steerLimit, steerResponse);
   const lowSpeed = roadVehicle ? clamp(Math.abs(v.vel) / 0.9, 0.48, 1) : clamp(Math.abs(v.vel) / 1.2, 0.28, 1);
   const highSpeed = roadVehicle ? lerp(1.12, 0.72, speed01) : lerp(1, 0.58, speed01);
-  const boatMul = spec.kind === 'boat' ? 0.55 : 1;
-  const turnAssist = spec.kind === 'boat' ? 1 : spec.kind === 'bike' ? 1.08 : spec.kind === 'tuktuk' ? 1.18 : 1.25;
+  const boatMul = spec.kind === 'boat' ? 0.55 : spec.kind === 'airliner' ? 0.7 : 1;
+  const turnAssist = spec.kind === 'boat' ? 1 : spec.kind === 'airliner' ? 1 : spec.kind === 'bike' ? 1.08 : spec.kind === 'tuktuk' ? 1.18 : 1.25;
   const yawArcade = v.steerAngle * spec.turn * lowSpeed * highSpeed * weight * boatMul * turnAssist * (v.vel >= 0 ? 1 : -1);
   let yawTarget = yawArcade;
   if (roadVehicle) {
@@ -265,6 +265,14 @@ export function updatePlayerInVehicle(dt) {
     v.pos.y = 0.3 + Math.sin(performance.now() * 0.002 + v.pos.z * 0.15) * 0.06;
     v.mesh.rotation.z = Math.sin(performance.now() * 0.0016 + v.pos.z * 0.1) * 0.03;
   }
+  if (v.spec.kind === 'airliner') {
+    const a = G.world && G.world.airport;
+    if (a) {
+      v.pos.x = clamp(v.pos.x, a.x0 + 10, a.x1 - 8);
+      v.pos.z = clamp(v.pos.z, a.z0 + 20, a.z1 - 20);
+    }
+    v.pos.y = 0;
+  }
   v.mesh.position.copy(v.pos);
   v.mesh.rotation.y = v.heading;
   const baseRoll = v.spec.kind === 'bike'
@@ -285,7 +293,7 @@ export function updatePlayerInVehicle(dt) {
   if (v.spec.kind !== 'boat') {
     resolveVehicleVsBuildings(v);
     resolveVehicleVsVehicles(v);
-    if (GAMEPLAY.kerbScrub && !onCarriageway(v.pos.x, v.pos.z) && Math.abs(v.vel) > 4) {
+    if (GAMEPLAY.kerbScrub && spec.kind !== 'airliner' && !onCarriageway(v.pos.x, v.pos.z) && Math.abs(v.vel) > 4) {
       v.vel *= Math.pow(0.52, dt);
       exciteVehicleKerb(v);
     }
@@ -293,11 +301,11 @@ export function updatePlayerInVehicle(dt) {
 
   // place player at seat (invisible while inside)
   p.group.visible = false;
-  p.group.position.copy(v.pos); p.group.position.y = 0.5;
+  p.group.position.copy(v.pos); p.group.position.y = spec.kind === 'airliner' ? 3.2 : 0.5;
 
   // audio
   if (!v.audio) {
-    v.audio = (v.spec.kind === 'tuktuk') ? G.audio.tukTukLoop() : G.audio.engineLoop({ rpmBase: v.spec.kind === 'bike' ? 110 : 70, harsh: v.spec.kind === 'bike' });
+    v.audio = (v.spec.kind === 'tuktuk') ? G.audio.tukTukLoop() : G.audio.engineLoop({ rpmBase: v.spec.kind === 'bike' ? 110 : v.spec.kind === 'airliner' ? 38 : 70, harsh: v.spec.kind === 'bike' });
   }
   const speed01Audio = clamp(Math.abs(v.vel)/spec.topSpeed, 0, 1);
   v._rpm01 = clamp(speed01Audio * 0.65 + (v.throttle || 0) * 0.28, 0, 1);
@@ -429,7 +437,7 @@ function pickTrafficDest(v) {
   dx = clamp(dx, -GRID_I + 1, GRID_I);
   dz = clamp(dz, -GRID_I, GRID_I);
   if (v.spec && v.spec.kind !== 'bike' && v.spec.kind !== 'tuktuk') {
-    if (inYaowarat(dx * BLOCK, dz * BLOCK) || onSoi(dx * BLOCK, dz * BLOCK)) {
+    if (inYaowarat(dx * BLOCK, dz * BLOCK) || onSoi(dx * BLOCK, dz * BLOCK) || inAirport(dx * BLOCK, dz * BLOCK)) {
       dx = clamp(ix + (ix >= 0 ? 2 : -2), -GRID_I + 1, GRID_I);
     }
   }
@@ -445,7 +453,7 @@ function nextTrafficDir(v, ix, iz) {
 }
 
 function isAmbientTraffic(v) {
-  return !!(v && v.npc && v.npc.kind === 'traffic' && !v.isCop && v.driver !== 'player' && !v.dead && v.spec && v.spec.kind !== 'boat');
+  return !!(v && v.npc && v.npc.kind === 'traffic' && !v.isCop && v.driver !== 'player' && !v.dead && v.spec && v.spec.kind !== 'boat' && v.spec.kind !== 'airliner');
 }
 
 export function updateTrafficPopulation(dt) {
@@ -677,15 +685,15 @@ export function updateCamera(dt) {
     rig._vehPrevVel = v.vel || 0;
     rig._followStretch = lerp(rig._followStretch || 0, clamp(accel * 0.045, -0.45, 0.6), 1 - Math.pow(0.08, dt));
     _camTarget.copy(v.pos);
-    _camTarget.y += lerp(1.05, 1.55, speed01);
+    _camTarget.y += v.spec.kind === 'airliner' ? lerp(4.2, 5.4, speed01) : lerp(1.05, 1.55, speed01);
     const side = (v.steerAngle || 0) * lerp(0.5, 1.35, speed01);
     _camTarget.x += Math.cos(v.heading) * side;
     _camTarget.z += -Math.sin(v.heading) * side;
     const followYaw = v.heading + PI; // behind
     rig.yaw = lerpAngle(rig.yaw, followYaw, dt * lerp(1.15, 2.45, speed01));
-    const baseDist = v.spec.kind === 'bike' ? 4.8 : v.spec.kind === 'tuktuk' ? 5.6 : 6.4;
-    rig.targetDistance = baseDist + speed01 * (v.spec.kind === 'boat' ? 1.2 : 2.1) + (rig._followStretch || 0);
-    rig.pitch = lerp(rig.pitch, -0.13 - speed01 * 0.07, 1 - Math.pow(0.975, dt * 60));
+    const baseDist = v.spec.kind === 'bike' ? 4.8 : v.spec.kind === 'tuktuk' ? 5.6 : v.spec.kind === 'airliner' ? 22 : 6.4;
+    rig.targetDistance = baseDist + speed01 * (v.spec.kind === 'boat' ? 1.2 : v.spec.kind === 'airliner' ? 4 : 2.1) + (rig._followStretch || 0);
+    rig.pitch = lerp(rig.pitch, (v.spec.kind === 'airliner' ? -0.28 : -0.13) - speed01 * 0.07, 1 - Math.pow(0.975, dt * 60));
   } else {
     if (p.inCover && p.coverPeek) {
       _camTarget.set(p.coverPeek.x, p.coverPeek.y, p.coverPeek.z);

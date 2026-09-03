@@ -24,6 +24,7 @@ export * from './entities.js';
 import {
   animateWalk, makeCamera, makeDogMesh, makePedMesh, makePlayer, makeRain, makeVehicle, makeVehicleMesh, sidewalkPos, spawnBoat, spawnDog, spawnDogs, spawnParkedCars, spawnPed, spawnPeds, spawnTraffic, updateEntityLod
 } from './entities.js';
+import { spawnAirportPlanes } from './airport.js';
 export * from './wanted.js';
 import {
   gameOver, killCop, respawnPlayer, spawnCop, spawnCopCar, spawnFortuner, spawnSwat, updateCop, updateFootCops, updateWanted
@@ -487,6 +488,7 @@ async function init() {
   spawnTraffic(scene);
   spawnParkedCars(scene);
   spawnBoat(scene);
+  spawnAirportPlanes(scene);
   // a parked, enterable cop car — the Vigilante ride
   { const v = spawnCopCar(scene, new THREE.Vector3(50, 0, 90)); v.driver = null; v.vel = 0; v.heading = 0; v.mesh.rotation.y = 0; }
   spawnPeds(scene, 60);
@@ -928,7 +930,7 @@ export function updateQuickDelivery(dt) {
   }
 }
 
-const SHOWCASE_VEHICLES = ['bike', 'tuktuk', 'camry', 'sedan', 'hilux', 'songthaew', 'bus', 'luxsedan', 'supercar', 'cop', 'fortuner', 'swat', 'boat'];
+const SHOWCASE_VEHICLES = ['bike', 'tuktuk', 'camry', 'sedan', 'hilux', 'songthaew', 'bus', 'luxsedan', 'supercar', 'cop', 'fortuner', 'swat', 'boat', 'airliner'];
 const SHOWCASE_PEDS = ['local', 'office', 'tourist', 'monk', 'vendor', 'laborer'];
 function makeLabelSprite(text) {
   const c = document.createElement('canvas'); c.width = 256; c.height = 64;

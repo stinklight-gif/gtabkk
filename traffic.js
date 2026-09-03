@@ -64,6 +64,7 @@ export function buildTrafficLights(scene) {
 
   for (let i = -GRID / 2; i <= GRID / 2; i++) {
     if (i === RIVER_I) continue;                 // river column — no roads there
+    if (GAMEPLAY.airport && i === GRID / 2 - 1) continue; // no lights on the runway strip
     for (let j = -GRID / 2; j <= GRID / 2; j++) {
       const cx = i * BLOCK, cz = j * BLOCK;
       const px = cx + RW / 2 + 0.9, pz = cz + RW / 2 + 0.9;  // mast on the NE corner

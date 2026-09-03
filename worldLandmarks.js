@@ -35,6 +35,7 @@ export function buildLandmarks(env) {
   for (let i = -GRID/2; i < GRID/2; i++) {
     for (let j = -GRID/2; j < GRID/2; j++) {
       if (i === RIVER_I) continue;   // no parked bikes in the river
+      if (GAMEPLAY.airport && i === GRID / 2 - 1) continue;
       const cx = (i + 0.5) * BLOCK;
       const cz = (j + 0.5) * BLOCK;
       const numClusters = irand(1, 3);
@@ -97,6 +98,7 @@ export function buildLandmarks(env) {
   for (let i = -GRID/2; i < GRID/2; i++) {
     for (let j = -GRID/2; j < GRID/2; j++) {
       if (i === RIVER_I) continue;   // no sidewalk props in the river
+      if (GAMEPLAY.airport && i === GRID / 2 - 1) continue;
       const cx = (i + 0.5) * BLOCK;
       const cz = (j + 0.5) * BLOCK;
       const numProps = irand(2, 4);

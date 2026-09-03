@@ -443,7 +443,7 @@ export function makeAudio() {
       const kind = G._districtName || 'Sukhumvit';
       if (kind !== lastKind) {
         lastKind = kind;
-        const freq = kind === 'Yaowarat' ? 92 : kind === 'The Wat' ? 54 : kind === 'Riverside' ? 48 : kind === 'Asok' ? 62 : 68;
+        const freq = kind === 'Yaowarat' ? 92 : kind === 'The Wat' ? 54 : kind === 'Riverside' ? 48 : kind === 'Asok' ? 62 : kind === 'Suvarnabhumi' ? 42 : kind === 'Klong Toey' ? 58 : 68;
         distOsc.frequency.setTargetAtTime(freq, ctx.currentTime, 0.5);
       }
       const night = G.nightK || 0;

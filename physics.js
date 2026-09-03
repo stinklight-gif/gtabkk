@@ -191,7 +191,7 @@ function addNpcImpact(v, ix, iz, spin) {
 }
 
 function exciteSuspension(v, amount) {
-  if (!v || !v.spec || v.spec.kind === 'boat') return;
+  if (!v || !v.spec || v.spec.kind === 'boat' || v.spec.kind === 'airliner') return;
   v._suspVel = (v._suspVel || 0) + clamp(amount * 0.035, 0.03, 0.7);
 }
 
