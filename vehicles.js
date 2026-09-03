@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, UPGRADES, rankDiscount, ROAD_WIDTH, PED_TARGET, GAMEPLAY, trafficTarget, inYaowarat, inFlood, onSoi, onCarriageway, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, UPGRADES, rankDiscount, ROAD_WIDTH, PED_TARGET, GAMEPLAY, trafficTarget, inYaowarat, inFlood, onSoi, onCarriageway, inAirport, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { tip, cycleWeapon, damagePlayer, firePistol, fireSMG, fireShotgun, makeExplosion, makeSmokeEmitter, makeVehicle, onCopKilled, raiseWanted, resolveVehicleVsBuildings, resolveVehicleVsVehicles, saveGame, spawnSkid, updateCop, vehicleName } from './main.js';
 import { lightFor } from './traffic.js';
@@ -42,12 +42,12 @@ function applyLooseImpactMotion(v, dt) {
 }
 
 function exciteVehicleKerb(v) {
-  if (!v || !v.spec || v.spec.kind === 'boat') return;
+  if (!v || !v.spec || v.spec.kind === 'boat' || v.spec.kind === 'airliner') return;
   v._suspVel = (v._suspVel || 0) + 0.28;
 }
 
 function applyVehicleSuspensionVisual(v, dt, opts = {}) {
-  if (!v || !v.mesh || !v.spec || v.spec.kind === 'boat' || dt <= 0) return;
+  if (!v || !v.mesh || !v.spec || v.spec.kind === 'boat' || v.spec.kind === 'airliner' || dt <= 0) return;
   const spec = v.spec;
   const accelForward = opts.accelForward != null
     ? opts.accelForward
@@ -100,6 +100,15 @@ export function updatePlayerInVehicle(dt) {
     }, 6000);
     return;
   }
+  if (GAMEPLAY.fireAtTen && v.hp < 10 && v.hp > 0) {
+    if (!v._burning) {
+      v._burning = true;
+      if (!v.smoke) v.smoke = makeSmokeEmitter(v.mesh.position, 1.4);
+      else v.smoke.intensity = Math.max(v.smoke.intensity || 1, 1.4);
+    }
+    v.hp -= 5 * dt;
+  }
+
   // exit
   if (G.input.pressed('KeyE')) {
     p.inVehicle = null;
@@ -124,7 +133,7 @@ export function updatePlayerInVehicle(dt) {
   const inputEase = 1 - Math.pow(0.035, dt);
   v.throttle = lerp(v.throttle || 0, forward > 0 ? 1 : 0, inputEase);
   v.brakeInput = lerp(v.brakeInput || 0, forward < 0 ? 1 : 0, inputEase);
-  const roadVehicle = spec.kind !== 'boat';
+  const roadVehicle = spec.kind !== 'boat' && spec.kind !== 'airliner';
   const steerEase = roadVehicle ? (1 - Math.pow(0.0035, dt)) : (1 - Math.pow(0.02, dt));
   v.steerInput = lerp(v.steerInput || 0, steer, steerEase);
   const mass = spec.mass || 1500;
@@ -157,11 +166,11 @@ export function updatePlayerInVehicle(dt) {
   }
   const limp = (GAMEPLAY.vehicleLimp && v.hp < 30) ? 0.55 : 1;
   const speedMul = (v.tiresBlown ? 0.5 : 1) * limp;
-  v.vel = clamp(v.vel, -spec.topSpeed * 0.4 * speedMul, spec.topSpeed * (boost ? (spec.nitroTop || 1.15) : 1) * speedMul);
-  if (GAMEPLAY.floodPatches && (G.time.rainStrength || 0) > 0.7 && inFlood(v.pos.x, v.pos.z) && spec.kind !== 'bike' && spec.kind !== 'boat') {
+  v.vel = clamp(v.vel, -spec.topSpeed * (spec.kind === 'airliner' ? 0.22 : 0.4) * speedMul, spec.topSpeed * (boost ? (spec.nitroTop || 1.15) : 1) * speedMul);
+  if (GAMEPLAY.floodPatches && (G.time.rainStrength || 0) > 0.7 && inFlood(v.pos.x, v.pos.z) && spec.kind !== 'bike' && spec.kind !== 'boat' && spec.kind !== 'airliner') {
     if (v.vel > 4) v.vel = lerp(v.vel, 4, 1 - Math.pow(0.2, dt));
   }
-  if (GAMEPLAY.yaowaratCarHostility && spec.kind !== 'bike' && spec.kind !== 'tuktuk' && spec.kind !== 'boat' && inYaowarat(v.pos.x, v.pos.z)) {
+  if (GAMEPLAY.yaowaratCarHostility && spec.kind !== 'bike' && spec.kind !== 'tuktuk' && spec.kind !== 'boat' && spec.kind !== 'airliner' && inYaowarat(v.pos.x, v.pos.z)) {
     v.vel = clamp(v.vel, -6, 6);
     v._yaoHonk = (v._yaoHonk || 0) - dt;
     if (v._yaoHonk <= 0) { G.audio.honk(); v._yaoHonk = 1.3; }
@@ -178,8 +187,8 @@ export function updatePlayerInVehicle(dt) {
   v.steerAngle = lerp(v.steerAngle || 0, v.steerInput * steerLimit, steerResponse);
   const lowSpeed = roadVehicle ? clamp(Math.abs(v.vel) / 0.9, 0.48, 1) : clamp(Math.abs(v.vel) / 1.2, 0.28, 1);
   const highSpeed = roadVehicle ? lerp(1.12, 0.72, speed01) : lerp(1, 0.58, speed01);
-  const boatMul = spec.kind === 'boat' ? 0.55 : 1;
-  const turnAssist = spec.kind === 'boat' ? 1 : spec.kind === 'bike' ? 1.08 : spec.kind === 'tuktuk' ? 1.18 : 1.25;
+  const boatMul = spec.kind === 'boat' ? 0.55 : spec.kind === 'airliner' ? 0.7 : 1;
+  const turnAssist = spec.kind === 'boat' ? 1 : spec.kind === 'airliner' ? 1 : spec.kind === 'bike' ? 1.08 : spec.kind === 'tuktuk' ? 1.18 : 1.25;
   const yawArcade = v.steerAngle * spec.turn * lowSpeed * highSpeed * weight * boatMul * turnAssist * (v.vel >= 0 ? 1 : -1);
   let yawTarget = yawArcade;
   if (roadVehicle) {
@@ -233,6 +242,18 @@ export function updatePlayerInVehicle(dt) {
   if (roadVehicle && Math.abs(v.latVel || 0) > 2.5 && Math.abs(v.vel) > 4) {
     spawnSkid(v);
   }
+  if (GAMEPLAY.bikeLowside && spec.kind === 'bike' && Math.abs(v.latVel || 0) > 7.2 && Math.abs(v.vel) > 7) {
+    p.inVehicle = null; v.driver = null; p.group.visible = true;
+    p.group.position.set(v.pos.x + Math.cos(v.heading) * 1.6, 0, v.pos.z - Math.sin(v.heading) * 1.6);
+    p.velocity.set(0, 0, 0);
+    v.vel = 0; v.latVel = 0; v.yawRate = 0;
+    if (v.audio) { v.audio.kill(); v.audio = null; }
+    damagePlayer(8);
+    G.camRig.shake = Math.max(G.camRig.shake || 0, 0.35);
+    if (G.audio && G.audio.hit) G.audio.hit();
+    G.hud.showNotif('Lowside!');
+    return;
+  }
 
   // apply motion
   const rightX = Math.cos(v.heading), rightZ = -Math.sin(v.heading);
@@ -243,6 +264,14 @@ export function updatePlayerInVehicle(dt) {
     v.pos.z = clamp(v.pos.z, -246, 246);
     v.pos.y = 0.3 + Math.sin(performance.now() * 0.002 + v.pos.z * 0.15) * 0.06;
     v.mesh.rotation.z = Math.sin(performance.now() * 0.0016 + v.pos.z * 0.1) * 0.03;
+  }
+  if (v.spec.kind === 'airliner') {
+    const a = G.world && G.world.airport;
+    if (a) {
+      v.pos.x = clamp(v.pos.x, a.x0 + 10, a.x1 - 8);
+      v.pos.z = clamp(v.pos.z, a.z0 + 20, a.z1 - 20);
+    }
+    v.pos.y = 0;
   }
   v.mesh.position.copy(v.pos);
   v.mesh.rotation.y = v.heading;
@@ -264,7 +293,7 @@ export function updatePlayerInVehicle(dt) {
   if (v.spec.kind !== 'boat') {
     resolveVehicleVsBuildings(v);
     resolveVehicleVsVehicles(v);
-    if (GAMEPLAY.kerbScrub && !onCarriageway(v.pos.x, v.pos.z) && Math.abs(v.vel) > 4) {
+    if (GAMEPLAY.kerbScrub && spec.kind !== 'airliner' && !onCarriageway(v.pos.x, v.pos.z) && Math.abs(v.vel) > 4) {
       v.vel *= Math.pow(0.52, dt);
       exciteVehicleKerb(v);
     }
@@ -272,13 +301,15 @@ export function updatePlayerInVehicle(dt) {
 
   // place player at seat (invisible while inside)
   p.group.visible = false;
-  p.group.position.copy(v.pos); p.group.position.y = 0.5;
+  p.group.position.copy(v.pos); p.group.position.y = spec.kind === 'airliner' ? 3.2 : 0.5;
 
   // audio
   if (!v.audio) {
-    v.audio = (v.spec.kind === 'tuktuk') ? G.audio.tukTukLoop() : G.audio.engineLoop({ rpmBase: v.spec.kind === 'bike' ? 110 : 70, harsh: v.spec.kind === 'bike' });
+    v.audio = (v.spec.kind === 'tuktuk') ? G.audio.tukTukLoop() : G.audio.engineLoop({ rpmBase: v.spec.kind === 'bike' ? 110 : v.spec.kind === 'airliner' ? 38 : 70, harsh: v.spec.kind === 'bike' });
   }
-  v.audio.set(clamp(Math.abs(v.vel)/spec.topSpeed, 0, 1), true, v.throttle || 0);
+  const speed01Audio = clamp(Math.abs(v.vel)/spec.topSpeed, 0, 1);
+  v._rpm01 = clamp(speed01Audio * 0.65 + (v.throttle || 0) * 0.28, 0, 1);
+  v.audio.set(speed01Audio, true, v.throttle || 0);
 
   // honk
   if (G.input.pressed('KeyH')) G.audio.honk();
@@ -340,11 +371,20 @@ export function updateVehicles(dt) {
     }
     if (v.driver !== 'player' && !v.npc) applyLooseImpactMotion(v, dt);
     if (v.driver === 'player') continue;
-    if (v.isCop && v.driver) updateCop(v, dt);
+    if (v.spec && v.spec.kind === 'boat' && v.npc) updateNpcBoat(v, dt);
+    else if (v.isCop && v.driver) updateCop(v, dt);
     else if (v.npc) updateTrafficCar(v, dt);
     // damage smoke
     if (v.hp < 30 && !v.smoke) {
       v.smoke = makeSmokeEmitter(v.mesh.position, 0.5);
+    }
+    if (GAMEPLAY.fireAtTen && v.hp < 10 && v.hp > 0) {
+      if (!v._burning) {
+        v._burning = true;
+        if (!v.smoke) v.smoke = makeSmokeEmitter(v.mesh.position, 1.4);
+        else v.smoke.intensity = Math.max(v.smoke.intensity || 1, 1.4);
+      }
+      v.hp -= 5 * dt;
     }
     if (GAMEPLAY.vehicleLimp && v.hp < 40 && !v._dented && v.mesh) {
       v._dented = true;
@@ -397,8 +437,10 @@ function pickTrafficDest(v) {
   }
   dx = clamp(dx, -GRID_I + 1, GRID_I);
   dz = clamp(dz, -GRID_I, GRID_I);
-  if (v.spec && v.spec.kind !== 'bike' && v.spec.kind !== 'tuktuk' && inYaowarat(dx * BLOCK, dz * BLOCK)) {
-    dx = clamp(ix + (ix >= 0 ? 2 : -2), -GRID_I + 1, GRID_I);
+  if (v.spec && v.spec.kind !== 'bike' && v.spec.kind !== 'tuktuk') {
+    if (inYaowarat(dx * BLOCK, dz * BLOCK) || onSoi(dx * BLOCK, dz * BLOCK) || inAirport(dx * BLOCK, dz * BLOCK)) {
+      dx = clamp(ix + (ix >= 0 ? 2 : -2), -GRID_I + 1, GRID_I);
+    }
   }
   v.npc.destI = dx; v.npc.destJ = dz;
 }
@@ -412,7 +454,7 @@ function nextTrafficDir(v, ix, iz) {
 }
 
 function isAmbientTraffic(v) {
-  return !!(v && v.npc && v.npc.kind === 'traffic' && !v.isCop && v.driver !== 'player' && !v.dead && v.spec && v.spec.kind !== 'boat');
+  return !!(v && v.npc && v.npc.kind === 'traffic' && !v.isCop && v.driver !== 'player' && !v.dead && v.spec && v.spec.kind !== 'boat' && v.spec.kind !== 'airliner');
 }
 
 export function updateTrafficPopulation(dt) {
@@ -466,7 +508,7 @@ function spawnAmbientTraffic(playerPos) {
 export function updateTrafficCar(v, dt) {
   const npc = v.npc;
   const prevHeading = v.heading;
-  v.latVel = 0;
+  if (!(npc.ramPanic > 0)) v.latVel = 0;
   npc.ramPanic = Math.max(0, (npc.ramPanic || 0) - dt);
   if (npc.dir === undefined) npc.dir = inferDir(v.heading);
   let dir = npc.dir;
@@ -554,6 +596,13 @@ export function updateTrafficCar(v, dt) {
   // --- move along the cardinal, keep the lane, ease the visual heading around ---
   v.pos.x += hx * v.vel * dt;
   v.pos.z += hz * v.vel * dt;
+  if (npc.ramPanic > 0) {
+    const rx = Math.cos(v.heading), rz = -Math.sin(v.heading);
+    v.pos.x += rx * (v.latVel || 0) * dt;
+    v.pos.z += rz * (v.latVel || 0) * dt;
+    v.heading += (v.latVel || 0) * 0.12 * dt;
+    v.latVel = (v.latVel || 0) * Math.pow(0.22, dt);
+  }
   const blockedForBike = v.spec.kind === 'bike' && obstacleTarget < npc.cruiseSpeed * 0.35 && v.vel < npc.cruiseSpeed * 0.3 && signalTarget > 0.1;
   if (blockedForBike) laneTarget += LANESIGN[dir] * (GAMEPLAY.bikeFilterWide ? 2.05 : 1.05);
   if (GAMEPLAY.bikeFilterWide && blockedForBike && v.vel < 4) laneTarget += LANESIGN[dir] * 0.85;
@@ -600,6 +649,24 @@ export function updateTrafficCar(v, dt) {
   if (dist2(v.pos, pp) > 220 * 220) respawnTraffic(v, pp);
 }
 
+export function updateNpcBoat(v, dt) {
+  const npc = v.npc;
+  if (!npc) return;
+  const cruise = npc.cruise || 7;
+  if (v.vel < cruise) v.vel = Math.min(cruise, v.vel + 4 * dt);
+  else v.vel = Math.max(cruise, v.vel - 3 * dt);
+  const dir = npc.dir >= 0 ? 1 : -1;
+  v.heading = dir > 0 ? 0 : PI;
+  v.pos.z += dir * v.vel * dt;
+  if (v.pos.z > HALF - 28) { npc.dir = -1; v.heading = PI; }
+  if (v.pos.z < -HALF + 28) { npc.dir = 1; v.heading = 0; }
+  v.pos.x = clamp(v.pos.x, -248, -210);
+  v.pos.y = 0.3 + Math.sin(performance.now() * 0.002 + v.pos.z * 0.15) * 0.06;
+  v.mesh.position.copy(v.pos);
+  v.mesh.rotation.y = v.heading;
+  v.mesh.rotation.z = Math.sin(performance.now() * 0.0016 + v.pos.z * 0.1) * 0.03;
+}
+
 export function isNearGridLine(v) {
   const m = ((v + HALF) % BLOCK) - BLOCK/2;
   return Math.abs(m) < 1.5;
@@ -637,17 +704,21 @@ export function updateCamera(dt) {
     rig._vehPrevVel = v.vel || 0;
     rig._followStretch = lerp(rig._followStretch || 0, clamp(accel * 0.045, -0.45, 0.6), 1 - Math.pow(0.08, dt));
     _camTarget.copy(v.pos);
-    _camTarget.y += lerp(1.05, 1.55, speed01);
+    _camTarget.y += v.spec.kind === 'airliner' ? lerp(4.2, 5.4, speed01) : lerp(1.05, 1.55, speed01);
     const side = (v.steerAngle || 0) * lerp(0.5, 1.35, speed01);
     _camTarget.x += Math.cos(v.heading) * side;
     _camTarget.z += -Math.sin(v.heading) * side;
     const followYaw = v.heading + PI; // behind
     rig.yaw = lerpAngle(rig.yaw, followYaw, dt * lerp(1.15, 2.45, speed01));
-    const baseDist = v.spec.kind === 'bike' ? 4.8 : v.spec.kind === 'tuktuk' ? 5.6 : 6.4;
-    rig.targetDistance = baseDist + speed01 * (v.spec.kind === 'boat' ? 1.2 : 2.1) + (rig._followStretch || 0);
-    rig.pitch = lerp(rig.pitch, -0.13 - speed01 * 0.07, 1 - Math.pow(0.975, dt * 60));
+    const baseDist = v.spec.kind === 'bike' ? 4.8 : v.spec.kind === 'tuktuk' ? 5.6 : v.spec.kind === 'airliner' ? 22 : 6.4;
+    rig.targetDistance = baseDist + speed01 * (v.spec.kind === 'boat' ? 1.2 : v.spec.kind === 'airliner' ? 4 : 2.1) + (rig._followStretch || 0);
+    rig.pitch = lerp(rig.pitch, (v.spec.kind === 'airliner' ? -0.28 : -0.13) - speed01 * 0.07, 1 - Math.pow(0.975, dt * 60));
   } else {
-    _camTarget.copy(p.group.position); _camTarget.y += 1.5;
+    if (p.inCover && p.coverPeek) {
+      _camTarget.set(p.coverPeek.x, p.coverPeek.y, p.coverPeek.z);
+    } else {
+      _camTarget.copy(p.group.position); _camTarget.y += 1.5;
+    }
     if (p.isSprinting) {
       rig._sprintBobPhase = (rig._sprintBobPhase || 0) + dt * 13.5;
       _camTarget.y += Math.sin(rig._sprintBobPhase) * 0.03;

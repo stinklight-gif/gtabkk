@@ -35,6 +35,7 @@ export function buildLandmarks(env) {
   for (let i = -GRID/2; i < GRID/2; i++) {
     for (let j = -GRID/2; j < GRID/2; j++) {
       if (i === RIVER_I) continue;   // no parked bikes in the river
+      if (GAMEPLAY.airport && i === GRID / 2 - 1) continue;
       const cx = (i + 0.5) * BLOCK;
       const cz = (j + 0.5) * BLOCK;
       const numClusters = irand(1, 3);
@@ -97,6 +98,7 @@ export function buildLandmarks(env) {
   for (let i = -GRID/2; i < GRID/2; i++) {
     for (let j = -GRID/2; j < GRID/2; j++) {
       if (i === RIVER_I) continue;   // no sidewalk props in the river
+      if (GAMEPLAY.airport && i === GRID / 2 - 1) continue;
       const cx = (i + 0.5) * BLOCK;
       const cz = (j + 0.5) * BLOCK;
       const numProps = irand(2, 4);
@@ -255,6 +257,38 @@ export function buildLandmarks(env) {
     world.bts = { x: sx, z: 0, platformY: PY };   // platform center + height (probe / map icon)
   }
 
+  // Second stop on the same track (east of Asok) so a commute has a next station.
+  {
+    const sx = 100;
+    const stationFloorY = 13.6;
+    const PY = stationFloorY + 0.3;
+    const platformMat = new THREE.MeshStandardMaterial({ color: 0xcfcfcf, roughness: 0.7 });
+    const platform = new THREE.Mesh(new THREE.BoxGeometry(20, 0.6, 11), platformMat);
+    platform.position.set(sx, stationFloorY, 0); platform.castShadow = true; scene.add(platform);
+    const canopy = new THREE.Mesh(new THREE.BoxGeometry(21, 0.35, 12), new THREE.MeshStandardMaterial({ color: 0x2a7d8e, roughness: 0.5 }));
+    canopy.position.set(sx, stationFloorY + 4.5, 0); scene.add(canopy);
+    world.walk.platforms.push({ x0: sx - 10, x1: sx + 10, z0: -5.5, z1: 5.5, y: PY });
+    const sideWallMat = new THREE.MeshStandardMaterial({ color: 0xbbbbbb, roughness: 0.7 });
+    const rail = (px, pz, sxw, szw) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(sxw, 1.1, szw), sideWallMat);
+      m.position.set(px, PY + 0.55, pz); scene.add(m);
+      world.walk.solids.push({ x: px, z: pz, sx: sxw, sz: szw, y0: PY, y1: PY + 1.3 });
+    };
+    rail(sx, 5.5, 20, 0.3);
+    rail(sx, -5.5, 20, 0.3);
+    rail(sx - 10, 0, 0.3, 11); rail(sx + 10, 0, 0.3, 11);
+    world.walk.ramps.push({ x0: sx - 2.2, x1: sx + 2.2, z0: -22, z1: -5, axis: 'z', yLo: 0, yHi: PY });
+    const escLen = Math.hypot(17, PY), escAng = Math.atan2(PY, 17);
+    const escMesh = new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.5, escLen), new THREE.MeshStandardMaterial({ color: 0x9a9a9a, roughness: 0.6 }));
+    escMesh.position.set(sx, PY / 2, -13.5); escMesh.rotation.x = -escAng; scene.add(escMesh);
+    const stops = [
+      { x: -50, y: PY, name: 'Asok' },
+      { x: 100, y: PY, name: 'Phrom Phong' },
+    ];
+    if (world.bts) world.bts.stops = stops;
+    if (G.bts) G.bts.stops = stops;
+  }
+
   // ---- Street lamps at intersections ----
   // ~480 lamps. Previously each had its own PointLight (pathological for forward
   // rendering); now the poles and bulb heads are instanced, and the bulbs glow via
@@ -324,7 +358,25 @@ export function buildLandmarks(env) {
     world.buildings.push({ pos: new THREE.Vector3(p.x, H / 2, p.z - HZ), size: new THREE.Vector3(HX * 2, H, 0.4) });
     world.buildings.push({ pos: new THREE.Vector3(p.x - HX, H / 2, p.z), size: new THREE.Vector3(0.4, H, HZ * 2) });
     world.buildings.push({ pos: new THREE.Vector3(p.x + HX, H / 2, p.z), size: new THREE.Vector3(0.4, H, HZ * 2) });
-    world.sevenElevens.push({ pos: p.clone(), group: store, chimed: 0 });
+    const rec = { pos: p.clone(), group: store, chimed: 0, clerk: cashier, hx: HX, hz: HZ };
+    if (!world.sevenWalkIn && GAMEPLAY.sevenInterior) {
+      rec.walkIn = true;
+      const atm = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.5, 0.45), new THREE.MeshStandardMaterial({ color: 0x1a3a6a, roughness: 0.4, metalness: 0.3 }));
+      atm.position.set(-3.6, 0.85, 1.6); store.add(atm);
+      rec.atm = new THREE.Vector3(p.x - 3.6, 0, p.z + 1.6);
+      world.buildings.push({ pos: new THREE.Vector3(p.x - 3.6, 0.85, p.z + 1.6), size: new THREE.Vector3(0.8, 1.6, 0.55) });
+      const micro = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.4, 0.45), new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.35 }));
+      micro.position.set(3.2, 1.15, -2.4); store.add(micro);
+      rec.microwave = new THREE.Vector3(p.x + 3.2, 0, p.z - 2.4);
+      const shelfA = new THREE.Vector3(p.x + 1.6, 0.7, p.z - 0.6);
+      const shelfB = new THREE.Vector3(p.x + 1.6, 0.7, p.z + 1.8);
+      rec.shelves = [shelfA, shelfB];
+      world.buildings.push({ pos: new THREE.Vector3(p.x + 1.6, 0.7, p.z - 0.6), size: new THREE.Vector3(3.0, 1.4, 1.0) });
+      world.buildings.push({ pos: new THREE.Vector3(p.x + 1.6, 0.7, p.z + 1.8), size: new THREE.Vector3(3.0, 1.4, 1.0) });
+      world.buildings.push({ pos: new THREE.Vector3(p.x - 3, 0.55, p.z - 2.6), size: new THREE.Vector3(3.4, 1.1, 1.2) });
+      world.sevenWalkIn = rec;
+    }
+    world.sevenElevens.push(rec);
   }
 
   // ---- Buyable business kiosks (passive income — see player.js updateBusinesses) ----
@@ -933,6 +985,41 @@ export function buildLandmarks(env) {
     addInstanced(stallLegGeo, legMat, legM, false, false);
 
     world.poi.yaowarat = new THREE.Vector3(laneX, 0, (zStart + zEnd) / 2);
+
+    // Night-only extra stalls + grills (hidden by day so the 6pm flip is obvious)
+    const nightGroup = new THREE.Group();
+    nightGroup.visible = false;
+    const nightStalls = [];
+    const grills = [];
+    for (let z = zStart + 5; z < zEnd; z += 5.2) {
+      if (Math.abs(z - crossZ) < 8) continue;
+      for (const sx of [laneX - 1.6, laneX + 1.6]) {
+        const top = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.08, 1.8), new THREE.MeshStandardMaterial({ color: pick(stallTop), roughness: 0.8 }));
+        top.position.set(sx, 1.85, z); nightGroup.add(top);
+        const board = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.7, 1.5), new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.9 }));
+        board.position.set(sx, 0.55, z); nightGroup.add(board);
+        nightStalls.push(top);
+        if (Math.random() < 0.45) {
+          const grill = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.22, 0.7), new THREE.MeshStandardMaterial({ color: 0x222, emissive: 0xff6a1a, emissiveIntensity: 0.4, roughness: 0.5 }));
+          grill.position.set(sx, 1.05, z + 0.2); nightGroup.add(grill);
+          G.nightEmissive.push({ mat: grill.material, dayIntensity: 0.05, nightIntensity: 1.1 });
+          grills.push(grill.position.clone());
+          const smokeGeo = new THREE.BufferGeometry();
+          const sp = new Float32Array(18);
+          for (let k = 0; k < 6; k++) { sp[k*3] = rand(-0.2, 0.2); sp[k*3+1] = 0.4 + k * 0.35; sp[k*3+2] = rand(-0.2, 0.2); }
+          smokeGeo.setAttribute('position', new THREE.BufferAttribute(sp, 3));
+          const smoke = new THREE.Points(smokeGeo, new THREE.PointsMaterial({ color: 0x665544, size: 0.45, transparent: true, opacity: 0.45, depthWrite: false }));
+          smoke.position.copy(grill.position); nightGroup.add(smoke);
+        }
+      }
+    }
+    scene.add(nightGroup);
+    world.yaowaratNight = { group: nightGroup, stalls: nightStalls, grills, smoke: [] };
+
+    const crate = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.55, 0.7), new THREE.MeshStandardMaterial({ color: 0x8a6a32, roughness: 0.85 }));
+    crate.position.set(laneX + 3.2, 0.4, (zStart + zEnd) / 2 + 8);
+    crate.castShadow = true; scene.add(crate);
+    world.yaowaratCrate = { mesh: crate, pos: crate.position.clone(), taken: false };
   }
 
   // ---- Hidden amulets: a collectible hunt across the districts ----
@@ -1001,6 +1088,54 @@ export function buildLandmarks(env) {
       m.position.set(x, 1.1, z); scene.add(m);
       world.armorPickups.push({ mesh: m, pos: new THREE.Vector3(x, 0, z), readyAt: 0 });
     }
+  }
+
+  // ---- Klong Toey port pocket (containers + warehouse) at the existing turf ----
+  {
+    const cx = -150, cz = 150;
+    const rust = new THREE.MeshStandardMaterial({ color: 0xb45a2a, roughness: 0.7, metalness: 0.25 });
+    const rust2 = new THREE.MeshStandardMaterial({ color: 0x3a6a8a, roughness: 0.65, metalness: 0.3 });
+    const rust3 = new THREE.MeshStandardMaterial({ color: 0xc8a22a, roughness: 0.7 });
+    const crate = new THREE.BoxGeometry(4.4, 2.4, 2.2);
+    const mats = [rust, rust2, rust3];
+    for (let i = 0; i < 8; i++) {
+      const row = i % 4, stack = Math.floor(i / 4);
+      const m = new THREE.Mesh(crate, mats[i % 3]);
+      m.position.set(cx - 8 + row * 4.8, 1.2 + stack * 2.4, cz - 6);
+      m.castShadow = true; scene.add(m);
+    }
+    const shed = new THREE.Mesh(new THREE.BoxGeometry(14, 6, 10), new THREE.MeshStandardMaterial({ color: 0x6a6e72, roughness: 0.8 }));
+    shed.position.set(cx + 10, 3, cz + 4); shed.castShadow = true; scene.add(shed);
+    const crane = new THREE.Mesh(new THREE.BoxGeometry(0.6, 14, 0.6), new THREE.MeshStandardMaterial({ color: 0xc9a020, roughness: 0.5, metalness: 0.4 }));
+    crane.position.set(cx - 12, 7, cz + 8); scene.add(crane);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(10, 0.5, 0.5), crane.material);
+    arm.position.set(cx - 7, 13.5, cz + 8); scene.add(arm);
+    const bShed = { pos: new THREE.Vector3(cx + 10, 3, cz + 4), size: new THREE.Vector3(14, 6, 10) };
+    world.buildings.push(bShed);
+    world.poi.klongToey = new THREE.Vector3(cx, 0, cz);
+    world.poi.customsDrop = new THREE.Vector3(120, 0, -40);
+  }
+
+  // Gym pad by the safehouse
+  {
+    const gx = -18, gz = 82;
+    const mat = new THREE.MeshStandardMaterial({ color: 0x2a2a28, roughness: 0.9 });
+    const pad = new THREE.Mesh(new THREE.BoxGeometry(6, 0.12, 6), mat);
+    pad.position.set(gx, 0.08, gz); scene.add(pad);
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.4, 8), new THREE.MeshStandardMaterial({ color: 0x888 }));
+    post.position.set(gx - 2.4, 1.2, gz - 2.4); scene.add(post);
+    world.poi.gym = new THREE.Vector3(gx, 0, gz);
+  }
+
+  // Yaowarat cleaver + bottle pickups
+  if (world.poi.yaowarat) {
+    const y = world.poi.yaowarat;
+    const cleaver = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.35, 0.7), new THREE.MeshStandardMaterial({ color: 0xc0c4c8, metalness: 0.7, roughness: 0.3 }));
+    cleaver.position.set(y.x + 4, 1.0, y.z + 2); scene.add(cleaver);
+    world.cleaver = { mesh: cleaver, pos: cleaver.position.clone(), taken: false };
+    const bottle = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.09, 0.32, 8), new THREE.MeshStandardMaterial({ color: 0x5a3a10, roughness: 0.35 }));
+    bottle.position.set(y.x - 3, 0.9, y.z - 2); scene.add(bottle);
+    world.bottle = { mesh: bottle, pos: bottle.position.clone(), taken: false };
   }
 
 }

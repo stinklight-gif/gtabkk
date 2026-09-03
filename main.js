@@ -24,6 +24,7 @@ export * from './entities.js';
 import {
   animateWalk, makeCamera, makeDogMesh, makePedMesh, makePlayer, makeRain, makeVehicle, makeVehicleMesh, sidewalkPos, spawnBoat, spawnDog, spawnDogs, spawnParkedCars, spawnPed, spawnPeds, spawnTraffic, updateEntityLod
 } from './entities.js';
+import { spawnAirportPlanes } from './airport.js';
 export * from './wanted.js';
 import {
   gameOver, killCop, respawnPlayer, spawnCop, spawnCopCar, spawnFortuner, spawnSwat, updateCop, updateFootCops, updateWanted
@@ -34,7 +35,7 @@ import {
 } from './physics.js';
 export * from './npcs.js';
 import {
-  CROWD_CURVE, buildClusterAnchors, crowdFactor, crowdTarget, makeBarkSprite, resyncCrowd, spawnAnchoredPed, spawnBark, spawnSpikeStrip, updateArmorPickups, updateBarks, updateClusters, updateDogs, updateFoodStalls, updateMuggings, updatePeds, updateSpikes, updateTurf, updateVigilante, vigilanteEnd, vigilanteSpawnTarget
+  CROWD_CURVE, buildClusterAnchors, crowdFactor, crowdTarget, makeBarkSprite, resyncCrowd, spawnAnchoredPed, spawnBark, spawnSpikeStrip, updateAlms, updateArmorPickups, updateBarks, updateClusters, updateDogs, updateFoodStalls, updateMuggings, updatePeds, updateSpikes, updateTurf, updateVigilante, updateYaowaratNight, vigilanteEnd, vigilanteSpawnTarget
 } from './npcs.js';
 export * from './combat.js';
 import {
@@ -55,7 +56,7 @@ import {
 } from './daynight.js';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G,
-  PRICE, PAINT_COLORS, BUSINESSES, TURFS, missionMilestones, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir,
+  PRICE, PAINT_COLORS, BUSINESSES, TURFS, missionMilestones, ROAD_WIDTH, PED_TARGET, GAMEPLAY, inYaowarat, yaowaratNightOpen, _camTarget, _camOffset, _fireDir,
   _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 
@@ -182,6 +183,8 @@ export function saveGame() {
       welcomeDone: !!G._welcomeDone,
       soiRunWon: !!G._soiRunWon, hitDone: !!G._hitDone,
       deliveryDone: !!G._deliveryDone, mallJobDone: !!G._mallJobDone, getawayDone: !!G._getawayDone,
+      boutDone: !!G._boutDone, monsoonDone: !!G._monsoonDone,
+      customsDone: !!G._customsDone, nightSoiDone: !!G._nightSoiDone,
       px: p.group.position.x, py: p.group.position.y, pz: p.group.position.z,
       // property / ownership economy
       safehouseOwned: !!G.econ.safehouse.owned,
@@ -259,6 +262,10 @@ export function loadGame() {
   if (s.deliveryDone) G._deliveryDone = true;
   if (s.mallJobDone) G._mallJobDone = true;
   if (s.getawayDone) G._getawayDone = true;
+  if (s.boutDone) G._boutDone = true;
+  if (s.monsoonDone) G._monsoonDone = true;
+  if (s.customsDone) G._customsDone = true;
+  if (s.nightSoiDone) G._nightSoiDone = true;
   if (s.welcomeDone) { G._welcomeDone = true; if (G.mission.resume) G.mission.resume(true); }
   // property / ownership economy
   if (s.safehouseOwned) { G.econ.safehouse.owned = true; markSafehouseOwned(); }
@@ -276,7 +283,7 @@ export function loadGame() {
     }
   }
   if (s.upgrades && typeof s.upgrades === 'object') {               // restore vehicle upgrade levels
-    for (const k of ['engine', 'nitro', 'armor']) G.econ.upgrades[k] = Math.max(0, Math.min(3, +s.upgrades[k] || 0));
+    for (const k of ['engine', 'nitro', 'armor', 'melee']) G.econ.upgrades[k] = Math.max(0, Math.min(3, +s.upgrades[k] || 0));
   }
   if (s.bank && typeof s.bank === 'object') {                       // restore the bank balance
     G.econ.bank.balance = Math.max(0, Math.floor(+s.bank.balance) || 0);
@@ -481,6 +488,7 @@ async function init() {
   spawnTraffic(scene);
   spawnParkedCars(scene);
   spawnBoat(scene);
+  spawnAirportPlanes(scene);
   // a parked, enterable cop car — the Vigilante ride
   { const v = spawnCopCar(scene, new THREE.Vector3(50, 0, 90)); v.driver = null; v.vel = 0; v.heading = 0; v.mesh.rotation.y = 0; }
   spawnPeds(scene, 60);
@@ -636,12 +644,26 @@ export function updateTaxi(dt) {
   }
   if (t.stage === 'idle') {
     if (inSong) {
-      G.hud.showPrompt('Press <b>J</b> for a taxi fare', 0.4);
+      const drunk = GAMEPLAY.yaowaratNight && yaowaratNightOpen() && inYaowarat(p.inVehicle.pos.x, p.inVehicle.pos.z);
+      G.hud.showPrompt(drunk ? 'Press <b>J</b> for a drunk tourist fare' : 'Press <b>J</b> for a taxi fare', 0.4);
       if (G.input.pressed('KeyJ')) {
-        t.stage = 'toPickup';
-        t.markerPos = taxiRandPoint(p.inVehicle.pos, 90);
-        taxiBeam(t, t.markerPos, 0xffcf4a);
-        G.hud.showNotif('New fare — head to the yellow marker');
+        if (drunk) {
+          t.stage = 'toDropoff';
+          t.dest = taxiRandPoint(p.inVehicle.pos, 160);
+          t.markerPos = t.dest;
+          taxiBeam(t, t.dest, 0x39ff7a);
+          const d = Math.sqrt(dist2(p.inVehicle.pos, t.dest));
+          t.timeLeft = 28 + d / 8;
+          t.fareValue = Math.round(280 + d * 8);
+          t.drunk = true;
+          G.hud.showNotif('Drunk tourist piled in — get them home');
+        } else {
+          t.stage = 'toPickup';
+          t.drunk = false;
+          t.markerPos = taxiRandPoint(p.inVehicle.pos, 90);
+          taxiBeam(t, t.markerPos, 0xffcf4a);
+          G.hud.showNotif('New fare — head to the yellow marker');
+        }
       }
     }
     return;
@@ -922,7 +944,7 @@ export function updateQuickDelivery(dt) {
   }
 }
 
-const SHOWCASE_VEHICLES = ['bike', 'tuktuk', 'camry', 'sedan', 'hilux', 'songthaew', 'bus', 'luxsedan', 'supercar', 'cop', 'fortuner', 'swat', 'boat'];
+const SHOWCASE_VEHICLES = ['bike', 'tuktuk', 'camry', 'sedan', 'hilux', 'songthaew', 'bus', 'luxsedan', 'supercar', 'cop', 'fortuner', 'swat', 'boat', 'airliner'];
 const SHOWCASE_PEDS = ['local', 'office', 'tourist', 'monk', 'vendor', 'laborer'];
 function makeLabelSprite(text) {
   const c = document.createElement('canvas'); c.width = 256; c.height = 64;
@@ -1280,6 +1302,22 @@ export function updateRadio(dt) {
   a.duckEngine(inV && a.radio.station !== 0);
   // Persistent HUD chip: live station name while driving, hidden on foot / RADIO OFF.
   G.hud.setRadioChip(inV && a.radio.station !== 0 ? '📻 ' + a.radio.names[a.radio.station] : null);
+  const talkOn = inV && a.radio.names[a.radio.station] === 'TALK RADIO AM';
+  const hot = GAMEPLAY.talkChase && G.wanted && G.wanted.stars >= 3;
+  if (talkOn && hot) {
+    G._talkChaseT = (G._talkChaseT || 0) - dt;
+    if (!G._talkChaseOn || G._talkChaseT <= 0) {
+      G._talkChaseOn = true;
+      G._talkChaseT = 16;
+      const d = G._districtName || 'Sukhumvit';
+      const place = d === 'Yaowarat' ? 'Yaowarat' : d === 'Riverside' ? 'the riverside' : 'Sukhumvit';
+      G.hud.showSubtitle(`Talk Radio: "A chase ripping down ${place} — police on the bumper."`, 'วิทยุ: ไล่ล่า');
+    }
+  } else if (G._talkChaseOn && (!hot || !talkOn)) {
+    G._talkChaseOn = false;
+    G._talkChaseT = 0;
+    if (talkOn) G.hud.showSubtitle('Talk Radio: "Back to the phones — traffic\'s clearing."', 'วิทยุ: ข่าวจบ');
+  }
 }
 
 // =============================================================================
@@ -1511,6 +1549,8 @@ export function loop() {
     updateVigilante(dt);
     updateTurf(dt);
     updateDogs(dt);
+    updateAlms(dt);
+    updateYaowaratNight(dt);
     updateFootCops(dt);
     updateBullets(dt);
     updateParticles(dt);
@@ -1547,12 +1587,27 @@ export function loop() {
     G.hud.update(dt);
     G.hud.setBars(G.player.hp, G.player.armor, G.player.stam);
     G.hud.setVehicle(G.player.inVehicle ? G.player.inVehicle.hp : 0, !!G.player.inVehicle);
-    if (G.hud.setSpeed) G.hud.setSpeed(G.player.inVehicle ? G.player.inVehicle.vel : 0, !!G.player.inVehicle);
+    if (G.hud.setSpeed) G.hud.setSpeed(G.player.inVehicle ? G.player.inVehicle.vel : 0, !!G.player.inVehicle, G.player.inVehicle && G.player.inVehicle._rpm01);
     G.hud.setCash(G.cash);
     G.hud.drawMinimap(G.player);
     if (G.input.endFrame) G.input.endFrame();
   } else if (G.state === 'phone') {
     updateCamera(dt);
+    const jobs = document.querySelectorAll('#ph-activities .act.job');
+    if (jobs.length) {
+      if (G.input.pressed('ArrowDown') || G.input.pressed('KeyS')) G._phoneIdx = ((G._phoneIdx || 0) + 1) % jobs.length;
+      if (G.input.pressed('ArrowUp') || G.input.pressed('KeyW')) G._phoneIdx = ((G._phoneIdx || 0) - 1 + jobs.length) % jobs.length;
+      jobs.forEach((el, i) => { el.style.outline = i === (G._phoneIdx || 0) ? '1px solid #ffcf4a' : ''; });
+      if (G.input.pressed('Enter') || G.input.pressed('Space')) {
+        const job = jobs[G._phoneIdx || 0] && jobs[G._phoneIdx || 0].getAttribute('data-job');
+        if (job && G.mission && G.mission.start) {
+          G.mission.start(job);
+          document.getElementById('phone').classList.remove('open');
+          G.state = 'playing';
+          if (G.input.requestLock) G.input.requestLock();
+        }
+      }
+    }
     if (G.input.endFrame) G.input.endFrame();
   } else if (G.state === 'map') {
     drawFullMap();

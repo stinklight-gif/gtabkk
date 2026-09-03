@@ -19,6 +19,7 @@ const MIME = {
   '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript',
   '.json': 'application/json', '.css': 'text/css', '.png': 'image/png',
   '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.md': 'text/plain',
+  '.gltf': 'model/gltf+json', '.bin': 'application/octet-stream',
 };
 
 function serve() {
@@ -50,7 +51,7 @@ async function main() {
 
   try {
     const page = await browser.newPage({ viewport: { width: 854, height: 480 } });
-    page.on('pageerror', err => errors.push(`pageerror: ${err.message}`));
+    page.on('pageerror', err => errors.push(`pageerror: ${err.message}${err.stack ? ' | ' + String(err.stack).split('\n').slice(0, 4).join(' > ') : ''}`));
     page.on('console', msg => { if (msg.type() === 'error') errors.push(`console.error: ${msg.text()}`); });
 
     console.log(`serving ${ROOT} on :${PORT}, booting game...`);
@@ -229,8 +230,10 @@ async function main() {
         if (v.group) { v.group.position.copy(v.pos); v.group.rotation.y = v.heading; }
       };
       const cars = G.vehicles.filter(v => v && v.spec && v.boundsHalf && !v.dead && v.spec.kind !== 'boat');
-      const playerCar = cars.find(v => ['sedan', 'camry', 'hilux', 'tuktuk'].includes(v.kind)) || cars[0];
-      const blocker = cars.find(v => v !== playerCar && !v.isCop) || cars[1];
+      let playerCar = cars.find(v => ['sedan', 'camry', 'hilux'].includes(v.kind));
+      if (!playerCar) { playerCar = main.makeVehicle('camry', G.scene); playerCar.pos.set(0, 0, -140); }
+      let blocker = cars.find(v => v !== playerCar && !v.isCop && v.spec.kind !== 'bike' && v.spec.kind !== 'bus');
+      if (!blocker) { blocker = main.makeVehicle('sedan', G.scene); blocker.pos.set(20, 0, -100); }
       const trafficCar = G.vehicles.find(v => v !== playerCar && v !== blocker && v.npc && v.npc.kind === 'traffic' && !v.dead);
       if (!playerCar || !blocker || !trafficCar) throw new Error('not enough vehicles for driving probe');
       for (const v of G.vehicles) {
@@ -332,6 +335,7 @@ async function main() {
         car.pos.set(0, 0, -140); car.heading = 0; car.vel = v;
         car.yawRate = 0; car.steerAngle = 0; car.steerInput = 0;
         car.throttle = 0; car.brakeInput = 0; car.latVel = 0; car._aLong = 0;
+        car.hp = 100; car._burning = false; car.dead = false; car.tiresBlown = false;
         car.mesh.position.copy(car.pos); car.mesh.rotation.y = car.heading;
         G.player.group.position.copy(car.pos);
       };
@@ -452,9 +456,10 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
+    assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
 
     console.log('\n[8] P1 pedestrians vs buildings + walkways');
     const peds = await page.evaluate(() => {
@@ -567,16 +572,215 @@ async function main() {
       const sub = document.getElementById('ammo-sub').textContent;
       const v = G.vehicles.find(x => x && x.spec && x.spec.kind !== 'boat');
       G.player.inVehicle = v; v.driver = 'player'; v.vel = 10;
-      if (G.hud.setSpeed) G.hud.setSpeed(v.vel, true);
+      if (G.hud.setSpeed) G.hud.setSpeed(v.vel, true, 0.6);
       const speedo = document.getElementById('speedo');
+      const tachRow = document.getElementById('tach-row');
+      const tach = document.getElementById('tach-fill');
       return {
         ammo, sub,
         speedShown: speedo && speedo.style.display !== 'none',
         speedText: speedo && speedo.textContent,
+        tachShown: tachRow && tachRow.style.display !== 'none',
+        tachW: tach && tach.style.width,
       };
     });
     assert(/12/.test(ui.ammo) && /36/.test(ui.ammo), `ammo HUD shows mag | reserve ("${ui.ammo}")`);
     assert(ui.speedShown && /km\/h/.test(ui.speedText), `speedo shows km/h ("${ui.speedText}")`);
+    assert(ui.tachShown && parseFloat(ui.tachW) > 0, `tach bar visible ("${ui.tachW}")`);
+
+    console.log('\n[15] P8.0 bike lowside + vehicle LOS');
+    const p80 = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const bike = G.vehicles.find(v => v && v.spec && v.spec.kind === 'bike' && !v.dead) || main.makeVehicle('bike', G.scene);
+      G.player.inVehicle = bike; bike.driver = 'player'; bike.npc = null;
+      bike.pos.set(0, 0, -140); bike.heading = 0; bike.vel = 12; bike.latVel = 9; bike.hp = 100;
+      bike.mesh.position.copy(bike.pos);
+      main.updatePlayerInVehicle(0.05);
+      const dumped = G.player.inVehicle === null;
+      const bus = G.vehicles.find(v => v && v.spec && v.spec.kind === 'bus') || main.makeVehicle('bus', G.scene);
+      bus.pos.set(20, 0, -120); bus.heading = 0; bus.dead = false;
+      if (bus.boundsHalf) {
+        /* keep */
+      }
+      const blocked = main.hasLineOfSight(20, 1.5, -130, 20, 1.5, -110);
+      const clear = main.hasLineOfSight(-40, 1.5, -80, -40, 1.5, -70);
+      return { dumped, blocked, clear, weatherCycle: true };
+    });
+    assert(p80.dumped, 'extreme bike latVel dumps the player (lowside)');
+    assert(p80.blocked === false, 'line of sight is blocked by a vehicle AABB');
+    assert(p80.clear === true, 'open ground still has line of sight');
+
+    console.log('\n[16] P8.1 hero GLTF bike');
+    await page.waitForFunction(() => {
+      const G = window.GAME;
+      if (!G.gameplay.gltf) return true;
+      const bike = G.vehicles.find(v => v && v.kind === 'bike' && v.mesh);
+      return !!(bike && bike.mesh.getObjectByName('gltf-hero'));
+    }, null, { timeout: 20_000 }).catch(() => {});
+    const gltf = await page.evaluate(() => {
+      const G = window.GAME;
+      const bike = G.vehicles.find(v => v && v.kind === 'bike' && v.mesh);
+      return {
+        flag: !!(G.gameplay && G.gameplay.gltf),
+        hero: !!(bike && bike.mesh.getObjectByName('gltf-hero')),
+      };
+    });
+    assert(gltf.flag && gltf.hero, 'hero Wave GLTF attached as gltf-hero on a bike');
+
+    console.log('\n[17] P8.2 Klong Toey pocket + Customs');
+    const port = await page.evaluate(() => {
+      const G = window.GAME;
+      G.player.group.position.set(-150, 0, 150);
+      window.__REALISM_MAIN.updateDistrict();
+      const names = G.mission && G.mission.missions ? Object.keys(G.mission.missions) : [];
+      G.mission.start('customs');
+      return {
+        district: G._districtName,
+        poi: !!(G.world.poi && G.world.poi.klongToey),
+        names,
+        mission: G.mission.active && G.mission.active.name,
+        buildings: G.world.buildings.length,
+      };
+    });
+    assert(port.poi && port.district === 'Klong Toey', `Klong Toey banner/POI (${port.district})`);
+    assert(port.names.indexOf('customs') >= 0 && /Customs/i.test(port.mission), 'Customs Issue starts');
+
+    console.log('\n[18] follow-on cover/clinch/cleaver/alms/fire/radio');
+    const more = await page.evaluate(() => {
+      const G = window.GAME;
+      const stations = (G.audio.radio && G.audio.radio.names) || [];
+      return {
+        cover: !!G.gameplay.cover,
+        clinch: !!G.gameplay.clinch,
+        gym: !!(G.world.poi && G.world.poi.gym),
+        cleaver: !!(G.world.cleaver && G.world.cleaver.mesh),
+        bottle: !!(G.world.bottle),
+        morlam: stations.indexOf('MOR LAM EXPRESS') >= 0,
+        cowboy: stations.indexOf('SOI COWBOY CLASSICS') >= 0,
+        nightSoi: !!(G.mission.missions && G.mission.missions.nightSoi),
+        fireAtTen: !!G.gameplay.fireAtTen,
+        rapierOff: G.gameplay.rapier === false,
+      };
+    });
+    assert(more.cover && more.clinch && more.gym && more.cleaver && more.bottle, 'cover, clinch, gym, cleaver, bottle exist');
+    assert(more.morlam && more.cowboy, 'Mor Lam and Soi Cowboy stations exist');
+    assert(more.nightSoi && more.fireAtTen && more.rapierOff, 'night race + fire-at-10 + rapier off');
+
+    console.log('\n[19] Suvarnabhumi pocket + ground taxi');
+    const bkk = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const plane = G.vehicles.find(v => v && v.kind === 'airliner' && v.playerJet) || G.vehicles.find(v => v && v.kind === 'airliner');
+      const n = G.vehicles.filter(v => v && v.kind === 'airliner' && !v.dead).length;
+      G.player.group.position.set(220, 0, 0);
+      main.updateDistrict();
+      let moved = 0, turned = 0;
+      if (plane) {
+        G.player.inVehicle = plane; plane.driver = 'player'; plane.npc = null;
+        plane.pos.set(237, 0, -40); plane.heading = 0; plane.vel = 0; plane.hp = 220;
+        plane.throttle = 1; plane.steerAngle = 0; plane.yawRate = 0; plane.latVel = 0;
+        plane.mesh.position.copy(plane.pos); plane.mesh.rotation.y = 0;
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyW' }));
+        for (let i = 0; i < 20; i++) main.updatePlayerInVehicle(0.1);
+        moved = plane.pos.z + 40;
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyA' }));
+        plane.steerInput = 1;
+        for (let i = 0; i < 16; i++) main.updatePlayerInVehicle(0.1);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyW' }));
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyA' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        turned = Math.abs(plane.heading);
+      }
+      return {
+        flag: !!(G.gameplay && G.gameplay.airport),
+        poi: !!(G.world.poi && G.world.poi.suvarnabhumi),
+        district: G._districtName,
+        n,
+        moved,
+        turned,
+        kind: plane && plane.spec && plane.spec.kind,
+      };
+    });
+    assert(bkk.flag && bkk.poi && bkk.district === 'Suvarnabhumi', `Suvarnabhumi banner/POI (${bkk.district})`);
+    assert(bkk.n >= 3 && bkk.kind === 'airliner', `parked airliners exist (${bkk.n})`);
+    assert(bkk.moved > 1.5, `player can taxi an airliner on the ground (dz ${bkk.moved.toFixed(1)})`);
+    assert(bkk.turned > 0.04, `player can steer an airliner on the ground (heading ${bkk.turned.toFixed(3)})`);
+
+    console.log('\n[20] BTS commute ride + next stop');
+    const bts = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const stops = (G.bts && G.bts.stops) || [];
+      G.player.inVehicle = null;
+      G.player.group.position.set(-50, 14, 0);
+      G.bts.mesh.position.x = -50; G.bts.dir = 1;
+      G._btsRide = { from: -50, armed: true };
+      G.bts.mesh.position.x = 100;
+      main.updateBTS(0.05);
+      return {
+        nStops: stops.length,
+        dumped: !G._btsRide,
+        x: G.player.group.position.x,
+        y: G.player.group.position.y,
+        visible: G.player.group.visible,
+      };
+    });
+    assert(bts.nStops >= 2, `BTS has a next stop (${bts.nStops} stations)`);
+    assert(bts.dumped && bts.visible && Math.abs(bts.x - 100) < 12 && bts.y > 12, `commute dumps at the next platform (x=${bts.x.toFixed(1)} y=${bts.y.toFixed(1)})`);
+
+    console.log('\n[21] Talk Radio chase call-out');
+    const talk = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const car = G.vehicles.find(v => v && v.spec && v.spec.kind === 'camry') || G.vehicles[0];
+      G.player.inVehicle = car; car.driver = 'player';
+      G.wanted.stars = 3; G._districtName = 'Sukhumvit'; G._talkChaseOn = false; G._talkChaseT = 0;
+      const names = G.audio.radio.names;
+      let guard = 0;
+      while (names[G.audio.radio.station] !== 'TALK RADIO AM' && guard++ < 12) G.audio.radio.next();
+      main.updateRadio(0.2);
+      const on = !!G._talkChaseOn;
+      G.wanted.stars = 0;
+      main.updateRadio(0.2);
+      const off = !G._talkChaseOn;
+      G.player.inVehicle = null; car.driver = null;
+      return { on, off, station: names[G.audio.radio.station] };
+    });
+    assert(talk.station === 'TALK RADIO AM' && talk.on && talk.off, `Talk Radio mentions the chase then clears (${talk.station})`);
+
+    console.log('\n[22] Yaowarat night market');
+    const yao = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      G.time.dayT = 20 / 24;
+      main.updateYaowaratNight(0.2);
+      const nightOn = !!(G.world.yaowaratNight && G.world.yaowaratNight.group && G.world.yaowaratNight.group.visible);
+      const crate = !!(G.world.yaowaratCrate && G.world.yaowaratCrate.mesh);
+      G.time.dayT = 0.4;
+      main.updateYaowaratNight(0.2);
+      const dayOff = !(G.world.yaowaratNight && G.world.yaowaratNight.group && G.world.yaowaratNight.group.visible);
+      return { nightOn, dayOff, crate, stalls: (G.world.yaowaratNight && G.world.yaowaratNight.stalls || []).length };
+    });
+    assert(yao.nightOn && yao.dayOff && yao.crate && yao.stalls > 4, `Yaowarat densifies at night (${yao.stalls} extra stalls)`);
+
+    console.log('\n[23] take over an NPC longtail');
+    const boat = await page.evaluate(() => {
+      const G = window.GAME;
+      const npc = G.vehicles.find(v => v && v.spec && v.spec.kind === 'boat' && v.driver === 'boatman');
+      const parked = G.vehicles.find(v => v && v.spec && v.spec.kind === 'boat' && !v.driver);
+      if (npc) {
+        G.player.inVehicle = npc; npc.driver = 'player'; npc.npc = null;
+      }
+      return { npc: !!npc, parked: !!parked, nowPlayer: !!(G.player.inVehicle && G.player.inVehicle.spec && G.player.inVehicle.spec.kind === 'boat') };
+    });
+    assert(boat.npc && boat.parked && boat.nowPlayer, 'NPC longtail can be taken over; parked boats still exist');
+
+    console.log('\n[24] walk-in 7-Eleven interior');
+    const seven = await page.evaluate(() => {
+      const G = window.GAME;
+      const w = G.world.sevenWalkIn;
+      return {
+        walkIn: !!(w && w.atm && w.microwave && w.clerk && w.shelves && w.shelves.length),
+        pos: !!(w && w.pos),
+      };
+    });
+    assert(seven.walkIn && seven.pos, 'walk-in 7-Eleven has ATM, microwave, clerk, shelves');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

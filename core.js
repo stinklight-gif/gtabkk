@@ -97,7 +97,7 @@ export const G = {
     safehouse: { owned: false, pos: null },           // buyable respawn point
     garage: { rented: false, stored: [], capacity: 4, retrieveIdx: 0 }, // stored: [{kind,color,plate,hp}]
     businesses: {},                                   // id -> { owned, pending } passive-income holdings
-    upgrades: { engine: 0, nitro: 0, armor: 0 },      // account-wide vehicle tuning (levels 0..3)
+    upgrades: { engine: 0, nitro: 0, armor: 0, melee: 0 },      // account-wide vehicle + gym melee tuning (levels 0..3)
     bank: { balance: 0, lastDay: null, lastInterest: 0 },  // savings account at Krung Thep Bank (earns daily interest)
   },
 };
@@ -174,9 +174,13 @@ export const TURFS = [
 ];
 
 // Story-mission milestones, in chain order — single source of truth for the
-// completion % (phone + 100% celebration) so it tracks the whole 6-job chain.
+// completion % (phone + 100% celebration) so it tracks the story jobs plus
+// Bout / Monsoon / Customs / 2 AM Soi.
 export function missionMilestones() {
-  const flags = [G._welcomeDone, G._soiRunWon, G._hitDone, G._deliveryDone, G._mallJobDone, G._getawayDone];
+  const flags = [
+    G._welcomeDone, G._soiRunWon, G._hitDone, G._deliveryDone, G._mallJobDone, G._getawayDone,
+    G._boutDone, G._monsoonDone, G._customsDone, G._nightSoiDone,
+  ];
   return { done: flags.reduce((n, f) => n + (f ? 1 : 0), 0), total: flags.length };
 }
 
@@ -231,6 +235,24 @@ export const GAMEPLAY = {
   honestAmmo: true,
   speedo: true,
   gamepad: true,
+  tach: true,
+  bikeLowside: true,
+  coverVehicles: true,
+  gltf: true,
+  rapier: false,
+  rollover: false,
+  fuel: false,
+  cover: true,
+  clinch: true,
+  btsHijack: true,
+  fireAtTen: true,
+  allRed: true,
+  airport: true,
+  btsRide: true,
+  talkChase: true,
+  yaowaratNight: true,
+  boatHijack: true,
+  sevenInterior: true,
 };
 G.gameplay = GAMEPLAY;
 
@@ -314,10 +336,31 @@ export function onSoi(x, z) {
   }
   return false;
 }
+export function inAirport(x, z) {
+  if (!GAMEPLAY.airport) return false;
+  const b = G.world && G.world.airport;
+  if (b) return x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1;
+  return x >= 200 && x <= 248 && z >= -220 && z <= 220;
+}
+export function inRiver(x) {
+  return x < -206;
+}
+export function hourOfDay() {
+  return ((G.time.dayT % 1) + 1) % 1 * 24;
+}
+export function yaowaratNightOpen() {
+  if (!GAMEPLAY.yaowaratNight) return false;
+  const h = hourOfDay();
+  return h >= 18 || h < 2;
+}
 export function onCarriageway(x, z) {
-  const mx = ((x + HALF) % BLOCK) - BLOCK / 2;
-  const mz = ((z + HALF) % BLOCK) - BLOCK / 2;
-  return Math.abs(mx) < ROAD_WIDTH / 2 + 0.35 || Math.abs(mz) < ROAD_WIDTH / 2 + 0.35 || onSoi(x, z);
+  // Roads are authored on the grid lines (x = i*BLOCK, z = j*BLOCK). Measure
+  // distance to the nearest line, wrapping the JS negative-mod case.
+  const rx = ((x % BLOCK) + BLOCK) % BLOCK;
+  const rz = ((z % BLOCK) + BLOCK) % BLOCK;
+  const dx = Math.min(rx, BLOCK - rx);
+  const dz = Math.min(rz, BLOCK - rz);
+  return dx < ROAD_WIDTH / 2 + 0.35 || dz < ROAD_WIDTH / 2 + 0.35 || onSoi(x, z) || inAirport(x, z);
 }
 
 // pooled scratch objects (never returned/stored — copy out before reuse)

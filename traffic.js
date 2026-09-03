@@ -8,12 +8,13 @@
 // =============================================================================
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { G, BLOCK, GRID, HALF, ROAD_WIDTH, makeStaticBaker, clamp } from './core.js';
+import { G, BLOCK, GRID, HALF, ROAD_WIDTH, makeStaticBaker, clamp, GAMEPLAY } from './core.js';
 
 // Phase cycle (seconds): N/S green → N/S amber → E/W green → E/W amber, repeat.
 // One shared phase for the whole city: a car leaving one green never immediately
 // meets a red, and the box always clears, so the grid can never deadlock.
-const GREEN = 10.0, AMBER = 2.4, CYCLE = 2 * (GREEN + AMBER);
+const GREEN = 10.0, AMBER = 2.4, ALLRED = 3.0;
+const CYCLE = 2 * (GREEN + AMBER + ALLRED);
 
 // dir convention matches vehicles.js: 0=N(+z) 1=E(+x) 2=S(-z) 3=W(-x).
 // Even dirs travel along z (a "N/S" movement); odd dirs along x ("E/W").
@@ -63,6 +64,7 @@ export function buildTrafficLights(scene) {
 
   for (let i = -GRID / 2; i <= GRID / 2; i++) {
     if (i === RIVER_I) continue;                 // river column — no roads there
+    if (GAMEPLAY.airport && i === GRID / 2 - 1) continue; // no lights on the runway strip
     for (let j = -GRID / 2; j <= GRID / 2; j++) {
       const cx = i * BLOCK, cz = j * BLOCK;
       const px = cx + RW / 2 + 0.9, pz = cz + RW / 2 + 0.9;  // mast on the NE corner
@@ -114,13 +116,19 @@ export function buildTrafficLights(scene) {
 export function updateTrafficLights(dt) {
   const t = G.traffic;
   if (!t) return;
-  t.t = (t.t + dt) % CYCLE;
+  const allRed = GAMEPLAY.allRed ? ALLRED : 0;
+  const cycle = 2 * (GREEN + AMBER + allRed);
+  t.t = (t.t + dt) % cycle;
   const x = t.t;
   let ns, ew;
-  if      (x < GREEN)               { ns = 'green'; ew = 'red';   }
-  else if (x < GREEN + AMBER)       { ns = 'amber'; ew = 'red';   }
-  else if (x < 2 * GREEN + AMBER)   { ns = 'red';   ew = 'green'; }
-  else                              { ns = 'red';   ew = 'amber'; }
+  const A = GREEN, B = GREEN + AMBER, C = GREEN + AMBER + allRed;
+  const D = C + GREEN, E = D + AMBER;
+  if      (x < A) { ns = 'green'; ew = 'red'; }
+  else if (x < B) { ns = 'amber'; ew = 'red'; }
+  else if (x < C) { ns = 'red';   ew = 'red'; }     // all-red so the box + zebras clear
+  else if (x < D) { ns = 'red';   ew = 'green'; }
+  else if (x < E) { ns = 'red';   ew = 'amber'; }
+  else            { ns = 'red';   ew = 'red'; }
   t.ns = ns; t.ew = ew;
 
   // Drive the six shared materials — the only per-frame cost (brighter at night).

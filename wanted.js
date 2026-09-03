@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, inWat, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, inWat, onSoi, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { CRIME_THRESHOLDS, abortHeist, animateWalk, damagePlayer, hasLineOfSight, makePedMesh, makeVehicle, onCopKilled, raiseWanted, updateVehicleVisuals } from './main.js';
 
@@ -135,8 +135,20 @@ export function updateWanted(dt) {
     // spawn just outside view
     const ang = rand(0, TAU);
     const r = rand(35, 60);
-    const sx = clamp(p.x + Math.cos(ang) * r, -HALF + 5, HALF - 5);
-    const sz = clamp(p.z + Math.sin(ang) * r, -HALF + 5, HALF - 5);
+    if (G._btsRide) return;
+    let sx = clamp(p.x + Math.cos(ang) * r, -200, HALF - 5);
+    let sz = clamp(p.z + Math.sin(ang) * r, -HALF + 5, HALF - 5);
+    if (sx < -200) sx = -200;
+    for (let tries = 0; onSoi(sx, sz) && tries < 8; tries++) {
+      const a2 = rand(0, TAU), r2 = rand(35, 70);
+      sx = clamp(p.x + Math.cos(a2) * r2, -200, HALF - 5);
+      sz = clamp(p.z + Math.sin(a2) * r2, -HALF + 5, HALF - 5);
+    }
+    if (onSoi(sx, sz)) {
+      const road = Math.round(sx / BLOCK) * BLOCK;
+      sx = clamp(road + 2.5, -200, HALF - 5);
+    }
+    if (sx < -200) sx = -200;
     if (G.wanted.stars >= 5 && Math.random() < 0.7) {
       const s = spawnSwat(G.scene, new THREE.Vector3(sx, 0, sz));
       s.vel = 7;
@@ -234,7 +246,7 @@ function copWitness(dt) {
 
 export function updateTrafficOffences(dt) {
   const v = G.player.inVehicle;
-  if (!v || !v.spec || v.spec.kind === 'boat' || Math.abs(v.vel || 0) < 6) { G._inJunction = false; return; }
+  if (!v || !v.spec || v.spec.kind === 'boat' || v.spec.kind === 'airliner' || Math.abs(v.vel || 0) < 6) { G._inJunction = false; return; }
   // dominant travel axis — same dir convention as updateTrafficCar (even = along z)
   const alongZ = Math.abs(Math.cos(v.heading)) >= Math.abs(Math.sin(v.heading));
   const coord = alongZ ? v.pos.z : v.pos.x;
@@ -330,7 +342,8 @@ function maybeAmbush() {
 export function updateCop(v, dt) {
   // chase player
   const p = G.player;
-  const px = p.group.position.x, pz = p.group.position.z;
+  const onBoat = !!(p.inVehicle && p.inVehicle.spec && p.inVehicle.spec.kind === 'boat');
+  const px = onBoat ? -200 : p.group.position.x, pz = p.group.position.z;
   const tx0 = px - v.pos.x;
   const tz0 = pz - v.pos.z;
   const d = Math.hypot(tx0, tz0);
@@ -375,6 +388,7 @@ export function updateCop(v, dt) {
   v.steerAngle = lerp(v.steerAngle || 0, clamp(headingDelta * 6, -0.5, 0.5), 0.28);
   v.pos.x += Math.sin(v.heading) * v.vel * dt;
   v.pos.z += Math.cos(v.heading) * v.vel * dt;
+  if (v.pos.x < -200) v.pos.x = -200;
   v.mesh.position.copy(v.pos);
   v.mesh.rotation.y = v.heading;
   updateVehicleVisuals(v, dt, { braking: target < v.vel, reverse: v.vel < -0.1 });

@@ -191,6 +191,12 @@ export function bindHud() {
     if (G._welcomeDone) out.push({ name: 'Soi Run', status: G._soiRunWon ? 'done · replay' : 'available', job: 'soiRun', dist: null });
     if (G._holdYardDone) out.push({ name: 'Lumpinee Bout', status: G._boutDone ? 'done · replay' : 'available', job: 'bout', dist: d(poi.temple) });
     if (G._boutDone) out.push({ name: 'Monsoon', status: G._monsoonDone ? 'done · replay' : 'available', job: 'monsoon', dist: d(poi.pier) });
+    if (G._monsoonDone) out.push({ name: 'Customs Issue', status: G._customsDone ? 'done · replay' : 'available', job: 'customs', dist: d(poi.klongToey) });
+    out.push({ name: '2 AM Soi Race', status: G._nightSoiDone ? 'done · replay' : 'bikes · night', job: 'nightSoi', dist: null });
+    if (poi.gym) out.push({ name: 'Muay Thai gym', status: `melee ${((G.econ.upgrades && G.econ.upgrades.melee) || 0)}/3`, dist: d(poi.gym) });
+    if (poi.suvarnabhumi) out.push({ name: 'Suvarnabhumi', status: 'taxi an airliner', dist: d(poi.suvarnabhumi) });
+    if (G.world && G.world.bts) out.push({ name: 'BTS Asok', status: 'ride the skytrain', dist: d({ x: G.world.bts.x, z: G.world.bts.z || 0 }) });
+    if (poi.yaowarat) out.push({ name: 'Yaowarat', status: 'night market', dist: d(poi.yaowarat) });
     if (G.world && G.world.bank) {
       const h = G.heist;
       const st = (h && h.active) ? 'in progress' : (h && performance.now() < h.cooldownUntil) ? `cooldown ${Math.ceil((h.cooldownUntil - performance.now()) / 1000)}s` : 'ready';
@@ -264,12 +270,16 @@ export function bindHud() {
     row.style.display = show ? '' : 'none';
     if (show) document.getElementById('veh-fill').style.width = clamp(hp, 0, 100) + '%';
   }
-  function setSpeed(vel, show) {
+  function setSpeed(vel, show, rpm01) {
     const el = document.getElementById('speedo');
     if (!el) return;
     const on = !!(show && GAMEPLAY.speedo);
     el.style.display = on ? '' : 'none';
     if (on) el.textContent = Math.round(Math.abs(vel || 0) * 3.6) + ' km/h';
+    const tach = document.getElementById('tach-fill');
+    const tachRow = document.getElementById('tach-row');
+    if (tachRow) tachRow.style.display = (on && GAMEPLAY.tach) ? '' : 'none';
+    if (tach && on && GAMEPLAY.tach) tach.style.width = (clamp(rpm01 != null ? rpm01 : 0, 0, 1) * 100) + '%';
   }
   function setClock(s) { document.getElementById('clock').textContent = s; document.getElementById('ph-time').textContent = s; }
   function setWeather(t) { document.getElementById('weather-tag').textContent = t; }
@@ -428,6 +438,7 @@ export function bindHud() {
     for (const shop of ((G.world.gunShops && G.world.gunShops.length) ? G.world.gunShops : (G.world.gunShop ? [{ pos: G.world.gunShop }] : []))) drawMiniBadge(shop.pos || shop, 'GUN', '#ff3344');
     if (G.world.poi && G.world.poi.bank) drawMiniBadge(G.world.poi.bank, 'BANK', BANK_COLOR);
     if (G.world.bts) drawMiniBadge({ x: G.world.bts.x, z: G.world.bts.z || 0 }, 'BTS', BTS_COLOR);
+    if (G.world.poi && G.world.poi.suvarnabhumi) drawMiniBadge(G.world.poi.suvarnabhumi, 'BKK', '#c9a020');
 
     // player blip (always center, facing up)
     mctx.save();

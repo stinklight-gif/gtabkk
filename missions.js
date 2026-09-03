@@ -919,13 +919,14 @@ export function makeMissionSystem() {
           const d2 = dist2(pp, this.markerPos);
           if (!this.armed && d2 > 18 * 18) this.armed = true;
           if (this.armed) {
-            G.hud.showPrompt('Return to the <b>marker</b> to run <b>Monsoon</b> again', 0.4);
-            if (d2 < 8 * 8) { this.armed = false; this.onStart(); }
+            const label = this.nextJob ? 'start <b>Customs Issue</b>' : 'run <b>Monsoon</b> again';
+            G.hud.showPrompt('Return to the <b>marker</b> to ' + label, 0.4);
+            if (d2 < 8 * 8) { this.armed = false; if (this.nextJob) sys.start(this.nextJob); else this.onStart(); }
           }
         }
       },
       win() {
-        this.stage = 5; this.armed = false;
+        this.stage = 5; this.armed = false; this.nextJob = 'customs';
         G._monsoonDone = true;
         G.cash += this.reward; G.hud.setCash(G.cash); G.hud.cashPop(this.reward);
         G.hud.showNotif(`Monsoon done: +฿${this.reward.toLocaleString()}`);
@@ -933,6 +934,131 @@ export function makeMissionSystem() {
         G.hud.setMissionText('Free Roam · Sukhumvit');
         this.markerPos = this.drop.clone();
         setBeam(this.drop, 0xff2a86);
+      },
+    },
+
+    customs: {
+      name: 'Customs Issue',
+      th: 'ของเถื่อนท่าเรือ',
+      markerPos: null,
+      stage: 0,
+      armed: false,
+      pickup: null,
+      drop: null,
+      reward: 8000,
+      onStart() {
+        this.stage = 1;
+        this.pickup = (G.world.poi.klongToey || new THREE.Vector3(-150, 0, 150)).clone();
+        this.drop = (G.world.poi.customsDrop || new THREE.Vector3(120, 0, -40)).clone();
+        this.markerPos = this.pickup.clone();
+        setBeam(this.markerPos, 0x39ff7a);
+        const driving = G.player.inVehicle && G.player.inVehicle.spec && G.player.inVehicle.spec.kind === 'hilux';
+        if (!driving) {
+          const h = makeVehicle('hilux', G.scene);
+          h.pos.set(this.pickup.x + 6, 0, this.pickup.z);
+          h.mesh.position.copy(h.pos);
+          h.heading = 0; h.mesh.rotation.y = 0;
+        }
+        G.hud.setMissionText('Customs Issue');
+        G.hud.showSubtitle("Uncle Seng: \"Hilux at the port. Lose the heat, drop in Thonglor.\"", "ลุงเซ้ง: \"ของท่าเรือ รีบไป\"");
+      },
+      update(dt) {
+        const pp = G.player.group.position;
+        if (this.stage === 1) {
+          G.hud.showPrompt('Get to the <b>Klong Toey</b> port', 0.4);
+          if (dist2(pp, this.pickup) < 12 * 12) {
+            this.stage = 2;
+            raiseWanted(2);
+            this.markerPos = this.drop.clone();
+            setBeam(this.drop, 0x21f0ff);
+            G.hud.showNotif('Goods loaded — 2★. Lose them, then drop.');
+          }
+        } else if (this.stage === 2) {
+          G.hud.showPrompt(`CUSTOMS &nbsp; ★${G.wanted.stars} &nbsp;→&nbsp; warehouse`, 0.4);
+          if (G.wanted.stars === 0 && dist2(pp, this.drop) < 10 * 10) { this.win(); return; }
+          if (G.wanted.stars > 0 && dist2(pp, this.drop) < 10 * 10) G.hud.showPrompt('Lose the heat before the drop', 0.4);
+        } else if (this.stage === 5) {
+          const d2 = dist2(pp, this.markerPos);
+          if (!this.armed && d2 > 18 * 18) this.armed = true;
+          if (this.armed) {
+            G.hud.showPrompt('Return to the <b>marker</b> to run <b>Customs</b> again', 0.4);
+            if (d2 < 8 * 8) { this.armed = false; this.onStart(); }
+          }
+        }
+      },
+      win() {
+        this.stage = 5; this.armed = false;
+        G._customsDone = true;
+        G.cash += this.reward; G.hud.setCash(G.cash); G.hud.cashPop(this.reward);
+        G.hud.showNotif(`Customs Issue complete: +฿${this.reward.toLocaleString()}`);
+        G.hud.showSubtitle("Uncle Seng: \"Clean. The port's yours.\"", "ลุงเซ้ง: \"เรียบร้อย\"");
+        G.hud.setMissionText('Free Roam · Sukhumvit');
+        this.markerPos = this.drop.clone();
+        setBeam(this.drop, 0xff2a86);
+      },
+    },
+
+    nightSoi: {
+      name: '2 AM Soi Race',
+      th: 'ซิ่งซอยตีสอง',
+      markerPos: null,
+      stage: 0,
+      armed: false,
+      cp: 0,
+      timeLeft: 0,
+      route: [],
+      startTime: 40,
+      cpBonus: 8,
+      reward: 4500,
+      onStart() {
+        this.stage = 1; this.cp = 0; this.timeLeft = 0;
+        this.route = (G.world.sois || []).slice(0, 4).map(s => new THREE.Vector3((s.x0 + s.x1) / 2, 0, (s.z0 + s.z1) / 2));
+        if (!this.route.length) this.route = [new THREE.Vector3(0, 0, -150), new THREE.Vector3(150, 0, -50)];
+        this.markerPos = this.route[0].clone();
+        setBeam(this.markerPos, 0x39ff7a);
+        const hour = ((G.time.dayT % 1) + 1) % 1 * 24;
+        if (hour >= 5 && hour < 21) G.time.dayT = 2 / 24;
+        G.hud.setMissionText('2 AM Soi Race');
+        G.hud.showSubtitle("Bikes only. Hit the sois before dawn.", "มอเตอร์ไซค์อย่างเดียว");
+      },
+      update(dt) {
+        const pp = G.player.group.position;
+        const v = G.player.inVehicle;
+        const bikeOk = v && v.spec && v.spec.kind === 'bike';
+        if (this.stage === 1) {
+          if (dist2(pp, this.markerPos) < 8 * 8 && bikeOk) {
+            this.stage = 2; this.cp = 0; this.timeLeft = this.startTime;
+            this.markerPos = this.route[0].clone(); setBeam(this.markerPos, 0x21f0ff);
+            G.hud.showNotif('GO — stay on the bike');
+          } else if (dist2(pp, this.markerPos) < 8 * 8) G.hud.showPrompt('Bring a <b>bike</b>', 0.4);
+        } else if (this.stage === 2) {
+          if (!bikeOk) { this.fail(); return; }
+          this.timeLeft -= dt;
+          if (this.timeLeft <= 0) { this.fail(); return; }
+          G.hud.showPrompt(`SOI RACE &nbsp; ⏱ ${this.timeLeft.toFixed(0)}s &nbsp;·&nbsp; ${this.cp + 1}/${this.route.length}`, 0.4);
+          if (dist2(pp, this.markerPos) < 8 * 8) {
+            this.cp++;
+            if (this.cp >= this.route.length) { this.win(); return; }
+            this.timeLeft += this.cpBonus;
+            this.markerPos = this.route[this.cp].clone(); setBeam(this.markerPos, 0x21f0ff);
+          }
+        } else if (this.stage === 5) {
+          const d2 = dist2(pp, this.markerPos);
+          if (!this.armed && d2 > 18 * 18) this.armed = true;
+          if (this.armed && d2 < 8 * 8) { this.armed = false; this.onStart(); }
+        }
+      },
+      win() {
+        this.stage = 5; this.armed = false;
+        G._nightSoiDone = true;
+        G.cash += this.reward; G.hud.setCash(G.cash); G.hud.cashPop(this.reward);
+        G.hud.showNotif(`Soi race won: +฿${this.reward.toLocaleString()}`);
+        this.markerPos = this.route[0].clone(); setBeam(this.markerPos, 0xff2a86);
+      },
+      fail() {
+        this.stage = 5; this.armed = false;
+        G.hud.showNotif('Soi race failed.');
+        this.markerPos = (this.route[0] || new THREE.Vector3()).clone(); setBeam(this.markerPos, 0xff2a86);
       },
     },
   };

@@ -3,13 +3,14 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, bizRate, bizCap, bizUpgradeCost, bizManagerCost, bizSaleValue, BANK_INTEREST, BANK_INTEREST_CAP, WEALTH_TIERS, netWorth, wealthRank, rankDiscount, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, bizRate, bizCap, bizUpgradeCost, bizManagerCost, bizSaleValue, BANK_INTEREST, BANK_INTEREST_CAP, WEALTH_TIERS, netWorth, wealthRank, rankDiscount, ROAD_WIDTH, PED_TARGET, GAMEPLAY, buildingsNear, inAirport, inYaowarat, yaowaratNightOpen, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { tip, damagePlayer, resolvePlayerVsBuildings, resolvePlayerVsVehicles, resolvePlayerVsPlatforms, worldSupportY, saveGame, startArcade, applyUpgrades, raiseWanted, makeVehicle, updateAmmoHud, updateCombat, updatePlayerInVehicle } from './main.js';
 
 export function updatePlayer(dt) {
   const p = G.player;
   if (p.inVehicle) { updatePlayerInVehicle(dt); return; }
+  if (G._btsRide) return;
 
   // mouse look
   const [dx, dy] = G.input.consumeMouseDelta();
@@ -148,11 +149,15 @@ export function updatePlayer(dt) {
     if (parts && parts.foreR) parts.foreR.rotation.x = lerp(parts.foreR.rotation.x || 0, 0.24, 0.15);
   }
 
+  updateCover(dt);
+
   // Combat
   updateCombat(dt);
 
-  // 7-Eleven proximity — snacks restore HP, a vest tops up armor
+  // 7-Eleven proximity — snacks restore HP, a vest tops up armor (walk-in store
+  // is diegetic: you use the shelves / microwave instead of this radius heal)
   for (const e of G.world.sevenElevens) {
+    if (e.walkIn) continue;
     if (dist2(p.group.position, e.pos) < 7*7) {
       if (Date.now() - e.chimed > 4000) {
         G.audio.chime(); e.chimed = Date.now();
@@ -173,7 +178,9 @@ export function updateDistrict() {
   const p = G.player.group.position;
   const poi = G.world.poi;
   let zone;
-  if (p.x < -185) zone = { en: 'Riverside', th: 'ริมแม่น้ำ' };
+  if (GAMEPLAY.airport && inAirport(p.x, p.z)) zone = { en: 'Suvarnabhumi', th: 'สุวรรณภูมิ' };
+  else if (poi.klongToey && dist2(p, poi.klongToey) < 48 * 48) zone = { en: 'Klong Toey', th: 'คลองเตย' };
+  else if (p.x < -185) zone = { en: 'Riverside', th: 'ริมแม่น้ำ' };
   else if (poi.yaowarat && dist2(p, poi.yaowarat) < 62*62) zone = { en: 'Yaowarat', th: 'เยาวราช' };
   else if (poi.temple && dist2(p, poi.temple) < 46*46) zone = { en: 'The Wat', th: 'วัด' };
   else if (poi.terminal21 && dist2(p, poi.terminal21) < 55*55) zone = { en: 'Asok', th: 'อโศก' };
@@ -185,6 +192,32 @@ export function updateDistrict() {
   }
 }
 
+function btsStops() {
+  return (G.bts && G.bts.stops) || (G.world && G.world.bts && G.world.bts.stops) || [
+    { x: -50, y: 13.9, name: 'Asok' },
+    { x: 100, y: 13.9, name: 'Phrom Phong' },
+  ];
+}
+function nearestBtsStop(x) {
+  const stops = btsStops();
+  let best = stops[0], bd = 1e9;
+  for (const s of stops) {
+    const d = Math.abs((s.x) - x);
+    if (d < bd) { bd = d; best = s; }
+  }
+  return { stop: best, dist: bd };
+}
+function dumpOffBts(b, stop) {
+  const p = G.player;
+  G._btsRide = null;
+  p.group.visible = true;
+  const y = (stop && stop.y) || 13.9;
+  p.group.position.set((stop && stop.x) || b.mesh.position.x, y, -8);
+  p.velocity.set(0, 0, 0);
+  if (G.audio && G.audio.btsChime) G.audio.btsChime();
+  G.hud.showNotif(stop && stop.name ? `BTS — ${stop.name}` : 'BTS — next stop');
+}
+
 // Slide the Skytrain back and forth along the elevated track.
 export function updateBTS(dt) {
   const b = G.bts;
@@ -192,14 +225,87 @@ export function updateBTS(dt) {
   b.mesh.position.x += b.dir * b.speed * dt;
   if (b.mesh.position.x > b.max) b.dir = -1;
   else if (b.mesh.position.x < b.min) b.dir = 1;
-  // rumble as the train passes over a player near the track (z≈0)
   const dx = b.mesh.position.x - G.player.group.position.x;
   if ((b._dxPrev || 0) * dx < 0 && Math.abs(G.player.group.position.z) < 45 && G.audio.rumble) G.audio.rumble();
   b._dxPrev = dx;
-  const stationX = (G.world.bts && G.world.bts.x) || -50;
-  if (Math.abs(b.mesh.position.x - stationX) < 6) {
+
+  const stops = btsStops();
+  const atStop = nearestBtsStop(b.mesh.position.x);
+  if (atStop.dist < 8) {
     if (!b._announced && G.audio.btsChime) { G.audio.btsChime(); b._announced = true; }
   } else b._announced = false;
+
+  const p = G.player;
+  if (G._btsRide) {
+    p.group.visible = false;
+    p.group.position.copy(b.mesh.position);
+    p.group.position.y = 16.2;
+    const ride = G._btsRide;
+    if (typeof ride === 'object' && ride.from != null) {
+      if (!ride.armed && Math.abs(b.mesh.position.x - ride.from) > 22) ride.armed = true;
+      const nxt = stops.find(s => Math.abs(s.x - ride.from) > 20) || stops[stops.length - 1];
+      G.hud.showPrompt(`BTS — next ${nxt && nxt.name ? nxt.name : 'stop'}` + (GAMEPLAY.btsHijack ? ' · <b>E</b> jump' : ''), 0.4);
+      if (ride.armed && atStop.dist < 7 && Math.abs(atStop.stop.x - ride.from) > 20) {
+        dumpOffBts(b, atStop.stop);
+        return;
+      }
+    } else {
+      G.hud.showPrompt('Press <b>E</b> to jump off the BTS', 0.4);
+    }
+    if (GAMEPLAY.btsHijack && G.input.pressed('KeyE')) {
+      dumpOffBts(b, atStop.dist < 14 ? atStop.stop : { x: b.mesh.position.x, y: 13.9 });
+    }
+    return;
+  }
+  if (p.inVehicle) return;
+  const onPlat = p.group.position.y > 12 && Math.abs(p.group.position.z) < 5.5;
+  const platStop = nearestBtsStop(p.group.position.x);
+  const trainIn = onPlat && platStop.dist < 12 && Math.abs(b.mesh.position.x - platStop.stop.x) < 12;
+  if (GAMEPLAY.btsRide && trainIn) {
+    G.hud.showPrompt('Press <b>E</b> to ride the BTS', 0.4);
+    if (G.input.pressed('KeyE')) {
+      G._btsRide = { from: platStop.stop.x, armed: false };
+      p.group.visible = false;
+      if (G.audio && G.audio.rumble) G.audio.rumble();
+      if (G.audio && G.audio.btsChime) G.audio.btsChime();
+      if (GAMEPLAY.btsHijack && G.wanted && G.wanted.stars >= 2) {
+        G.hud.showNotif('You forced the train');
+      }
+    }
+  }
+}
+
+export function updateCover(dt) {
+  const p = G.player;
+  p.inCover = false;
+  p.coverPeek = null;
+  if (!GAMEPLAY.cover || p.inVehicle || G._btsRide) return;
+  const aiming = G.input.rightDown || (p.activeWeapon !== 'fists' && G.input.down('ControlLeft'));
+  if (!aiming) return;
+  const pos = p.group.position;
+  const list = buildingsNear(pos.x, pos.z);
+  let best = null, bd = 1.25;
+  for (const b of list) {
+    const dx = pos.x - b.pos.x, dz = pos.z - b.pos.z;
+    const px = Math.abs(dx) - b.size.x / 2, pz = Math.abs(dz) - b.size.z / 2;
+    const dist = Math.max(px, pz);
+    if (dist > -0.2 && dist < bd) { bd = dist; best = b; }
+  }
+  if (!best) return;
+  p.inCover = true;
+  const dx = pos.x - best.pos.x, dz = pos.z - best.pos.z;
+  const alongX = (best.size.x / 2) - Math.abs(dx) < (best.size.z / 2) - Math.abs(dz);
+  const nx = alongX ? Math.sign(dx) || 1 : 0;
+  const nz = alongX ? 0 : (Math.sign(dz) || 1);
+  const tx = alongX ? 0 : 1, tz = alongX ? 1 : 0;
+  const peek = (G.input.down('KeyA') ? -1 : G.input.down('KeyD') ? 1 : 0);
+  p.coverPeek = {
+    x: best.pos.x + nx * (best.size.x / 2 + 0.55) + tx * peek * 0.7,
+    y: pos.y + 1.4,
+    z: best.pos.z + nz * (best.size.z / 2 + 0.55) + tz * peek * 0.7,
+  };
+  pos.x = lerp(pos.x, best.pos.x + nx * (best.size.x / 2 + 0.42), 0.25);
+  pos.z = lerp(pos.z, best.pos.z + nz * (best.size.z / 2 + 0.42), 0.25);
 }
 
 // Spin/bob the hidden amulets and collect them on touch.
@@ -238,7 +344,63 @@ export function updateCollectibles(dt) {
 
 export function updateInteraction(dt) {
   const p = G.player;
-  if (p.inVehicle) return;
+  if (p.inVehicle || G._btsRide) return;
+
+  const crate = G.world.yaowaratCrate;
+  if (crate && !crate.taken && dist2(p.group.position, crate.pos) < 2.6 * 2.6) {
+    G.hud.showPrompt('Press <b>E</b> to snatch the crate', 0.4);
+    if (G.input.pressed('KeyE')) {
+      crate.taken = true;
+      if (crate.mesh) G.scene.remove(crate.mesh);
+      G.cash += 800; G.hud.setCash(G.cash); G.hud.cashPop(800);
+      raiseWanted(2, 5);
+      G.hud.showNotif('Crate snatched — 2★');
+      G.hud.showSubtitle('Vendor: "HEY! That\'s not yours!"', 'เฮ้ย ของกู!');
+    }
+    return;
+  }
+  const seven = G.world.sevenWalkIn;
+  if (GAMEPLAY.sevenInterior && seven) {
+    const inside = Math.abs(p.group.position.x - seven.pos.x) < seven.hx - 0.35
+                && Math.abs(p.group.position.z - seven.pos.z) < seven.hz - 0.35
+                && p.group.position.y < 3;
+    if (inside) { update7Eleven(dt); return; }
+  }
+  const gym = G.world.poi && G.world.poi.gym;
+  if (gym && dist2(p.group.position, gym) < 4 * 4) {
+    G.hud.showPrompt('Press <b>E</b> to train (stamina → melee)', 0.4);
+    if (G.input.pressed('KeyE') && p.stam > 25) {
+      p.stam = Math.max(0, p.stam - 35);
+      G.econ.upgrades.melee = Math.min(3, (G.econ.upgrades.melee || 0) + 1);
+      G.hud.showNotif('Gym — melee ' + G.econ.upgrades.melee + '/3');
+      if (G.audio && G.audio.whack) G.audio.whack();
+    }
+    return;
+  }
+  const cleaver = G.world.cleaver;
+  if (cleaver && !cleaver.taken && dist2(p.group.position, cleaver.pos) < 3 * 3) {
+    G.hud.showPrompt('Press <b>E</b> to take the cleaver', 0.4);
+    if (G.input.pressed('KeyE')) {
+      cleaver.taken = true;
+      if (cleaver.mesh) { G.scene.remove(cleaver.mesh); }
+      p.weapons.cleaver = true; p.activeWeapon = 'cleaver';
+      G.hud.showNotif('Cleaver picked up');
+      updateAmmoHud();
+    }
+    return;
+  }
+  const bottle = G.world.bottle;
+  if (bottle && !bottle.taken && dist2(p.group.position, bottle.pos) < 3 * 3) {
+    G.hud.showPrompt('Press <b>E</b> to take a fish-sauce bottle', 0.4);
+    if (G.input.pressed('KeyE')) {
+      bottle.taken = true;
+      if (bottle.mesh) G.scene.remove(bottle.mesh);
+      p.weapons.bottle = true;
+      G.hud.showNotif('Throwable — cycle to BOTTLE');
+      updateAmmoHud();
+    }
+    return;
+  }
 
   // Inside the garage shed, let updateGarageOwnership own the E key (rent/retrieve)
   // so the enter-vehicle prompt doesn't fight it. The garage door sits just
@@ -247,13 +409,29 @@ export function updateInteraction(dt) {
   if (gg && dist2(p.group.position, gg.pos) < gg.r * gg.r) return;
 
   // find nearest vehicle within reach that isn't a cop unit or a burning wreck
-  let near = null, nd = Infinity;
+  let near = null, nd = Infinity, takeBoat = null, tbd = Infinity;
   for (const v of G.vehicles) {
-    if (v.driver || v.dead) continue; // occupied/cop/player, or a wreck about to despawn
+    if (v.dead) continue;
+    if (v.driver === 'player') continue;
     const d2 = dist2(v.pos, p.group.position);
-    if (d2 < 8 * 8 && d2 < nd) { nd = d2; near = v; }   // dist2 is squared → compare against radius²
+    const reach = (v.spec && v.spec.kind === 'airliner') ? 16 : (v.spec && v.spec.kind === 'boat') ? 6 : 8;
+    if (GAMEPLAY.boatHijack && v.spec && v.spec.kind === 'boat' && v.driver && v.driver !== 'player' && d2 < reach * reach && d2 < tbd) {
+      takeBoat = v; tbd = d2;
+    }
+    if (v.driver) continue; // occupied/cop, or a wreck about to despawn
+    if (d2 < reach * reach && d2 < nd) { nd = d2; near = v; }
   }
-  if (near) {
+  if (takeBoat && (nd === Infinity || tbd <= nd)) {
+    G.hud.showPrompt('Press <b>E</b> to take the longtail', 0.5);
+    if (G.input.pressed('KeyE')) {
+      takeBoat.driver = 'player';
+      takeBoat.npc = null;
+      p.inVehicle = takeBoat;
+      applyUpgrades(takeBoat);
+      G.hud.showNotif('You took the longtail');
+      G.audio.blip({ freq: 280, dur: 0.06, gain: 0.1 });
+    }
+  } else if (near) {
     G.hud.showPrompt('Press <b>E</b> to enter ' + vehicleName(near.kind), 0.5);
     if (G.input.pressed('KeyE')) {
       p.inVehicle = near;
@@ -571,7 +749,57 @@ export function updateBank(dt) {
 
 export function update7Eleven(dt) {
   const p = G.player;
+  const walk = G.world.sevenWalkIn;
+  if (GAMEPLAY.sevenInterior && walk) {
+    const inside = Math.abs(p.group.position.x - walk.pos.x) < walk.hx - 0.35
+                && Math.abs(p.group.position.z - walk.pos.z) < walk.hz - 0.35
+                && p.group.position.y < 3;
+    if (inside && !G._inSeven) {
+      G._inSeven = true;
+      G.hud.showSubtitle('7-Eleven', 'เซเว่นอีเลฟเว่น', 1.6);
+      if (G.audio && G.audio.chime) G.audio.chime();
+      walk.chimed = Date.now();
+    } else if (!inside && G._inSeven) G._inSeven = false;
+    if (inside) {
+      const hot = (G.wanted && G.wanted.stars >= 1) || (G.heist && G.heist.active);
+      if (hot && walk.clerk && !walk._clerkHid) {
+        walk._clerkHid = true;
+        walk.clerk.position.y = -0.4;
+        G.hud.showSubtitle('Clerk hits the floor.', 'พนักงานหมอบ');
+      } else if (!hot && walk.clerk && walk._clerkHid) {
+        walk._clerkHid = false;
+        walk.clerk.position.y = 0;
+      }
+      if (walk.atm && dist2(p.group.position, walk.atm) < 2.2 * 2.2) {
+        G.hud.showPrompt('Press <b>E</b> for the ATM', 0.4);
+        if (G.input.pressed('KeyE')) openBank();
+        return;
+      }
+      if (walk.microwave && dist2(p.group.position, walk.microwave) < 1.8 * 1.8) {
+        G.hud.showPrompt('Press <b>E</b> to microwave a snack (stamina)', 0.4);
+        if (G.input.pressed('KeyE')) {
+          p.stam = p.stamMax;
+          G.hud.showNotif('Microwaved — stamina up');
+          if (G.audio && G.audio.blip) G.audio.blip({ freq: 440, dur: 0.08, gain: 0.1 });
+        }
+        return;
+      }
+      for (const sh of (walk.shelves || [])) {
+        if (dist2(p.group.position, sh) < 1.8 * 1.8) {
+          G.hud.showPrompt('Press <b>E</b> to grab a snack (+HP)', 0.4);
+          if (G.input.pressed('KeyE')) {
+            p.hp = Math.min(p.hpMax, p.hp + 35);
+            G.hud.showNotif('Snack — +35 HP');
+            if (G.audio && G.audio.chime) G.audio.chime();
+          }
+          return;
+        }
+      }
+      return;
+    }
+  }
   for (const e of G.world.sevenElevens) {
+    if (e.walkIn) continue;
     if (dist2(p.group.position, e.pos) < 5 * 5) {
       G.hud.showPrompt('Press <b>E</b> to shop at <b>7-Eleven</b>', 0.4);
       if (G.input.pressed('KeyE')) openStore('7-Eleven');
@@ -872,5 +1100,5 @@ export function updateGunShop(dt) {
 }
 
 export function vehicleName(k) {
-  return { bike: 'motorbike', tuktuk: 'tuk-tuk', hilux: 'pickup', camry: 'car', sedan: 'sedan', cop: 'cop pickup', fortuner: 'unmarked SUV', swat: 'SWAT van', songthaew: 'songthaew', boat: 'longtail boat', bus: 'bus', luxsedan: 'luxury sedan', supercar: 'supercar' }[k] || k;
+  return { bike: 'motorbike', tuktuk: 'tuk-tuk', hilux: 'pickup', camry: 'car', sedan: 'sedan', cop: 'cop pickup', fortuner: 'unmarked SUV', swat: 'SWAT van', songthaew: 'songthaew', boat: 'longtail boat', bus: 'bus', luxsedan: 'luxury sedan', supercar: 'supercar', airliner: 'airliner' }[k] || k;
 }

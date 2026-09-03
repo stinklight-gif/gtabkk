@@ -6,6 +6,7 @@ import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, indexBuilding, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { buildLandmarks } from './worldLandmarks.js';
+import { buildAirport, AIRPORT_I } from './airport.js';
 import { updateDayNight } from './main.js';
 
 // 3. WORLD GENERATION — Sukhumvit, procedural
@@ -552,6 +553,7 @@ export function buildWorld(scene) {
     for (let j = -GRID/2; j < GRID/2; j++) {
       if (i === TEMPLE_I && j === TEMPLE_J) continue; // temple placed after loop
       if (i === RIVER_I) continue;                    // river column — no buildings
+      if (GAMEPLAY.airport && i === AIRPORT_I) continue; // Suvarnabhumi pocket
       if (i === GARAGE_I && j === GARAGE_J) continue; // U-Spray garage block
       if (i === SAFE_I && j === SAFE_J) continue;      // safehouse block
       if (i === YAO_I && (j === YAO_J0 || j === YAO_J1)) continue; // Yaowarat market
@@ -810,6 +812,7 @@ export function buildWorld(scene) {
       const zPole = zRoad + zSign * 8.5;
       let prevX = null;
       for (let x = -HALF + 14; x <= HALF - 14; x += POLE_SPACING) {
+        if (GAMEPLAY.airport && x > 198) continue;
         makePole(x, zPole, true);
         if (prevX !== null) {
           for (const off of [-0.55, 0, 0.55]) {
@@ -823,6 +826,7 @@ export function buildWorld(scene) {
   // Poles along NS roads
   for (let i = -GRID/2; i <= GRID/2; i++) {
     const xRoad = i * BLOCK;
+    if (GAMEPLAY.airport && xRoad >= 200) continue;
     for (const xSign of [-1, +1]) {
       const xPole = xRoad + xSign * 8.5;
       let prevZ = null;
@@ -846,6 +850,7 @@ export function buildWorld(scene) {
 
 
   buildLandmarks({ scene, world, _m, _m2, _p, _q, _s, _e, addInstanced, bakeGroup, TEMPLE_I, TEMPLE_J, GARAGE_I, GARAGE_J, SAFE_I, SAFE_J, RIVER_I, YAO_I, YAO_J0, YAO_J1, GUN_I, GUN_J, MALL_I, MALL_J, BANK_I, BANK_J, SIDEWALK_EDGE });
+  buildAirport(scene, world);
   world.buildingCells = new Map();
   for (const b of world.buildings) indexBuilding(world, b);
   // ---- Flush static-geometry bakers → a handful of merged meshes ----

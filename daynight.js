@@ -98,6 +98,17 @@ export function updateDayNight(dt) {
   G.scene.background.copy(sky);
   G.scene.fog.color.copy(sky);
   G.scene.fog.density = lerp(0.0012, 0.0035, 1 - dayK) + G.time.rainStrength * 0.004;
+  if (G.time.weather === 'overcast') {
+    G.sun.intensity *= 0.55;
+    G.hemi.intensity *= 0.82;
+    G.scene.fog.density += 0.0014;
+    G.renderer.toneMappingExposure *= 0.92;
+  } else if (G.time.weather === 'haze') {
+    G.sun.intensity *= 0.7;
+    G.scene.fog.color.setHex(0x9a8060);
+    G.scene.fog.density += 0.0026;
+    G.scene.background.lerp(new THREE.Color(0xc4a070), 0.35);
+  }
 
   // neon/lamp/window emissive + accent lights: brighter at night.
   // Iterate only the cached arrays built in buildWorld — no full scene.traverse.
@@ -117,17 +128,32 @@ export function updateDayNight(dt) {
   const hh = Math.floor(totalMin / 60), mm = Math.floor(totalMin % 60);
   G.hud.setClock(`${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`);
 
-  // weather cycle: clear ⇄ rain, intensity builds then breaks; lightning in downpours
+  // weather cycle: clear ⇄ rain / overcast / burning-season haze
   if (G._weatherT === undefined) { G._weatherT = 0; G._weatherUntil = 60; G._rainTarget = 0; }
   G._weatherT += dt;
   if (G._weatherT > G._weatherUntil) {
     if (G.time.weather === 'clear') {
-      G.time.weather = 'rain';
-      G._rainTarget = Math.random() < 0.5 ? 0.45 : 0.85;   // drizzle or downpour
-      G.hud.setWeather((G._rainTarget > 0.7 ? 'DOWNPOUR' : 'LIGHT RAIN') + ' · 28°C');
-      G.hud.showNotif(G._rainTarget > 0.7 ? 'The sky opens up.' : 'It starts to rain.');
-      G.audio.thunder();
-      G._weatherUntil = G._weatherT + rand(40, 90);
+      const roll = Math.random();
+      if (roll < 0.5) {
+        G.time.weather = 'rain';
+        G._rainTarget = Math.random() < 0.5 ? 0.45 : 0.85;
+        G.hud.setWeather((G._rainTarget > 0.7 ? 'DOWNPOUR' : 'LIGHT RAIN') + ' · 28°C');
+        G.hud.showNotif(G._rainTarget > 0.7 ? 'The sky opens up.' : 'It starts to rain.');
+        G.audio.thunder();
+        G._weatherUntil = G._weatherT + rand(40, 90);
+      } else if (roll < 0.75) {
+        G.time.weather = 'overcast';
+        G._rainTarget = 0;
+        G.hud.setWeather('OVERCAST · 30°C');
+        G.hud.showNotif('Clouds pile up over the Gulf.');
+        G._weatherUntil = G._weatherT + rand(50, 100);
+      } else {
+        G.time.weather = 'haze';
+        G._rainTarget = 0;
+        G.hud.setWeather('HAZE · 34°C');
+        G.hud.showNotif('Burning-season haze rolls in.');
+        G._weatherUntil = G._weatherT + rand(50, 110);
+      }
     } else {
       G.time.weather = 'clear';
       G._rainTarget = 0;

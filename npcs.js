@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, TURFS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, TURFS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, yaowaratNightOpen, inYaowarat, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { animateWalk, damagePlayer, recolorTorso, resolvePedVsBuildings, saveGame, sidewalkPos, spawnPed, spawnWalkingPair } from './main.js';
 import { lightFor } from './traffic.js';
@@ -154,7 +154,38 @@ export function crowdFactor(dayT) {
   }
   return CROWD_CURVE[0][1];
 }
-export function crowdTarget() { return Math.round(PED_TARGET * crowdFactor(G.time.dayT)); }
+export function crowdTarget() {
+  let n = Math.round(PED_TARGET * crowdFactor(G.time.dayT));
+  if (yaowaratNightOpen()) n = Math.min(PED_TARGET + 14, n + 12);
+  return n;
+}
+
+export function updateYaowaratNight(dt) {
+  const night = G.world && G.world.yaowaratNight;
+  if (!night) return;
+  const open = yaowaratNightOpen();
+  if (night.group) night.group.visible = open;
+  const poi = G.world.poi && G.world.poi.yaowarat;
+  if (!poi || !GAMEPLAY.yaowaratNight) return;
+  G._yaoNightPeds = G._yaoNightPeds || [];
+  G._yaoNightPeds = G._yaoNightPeds.filter(p => p && !p.dead);
+  if (open) {
+    while (G._yaoNightPeds.length < 8) {
+      const pos = new THREE.Vector3(poi.x + rand(-10, 10), 0, poi.z + rand(-28, 28));
+      const ped = spawnPed(G.scene, pos);
+      ped.yaowaratNight = true;
+      ped.kind = Math.random() < 0.55 ? 'tourist' : 'vendor';
+      if (ped.mesh && ped.mesh.userData) ped.mesh.userData.kind = ped.kind;
+      G._yaoNightPeds.push(ped);
+    }
+  } else if (G._yaoNightPeds.length) {
+    for (const ped of G._yaoNightPeds) {
+      if (!ped || ped.dead) continue;
+      ped.yaowaratNight = false;
+    }
+    G._yaoNightPeds = [];
+  }
+}
 
 // Snap the live crowd to the current time-of-day target immediately (spawn the
 // shortfall near the player, cull the farthest excess). Used by the headless
@@ -166,14 +197,14 @@ export function resyncCrowd() {
   // pull stray wanderers onto nearby sidewalks so the count near the camera
   // reflects the hour immediately (harness-only; gameplay distributes gradually)
   for (const ped of G.peds) {
-    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang) continue;
+    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight) continue;
     if (dist2(ped.mesh.position, pp) > 95 * 95) ped.mesh.position.copy(sidewalkPos(pp.x, pp.z, 88));
   }
   for (let guard = 0; G.peds.length > target && guard < 500; guard++) {
     let fi = -1, fd = -1;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight) continue;
       const d = dist2(ped.mesh.position, pp);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -329,7 +360,7 @@ export function updatePeds(dt) {
     // signal-aware kerb hold: plain wanderers wait at the edge of a carriageway
     // that currently has the green (panicked / gang / clustered / encounter peds
     // are exempt — they keep their urgent paths). Only zeroes speed; never moves.
-    if (ped.state === 'walking' && ped.speed > 0.05 && !ped.gang && ped.panicT <= 0 && !ped.anchor && !ped.isMugger && !ped.isTarget) {
+    if (ped.state === 'walking' && ped.speed > 0.05 && !ped.gang && ped.panicT <= 0 && !ped.anchor && !ped.isMugger && !ped.isTarget && !ped.alms) {
       const nx = ped.mesh.position.x + Math.sin(ped.heading) * ped.speed * dt;
       const nz = ped.mesh.position.z + Math.cos(ped.heading) * ped.speed * dt;
       const road = roadAboutToEnter(ped.mesh.position.x, ped.mesh.position.z, nx, nz);
@@ -407,7 +438,7 @@ export function updatePeds(dt) {
     let fi = -1, fd = 60 * 60;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight) continue;
       const d = dist2(ped.mesh.position, playerPos);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -743,6 +774,42 @@ export function updateVigilante(dt) {
       vigilanteSpawnTarget(G.vigilante);
       G.hud.showNotif('Vigilante: run down the fleeing crooks!');
     }
+  }
+}
+
+export function updateAlms(dt) {
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const temple = G.world && G.world.poi && G.world.poi.temple;
+  if (!temple) return;
+  if (h >= 5 && h < 7) {
+    G._alms = G._alms || [];
+    const ways = (G.world.walkways || []).filter(w => {
+      const mx = (w.x0 + w.x1) / 2, mz = (w.z0 + w.z1) / 2;
+      return dist2({ x: mx, z: mz }, temple) < 80 * 80;
+    });
+    while (G._alms.length < 3) {
+      const w = ways[G._alms.length] || ways[0] || null;
+      const pos = w
+        ? new THREE.Vector3((w.x0 + w.x1) / 2, 0, (w.z0 + w.z1) / 2)
+        : new THREE.Vector3(temple.x + rand(-12, 12), 0, temple.z + rand(-12, 12));
+      const ped = spawnPed(G.scene, pos);
+      ped.kind = 'monk'; ped.mesh.userData.kind = 'monk';
+      ped.anchor = null; ped.state = 'walking'; ped.alms = true;
+      ped.heading = Math.atan2(temple.x - pos.x, temple.z - pos.z);
+      G._alms.push(ped);
+    }
+    for (const ped of G._alms) {
+      if (!ped || ped.dead) continue;
+      const dx = temple.x - ped.mesh.position.x, dz = temple.z - ped.mesh.position.z;
+      if (Math.hypot(dx, dz) > 6) { ped.heading = Math.atan2(dx, dz); ped.speed = 0.85; }
+      else ped.speed = 0.4;
+    }
+  } else if (G._alms && G._alms.length) {
+    for (const ped of G._alms) {
+      if (!ped || ped.dead) continue;
+      ped.alms = false;
+    }
+    G._alms = [];
   }
 }
 

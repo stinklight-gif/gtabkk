@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, TRAFFIC_TARGET, trafficTarget, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
+import { attachHeroBike } from './gltf.js';
 
 // 4. PLAYER + CAMERA
 // =============================================================================
@@ -93,7 +94,7 @@ export function makePlayer(scene) {
     stam: 100, stamMax: 100,
     armor: 0, armorMax: 100,
     sprintLock: false,
-    weapons: { fists: true, pistol: false, smg: false, shotgun: false },
+    weapons: { fists: true, pistol: false, smg: false, shotgun: false, cleaver: false, bottle: false },
     activeWeapon: 'fists',
     pistolAmmo: 0, pistolMag: 12, pistolReserve: 36,
     smgAmmo: 0, smgMag: 30, smgReserve: 90,
@@ -240,6 +241,11 @@ function applyVehicleRealismSpec(spec, kind) {
     spec.grip = spec.grip || 11.5;
     spec.frictionFloor = 0.08;
     spec.powerYaw = 0;
+  } else if (family === 'airliner') {
+    spec.wheelbase = spec.wheelbase || 14;
+    spec.grip = spec.grip || 6.2;
+    spec.frictionFloor = 0.30;
+    spec.powerYaw = 0;
   } else if (family !== 'boat') {
     spec.wheelbase = spec.wheelbase || 2.6;
     spec.grip = spec.grip || 9.5;
@@ -296,6 +302,10 @@ function makeVehicleLodProxy(group, kind) {
   } else if (kind === 'boat') {
     addVehicleBox(low, [dims.W, 0.48, dims.L], paint, [0, 0.35, 0], null, false);
     addVehicleBox(low, [0.12, 0.1, dims.L * 1.15], dark, [0, 0.76, -0.25], [0.25, 0, 0], false);
+  } else if (kind === 'airliner') {
+    addVehicleBox(low, [3.4, 3.2, dims.L * 0.9], paint, [0, 3.0, 0], null, false);
+    addVehicleBox(low, [dims.W * 2.4, 0.28, 6], paint, [0, 2.3, -2], null, false);
+    addVehicleBox(low, [0.35, 5.5, 3.4], dark, [0, 6.0, -14], null, false);
   } else {
     addVehicleBox(low, [dims.W * 0.94, Math.max(0.42, dims.H * 0.35), dims.L * 0.96], paint, [0, Math.max(0.55, dims.H * 0.3), 0], null, false);
     addVehicleBox(low, [dims.W * 0.72, Math.max(0.28, dims.H * 0.25), dims.L * 0.34], glass, [0, Math.max(1.0, dims.H * 0.58), dims.L * 0.03], null, false);
@@ -308,7 +318,7 @@ function makeVehicleLodProxy(group, kind) {
 
 function enhanceVehicleVisual(g, kind) {
   const dims = g.userData.dims;
-  if (!dims || kind === 'boat') return;
+  if (!dims || kind === 'boat' || kind === 'airliner') return;
   const visual = g.userData.visual || (g.userData.visual = { wheels: [], headlights: [], brakeLights: [], reverseLights: [] });
   const trim = vehicleMat(0x0b0d10, 0.82, 0.12);
   const plateMat = new THREE.MeshBasicMaterial({ color: 0xf2e6ba });
@@ -360,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.yaowaratNight;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -572,6 +582,31 @@ export function makeVehicleMesh(kind) {
     }
     g.userData.dims = { L: 4.2, W: 1.95, H: 1.0 };
     g.userData.spec = { topSpeed: 40, accel: 22, brake: 22, turn: 2.0, mass: 1200, kind: 'supercar' };
+  } else if (kind === 'airliner') {
+    const body = new THREE.Mesh(new THREE.BoxGeometry(3.8, 3.6, 34), new THREE.MeshStandardMaterial({ color: 0xf2f0ea, roughness: 0.42, metalness: 0.25 }));
+    body.position.y = 3.2; g.add(body);
+    const nose = new THREE.Mesh(new THREE.BoxGeometry(3.2, 2.8, 4.2), new THREE.MeshStandardMaterial({ color: 0xf2f0ea, roughness: 0.42, metalness: 0.25 }));
+    nose.position.set(0, 3.0, 18.2); g.add(nose);
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(3.85, 0.55, 30), new THREE.MeshStandardMaterial({ color: 0x4a1a58, roughness: 0.5 }));
+    stripe.position.set(0, 2.6, 0); g.add(stripe);
+    const wing = new THREE.Mesh(new THREE.BoxGeometry(32, 0.35, 7.2), new THREE.MeshStandardMaterial({ color: 0xe6e2da, roughness: 0.5, metalness: 0.2 }));
+    wing.position.set(0, 2.4, -2); g.add(wing);
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.4, 6.4, 4.2), new THREE.MeshStandardMaterial({ color: 0x4a1a58, roughness: 0.5 }));
+    tail.position.set(0, 6.4, -15.4); g.add(tail);
+    const hstab = new THREE.Mesh(new THREE.BoxGeometry(10, 0.28, 2.6), new THREE.MeshStandardMaterial({ color: 0xe6e2da, roughness: 0.5 }));
+    hstab.position.set(0, 5.8, -16.2); g.add(hstab);
+    const engMat = new THREE.MeshStandardMaterial({ color: 0x888c92, roughness: 0.35, metalness: 0.55 });
+    for (const sx of [-1, 1]) {
+      const eng = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.05, 4.4, 10), engMat);
+      eng.rotation.x = PI / 2; eng.position.set(sx * 6.4, 1.7, -1.2); g.add(eng);
+    }
+    const gearMat = new THREE.MeshStandardMaterial({ color: 0x222 });
+    for (const z of [-8, 10]) for (const x of z > 0 ? [0] : [-1.2, 1.2]) {
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.28, 10), gearMat);
+      w.rotation.z = PI / 2; w.position.set(x, 0.42, z); g.add(w);
+    }
+    g.userData.dims = { L: 38, W: 12, H: 8 };
+    g.userData.spec = { topSpeed: 16, accel: 8, brake: 12, turn: 1.15, mass: 18000, kind: 'airliner', rollDrag: 0.65 };
   } else if (kind === 'camry' || kind === 'sedan') {
     const color = kind === 'sedan' ? pick([0x222, 0xf5f5f5, 0xc23a3a, 0x335a99, 0x8c8c8c]) : 0xeeeeee;
     const body = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.9, 3.6), new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.4 }));
@@ -604,15 +639,18 @@ export function makeVehicle(kind, scene) {
   // head/tail lights — per-vehicle materials that glow at night (driven from
   // G.nightK in updateVehicles; per-vehicle so disposeObject stays safe).
   const dims = mesh.userData.dims;
+  const skipLights = kind === 'airliner' || kind === 'boat';
   const headMat = new THREE.MeshStandardMaterial({ color: 0x999999, emissive: 0xfff2cc, emissiveIntensity: 0 });
   const tailMat = new THREE.MeshStandardMaterial({ color: 0x331111, emissive: 0xff2222, emissiveIntensity: 0 });
-  const lightGeo = new THREE.PlaneGeometry(0.3, 0.18);
-  const lz = dims.L * 0.46, lx = dims.W * 0.3, ly = dims.H * 0.32 + 0.2;
-  for (const sx of [-1, 1]) {
-    const hl = new THREE.Mesh(lightGeo, headMat);
-    hl.position.set(sx * lx, ly, lz); mesh.add(hl);
-    const tl = new THREE.Mesh(lightGeo, tailMat);
-    tl.position.set(sx * lx, ly, -lz); tl.rotation.y = PI; mesh.add(tl);
+  if (!skipLights) {
+    const lightGeo = new THREE.PlaneGeometry(0.3, 0.18);
+    const lz = dims.L * 0.46, lx = dims.W * 0.3, ly = dims.H * 0.32 + 0.2;
+    for (const sx of [-1, 1]) {
+      const hl = new THREE.Mesh(lightGeo, headMat);
+      hl.position.set(sx * lx, ly, lz); mesh.add(hl);
+      const tl = new THREE.Mesh(lightGeo, tailMat);
+      tl.position.set(sx * lx, ly, -lz); tl.rotation.y = PI; mesh.add(tl);
+    }
   }
   const veh = {
     kind, mesh, spec,
@@ -623,18 +661,19 @@ export function makeVehicle(kind, scene) {
     steerAngle: 0,
     yawRate: 0,
     wheelSpin: 0,
-    hp: 100,
+    hp: kind === 'airliner' ? 220 : 100,
     smoke: null, fire: null,
     dead: false,
     driver: null,      // 'player' | npc obj | null
     npc: null,
     audio: null,
     isCop: kind === 'cop' || kind === 'fortuner' || kind === 'swat',
-    lights: [headMat, tailMat],
+    lights: skipLights ? null : [headMat, tailMat],
     visual: mesh.userData.visual,
     boundsHalf: { x: mesh.userData.dims.W * 0.5, z: mesh.userData.dims.L * 0.5 },
   };
   G.vehicles.push(veh);
+  if (kind === 'bike') attachHeroBike(mesh);
   return veh;
 }
 
@@ -657,7 +696,9 @@ function pickPedKind(pos) {
     return r < 0.42 ? 'monk' : r < 0.75 ? 'tourist' : 'local';
   }
   if (poi && poi.yaowarat && pos && dist2(pos, poi.yaowarat) < 62 * 62) {
+    const night = (h >= 18 || h < 2);
     const r = Math.random();
+    if (night) return r < 0.4 ? 'tourist' : r < 0.75 ? 'vendor' : 'local';
     return r < 0.38 ? 'vendor' : r < 0.7 ? 'local' : 'laborer';
   }
   const roll = Math.random();
@@ -1093,6 +1134,16 @@ export function spawnBoat(scene) {
     v.pos.set(x, 0.3, z); v.mesh.position.copy(v.pos);
     v.heading = 0; v.mesh.rotation.y = 0;
     v.driver = null; v.vel = 0;
+  }
+  if (GAMEPLAY.boatHijack) {
+    for (const [x, z, heading] of [[-230, 90, 0], [-218, -90, PI], [-236, 170, 0]]) {
+      const v = makeVehicle('boat', scene);
+      v.pos.set(x, 0.3, z); v.mesh.position.copy(v.pos);
+      v.heading = heading; v.mesh.rotation.y = heading;
+      v.driver = 'boatman';
+      v.npc = { kind: 'boat', cruise: rand(5.5, 8.5), dir: Math.abs(heading) < 1 ? 1 : -1 };
+      v.vel = v.npc.cruise * 0.7;
+    }
   }
 }
 

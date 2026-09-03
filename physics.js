@@ -138,6 +138,20 @@ export function hasLineOfSight(ax, ay, az, bx, by, bz) {
     const hd = Math.hypot(hit.x - ax, hit.y - ay, hit.z - az);
     if (hd < len - 0.4) return false;      // a wall sits between the two points
   }
+  if (GAMEPLAY.coverVehicles && G.vehicles) {
+    for (const v of G.vehicles) {
+      if (!v || v.dead || !v.boundsHalf || v.driver === 'player') continue;
+      const vdx = v.pos.x - ax, vdz = v.pos.z - az;
+      if (vdx * vdx + vdz * vdz > cullR2) continue;
+      const hx = v.boundsHalf.x, hz = v.boundsHalf.z, hy = Math.max(0.6, (v.spec && v.spec.kind === 'bike') ? 0.7 : 1.1);
+      _losBox.min.set(v.pos.x - hx, v.pos.y, v.pos.z - hz);
+      _losBox.max.set(v.pos.x + hx, v.pos.y + hy * 2, v.pos.z + hz);
+      const hit = _losRay.intersectBox(_losBox, _losHit);
+      if (!hit) continue;
+      const hd = Math.hypot(hit.x - ax, hit.y - ay, hit.z - az);
+      if (hd < len - 0.5) return false;
+    }
+  }
   return true;
 }
 
@@ -177,7 +191,7 @@ function addNpcImpact(v, ix, iz, spin) {
 }
 
 function exciteSuspension(v, amount) {
-  if (!v || !v.spec || v.spec.kind === 'boat') return;
+  if (!v || !v.spec || v.spec.kind === 'boat' || v.spec.kind === 'airliner') return;
   v._suspVel = (v._suspVel || 0) + clamp(amount * 0.035, 0.03, 0.7);
 }
 
