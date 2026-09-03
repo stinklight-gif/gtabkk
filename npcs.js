@@ -526,7 +526,8 @@ export function updateClusters(dt) {
     a.peds = a.peds.filter(p => !p.dead && p.anchor);  // drop any that died / got repurposed
     const near = dist2(a.pos, pp) < 135 * 135;
     const occ = a.kind === 'store' ? clamp(cf * 1.15, 0, 1) : cf;
-    const want = near ? Math.round(a.capacity * occ) : 0;
+    let want = near ? Math.round(a.capacity * occ) : 0;
+    if (GAMEPLAY.rainPack && a.kind === 'food' && (G.time.rainStrength || 0) > 0.45) want = 0;
     while (a.peds.length < want && a.peds.length < a.slots.length) {
       const used = new Set(a.peds.map(p => p._slotIdx));
       let si = -1;
@@ -610,6 +611,10 @@ export function updateFoodStalls(dt) {
   const now = performance.now();
   for (const f of fs) {
     if (dist2(f.pos, pp) > 2.4 * 2.4) continue;
+    if (GAMEPLAY.rainPack && f.packed) {
+      G.hud.showPrompt('Packed up — rain', 0.35);
+      return;
+    }
     if (f.readyAt && now < f.readyAt) {
       G.hud.showPrompt('Stall is busy', 0.35);
       return;
@@ -1147,6 +1152,26 @@ export function updateSeekShade(dt) {
     if (!w) continue;
     ped.shade = { x: clamp(ped.mesh.position.x, w.x0, w.x1), z: clamp(ped.mesh.position.z, w.z0, w.z1) };
     n++;
+  }
+}
+
+export function updateRainPack(dt) {
+  if (!GAMEPLAY.rainPack) return;
+  const fs = G.world && G.world.foodStalls;
+  if (!fs) return;
+  const wet = (G.time.rainStrength || 0) > 0.45;
+  for (const f of fs) {
+    if (wet && !f.packed) {
+      f.packed = true;
+      const parasol = f.mesh && f.mesh.getObjectByName('parasol');
+      if (parasol) parasol.rotation.x = 1.15;
+      if (f.mesh) f.mesh.traverse(o => { if (o.name === 'stool') o.visible = false; });
+    } else if (!wet && f.packed) {
+      f.packed = false;
+      const parasol = f.mesh && f.mesh.getObjectByName('parasol');
+      if (parasol) parasol.rotation.x = 0;
+      if (f.mesh) f.mesh.traverse(o => { if (o.name === 'stool') o.visible = true; });
+    }
   }
 }
 

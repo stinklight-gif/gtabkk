@@ -267,6 +267,7 @@ export const GAMEPLAY = {
   afternoonStorm: true,   // after the heat, a Gulf thunderstorm breaks mid-afternoon
   crossingGuard: true,    // yellow-vest stop-paddle at Asok during the school walk
   btsMotosai: true,       // extra orange-vest stand at the Asok BTS escalator mouth
+  rainPack: true,         // food stalls pack tarps and queues when the rain hits
 };
 G.gameplay = GAMEPLAY;
 

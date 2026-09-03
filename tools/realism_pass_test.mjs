@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -1292,6 +1292,37 @@ async function main() {
     });
     assert(rank.flag && rank.n >= 1, `a motosai rank waits at the BTS (${rank.n})`);
     assert(rank.vest && rank.helm && rank.stand && rank.waiter, 'BTS rank has a helmeted vest rider, bike, and waiter');
+
+    console.log('\n[40] rain packs the food stalls');
+    const pack = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      G.time.weather = 'rain';
+      G.time.rainStrength = 0.8;
+      G._rainTarget = 0.8;
+      G._clusterT = 0;
+      main.updateRainPack(0.05);
+      main.updateClusters(2);
+      const fs = G.world.foodStalls || [];
+      const packed = fs.filter(f => f.packed).length;
+      const stools = fs[0] && fs[0].mesh && fs[0].mesh.getObjectByName('stool');
+      const parasol = fs[0] && fs[0].mesh && fs[0].mesh.getObjectByName('parasol');
+      const stoolHidden = !!(stools && stools.visible === false);
+      const parasolTilt = !!(parasol && parasol.rotation.x > 0.5);
+      const foodQ = (G.clusterAnchors || []).filter(a => a.kind === 'food').reduce((n, a) => n + a.peds.length, 0);
+      G.time.weather = 'clear';
+      G.time.rainStrength = 0;
+      G._rainTarget = 0;
+      main.updateRainPack(0.05);
+      const open = fs.filter(f => f.packed).length;
+      const stoolBack = fs[0] && fs[0].mesh && fs[0].mesh.getObjectByName('stool') && fs[0].mesh.getObjectByName('stool').visible;
+      return {
+        flag: !!(G.gameplay && G.gameplay.rainPack),
+        packed, foodQ, stoolHidden, parasolTilt, open, stoolBack,
+      };
+    });
+    assert(pack.flag && pack.packed >= 8 && pack.stoolHidden && pack.parasolTilt, `stalls pack in the rain (${pack.packed})`);
+    assert(pack.foodQ === 0, 'food queues empty when packed');
+    assert(pack.open === 0 && pack.stoolBack, 'stalls unpack when it dries');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
