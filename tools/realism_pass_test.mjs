@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -704,6 +704,83 @@ async function main() {
     assert(bkk.n >= 3 && bkk.kind === 'airliner', `parked airliners exist (${bkk.n})`);
     assert(bkk.moved > 1.5, `player can taxi an airliner on the ground (dz ${bkk.moved.toFixed(1)})`);
     assert(bkk.turned > 0.04, `player can steer an airliner on the ground (heading ${bkk.turned.toFixed(3)})`);
+
+    console.log('\n[20] BTS commute ride + next stop');
+    const bts = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const stops = (G.bts && G.bts.stops) || [];
+      G.player.inVehicle = null;
+      G.player.group.position.set(-50, 14, 0);
+      G.bts.mesh.position.x = -50; G.bts.dir = 1;
+      G._btsRide = { from: -50, armed: true };
+      G.bts.mesh.position.x = 100;
+      main.updateBTS(0.05);
+      return {
+        nStops: stops.length,
+        dumped: !G._btsRide,
+        x: G.player.group.position.x,
+        y: G.player.group.position.y,
+        visible: G.player.group.visible,
+      };
+    });
+    assert(bts.nStops >= 2, `BTS has a next stop (${bts.nStops} stations)`);
+    assert(bts.dumped && bts.visible && Math.abs(bts.x - 100) < 12 && bts.y > 12, `commute dumps at the next platform (x=${bts.x.toFixed(1)} y=${bts.y.toFixed(1)})`);
+
+    console.log('\n[21] Talk Radio chase call-out');
+    const talk = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const car = G.vehicles.find(v => v && v.spec && v.spec.kind === 'camry') || G.vehicles[0];
+      G.player.inVehicle = car; car.driver = 'player';
+      G.wanted.stars = 3; G._districtName = 'Sukhumvit'; G._talkChaseOn = false; G._talkChaseT = 0;
+      const names = G.audio.radio.names;
+      let guard = 0;
+      while (names[G.audio.radio.station] !== 'TALK RADIO AM' && guard++ < 12) G.audio.radio.next();
+      main.updateRadio(0.2);
+      const on = !!G._talkChaseOn;
+      G.wanted.stars = 0;
+      main.updateRadio(0.2);
+      const off = !G._talkChaseOn;
+      G.player.inVehicle = null; car.driver = null;
+      return { on, off, station: names[G.audio.radio.station] };
+    });
+    assert(talk.station === 'TALK RADIO AM' && talk.on && talk.off, `Talk Radio mentions the chase then clears (${talk.station})`);
+
+    console.log('\n[22] Yaowarat night market');
+    const yao = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      G.time.dayT = 20 / 24;
+      main.updateYaowaratNight(0.2);
+      const nightOn = !!(G.world.yaowaratNight && G.world.yaowaratNight.group && G.world.yaowaratNight.group.visible);
+      const crate = !!(G.world.yaowaratCrate && G.world.yaowaratCrate.mesh);
+      G.time.dayT = 0.4;
+      main.updateYaowaratNight(0.2);
+      const dayOff = !(G.world.yaowaratNight && G.world.yaowaratNight.group && G.world.yaowaratNight.group.visible);
+      return { nightOn, dayOff, crate, stalls: (G.world.yaowaratNight && G.world.yaowaratNight.stalls || []).length };
+    });
+    assert(yao.nightOn && yao.dayOff && yao.crate && yao.stalls > 4, `Yaowarat densifies at night (${yao.stalls} extra stalls)`);
+
+    console.log('\n[23] take over an NPC longtail');
+    const boat = await page.evaluate(() => {
+      const G = window.GAME;
+      const npc = G.vehicles.find(v => v && v.spec && v.spec.kind === 'boat' && v.driver === 'boatman');
+      const parked = G.vehicles.find(v => v && v.spec && v.spec.kind === 'boat' && !v.driver);
+      if (npc) {
+        G.player.inVehicle = npc; npc.driver = 'player'; npc.npc = null;
+      }
+      return { npc: !!npc, parked: !!parked, nowPlayer: !!(G.player.inVehicle && G.player.inVehicle.spec && G.player.inVehicle.spec.kind === 'boat') };
+    });
+    assert(boat.npc && boat.parked && boat.nowPlayer, 'NPC longtail can be taken over; parked boats still exist');
+
+    console.log('\n[24] walk-in 7-Eleven interior');
+    const seven = await page.evaluate(() => {
+      const G = window.GAME;
+      const w = G.world.sevenWalkIn;
+      return {
+        walkIn: !!(w && w.atm && w.microwave && w.clerk && w.shelves && w.shelves.length),
+        pos: !!(w && w.pos),
+      };
+    });
+    assert(seven.walkIn && seven.pos, 'walk-in 7-Eleven has ATM, microwave, clerk, shelves');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
