@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -1271,6 +1271,27 @@ async function main() {
     assert(guard.flag && guard.n >= 2 && guard.nearBts, `crossing guards stand at Asok (${guard.n})`);
     assert(guard.vest && guard.paddle, 'yellow vest and stop paddle');
     assert(guard.gone, 'crossing guards leave after morning');
+
+    console.log('\n[39] BTS motosai rank');
+    const rank = await page.evaluate(() => {
+      const G = window.GAME;
+      const bts = G.world && G.world.bts;
+      const list = (G.world && G.world.motosaiStands) || [];
+      const atBts = list.filter(s => s && (s.bts || (bts && Math.hypot(s.x - bts.x, s.z - (bts.z || 0)) < 28)));
+      const s0 = atBts[0] || list.find(s => s && s.bts);
+      const vest = !!(s0 && s0.rider && (s0.rider.motosaiVest || (s0.rider.mesh && s0.rider.mesh.getObjectByName('motosai-vest'))));
+      const helm = !!(s0 && s0.rider && (s0.rider.bikeHelmet || (s0.rider.mesh && s0.rider.mesh.getObjectByName('bike-helmet'))));
+      const bike = s0 && s0.bike;
+      return {
+        flag: !!(G.gameplay && G.gameplay.btsMotosai),
+        n: atBts.length,
+        vest, helm,
+        stand: !!(bike && bike.motosaiStand && bike.driver !== 'player'),
+        waiter: !!(s0 && s0.waiter),
+      };
+    });
+    assert(rank.flag && rank.n >= 1, `a motosai rank waits at the BTS (${rank.n})`);
+    assert(rank.vest && rank.helm && rank.stand && rank.waiter, 'BTS rank has a helmeted vest rider, bike, and waiter');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

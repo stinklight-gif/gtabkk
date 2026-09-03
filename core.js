@@ -266,6 +266,7 @@ export const GAMEPLAY = {
   officeCommute: true,    // evening office crowd walking the sois toward the BTS
   afternoonStorm: true,   // after the heat, a Gulf thunderstorm breaks mid-afternoon
   crossingGuard: true,    // yellow-vest stop-paddle at Asok during the school walk
+  btsMotosai: true,       // extra orange-vest stand at the Asok BTS escalator mouth
 };
 G.gameplay = GAMEPLAY;
 
