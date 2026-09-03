@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -857,10 +857,15 @@ async function main() {
       const first = list.find(s => s && s.bike && s.bike.motosaiStand && s.rider && s.waiter) || list[0];
       const vest = !!(first && first.rider && (first.rider.motosaiVest || (first.rider.mesh && first.rider.mesh.getObjectByName('motosai-vest'))));
       const mouth = !!(first && ((first.x != null && onSoi(first.x, first.z)) || (first.bike && onSoi(first.bike.pos.x, first.bike.pos.z)) || first.soi));
-      let pillionBike = G.vehicles.find(v => v && v.spec && v.spec.kind === 'bike' && v.pillionPed && v.npc);
+      let pillionBike = G.vehicles.find(v => v && v.spec && v.spec.kind === 'bike' && v.pillionPed && v.pillionPed.pillion && v.pillionPed.mesh);
       if (!pillionBike) {
-        const tBike = G.vehicles.find(v => v && v.spec && v.spec.kind === 'bike' && v.npc && v.driver !== 'player');
-        if (tBike && main.attachTrafficPillion) pillionBike = tBike, main.attachTrafficPillion(tBike);
+        const tBike = G.vehicles.find(v => v && v.spec && v.spec.kind === 'bike' && v.driver !== 'player' && !v.motosaiStand) || main.makeVehicle('bike', G.scene);
+        if (tBike) {
+          tBike.npc = tBike.npc || { kind: 'traffic', cruiseSpeed: 12 };
+          tBike.pillionPed = null;
+          main.attachTrafficPillion(tBike);
+          pillionBike = tBike;
+        }
       }
       G.player.inVehicle = null;
       G.player.group.visible = true;
@@ -1037,6 +1042,39 @@ async function main() {
     assert(shade.flag && shade.ways > 10, 'seekShade flag on and walkways exist');
     assert(shade.assigned >= 4 && shade.moving, `noon wanderers pull into shade (${shade.assigned})`);
     assert(shade.cleared === 0, 'shade-seeking clears after the heat');
+
+    console.log('\n[31] sit and eat at a stall');
+    const eat = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const f = (G.world.foodStalls || [])[0];
+      if (!f) return { flag: false };
+      G.player.inVehicle = null;
+      G.player.group.visible = true;
+      G.player.group.position.copy(f.pos);
+      G._eating = null;
+      G.cash = 120;
+      G.player.hp = 40;
+      f.visited = false;
+      f.readyAt = 0;
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+      main.updateFoodStalls(0.016);
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      const sitting = !!(G._eating && G._eating.t > 0);
+      const cashMid = G.cash;
+      main.updateFoodStalls(2.5);
+      return {
+        flag: !!(G.gameplay && G.gameplay.stallSit),
+        stools: f && G.world.foodStalls.length,
+        sitting,
+        paid: cashMid === 80,
+        healed: G.player.hp > 40,
+        visited: !!f.visited,
+        done: !G._eating,
+      };
+    });
+    assert(eat.flag && eat.stools >= 4, 'stallSit flag on and stalls exist');
+    assert(eat.sitting && eat.paid && eat.healed && eat.visited && eat.done, 'E sits you down, ฿40, heal, first visit ticks');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

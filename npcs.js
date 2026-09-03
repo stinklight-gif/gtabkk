@@ -540,21 +540,64 @@ export function updateArmorPickups(dt) {
   }
 }
 
-// Street-food stalls — visit on foot to eat (heal once) and tick the set.
+// Street-food stalls — sit (E), pay, eat, heal. First sit still ticks the set.
 export function updateFoodStalls(dt) {
   const fs = G.world.foodStalls;
-  if (!fs || G.player.inVehicle) return;
-  const pp = G.player.group.position;
-  for (const f of fs) {
-    if (f.visited) continue;
-    if (dist2(f.pos, pp) < 4 * 4) {
+  if (!fs) return;
+  const eat = G._eating;
+  if (eat) {
+    eat.t -= dt;
+    G.hud.showPrompt('Eating…', 0.4);
+    if (eat.t > 0) return;
+    const p = G.player;
+    p.hp = Math.min(p.hpMax, p.hp + 30);
+    p.stam = Math.min(p.stamMax, p.stam + p.stamMax * 0.45);
+    const f = eat.stall;
+    if (f && !f.visited) {
       f.visited = true;
       G.foodVisited = (G.foodVisited || 0) + 1;
-      G.player.hp = Math.min(G.player.hpMax, G.player.hp + 25);
-      f.glowMat.emissiveIntensity = 0; f.glowMat.color.setHex(0x555555);   // dim = visited
+      if (f.glowMat) { f.glowMat.emissiveIntensity = 0; f.glowMat.color.setHex(0x555555); }
       G.hud.showNotif(`Street food! +HP (${G.foodVisited}/${fs.length})`);
-      G.audio.chime();
+    } else {
+      G.hud.showNotif('Street food — +HP, stamina');
     }
+    if (f) f.readyAt = performance.now() + 8000;
+    if (G.audio && G.audio.chime) G.audio.chime();
+    G._eating = null;
+    return;
+  }
+  if (!GAMEPLAY.stallSit || G.player.inVehicle) {
+    if (G.player.inVehicle) return;
+    const pp = G.player.group.position;
+    for (const f of fs) {
+      if (f.visited) continue;
+      if (dist2(f.pos, pp) < 4 * 4) {
+        f.visited = true;
+        G.foodVisited = (G.foodVisited || 0) + 1;
+        G.player.hp = Math.min(G.player.hpMax, G.player.hp + 25);
+        f.glowMat.emissiveIntensity = 0; f.glowMat.color.setHex(0x555555);
+        G.hud.showNotif(`Street food! +HP (${G.foodVisited}/${fs.length})`);
+        G.audio.chime();
+      }
+    }
+    return;
+  }
+  const pp = G.player.group.position;
+  const now = performance.now();
+  for (const f of fs) {
+    if (dist2(f.pos, pp) > 2.4 * 2.4) continue;
+    if (f.readyAt && now < f.readyAt) {
+      G.hud.showPrompt('Stall is busy', 0.35);
+      return;
+    }
+    G.hud.showPrompt('Press <b>E</b> to sit and eat · ฿40', 0.4);
+    if (G.input.pressed('KeyE')) {
+      if (G.cash < 40) { G.hud.showNotif('Need ฿40 for a plate'); return; }
+      G.cash -= 40; G.hud.setCash(G.cash);
+      G._eating = { t: 2.2, stall: f };
+      G.hud.showNotif('Sat down — eating');
+    }
+    return;
   }
 }
 

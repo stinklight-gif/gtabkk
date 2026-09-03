@@ -1065,8 +1065,13 @@ export function buildLandmarks(env) {
       const glowColor = pick([0xffaa33, 0xff5a5a, 0x39c6c0]);
       const glowMat = new THREE.MeshStandardMaterial({ color: glowColor, emissive: glowColor, emissiveIntensity: 0.7, roughness: 0.5 });
       const parasol = new THREE.Mesh(parasolGeo, glowMat); parasol.position.y = 1.9; stall.add(parasol);
+      const stoolMat = new THREE.MeshStandardMaterial({ color: 0xd9d2c4, roughness: 0.7 });
+      for (const sx of [-0.7, 0.7]) {
+        const stool = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.2, 0.42, 8), stoolMat);
+        stool.position.set(sx, 0.21, 0.85); stall.add(stool);
+      }
       stall.position.set(x, 0, z); scene.add(stall);
-      world.foodStalls.push({ pos: new THREE.Vector3(x, 0, z), visited: false, glowMat });
+      world.foodStalls.push({ pos: new THREE.Vector3(x, 0, z), visited: false, glowMat, readyAt: 0 });
     }
   }
 

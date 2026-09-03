@@ -1136,7 +1136,9 @@ export function dressMotosaiVest(ped) {
 }
 
 export function attachTrafficPillion(bike) {
-  if (!bike || bike.pillionPed) return null;
+  if (!bike) return null;
+  if (bike.pillionPed && bike.pillionPed.mesh && bike.pillionPed.mesh.parent) return bike.pillionPed;
+  bike.pillionPed = null;
   const ped = spawnPed(G.scene, bike.pos.clone());
   ped.pillion = true;
   ped.speed = 0;

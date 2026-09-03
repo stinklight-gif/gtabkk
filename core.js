@@ -258,6 +258,7 @@ export const GAMEPLAY = {
   burningHaze: true,      // third weather: burning-season haze (noon goes dirty, headlights, fog)
   schoolKids: true,       // morning uniforms walking the sois toward the BTS
   seekShade: true,        // midday / haze: wanderers pull onto walkways and stop
+  stallSit: true,         // E to sit at a food stall, pay, eat, heal
 };
 G.gameplay = GAMEPLAY;
 

@@ -11,6 +11,10 @@ export function updatePlayer(dt) {
   const p = G.player;
   if (p.inVehicle) { updatePlayerInVehicle(dt); return; }
   if (G._btsRide) return;
+  if (G._eating) {
+    p.velocity.x = 0; p.velocity.z = 0;
+    return;
+  }
 
   // mouse look
   const [dx, dy] = G.input.consumeMouseDelta();
@@ -344,7 +348,7 @@ export function updateCollectibles(dt) {
 
 export function updateInteraction(dt) {
   const p = G.player;
-  if (p.inVehicle || G._btsRide) return;
+  if (p.inVehicle || G._btsRide || G._eating) return;
 
   const crate = G.world.yaowaratCrate;
   if (crate && !crate.taken && dist2(p.group.position, crate.pos) < 2.6 * 2.6) {
