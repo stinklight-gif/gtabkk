@@ -106,10 +106,25 @@ async function main() {
       null, { timeout: 180_000 },
     );
     console.log('game started');
+    await page.evaluate(() => {
+      const GAME = window.GAME;
+      GAME.noBloom = true;          // same as realism_pass_test: SwiftShader dies on the bloom RTs
+      GAME.renderer.setPixelRatio(1);
+    });
+    const fontProbe = await page.evaluate(() => ({
+      status: document.fonts ? document.fonts.status : 'unknown',
+      loading: document.fonts ? [...document.fonts].filter(f => f.status === 'loading').map(f => f.family) : [],
+    }));
+    if (fontProbe.status === 'loading' || fontProbe.loading.length) {
+      errors.push(`document.fonts still loading after boot (${fontProbe.status}: ${fontProbe.loading.join(', ') || 'ready pending'})`);
+    } else {
+      console.log(`fonts: ${fontProbe.status}`);
+    }
 
     for (const shot of SHOTS) {
       await page.evaluate(({ dayT, festival, waypoint, tabmap, mall, bts, heli, river, bank }) => {
         const GAME = window.GAME;
+        GAME._holdFrame = false;
         GAME.state = 'playing';                                  // force-resume if pointer lock dropped
         document.getElementById('pause').classList.remove('show');
         document.getElementById('fullmap-wrap').classList.remove('show');  // clear a prior TAB-map shot
@@ -185,7 +200,22 @@ async function main() {
         if (GAME.resyncCrowd) GAME.resyncCrowd();                // snap crowd to this hour (busy noon vs dead 3am)
       }, shot);
       await waitFrames(page, (shot.festival || shot.waypoint || shot.tabmap || shot.mall || shot.bts || shot.heli || shot.river || shot.bank) ? 20 : 12);  // let day/night + camera settle
-      await page.screenshot({ path: path.join(ROOT, shot.name), timeout: 120_000 });
+      // Present one static frame, then stop the rAF GPU path so CDP
+      // captureScreenshot is not deadlocking SwiftShader mid-draw (CI hung
+      // 120s after "fonts loaded" on the first noon shot).
+      await page.evaluate(async () => {
+        const GAME = window.GAME;
+        GAME.noBloom = true;
+        if (GAME.renderer && GAME.scene && GAME.camera) {
+          GAME.renderer.setRenderTarget(null);
+          GAME.renderer.render(GAME.scene, GAME.camera);
+        }
+        if (GAME.hud && GAME.hud.drawWaypoint) GAME.hud.drawWaypoint();
+        GAME._holdFrame = true;
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      });
+      await page.screenshot({ path: path.join(ROOT, shot.name), timeout: 60_000, animations: 'disabled', caret: 'hide' });
+      await page.evaluate(() => { window.GAME._holdFrame = false; });
       const size = fs.statSync(path.join(ROOT, shot.name)).size;
       const calls = await page.evaluate(() => window.GAME.renderer.info.render.calls);
       console.log(`${shot.name}: ${(size / 1024).toFixed(0)} KB, draw calls = ${calls}`);
