@@ -197,14 +197,14 @@ export function resyncCrowd() {
   // pull stray wanderers onto nearby sidewalks so the count near the camera
   // reflects the hour immediately (harness-only; gameplay distributes gradually)
   for (const ped of G.peds) {
-    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute) continue;
+    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard) continue;
     if (dist2(ped.mesh.position, pp) > 95 * 95) ped.mesh.position.copy(sidewalkPos(pp.x, pp.z, 88));
   }
   for (let guard = 0; G.peds.length > target && guard < 500; guard++) {
     let fi = -1, fd = -1;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard) continue;
       const d = dist2(ped.mesh.position, pp);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -468,7 +468,7 @@ export function updatePeds(dt) {
     let fi = -1, fd = 60 * 60;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard) continue;
       const d = dist2(ped.mesh.position, playerPos);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -982,6 +982,74 @@ function spawnBtsWaiter(stop) {
   return ped;
 }
 
+function dressCrossingGuard(ped, slot) {
+  recolorTorso(ped.mesh.userData.parts, 0xffd23a, 0.7);
+  const vest = new THREE.Mesh(
+    new THREE.BoxGeometry(0.42, 0.38, 0.28),
+    new THREE.MeshStandardMaterial({ color: 0xffcf4a, roughness: 0.65, emissive: 0xffb020, emissiveIntensity: 0.16 })
+  );
+  vest.name = 'guard-vest';
+  vest.position.set(0, 1.18, 0.04);
+  ped.mesh.add(vest);
+  const paddle = new THREE.Group();
+  paddle.name = 'stop-paddle';
+  const stick = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.018, 0.018, 0.55, 5),
+    new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.6 })
+  );
+  stick.position.y = 0.2;
+  paddle.add(stick);
+  const disc = new THREE.Mesh(
+    new THREE.BoxGeometry(0.28, 0.28, 0.03),
+    new THREE.MeshStandardMaterial({ color: 0xc03030, roughness: 0.5 })
+  );
+  disc.position.y = 0.5;
+  paddle.add(disc);
+  const parts = ped.mesh.userData.parts;
+  if (parts && parts.foreR) {
+    paddle.position.set(0.02, -0.28, 0.08);
+    parts.foreR.add(paddle);
+  } else {
+    paddle.position.set(0.22, 1.05, 0.12);
+    ped.mesh.add(paddle);
+  }
+  ped.crossingGuard = true;
+  ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
+  ped.speed = 0;
+  ped.state = 'idle';
+  ped.heading = slot.facing;
+  ped.mesh.rotation.y = slot.facing;
+}
+
+export function updateCrossingGuards(dt) {
+  if (!GAMEPLAY.crossingGuard) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const bts = G.world && G.world.bts;
+  const cx = bts ? bts.x : -50;
+  const cz = (bts && bts.z) || 0;
+  const kerb = ROAD_WIDTH / 2 + 1.35;
+  if (h >= 6.2 && h < 8.7) {
+    G._crossingGuards = G._crossingGuards || [];
+    const slots = [
+      { x: cx + kerb, z: cz - kerb, facing: PI / 2 },
+      { x: cx - kerb, z: cz + kerb, facing: -PI / 2 },
+    ];
+    while (G._crossingGuards.length < slots.length) {
+      const slot = slots[G._crossingGuards.length];
+      const ped = spawnPed(G.scene, new THREE.Vector3(slot.x, 0, slot.z), 'laborer');
+      dressCrossingGuard(ped, slot);
+      G._crossingGuards.push(ped);
+    }
+  } else if (G._crossingGuards && G._crossingGuards.length) {
+    for (const ped of G._crossingGuards) {
+      if (!ped || ped.dead) continue;
+      ped.crossingGuard = false;
+      ped.anchor = null;
+    }
+    G._crossingGuards = [];
+  }
+}
+
 export function updateOfficeCommute(dt) {
   if (!GAMEPLAY.officeCommute) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
@@ -1073,7 +1141,7 @@ export function updateSeekShade(dt) {
   let n = 0;
   for (const ped of G.peds) {
     if (n >= 22) break;
-    if (!ped || ped.dead || ped.anchor || ped.gang || ped.pillion || ped.alms || ped.school || ped.btsWait || ped.commute || ped.panicT > 0) continue;
+    if (!ped || ped.dead || ped.anchor || ped.gang || ped.pillion || ped.alms || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.panicT > 0) continue;
     if (ped.social || ped.isMugger || ped.isTarget || ped.motosaiRider || ped.motosaiWait) continue;
     const w = nearestWalkway(ped.mesh.position.x, ped.mesh.position.z);
     if (!w) continue;

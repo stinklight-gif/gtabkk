@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -465,7 +465,7 @@ async function main() {
     const peds = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
       const ways = (G.world.walkways || []).length;
-      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute);
+      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard);
       const b = G.world.buildings.find(x => x.size.y > 8 && x.size.x > 4 && x.size.z > 4) || G.world.buildings[0];
       const insideBefore = wanderer && b && Math.abs(wanderer.mesh.position.x - b.pos.x) < b.size.x / 2 && Math.abs(wanderer.mesh.position.z - b.pos.z) < b.size.z / 2;
       if (wanderer && b) {
@@ -1250,6 +1250,27 @@ async function main() {
     assert(storm.flag, 'afternoonStorm flag on');
     assert(storm.fired && /STORM/.test(storm.tag || ''), `heat breaks into an afternoon storm ("${storm.tag}")`);
     assert(storm.reset, 'storm flag clears before dawn so the next day can fire');
+
+    console.log('\n[38] morning crossing guards');
+    const guard = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      G.time.dayT = 7.4 / 24;
+      main.updateCrossingGuards(0.05);
+      const list = G._crossingGuards || [];
+      const n = list.filter(p => p && p.crossingGuard && !p.dead).length;
+      const g0 = list[0];
+      const vest = !!(g0 && g0.mesh && g0.mesh.getObjectByName('guard-vest'));
+      const paddle = !!(g0 && g0.mesh && g0.mesh.getObjectByName('stop-paddle'));
+      const bts = G.world && G.world.bts;
+      const nearBts = !!(g0 && g0.mesh && bts && Math.hypot(g0.mesh.position.x - bts.x, g0.mesh.position.z - (bts.z || 0)) < 18);
+      G.time.dayT = 12 / 24;
+      main.updateCrossingGuards(0.05);
+      const gone = !(G._crossingGuards && G._crossingGuards.length);
+      return { flag: !!(G.gameplay && G.gameplay.crossingGuard), n, vest, paddle, nearBts, gone };
+    });
+    assert(guard.flag && guard.n >= 2 && guard.nearBts, `crossing guards stand at Asok (${guard.n})`);
+    assert(guard.vest && guard.paddle, 'yellow vest and stop paddle');
+    assert(guard.gone, 'crossing guards leave after morning');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
