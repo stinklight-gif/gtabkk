@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.yaowaratNight;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -696,7 +696,9 @@ function pickPedKind(pos) {
     return r < 0.42 ? 'monk' : r < 0.75 ? 'tourist' : 'local';
   }
   if (poi && poi.yaowarat && pos && dist2(pos, poi.yaowarat) < 62 * 62) {
+    const night = (h >= 18 || h < 2);
     const r = Math.random();
+    if (night) return r < 0.4 ? 'tourist' : r < 0.75 ? 'vendor' : 'local';
     return r < 0.38 ? 'vendor' : r < 0.7 ? 'local' : 'laborer';
   }
   const roll = Math.random();
@@ -1132,6 +1134,16 @@ export function spawnBoat(scene) {
     v.pos.set(x, 0.3, z); v.mesh.position.copy(v.pos);
     v.heading = 0; v.mesh.rotation.y = 0;
     v.driver = null; v.vel = 0;
+  }
+  if (GAMEPLAY.boatHijack) {
+    for (const [x, z, heading] of [[-230, 90, 0], [-218, -90, PI], [-236, 170, 0]]) {
+      const v = makeVehicle('boat', scene);
+      v.pos.set(x, 0.3, z); v.mesh.position.copy(v.pos);
+      v.heading = heading; v.mesh.rotation.y = heading;
+      v.driver = 'boatman';
+      v.npc = { kind: 'boat', cruise: rand(5.5, 8.5), dir: Math.abs(heading) < 1 ? 1 : -1 };
+      v.vel = v.npc.cruise * 0.7;
+    }
   }
 }
 

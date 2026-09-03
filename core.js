@@ -248,6 +248,11 @@ export const GAMEPLAY = {
   fireAtTen: true,
   allRed: true,
   airport: true,
+  btsRide: true,
+  talkChase: true,
+  yaowaratNight: true,
+  boatHijack: true,
+  sevenInterior: true,
 };
 G.gameplay = GAMEPLAY;
 
@@ -336,6 +341,17 @@ export function inAirport(x, z) {
   const b = G.world && G.world.airport;
   if (b) return x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1;
   return x >= 200 && x <= 248 && z >= -220 && z <= 220;
+}
+export function inRiver(x) {
+  return x < -206;
+}
+export function hourOfDay() {
+  return ((G.time.dayT % 1) + 1) % 1 * 24;
+}
+export function yaowaratNightOpen() {
+  if (!GAMEPLAY.yaowaratNight) return false;
+  const h = hourOfDay();
+  return h >= 18 || h < 2;
 }
 export function onCarriageway(x, z) {
   // Roads are authored on the grid lines (x = i*BLOCK, z = j*BLOCK). Measure

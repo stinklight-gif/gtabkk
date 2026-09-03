@@ -136,17 +136,19 @@ export function updateWanted(dt) {
     const ang = rand(0, TAU);
     const r = rand(35, 60);
     if (G._btsRide) return;
-    let sx = clamp(p.x + Math.cos(ang) * r, -HALF + 5, HALF - 5);
+    let sx = clamp(p.x + Math.cos(ang) * r, -200, HALF - 5);
     let sz = clamp(p.z + Math.sin(ang) * r, -HALF + 5, HALF - 5);
+    if (sx < -200) sx = -200;
     for (let tries = 0; onSoi(sx, sz) && tries < 8; tries++) {
       const a2 = rand(0, TAU), r2 = rand(35, 70);
-      sx = clamp(p.x + Math.cos(a2) * r2, -HALF + 5, HALF - 5);
+      sx = clamp(p.x + Math.cos(a2) * r2, -200, HALF - 5);
       sz = clamp(p.z + Math.sin(a2) * r2, -HALF + 5, HALF - 5);
     }
     if (onSoi(sx, sz)) {
       const road = Math.round(sx / BLOCK) * BLOCK;
-      sx = clamp(road + 2.5, -HALF + 5, HALF - 5);
+      sx = clamp(road + 2.5, -200, HALF - 5);
     }
+    if (sx < -200) sx = -200;
     if (G.wanted.stars >= 5 && Math.random() < 0.7) {
       const s = spawnSwat(G.scene, new THREE.Vector3(sx, 0, sz));
       s.vel = 7;
@@ -340,7 +342,8 @@ function maybeAmbush() {
 export function updateCop(v, dt) {
   // chase player
   const p = G.player;
-  const px = p.group.position.x, pz = p.group.position.z;
+  const onBoat = !!(p.inVehicle && p.inVehicle.spec && p.inVehicle.spec.kind === 'boat');
+  const px = onBoat ? -200 : p.group.position.x, pz = p.group.position.z;
   const tx0 = px - v.pos.x;
   const tz0 = pz - v.pos.z;
   const d = Math.hypot(tx0, tz0);
@@ -385,6 +388,7 @@ export function updateCop(v, dt) {
   v.steerAngle = lerp(v.steerAngle || 0, clamp(headingDelta * 6, -0.5, 0.5), 0.28);
   v.pos.x += Math.sin(v.heading) * v.vel * dt;
   v.pos.z += Math.cos(v.heading) * v.vel * dt;
+  if (v.pos.x < -200) v.pos.x = -200;
   v.mesh.position.copy(v.pos);
   v.mesh.rotation.y = v.heading;
   updateVehicleVisuals(v, dt, { braking: target < v.vel, reverse: v.vel < -0.1 });

@@ -203,11 +203,11 @@ export function makeAudio() {
     const jingle = [12, 16, 19, 24];
     function talkRadio(step, t) {                          // AM talk + bumpers/ads
       const b = step % 32;
-      // muffled "speech" — short bandpassed noise blips, gated to feel like talking
-      if (b % 2 === 0 && Math.random() < 0.7) nz(t, 0.07 + Math.random() * 0.06, 0.16, 0, 700 + Math.random() * 900);
-      // station bumper jingle every 2 bars
-      if (b === 0) jingle.forEach((s, i) => tone(t + i * 0.12, nt(s), 0.18, 'square', 0.16));
-      // ad "ding" mid-loop
+      const chase = !!(window.GAME && window.GAME.gameplay && window.GAME.gameplay.talkChase && window.GAME.wanted && window.GAME.wanted.stars >= 3);
+      const gab = chase ? 0.92 : 0.7;
+      if (b % 2 === 0 && Math.random() < gab) nz(t, 0.07 + Math.random() * 0.06, chase ? 0.22 : 0.16, 0, 700 + Math.random() * 900);
+      if (chase && b % 4 === 1) nz(t, 0.05, 0.12, 0, 1400);
+      if (b === 0) jingle.forEach((s, i) => tone(t + i * 0.12, nt(s), 0.18, 'square', chase ? 0.2 : 0.16));
       if (b === 20) { tone(t, nt(19), 0.2, 'sine', 0.18); tone(t + 0.18, nt(14), 0.28, 'sine', 0.16); }
     }
     function watRadio(step, t) {

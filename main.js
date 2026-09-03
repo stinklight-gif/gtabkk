@@ -35,7 +35,7 @@ import {
 } from './physics.js';
 export * from './npcs.js';
 import {
-  CROWD_CURVE, buildClusterAnchors, crowdFactor, crowdTarget, makeBarkSprite, resyncCrowd, spawnAnchoredPed, spawnBark, spawnSpikeStrip, updateAlms, updateArmorPickups, updateBarks, updateClusters, updateDogs, updateFoodStalls, updateMuggings, updatePeds, updateSpikes, updateTurf, updateVigilante, vigilanteEnd, vigilanteSpawnTarget
+  CROWD_CURVE, buildClusterAnchors, crowdFactor, crowdTarget, makeBarkSprite, resyncCrowd, spawnAnchoredPed, spawnBark, spawnSpikeStrip, updateAlms, updateArmorPickups, updateBarks, updateClusters, updateDogs, updateFoodStalls, updateMuggings, updatePeds, updateSpikes, updateTurf, updateVigilante, updateYaowaratNight, vigilanteEnd, vigilanteSpawnTarget
 } from './npcs.js';
 export * from './combat.js';
 import {
@@ -56,7 +56,7 @@ import {
 } from './daynight.js';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G,
-  PRICE, PAINT_COLORS, BUSINESSES, TURFS, missionMilestones, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir,
+  PRICE, PAINT_COLORS, BUSINESSES, TURFS, missionMilestones, ROAD_WIDTH, PED_TARGET, GAMEPLAY, inYaowarat, yaowaratNightOpen, _camTarget, _camOffset, _fireDir,
   _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 
@@ -644,12 +644,26 @@ export function updateTaxi(dt) {
   }
   if (t.stage === 'idle') {
     if (inSong) {
-      G.hud.showPrompt('Press <b>J</b> for a taxi fare', 0.4);
+      const drunk = GAMEPLAY.yaowaratNight && yaowaratNightOpen() && inYaowarat(p.inVehicle.pos.x, p.inVehicle.pos.z);
+      G.hud.showPrompt(drunk ? 'Press <b>J</b> for a drunk tourist fare' : 'Press <b>J</b> for a taxi fare', 0.4);
       if (G.input.pressed('KeyJ')) {
-        t.stage = 'toPickup';
-        t.markerPos = taxiRandPoint(p.inVehicle.pos, 90);
-        taxiBeam(t, t.markerPos, 0xffcf4a);
-        G.hud.showNotif('New fare — head to the yellow marker');
+        if (drunk) {
+          t.stage = 'toDropoff';
+          t.dest = taxiRandPoint(p.inVehicle.pos, 160);
+          t.markerPos = t.dest;
+          taxiBeam(t, t.dest, 0x39ff7a);
+          const d = Math.sqrt(dist2(p.inVehicle.pos, t.dest));
+          t.timeLeft = 28 + d / 8;
+          t.fareValue = Math.round(280 + d * 8);
+          t.drunk = true;
+          G.hud.showNotif('Drunk tourist piled in — get them home');
+        } else {
+          t.stage = 'toPickup';
+          t.drunk = false;
+          t.markerPos = taxiRandPoint(p.inVehicle.pos, 90);
+          taxiBeam(t, t.markerPos, 0xffcf4a);
+          G.hud.showNotif('New fare — head to the yellow marker');
+        }
       }
     }
     return;
@@ -1288,6 +1302,22 @@ export function updateRadio(dt) {
   a.duckEngine(inV && a.radio.station !== 0);
   // Persistent HUD chip: live station name while driving, hidden on foot / RADIO OFF.
   G.hud.setRadioChip(inV && a.radio.station !== 0 ? '📻 ' + a.radio.names[a.radio.station] : null);
+  const talkOn = inV && a.radio.names[a.radio.station] === 'TALK RADIO AM';
+  const hot = GAMEPLAY.talkChase && G.wanted && G.wanted.stars >= 3;
+  if (talkOn && hot) {
+    G._talkChaseT = (G._talkChaseT || 0) - dt;
+    if (!G._talkChaseOn || G._talkChaseT <= 0) {
+      G._talkChaseOn = true;
+      G._talkChaseT = 16;
+      const d = G._districtName || 'Sukhumvit';
+      const place = d === 'Yaowarat' ? 'Yaowarat' : d === 'Riverside' ? 'the riverside' : 'Sukhumvit';
+      G.hud.showSubtitle(`Talk Radio: "A chase ripping down ${place} — police on the bumper."`, 'วิทยุ: ไล่ล่า');
+    }
+  } else if (G._talkChaseOn && (!hot || !talkOn)) {
+    G._talkChaseOn = false;
+    G._talkChaseT = 0;
+    if (talkOn) G.hud.showSubtitle('Talk Radio: "Back to the phones — traffic\'s clearing."', 'วิทยุ: ข่าวจบ');
+  }
 }
 
 // =============================================================================
@@ -1520,6 +1550,7 @@ export function loop() {
     updateTurf(dt);
     updateDogs(dt);
     updateAlms(dt);
+    updateYaowaratNight(dt);
     updateFootCops(dt);
     updateBullets(dt);
     updateParticles(dt);

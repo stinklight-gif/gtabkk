@@ -252,7 +252,9 @@ traffic AI.
   The Honda Wave stand-in can swap a local GLTF near-LOD (`models/wave.gltf`,
   `GAMEPLAY.gltf`); far LOD stays the box proxy. There is no city-wide asset pack.
   Suvarnabhumi is a 50 m east-column pocket (runway, taxiway, terminal, parked
-  jets you can taxi) — not a 4 km GIS airport.
+  jets you can taxi) — not a 4 km GIS airport. The BTS is a two-stop commute on
+  the existing track. Yaowarat densifies at night. Longtails can be taken from
+  NPC drivers. One 7-Eleven is a walk-in interior.
 - Collisions still use AABB/contact normals rather than a full rigid-body solver.
   Vehicle impacts bounce, scrape, spin, and exchange momentum — tuned game
   impulses, not Rapier. `GAMEPLAY.rapier` exists as an off-by-default experiment.

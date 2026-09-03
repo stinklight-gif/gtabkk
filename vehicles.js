@@ -371,7 +371,8 @@ export function updateVehicles(dt) {
     }
     if (v.driver !== 'player' && !v.npc) applyLooseImpactMotion(v, dt);
     if (v.driver === 'player') continue;
-    if (v.isCop && v.driver) updateCop(v, dt);
+    if (v.spec && v.spec.kind === 'boat' && v.npc) updateNpcBoat(v, dt);
+    else if (v.isCop && v.driver) updateCop(v, dt);
     else if (v.npc) updateTrafficCar(v, dt);
     // damage smoke
     if (v.hp < 30 && !v.smoke) {
@@ -646,6 +647,24 @@ export function updateTrafficCar(v, dt) {
   const blocked = obstacleTarget < npc.cruiseSpeed * 0.3 && signalTarget > npc.cruiseSpeed * 0.5;
   if (blocked && (npc.honkCooldown -= dt) <= 0) { G.audio.honk(); npc.honkCooldown = rand(2, 6); }
   if (dist2(v.pos, pp) > 220 * 220) respawnTraffic(v, pp);
+}
+
+export function updateNpcBoat(v, dt) {
+  const npc = v.npc;
+  if (!npc) return;
+  const cruise = npc.cruise || 7;
+  if (v.vel < cruise) v.vel = Math.min(cruise, v.vel + 4 * dt);
+  else v.vel = Math.max(cruise, v.vel - 3 * dt);
+  const dir = npc.dir >= 0 ? 1 : -1;
+  v.heading = dir > 0 ? 0 : PI;
+  v.pos.z += dir * v.vel * dt;
+  if (v.pos.z > HALF - 28) { npc.dir = -1; v.heading = PI; }
+  if (v.pos.z < -HALF + 28) { npc.dir = 1; v.heading = 0; }
+  v.pos.x = clamp(v.pos.x, -248, -210);
+  v.pos.y = 0.3 + Math.sin(performance.now() * 0.002 + v.pos.z * 0.15) * 0.06;
+  v.mesh.position.copy(v.pos);
+  v.mesh.rotation.y = v.heading;
+  v.mesh.rotation.z = Math.sin(performance.now() * 0.0016 + v.pos.z * 0.1) * 0.03;
 }
 
 export function isNearGridLine(v) {
