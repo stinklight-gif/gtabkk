@@ -256,6 +256,7 @@ export const GAMEPLAY = {
   motosai: true,          // pillion motorcycle taxi, soi-only, pays more if you filter traffic
   motosaiStands: true,    // orange-vest bikes waiting at soi mouths; traffic bikes carry pillions
   burningHaze: true,      // third weather: burning-season haze (noon goes dirty, headlights, fog)
+  schoolKids: true,       // morning uniforms walking the sois toward the BTS
 };
 G.gameplay = GAMEPLAY;
 

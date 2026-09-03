@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -465,7 +465,7 @@ async function main() {
     const peds = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
       const ways = (G.world.walkways || []).length;
-      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait);
+      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school);
       const b = G.world.buildings.find(x => x.size.y > 8 && x.size.x > 4 && x.size.z > 4) || G.world.buildings[0];
       const insideBefore = wanderer && b && Math.abs(wanderer.mesh.position.x - b.pos.x) < b.size.x / 2 && Math.abs(wanderer.mesh.position.z - b.pos.z) < b.size.z / 2;
       if (wanderer && b) {
@@ -982,6 +982,36 @@ async function main() {
     assert(/PM2\.5/.test(city.tag) && city.pm25 > 100, `haze HUD reports PM2.5 ("${city.tag}")`);
     assert(city.clearSeen && !city.hazeSeen, 'cops lose you at 22m in the haze, not in clear air');
     assert(city.hazeVel < city.cruise * 0.9, `cars crawl in the haze (${city.hazeVel.toFixed(1)} of cruise ${city.cruise.toFixed(1)})`);
+
+    console.log('\n[29] morning schoolkids');
+    const kids = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      G.time.dayT = 7.4 / 24;
+      G.time.weather = 'clear';
+      main.updateSchoolKids(0.05);
+      const list = G._schoolKids || [];
+      const n = list.filter(p => p && p.school && p.kind === 'school' && !p.dead).length;
+      const bts = G.world.bts;
+      const dest = { x: bts ? bts.x : 0, z: (bts && bts.z) || 0 };
+      let toward = 0;
+      for (const p of list) {
+        if (!p || !p.mesh) continue;
+        const dx = dest.x - p.mesh.position.x, dz = dest.z - p.mesh.position.z;
+        const want = Math.atan2(dx, dz);
+        let d = Math.abs(p.heading - want);
+        while (d > Math.PI) d = Math.abs(d - Math.PI * 2);
+        if (d < 0.6 || Math.hypot(dx, dz) < 10) toward++;
+      }
+      const shirt = list[0] && list[0].mesh && list[0].mesh.userData.parts && list[0].mesh.userData.parts.torso;
+      const white = shirt && shirt.material && shirt.material.color.getHex() > 0xe0e0e0;
+      G.time.dayT = 12 / 24;
+      main.updateSchoolKids(0.05);
+      const gone = !(G._schoolKids && G._schoolKids.length);
+      return { flag: !!(G.gameplay && G.gameplay.schoolKids), n, toward, white, gone, bts: !!(bts) };
+    });
+    assert(kids.flag && kids.bts, 'schoolKids flag on and BTS exists');
+    assert(kids.n >= 4 && kids.toward >= 3 && kids.white, `morning uniforms walk toward the BTS (${kids.n} kids)`);
+    assert(kids.gone, 'schoolkids disperse after morning');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

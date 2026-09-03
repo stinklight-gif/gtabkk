@@ -702,6 +702,12 @@ function pickPedKind(pos) {
     return r < 0.38 ? 'vendor' : r < 0.7 ? 'local' : 'laborer';
   }
   const roll = Math.random();
+  if (GAMEPLAY.schoolKids && h >= 6.2 && h < 8.6) {
+    if (roll < 0.42) return 'school';
+    if (roll < 0.55) return 'office';
+    if (roll < 0.68) return 'local';
+    return roll < 0.82 ? 'vendor' : 'laborer';
+  }
   if (h >= 5 && h < 7) {
     if (roll < 0.22) return 'monk';
     if (roll < 0.38) return 'vendor';
@@ -740,6 +746,8 @@ export function makePedMesh(forcedKind = null, pos = null) {
                     pantsColor = pick([0x33384a, 0x222222, 0x5a4030]); break;
     case 'laborer': shirtColor = pick([0x6a8fb0, 0x9a8a60, 0xb0b0b0, 0x7a6a5a]);
                     pantsColor = pick([0x3a4658, 0x4a3a2a, 0x222222]); break;
+    case 'school':  shirtColor = 0xf3f4f8; pantsColor = 0x1c355e; bareArms = false;
+                    if (Math.random() < 0.42) skirt = true; break;
     default:        shirtColor = pick([0xffffff, 0xeeeeee, 0xdeb887, 0x223344, 0x556677, 0xb04040, 0xddcc88, 0x3a6a8a]);
                     pantsColor = pick([0x222222, 0x111111, 0x445566, 0x804020, 0x33384a]);
   }
@@ -836,6 +844,11 @@ export function makePedMesh(forcedKind = null, pos = null) {
   } else if (kind === 'monk') {
     const bowl = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6, 0, TAU, 0, PI/2), new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.7 }));
     bowl.rotation.x = PI; bowl.position.set(0, 1.0, 0.2); g.add(bowl);
+  } else if (kind === 'school') {
+    const pack = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.34, 0.16), new THREE.MeshStandardMaterial({ color: pick([0x1c355e, 0xc44a3a, 0x2a5a3a]), roughness: 0.82 }));
+    pack.position.set(0, 1.12, -0.2); g.add(pack);
+    const tie = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.2, 0.02), new THREE.MeshStandardMaterial({ color: 0xc9a227, roughness: 0.7 }));
+    tie.position.set(0, 1.22, 0.12); g.add(tie);
   }
 
   const props = {};
@@ -974,8 +987,8 @@ export function sidewalkPos(cx, cz, radius) {
   return new THREE.Vector3(clamp(x, -HALF + 5, HALF - 5), 0, clamp(z, -HALF + 5, HALF - 5));
 }
 
-export function spawnPed(scene, pos) {
-  const m = makePedMesh(null, pos);
+export function spawnPed(scene, pos, kind = null) {
+  const m = makePedMesh(kind, pos);
   m.position.copy(pos);
   m.userData.heading = rand(0, TAU);
   scene.add(m);

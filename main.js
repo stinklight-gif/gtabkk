@@ -35,7 +35,7 @@ import {
 } from './physics.js';
 export * from './npcs.js';
 import {
-  CROWD_CURVE, buildClusterAnchors, crowdFactor, crowdTarget, makeBarkSprite, resyncCrowd, spawnAnchoredPed, spawnBark, spawnSpikeStrip, updateAlms, updateArmorPickups, updateBarks, updateClusters, updateDogs, updateFoodStalls, updateMuggings, updatePeds, updateSpikes, updateTurf, updateVigilante, updateYaowaratNight, vigilanteEnd, vigilanteSpawnTarget
+  CROWD_CURVE, buildClusterAnchors, crowdFactor, crowdTarget, makeBarkSprite, resyncCrowd, spawnAnchoredPed, spawnBark, spawnSpikeStrip, updateAlms, updateArmorPickups, updateBarks, updateClusters, updateDogs, updateFoodStalls, updateMuggings, updatePeds, updateSchoolKids, updateSpikes, updateTurf, updateVigilante, updateYaowaratNight, vigilanteEnd, vigilanteSpawnTarget
 } from './npcs.js';
 export * from './combat.js';
 import {
@@ -1707,6 +1707,7 @@ export function loop() {
     updateTurf(dt);
     updateDogs(dt);
     updateAlms(dt);
+    updateSchoolKids(dt);
     updateYaowaratNight(dt);
     updateFootCops(dt);
     updateBullets(dt);

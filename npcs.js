@@ -197,14 +197,14 @@ export function resyncCrowd() {
   // pull stray wanderers onto nearby sidewalks so the count near the camera
   // reflects the hour immediately (harness-only; gameplay distributes gradually)
   for (const ped of G.peds) {
-    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion) continue;
+    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school) continue;
     if (dist2(ped.mesh.position, pp) > 95 * 95) ped.mesh.position.copy(sidewalkPos(pp.x, pp.z, 88));
   }
   for (let guard = 0; G.peds.length > target && guard < 500; guard++) {
     let fi = -1, fd = -1;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school) continue;
       const d = dist2(ped.mesh.position, pp);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -439,7 +439,7 @@ export function updatePeds(dt) {
     let fi = -1, fd = 60 * 60;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school) continue;
       const d = dist2(ped.mesh.position, playerPos);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -811,6 +811,41 @@ export function updateAlms(dt) {
       ped.alms = false;
     }
     G._alms = [];
+  }
+}
+
+export function updateSchoolKids(dt) {
+  if (!GAMEPLAY.schoolKids) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const bts = G.world && G.world.bts;
+  const dest = { x: bts ? bts.x : -50, z: (bts && bts.z) || 0 };
+  if (h >= 6.2 && h < 8.7) {
+    G._schoolKids = G._schoolKids || [];
+    while (G._schoolKids.length < 5) {
+      const ang = rand(0, TAU), r = rand(22, 70);
+      const pos = new THREE.Vector3(
+        clamp(dest.x + Math.cos(ang) * r, -HALF + 8, HALF - 8), 0,
+        clamp(dest.z + Math.sin(ang) * r, -HALF + 8, HALF - 8));
+      const ped = spawnPed(G.scene, pos, 'school');
+      ped.school = true;
+      ped.anchor = null;
+      ped.state = 'walking';
+      ped.heading = Math.atan2(dest.x - pos.x, dest.z - pos.z);
+      G._schoolKids.push(ped);
+    }
+    for (const ped of G._schoolKids) {
+      if (!ped || ped.dead) continue;
+      const dx = dest.x - ped.mesh.position.x, dz = dest.z - ped.mesh.position.z;
+      const d = Math.hypot(dx, dz);
+      if (d > 8) { ped.heading = Math.atan2(dx, dz); ped.speed = 1.35; ped.state = 'walking'; }
+      else { ped.speed = 0.15; ped.state = 'idle'; }
+    }
+  } else if (G._schoolKids && G._schoolKids.length) {
+    for (const ped of G._schoolKids) {
+      if (!ped || ped.dead) continue;
+      ped.school = false;
+    }
+    G._schoolKids = [];
   }
 }
 
