@@ -1170,6 +1170,102 @@ export function dressMotosaiVest(ped) {
   ped.motosaiVest = true;
 }
 
+export function makeBikeHelmet(color = 0x1a1a1e) {
+  const g = new THREE.Group();
+  g.name = 'bike-helmet';
+  const shell = new THREE.Mesh(
+    new THREE.SphereGeometry(0.155, 9, 7, 0, TAU, 0, PI / 1.35),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.42, metalness: 0.28 })
+  );
+  g.add(shell);
+  const visor = new THREE.Mesh(
+    new THREE.BoxGeometry(0.16, 0.07, 0.1),
+    new THREE.MeshStandardMaterial({ color: 0x1a3040, roughness: 0.15, metalness: 0.7 })
+  );
+  visor.position.set(0, -0.02, 0.1);
+  g.add(visor);
+  return g;
+}
+
+export function wearBikeHelmet(ped, color = 0x1a1a1e) {
+  if (!GAMEPLAY.bikeHelmets || !ped || !ped.mesh || ped.bikeHelmet) return ped;
+  const head = ped.mesh.userData.parts && ped.mesh.userData.parts.head;
+  if (!head) return ped;
+  const h = makeBikeHelmet(color);
+  h.position.set(0, 0.12, 0.02);
+  head.add(h);
+  ped.bikeHelmet = h;
+  return ped;
+}
+
+function playerShirtHex() {
+  if (typeof G._shirtColor === 'number') return G._shirtColor;
+  const t = G.player && G.player.torso && G.player.torso.material && G.player.torso.material.color;
+  return t ? t.getHex() : 0xd44b3b;
+}
+
+export function makeSeatedBikeRider(opts = {}) {
+  const g = new THREE.Group();
+  g.name = 'bike-rider';
+  g.userData.keep = true;
+  const shirt = opts.shirt || 0xd44b3b;
+  const skin = opts.skin || 0xc69472;
+  const helm = opts.helmet != null ? opts.helmet : 0x1a1a1e;
+  const shirtMat = new THREE.MeshStandardMaterial({ color: shirt, roughness: 0.75 });
+  const skinMat = new THREE.MeshStandardMaterial({ color: skin, roughness: 0.8 });
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.32, 3, 6), shirtMat);
+  torso.position.set(0, 1.05, 0.02); torso.rotation.x = 0.22; torso.castShadow = true; g.add(torso);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), skinMat);
+  head.position.set(0, 1.42, 0.08); head.castShadow = true; g.add(head);
+  const helmet = makeBikeHelmet(helm);
+  helmet.position.set(0, 1.50, 0.08);
+  g.add(helmet);
+  for (const sx of [-1, 1]) {
+    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.32, 3, 5), shirtMat);
+    arm.position.set(sx * 0.18, 1.12, 0.16);
+    arm.rotation.x = -1.05;
+    arm.rotation.z = sx * 0.35;
+    g.add(arm);
+  }
+  g.position.set(0, 0.02, 0.12);
+  return g;
+}
+
+export function syncBikeRider(v) {
+  if (!v || !v.mesh || !v.spec || v.spec.kind !== 'bike') return;
+  if (!GAMEPLAY.bikeHelmets) {
+    if (v.bikeRider) v.bikeRider.visible = false;
+    return;
+  }
+  const playerOn = v.driver === 'player';
+  const npcOn = !!v.npc && v.driver !== 'player' && !v.motosaiStand;
+  const want = playerOn || npcOn;
+  if (!want) {
+    if (v.bikeRider) v.bikeRider.visible = false;
+    return;
+  }
+  const shirt = playerOn ? playerShirtHex() : (v._riderShirt || (v._riderShirt = pick([0xffffff, 0x223344, 0x556677, 0xff6a18, 0x2a5aad])));
+  const helm = playerOn ? 0x222226 : (v._riderHelm || (v._riderHelm = pick([0x1a1a1e, 0xb03030, 0x2a5a8a, 0xffcf2a, 0x2a2a2a])));
+  const look = shirt + ',' + helm;
+  if (!v.bikeRider || v._riderLook !== look) {
+    if (v.bikeRider) {
+      if (v.bikeRider.parent) v.bikeRider.parent.remove(v.bikeRider);
+      disposeObject(v.bikeRider);
+      const lod = v.mesh.userData.lod;
+      if (lod && lod.high) {
+        const i = lod.high.indexOf(v.bikeRider);
+        if (i >= 0) lod.high.splice(i, 1);
+      }
+    }
+    v.bikeRider = makeSeatedBikeRider({ shirt, helmet: helm });
+    v._riderLook = look;
+    v.mesh.add(v.bikeRider);
+    const lod = v.mesh.userData.lod;
+    if (lod && lod.high && !lod.high.includes(v.bikeRider)) lod.high.push(v.bikeRider);
+  }
+  v.bikeRider.visible = true;
+}
+
 export function attachTrafficPillion(bike) {
   if (!bike) return null;
   if (bike.pillionPed && bike.pillionPed.mesh && bike.pillionPed.mesh.parent) return bike.pillionPed;
@@ -1182,6 +1278,7 @@ export function attachTrafficPillion(bike) {
   bike.mesh.add(ped.mesh);
   ped.mesh.position.set(0, 0.02, -0.42);
   ped.mesh.rotation.set(0.16, 0, 0);
+  wearBikeHelmet(ped, pick([0x1a1a1e, 0xb03030, 0xffcf2a, 0x2a5a8a]));
   bike.pillionPed = ped;
   return ped;
 }
@@ -1207,6 +1304,7 @@ export function spawnMotosaiStands(scene) {
     bike.motosaiStand = true;
     const rider = spawnPed(scene, new THREE.Vector3(x + (alongZ ? 1.15 : 0), 0, z + (alongZ ? 0 : 1.15)));
     dressMotosaiVest(rider);
+    wearBikeHelmet(rider, 0xffcf2a);
     rider.anchor = { slot: rider.mesh.position.clone(), facing: heading + PI };
     rider.motosaiRider = true;
     rider.speed = 0;

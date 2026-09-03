@@ -262,6 +262,7 @@ export const GAMEPLAY = {
   spiritWai: true,        // E at a spirit house: incense, heat cools
   soiCats: true,          // cats loaf at food stalls and bolt when you get close
   btsPlatform: true,      // commuters wait on Asok / Phrom Phong; PA when the train pulls in
+  bikeHelmets: true,      // helmeted riders on bikes; stand/pillion heads get lids too
 };
 G.gameplay = GAMEPLAY;
 

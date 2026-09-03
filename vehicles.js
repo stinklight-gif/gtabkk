@@ -6,7 +6,7 @@ import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, UPGRADES, rankDiscount, ROAD_WIDTH, PED_TARGET, GAMEPLAY, trafficTarget, inYaowarat, inFlood, onSoi, onCarriageway, inAirport, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { tip, cycleWeapon, damagePlayer, firePistol, fireSMG, fireShotgun, makeExplosion, makeSmokeEmitter, makeVehicle, onCopKilled, raiseWanted, resolveVehicleVsBuildings, resolveVehicleVsVehicles, saveGame, spawnSkid, updateCop, vehicleName } from './main.js';
-import { attachTrafficPillion } from './entities.js';
+import { attachTrafficPillion, syncBikeRider } from './entities.js';
 import { lightFor } from './traffic.js';
 
 export function updateVehicleVisuals(v, dt, opts={}) {
@@ -365,6 +365,7 @@ export function killPed(ped) {
 export function updateVehicles(dt) {
   for (const v of G.vehicles) {
     if (v.dead) continue;
+    if (GAMEPLAY.bikeHelmets && v.spec && v.spec.kind === 'bike') syncBikeRider(v);
     if (v.lights) {
       const hazeOn = GAMEPLAY.burningHaze && G.time.weather === 'haze';
       const base = Math.max(G.nightK || 0, hazeOn ? 0.85 : 0);

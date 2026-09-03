@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -1158,6 +1158,43 @@ async function main() {
     assert(plat.paStop === 'Asok' && plat.paNext, `PA names the stop (${plat.paStop} → ${plat.paNext})`);
     assert(plat.boarded >= 3, `waiters board when the train pulls in (${plat.boarded})`);
     assert(plat.back >= 3, `waiters return after the train leaves (${plat.back})`);
+
+    console.log('\n[35] bike helmets + seated riders');
+    const lids = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const stands = (G.world && G.world.motosaiStands) || [];
+      const rider = stands[0] && stands[0].rider;
+      const standHelm = !!(rider && (rider.bikeHelmet || (rider.mesh && rider.mesh.getObjectByName('bike-helmet'))));
+      let pillionBike = G.vehicles.find(v => v && v.spec && v.spec.kind === 'bike' && v.pillionPed && v.pillionPed.mesh);
+      if (!pillionBike) {
+        const tBike = G.vehicles.find(v => v && v.spec && v.spec.kind === 'bike' && v.driver !== 'player' && !v.motosaiStand) || main.makeVehicle('bike', G.scene);
+        if (tBike) {
+          tBike.npc = tBike.npc || { kind: 'traffic', cruiseSpeed: 12 };
+          tBike.pillionPed = null;
+          main.attachTrafficPillion(tBike);
+          pillionBike = tBike;
+        }
+      }
+      const pillionHelm = !!(pillionBike && pillionBike.pillionPed && (pillionBike.pillionPed.bikeHelmet || (pillionBike.pillionPed.mesh && pillionBike.pillionPed.mesh.getObjectByName('bike-helmet'))));
+      let npcBike = G.vehicles.find(v => v && v.spec && v.spec.kind === 'bike' && v.npc && v.driver !== 'player' && !v.motosaiStand) || pillionBike;
+      if (npcBike) main.syncBikeRider(npcBike);
+      const npcRider = !!(npcBike && npcBike.bikeRider && npcBike.bikeRider.visible && npcBike.bikeRider.getObjectByName('bike-helmet'));
+      const bike = G.vehicles.find(v => v && v.spec && v.spec.kind === 'bike' && !v.dead) || main.makeVehicle('bike', G.scene);
+      G.player.inVehicle = bike; bike.driver = 'player'; bike.npc = null;
+      main.syncBikeRider(bike);
+      const playerRider = !!(bike.bikeRider && bike.bikeRider.visible && bike.bikeRider.getObjectByName('bike-helmet'));
+      G.player.inVehicle = null; bike.driver = null;
+      main.syncBikeRider(bike);
+      const hoppedOff = !(bike.bikeRider && bike.bikeRider.visible);
+      return {
+        flag: !!(G.gameplay && G.gameplay.bikeHelmets),
+        standHelm, pillionHelm, npcRider, playerRider, hoppedOff,
+      };
+    });
+    assert(lids.flag, 'bikeHelmets flag on');
+    assert(lids.standHelm && lids.pillionHelm, 'stand riders and pillions wear helmets');
+    assert(lids.npcRider, 'traffic bikes show a helmeted rider');
+    assert(lids.playerRider && lids.hoppedOff, 'player bike shows a helmeted rider that hides on foot');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
