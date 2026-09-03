@@ -50,12 +50,12 @@ export function makeAudio() {
   }
 
   // Engine looper — looped buffer per vehicle, pitch-shifted by speed
-  function engineLoop({rpmBase=80, harsh=false} = {}) {
+  function engineLoop({rpmBase=80, harsh=false, dest=null} = {}) {
     const o1 = ctx.createOscillator(); o1.type = 'sawtooth'; o1.frequency.value = rpmBase;
     const o2 = ctx.createOscillator(); o2.type = 'square';   o2.frequency.value = rpmBase * 0.5;
     const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = harsh ? 1800 : 900;
     const g  = ctx.createGain(); g.gain.value = 0;
-    o1.connect(lp); o2.connect(lp); lp.connect(g).connect(engineBus);
+    o1.connect(lp); o2.connect(lp); lp.connect(g).connect(dest || engineBus);
     o1.start(); o2.start();
     return {
       set(speed01, on, throttle = 0) {
@@ -124,7 +124,7 @@ export function makeAudio() {
     o.frequency.setValueAtTime(700, t);
     o.frequency.linearRampToValueAtTime(1200, t + 0.45);
     o.frequency.linearRampToValueAtTime(700, t + 0.9);
-    o.connect(g).connect(master);
+    o.connect(g).connect(copPanner);
     o.start(t); o.stop(t + 1.0);
   }
   function thunder() { noise(1.5, 0.45, 400); }
@@ -216,12 +216,31 @@ export function makeAudio() {
       if (b === 8) tone(t, nt(-5), 0.9, 'sine', 0.05);
       if (b === 0) tone(t, nt(19), 0.7, 'sine', 0.05);
     }
+    function morLam(step, t) {
+      const b = step % 16;
+      if (b === 0 || b === 6) kick(t, 0.55);
+      if (b === 4 || b === 12) snare(t, 0.3);
+      if (b % 2 === 0) hat(t, 0.07);
+      if (b % 4 === 0) tone(t, nt([-5, -5, 0, 2][(step / 4) % 4] - 12), 0.22, 'sawtooth', 0.28);
+      if (b % 2 === 1) tone(t, nt([0, 3, 7, 10][b % 4] + 12), 0.12, 'square', 0.1);
+    }
+    function soiCowboy(step, t) {
+      const b = step % 16;
+      if (b === 0 || b === 8) kick(t, 0.45);
+      if (b === 4 || b === 12) snare(t, 0.26);
+      if (b % 4 === 2) hat(t, 0.08);
+      if (b === 0) tone(t, nt(0), 0.5, 'triangle', 0.16);
+      if (b === 8) tone(t, nt(7), 0.4, 'triangle', 0.12);
+      if (b === 4) tone(t, nt(12), 0.18, 'square', 0.08);
+    }
     const STATIONS = [
       { name: 'RADIO OFF', bpm: 0, pattern: null },
       { name: 'LUK THUNG FM', bpm: 104, pattern: lukThung },
       { name: 'BANGKOK BARS 97.5', bpm: 88, pattern: bangkokBars },
       { name: 'TALK RADIO AM', bpm: 100, pattern: talkRadio },
       { name: 'WAT RADIO', bpm: 52, pattern: watRadio },
+      { name: 'MOR LAM EXPRESS', bpm: 118, pattern: morLam },
+      { name: 'SOI COWBOY CLASSICS', bpm: 96, pattern: soiCowboy },
     ];
     let station = 1, step = 0, nextTime = 0;
     function reset() { step = 0; nextTime = 0; }
@@ -405,6 +424,12 @@ export function makeAudio() {
   const rumbleOsc = ctx.createOscillator(); rumbleOsc.type = 'sawtooth'; rumbleOsc.frequency.value = 42;
   const rumbleLp = ctx.createBiquadFilter(); rumbleLp.type = 'lowpass'; rumbleLp.frequency.value = 90;
   rumbleOsc.connect(rumbleLp).connect(rumbleGain); rumbleOsc.start();
+  const copPanner = ctx.createStereoPanner(); copPanner.pan.value = 0; copPanner.connect(master);
+  const npcPans = [0, 1].map(() => {
+    const pan = ctx.createStereoPanner(); pan.connect(master);
+    const loop = engineLoop({ rpmBase: 64, dest: pan });
+    return { pan, loop };
+  });
   let lastWhoop = 0, lastKind = '';
   function updateWorld() {
     const G = window.GAME; if (!G || G.state !== 'playing') {
@@ -443,9 +468,31 @@ export function makeAudio() {
       }
       if (G.heli) { const d = Math.hypot(G.heli.mesh.position.x - p.x, G.heli.mesh.position.z - p.z); if (d < nd) nd = d; }
       const now = ctx.currentTime;
-      if (nearest && nd < 50 && now - lastWhoop > 0.95) {
-        lastWhoop = now;
-        siren();
+      if (nearest && nd < 50) {
+        const yaw = (G.camRig && G.camRig.yaw) || 0;
+        const ang = Math.atan2(nearest.pos.x - p.x, nearest.pos.z - p.z) - yaw;
+        copPanner.pan.setTargetAtTime(Math.max(-0.9, Math.min(0.9, Math.sin(ang))), ctx.currentTime, 0.08);
+        if (now - lastWhoop > 0.95) { lastWhoop = now; siren(); }
+      } else copPanner.pan.setTargetAtTime(0, ctx.currentTime, 0.2);
+    }
+    if (p && G.vehicles) {
+      const near = [];
+      for (const v of G.vehicles) {
+        if (!v || v.dead || v.driver === 'player' || !v.spec) continue;
+        const d2 = (v.pos.x - p.x) ** 2 + (v.pos.z - p.z) ** 2;
+        if (d2 < 22 * 22) near.push({ v, d2 });
+      }
+      near.sort((a, b) => a.d2 - b.d2);
+      const yaw = (G.camRig && G.camRig.yaw) || 0;
+      for (let i = 0; i < 2; i++) {
+        const slot = npcPans[i];
+        if (i < near.length) {
+          const v = near[i].v;
+          const ang = Math.atan2(v.pos.x - p.x, v.pos.z - p.z) - yaw;
+          slot.pan.pan.setTargetAtTime(Math.max(-0.85, Math.min(0.85, Math.sin(ang))), ctx.currentTime, 0.1);
+          const top = v.spec.topSpeed || 20;
+          slot.loop.set(Math.min(1, Math.abs(v.vel || 0) / top), true, 0.4);
+        } else slot.loop.set(0, false, 0);
       }
     }
     if (G.audio && G.audio.rainBed && (G.time.rainStrength || 0) > 0.25 && p) {

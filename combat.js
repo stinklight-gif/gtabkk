@@ -68,10 +68,23 @@ function setHeldGunPose(kind, recoil) {
 }
 
 function getMuzzleWorld() {
-  const gun = G.player && G.player.pistol;
+  const p = G.player;
+  if (p && p.inCover && p.coverPeek) return _muzzleWorld.set(p.coverPeek.x, p.coverPeek.y, p.coverPeek.z);
+  const gun = p && p.pistol;
   if (!gun) return _muzzleWorld.copy(G.camera.position);
   gun.updateWorldMatrix(true, false);
   return gun.localToWorld(_muzzleWorld.set(0, 0, 0.54));
+}
+
+function throwBottle() {
+  const p = G.player;
+  p.weapons.bottle = false; p.activeWeapon = 'fists'; updateAmmoHud();
+  G.camera.getWorldDirection(_fireDir);
+  const origin = p.group.position.clone(); origin.y += 1.4;
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), new THREE.MeshStandardMaterial({ color: 0x8a6a2a, roughness: 0.4 }));
+  ball.position.copy(origin); G.scene.add(ball);
+  G.bullets.push({ mesh: ball, vel: _fireDir.clone().multiplyScalar(22), life: 1.6, bottle: true });
+  G.audio.blip({ freq: 400, dur: 0.08, gain: 0.1 });
 }
 
 function spawnShotTracer(start, dir, len = 70, color = 0xfff0aa, life = 0.075) {
@@ -115,9 +128,11 @@ function actorBodyRayHit(actor, origin, dir, far) {
 export function cycleWeapon() {
   const p = G.player;
   const owned = ['fists'];
+  if (p.weapons.cleaver) owned.push('cleaver');
   if (p.weapons.pistol) owned.push('pistol');
   if (p.weapons.smg) owned.push('smg');
   if (p.weapons.shotgun) owned.push('shotgun');
+  if (p.weapons.bottle) owned.push('bottle');
   const idx = owned.indexOf(p.activeWeapon);
   p.activeWeapon = owned[(idx + 1) % owned.length];
   p.pistol.visible = (p.activeWeapon !== 'fists');
@@ -162,7 +177,40 @@ export function updateCombat(dt) {
   }
 
   // attack — F (melee) or LMB / F for pistol
-  if (p.activeWeapon === 'fists') {
+  if (p.clinch && p.clinch.t > 0 && GAMEPLAY.clinch) {
+    p.clinch.t -= dt;
+    const t = p.clinch.target;
+    p.stam = Math.max(0, p.stam - 18 * dt);
+    p.moveSpeed = 0;
+    if (t && !t.dead) {
+      t.speed = 0; t.flinchT = Math.max(t.flinchT || 0, 0.1);
+      G.hud.showPrompt('CLINCH — <b>F</b> knee / elbow', 0.3);
+      if (G.input.pressed('KeyF') && p.attackCooldown <= 0 && p.stam > 6) {
+        const kind = Math.random() < 0.5 ? 'knee' : 'elbow';
+        p.attackCooldown = 0.32; p.stam -= 8;
+        doMeleeHit(kind, false);
+        if (G.audio && G.audio.whack) G.audio.whack();
+      }
+    }
+    if (p.clinch.t <= 0) p.clinch = null;
+    G.hud.setCrosshair(false);
+    return;
+  }
+  if (p.activeWeapon === 'cleaver') {
+    p.pistol.visible = false;
+    if (G.input.pressed('KeyF') && p.attackCooldown <= 0 && p.stam > 8) {
+      p.attackKind = 'cross'; p.attackTimer = 0.24; p.attackCooldown = 0.32; p.stam -= 10;
+      doMeleeHit('cross', true);
+    }
+    G.hud.setCrosshair(false);
+  } else if (p.activeWeapon === 'bottle') {
+    p.pistol.visible = false;
+    G.hud.setCrosshair(G.input.rightDown);
+    if ((G.input.mouseDown || G.input.pressed('KeyF')) && p.attackCooldown <= 0) {
+      throwBottle();
+      p.attackCooldown = 0.6;
+    }
+  } else if (p.activeWeapon === 'fists') {
     p.pistol.visible = false;
     p.pistol.scale.setScalar(1.18);
     p.armL.rotation.y *= 0.85; p.armR.rotation.y *= 0.85;
@@ -245,6 +293,8 @@ function takeAmmo(gun) {
 export function updateAmmoHud() {
   const p = G.player;
   if (p.activeWeapon === 'fists') G.hud.setAmmo('FISTS', 'MUAY THAI');
+  else if (p.activeWeapon === 'cleaver') G.hud.setAmmo('CLEAVER', 'YAOWARAT');
+  else if (p.activeWeapon === 'bottle') G.hud.setAmmo('BOTTLE', 'THROWABLE');
   else if (!GAMEPLAY.honestAmmo) {
     if (p.activeWeapon === 'smg') G.hud.setAmmo('∞', 'SMG');
     else if (p.activeWeapon === 'shotgun') G.hud.setAmmo('∞', 'SHOTGUN');
@@ -271,8 +321,15 @@ export function doMeleeHit(kind, finisher = false) {
       const d2 = tx*tx + tz*tz;
       if (fwd > 0 && fwd < 1.7 && Math.abs(side) < 1.0 && d2 < 4) {
         // finisher hits harder; kick/cross outdamage the jab
-        let dmg = (kind === 'kick' ? 22 : kind === 'cross' ? 18 : kind === 'teep' ? 16 : 12);
+        let dmg = (kind === 'kick' ? 22 : kind === 'cross' ? 18 : kind === 'teep' ? 16 : kind === 'knee' ? 20 : kind === 'elbow' ? 19 : 12);
+        if (p.weapons.cleaver && p.activeWeapon === 'cleaver') dmg = Math.round(dmg * 1.45);
+        const mul = 1 + 0.12 * ((G.econ.upgrades && G.econ.upgrades.melee) || 0);
+        dmg = Math.round(dmg * mul);
         if (finisher) dmg = Math.round(dmg * 1.6);
+        if (GAMEPLAY.clinch && list === G.peds && d2 < 1.1 * 1.1) {
+          p._clinchHits = (p._clinchHits || 0) + 1;
+          if (p._clinchHits >= 2) { p.clinch = { target, t: 1.15 }; p._clinchHits = 0; }
+        }
         if (kind === 'teep' && list === G.peds) { target.knockX = fx * 5; target.knockZ = fz * 5; }
         target.hp -= dmg;
         target.panicT = 6;
@@ -495,7 +552,18 @@ export function updateBullets(dt) {
   if (_muzzleFlashT > 0) { _muzzleFlashT -= dt; if (_muzzleFlash) _muzzleFlash.material.opacity = Math.max(0, _muzzleFlashT / 0.05 * 0.95); }
   for (let i = G.bullets.length - 1; i >= 0; i--) {
     const b = G.bullets[i];
-    if (b.vel) b.mesh.position.addScaledVector(b.vel, dt);
+    if (b.vel) {
+      b.mesh.position.addScaledVector(b.vel, dt);
+      if (b.bottle) b.vel.y -= 18 * dt;
+    }
+    if (b.bottle && b.mesh.position.y < 0.2) {
+      scarePeds(b.mesh.position, 8);
+      for (const ped of G.peds) {
+        if (!ped.dead && dist2(ped.mesh.position, b.mesh.position) < 9) { ped.panicT = 5; ped.speed = 0.4; }
+      }
+      G.hud.showNotif('Fish sauce — blinded!');
+      b.life = 0;
+    }
     if (b.fade && b.mesh.material && b.maxLife) b.mesh.material.opacity = Math.max(0, b.life / b.maxLife);
     b.life -= dt;
     if (b.life <= 0) {

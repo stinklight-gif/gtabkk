@@ -248,31 +248,31 @@ traffic AI.
 
 ## Limits / Known compromises
 
-- All geometry is procedural — no GLTF assets. Faster to ship, less detail.
-- Collisions still use simple AABB/contact normals rather than a full rigid-body
-  solver. Vehicle impacts now bounce, scrape, spin, and exchange momentum, but
-  they are tuned game impulses, not continuous physics.
+- City geometry is still procedural (baked boxes + a Thai-script canvas atlas).
+  The Honda Wave stand-in can swap a local GLTF near-LOD (`models/wave.gltf`,
+  `GAMEPLAY.gltf`); far LOD stays the box proxy. There is no city-wide asset pack.
+- Collisions still use AABB/contact normals rather than a full rigid-body solver.
+  Vehicle impacts bounce, scrape, spin, and exchange momentum — tuned game
+  impulses, not Rapier. `GAMEPLAY.rapier` exists as an off-by-default experiment.
 - Vehicles have a speed-dependent engine taper, rolling + quadratic aero drag
-  (so top speed is an emergent terminal velocity rather than a clamp), a friction
-  circle shared between braking and cornering, and weight transfer that feeds
-  back into steering. There is still no drivetrain: no gears, clutch, RPM or
-  torque curve, no per-wheel tire model or slip ratio, no per-corner suspension,
-  no rollover, no fuel, and damage is one `hp` number plus `tiresBlown` rather
-  than per-component.
-- Police line of sight is a segment test against building AABBs, cached per cop
-  at 5 Hz. It does not account for vehicles, props or crowds as cover — only
-  buildings block a line.
-- Traffic AI is grid-aware with signal stops, obstacle yielding, seeded driver
-  personalities, amber runners, and bike filtering; it is still lane-following
-  rather than route-planned city driving. Signals still run on one shared
-  city-wide phase (a deliberate anti-deadlock choice), and pedestrians still have
-  no pathfinding — they walk through buildings.
+  (top speed is an emergent terminal velocity), a friction circle, and weight
+  transfer. Fake RPM is audio (+ a tach); there is still no clutch or torque
+  curve that gates acceleration, no per-wheel slip, no per-corner suspension.
+  Rollover and fuel stay behind off flags. Damage is `hp` + `tiresBlown` + limp
+  + a cook-off fire below 10% HP.
+- Police line of sight is a segment test against building AABBs and nearby
+  vehicle boxes, cached per cop at 5 Hz. Props and crowds are still not cover.
+- Traffic AI is grid-aware with signal stops (including a short all-red),
+  obstacle yielding, destination hops, and bike filtering. It is still
+  lane-following, not city-wide pathfinding. Signals share one city-wide phase
+  (anti-deadlock). Pedestrians walk authored sidewalk bands and wait at zebras;
+  they have AABB pushout vs buildings, not A*.
 - Cops use lightweight road-aware steering, not true pathfinding: beyond ~25 m
-  they route along the 50 m road grid (so they stop grinding the canyon walls);
-  inside 25 m they pursue and ram directly. AABB pushback is still the backstop.
-- Audio is fully synthesised, including the car radio's three procedural music
-  stations — catchy enough to read as luk-thung / hip-hop / talk, but not actual
-  songs. Licensed or hand-composed tracks would be a future upgrade.
+  they route along the 50 m road grid; inside 25 m they pursue and ram.
+  Four-wheel units avoid sois the same way they avoid Yaowarat.
+- Audio is fully synthesised: four-plus procedural radio stations (Luk Thung,
+  Bangkok Bars, Talk, Wat Radio, Mor Lam, Soi Cowboy), district beds, a
+  nearest-cop siren. Not licensed songs.
 
 ## Performance
 

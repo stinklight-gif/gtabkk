@@ -34,7 +34,7 @@ import {
 } from './physics.js';
 export * from './npcs.js';
 import {
-  CROWD_CURVE, buildClusterAnchors, crowdFactor, crowdTarget, makeBarkSprite, resyncCrowd, spawnAnchoredPed, spawnBark, spawnSpikeStrip, updateArmorPickups, updateBarks, updateClusters, updateDogs, updateFoodStalls, updateMuggings, updatePeds, updateSpikes, updateTurf, updateVigilante, vigilanteEnd, vigilanteSpawnTarget
+  CROWD_CURVE, buildClusterAnchors, crowdFactor, crowdTarget, makeBarkSprite, resyncCrowd, spawnAnchoredPed, spawnBark, spawnSpikeStrip, updateAlms, updateArmorPickups, updateBarks, updateClusters, updateDogs, updateFoodStalls, updateMuggings, updatePeds, updateSpikes, updateTurf, updateVigilante, vigilanteEnd, vigilanteSpawnTarget
 } from './npcs.js';
 export * from './combat.js';
 import {
@@ -182,6 +182,8 @@ export function saveGame() {
       welcomeDone: !!G._welcomeDone,
       soiRunWon: !!G._soiRunWon, hitDone: !!G._hitDone,
       deliveryDone: !!G._deliveryDone, mallJobDone: !!G._mallJobDone, getawayDone: !!G._getawayDone,
+      boutDone: !!G._boutDone, monsoonDone: !!G._monsoonDone,
+      customsDone: !!G._customsDone, nightSoiDone: !!G._nightSoiDone,
       px: p.group.position.x, py: p.group.position.y, pz: p.group.position.z,
       // property / ownership economy
       safehouseOwned: !!G.econ.safehouse.owned,
@@ -259,6 +261,10 @@ export function loadGame() {
   if (s.deliveryDone) G._deliveryDone = true;
   if (s.mallJobDone) G._mallJobDone = true;
   if (s.getawayDone) G._getawayDone = true;
+  if (s.boutDone) G._boutDone = true;
+  if (s.monsoonDone) G._monsoonDone = true;
+  if (s.customsDone) G._customsDone = true;
+  if (s.nightSoiDone) G._nightSoiDone = true;
   if (s.welcomeDone) { G._welcomeDone = true; if (G.mission.resume) G.mission.resume(true); }
   // property / ownership economy
   if (s.safehouseOwned) { G.econ.safehouse.owned = true; markSafehouseOwned(); }
@@ -276,7 +282,7 @@ export function loadGame() {
     }
   }
   if (s.upgrades && typeof s.upgrades === 'object') {               // restore vehicle upgrade levels
-    for (const k of ['engine', 'nitro', 'armor']) G.econ.upgrades[k] = Math.max(0, Math.min(3, +s.upgrades[k] || 0));
+    for (const k of ['engine', 'nitro', 'armor', 'melee']) G.econ.upgrades[k] = Math.max(0, Math.min(3, +s.upgrades[k] || 0));
   }
   if (s.bank && typeof s.bank === 'object') {                       // restore the bank balance
     G.econ.bank.balance = Math.max(0, Math.floor(+s.bank.balance) || 0);
@@ -1511,6 +1517,7 @@ export function loop() {
     updateVigilante(dt);
     updateTurf(dt);
     updateDogs(dt);
+    updateAlms(dt);
     updateFootCops(dt);
     updateBullets(dt);
     updateParticles(dt);
@@ -1547,12 +1554,27 @@ export function loop() {
     G.hud.update(dt);
     G.hud.setBars(G.player.hp, G.player.armor, G.player.stam);
     G.hud.setVehicle(G.player.inVehicle ? G.player.inVehicle.hp : 0, !!G.player.inVehicle);
-    if (G.hud.setSpeed) G.hud.setSpeed(G.player.inVehicle ? G.player.inVehicle.vel : 0, !!G.player.inVehicle);
+    if (G.hud.setSpeed) G.hud.setSpeed(G.player.inVehicle ? G.player.inVehicle.vel : 0, !!G.player.inVehicle, G.player.inVehicle && G.player.inVehicle._rpm01);
     G.hud.setCash(G.cash);
     G.hud.drawMinimap(G.player);
     if (G.input.endFrame) G.input.endFrame();
   } else if (G.state === 'phone') {
     updateCamera(dt);
+    const jobs = document.querySelectorAll('#ph-activities .act.job');
+    if (jobs.length) {
+      if (G.input.pressed('ArrowDown') || G.input.pressed('KeyS')) G._phoneIdx = ((G._phoneIdx || 0) + 1) % jobs.length;
+      if (G.input.pressed('ArrowUp') || G.input.pressed('KeyW')) G._phoneIdx = ((G._phoneIdx || 0) - 1 + jobs.length) % jobs.length;
+      jobs.forEach((el, i) => { el.style.outline = i === (G._phoneIdx || 0) ? '1px solid #ffcf4a' : ''; });
+      if (G.input.pressed('Enter') || G.input.pressed('Space')) {
+        const job = jobs[G._phoneIdx || 0] && jobs[G._phoneIdx || 0].getAttribute('data-job');
+        if (job && G.mission && G.mission.start) {
+          G.mission.start(job);
+          document.getElementById('phone').classList.remove('open');
+          G.state = 'playing';
+          if (G.input.requestLock) G.input.requestLock();
+        }
+      }
+    }
     if (G.input.endFrame) G.input.endFrame();
   } else if (G.state === 'map') {
     drawFullMap();

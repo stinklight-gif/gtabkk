@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, inWat, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, inWat, onSoi, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { CRIME_THRESHOLDS, abortHeist, animateWalk, damagePlayer, hasLineOfSight, makePedMesh, makeVehicle, onCopKilled, raiseWanted, updateVehicleVisuals } from './main.js';
 
@@ -135,8 +135,18 @@ export function updateWanted(dt) {
     // spawn just outside view
     const ang = rand(0, TAU);
     const r = rand(35, 60);
-    const sx = clamp(p.x + Math.cos(ang) * r, -HALF + 5, HALF - 5);
-    const sz = clamp(p.z + Math.sin(ang) * r, -HALF + 5, HALF - 5);
+    if (G._btsRide) return;
+    let sx = clamp(p.x + Math.cos(ang) * r, -HALF + 5, HALF - 5);
+    let sz = clamp(p.z + Math.sin(ang) * r, -HALF + 5, HALF - 5);
+    for (let tries = 0; onSoi(sx, sz) && tries < 8; tries++) {
+      const a2 = rand(0, TAU), r2 = rand(35, 70);
+      sx = clamp(p.x + Math.cos(a2) * r2, -HALF + 5, HALF - 5);
+      sz = clamp(p.z + Math.sin(a2) * r2, -HALF + 5, HALF - 5);
+    }
+    if (onSoi(sx, sz)) {
+      const road = Math.round(sx / BLOCK) * BLOCK;
+      sx = clamp(road + 2.5, -HALF + 5, HALF - 5);
+    }
     if (G.wanted.stars >= 5 && Math.random() < 0.7) {
       const s = spawnSwat(G.scene, new THREE.Vector3(sx, 0, sz));
       s.vel = 7;

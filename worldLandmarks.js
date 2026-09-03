@@ -1003,4 +1003,52 @@ export function buildLandmarks(env) {
     }
   }
 
+  // ---- Klong Toey port pocket (containers + warehouse) at the existing turf ----
+  {
+    const cx = -150, cz = 150;
+    const rust = new THREE.MeshStandardMaterial({ color: 0xb45a2a, roughness: 0.7, metalness: 0.25 });
+    const rust2 = new THREE.MeshStandardMaterial({ color: 0x3a6a8a, roughness: 0.65, metalness: 0.3 });
+    const rust3 = new THREE.MeshStandardMaterial({ color: 0xc8a22a, roughness: 0.7 });
+    const crate = new THREE.BoxGeometry(4.4, 2.4, 2.2);
+    const mats = [rust, rust2, rust3];
+    for (let i = 0; i < 8; i++) {
+      const row = i % 4, stack = Math.floor(i / 4);
+      const m = new THREE.Mesh(crate, mats[i % 3]);
+      m.position.set(cx - 8 + row * 4.8, 1.2 + stack * 2.4, cz - 6);
+      m.castShadow = true; scene.add(m);
+    }
+    const shed = new THREE.Mesh(new THREE.BoxGeometry(14, 6, 10), new THREE.MeshStandardMaterial({ color: 0x6a6e72, roughness: 0.8 }));
+    shed.position.set(cx + 10, 3, cz + 4); shed.castShadow = true; scene.add(shed);
+    const crane = new THREE.Mesh(new THREE.BoxGeometry(0.6, 14, 0.6), new THREE.MeshStandardMaterial({ color: 0xc9a020, roughness: 0.5, metalness: 0.4 }));
+    crane.position.set(cx - 12, 7, cz + 8); scene.add(crane);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(10, 0.5, 0.5), crane.material);
+    arm.position.set(cx - 7, 13.5, cz + 8); scene.add(arm);
+    const bShed = { pos: new THREE.Vector3(cx + 10, 3, cz + 4), size: new THREE.Vector3(14, 6, 10) };
+    world.buildings.push(bShed);
+    world.poi.klongToey = new THREE.Vector3(cx, 0, cz);
+    world.poi.customsDrop = new THREE.Vector3(120, 0, -40);
+  }
+
+  // Gym pad by the safehouse
+  {
+    const gx = -18, gz = 82;
+    const mat = new THREE.MeshStandardMaterial({ color: 0x2a2a28, roughness: 0.9 });
+    const pad = new THREE.Mesh(new THREE.BoxGeometry(6, 0.12, 6), mat);
+    pad.position.set(gx, 0.08, gz); scene.add(pad);
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.4, 8), new THREE.MeshStandardMaterial({ color: 0x888 }));
+    post.position.set(gx - 2.4, 1.2, gz - 2.4); scene.add(post);
+    world.poi.gym = new THREE.Vector3(gx, 0, gz);
+  }
+
+  // Yaowarat cleaver + bottle pickups
+  if (world.poi.yaowarat) {
+    const y = world.poi.yaowarat;
+    const cleaver = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.35, 0.7), new THREE.MeshStandardMaterial({ color: 0xc0c4c8, metalness: 0.7, roughness: 0.3 }));
+    cleaver.position.set(y.x + 4, 1.0, y.z + 2); scene.add(cleaver);
+    world.cleaver = { mesh: cleaver, pos: cleaver.position.clone(), taken: false };
+    const bottle = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.09, 0.32, 8), new THREE.MeshStandardMaterial({ color: 0x5a3a10, roughness: 0.35 }));
+    bottle.position.set(y.x - 3, 0.9, y.z - 2); scene.add(bottle);
+    world.bottle = { mesh: bottle, pos: bottle.position.clone(), taken: false };
+  }
+
 }

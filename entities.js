@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, TRAFFIC_TARGET, trafficTarget, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
+import { attachHeroBike } from './gltf.js';
 
 // 4. PLAYER + CAMERA
 // =============================================================================
@@ -93,7 +94,7 @@ export function makePlayer(scene) {
     stam: 100, stamMax: 100,
     armor: 0, armorMax: 100,
     sprintLock: false,
-    weapons: { fists: true, pistol: false, smg: false, shotgun: false },
+    weapons: { fists: true, pistol: false, smg: false, shotgun: false, cleaver: false, bottle: false },
     activeWeapon: 'fists',
     pistolAmmo: 0, pistolMag: 12, pistolReserve: 36,
     smgAmmo: 0, smgMag: 30, smgReserve: 90,
@@ -360,7 +361,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -635,6 +636,7 @@ export function makeVehicle(kind, scene) {
     boundsHalf: { x: mesh.userData.dims.W * 0.5, z: mesh.userData.dims.L * 0.5 },
   };
   G.vehicles.push(veh);
+  if (kind === 'bike') attachHeroBike(mesh);
   return veh;
 }
 

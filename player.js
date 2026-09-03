@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, bizRate, bizCap, bizUpgradeCost, bizManagerCost, bizSaleValue, BANK_INTEREST, BANK_INTEREST_CAP, WEALTH_TIERS, netWorth, wealthRank, rankDiscount, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, bizRate, bizCap, bizUpgradeCost, bizManagerCost, bizSaleValue, BANK_INTEREST, BANK_INTEREST_CAP, WEALTH_TIERS, netWorth, wealthRank, rankDiscount, ROAD_WIDTH, PED_TARGET, GAMEPLAY, buildingsNear, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { tip, damagePlayer, resolvePlayerVsBuildings, resolvePlayerVsVehicles, resolvePlayerVsPlatforms, worldSupportY, saveGame, startArcade, applyUpgrades, raiseWanted, makeVehicle, updateAmmoHud, updateCombat, updatePlayerInVehicle } from './main.js';
 
@@ -148,6 +148,8 @@ export function updatePlayer(dt) {
     if (parts && parts.foreR) parts.foreR.rotation.x = lerp(parts.foreR.rotation.x || 0, 0.24, 0.15);
   }
 
+  updateCover(dt);
+
   // Combat
   updateCombat(dt);
 
@@ -173,7 +175,8 @@ export function updateDistrict() {
   const p = G.player.group.position;
   const poi = G.world.poi;
   let zone;
-  if (p.x < -185) zone = { en: 'Riverside', th: 'ริมแม่น้ำ' };
+  if (poi.klongToey && dist2(p, poi.klongToey) < 48 * 48) zone = { en: 'Klong Toey', th: 'คลองเตย' };
+  else if (p.x < -185) zone = { en: 'Riverside', th: 'ริมแม่น้ำ' };
   else if (poi.yaowarat && dist2(p, poi.yaowarat) < 62*62) zone = { en: 'Yaowarat', th: 'เยาวราช' };
   else if (poi.temple && dist2(p, poi.temple) < 46*46) zone = { en: 'The Wat', th: 'วัด' };
   else if (poi.terminal21 && dist2(p, poi.terminal21) < 55*55) zone = { en: 'Asok', th: 'อโศก' };
@@ -200,6 +203,62 @@ export function updateBTS(dt) {
   if (Math.abs(b.mesh.position.x - stationX) < 6) {
     if (!b._announced && G.audio.btsChime) { G.audio.btsChime(); b._announced = true; }
   } else b._announced = false;
+
+  const p = G.player;
+  if (GAMEPLAY.btsHijack && G._btsRide) {
+    p.group.visible = false;
+    p.group.position.copy(b.mesh.position);
+    p.group.position.y = 16.2;
+    G.hud.showPrompt('Press <b>E</b> to jump off the BTS', 0.4);
+    if (G.input.pressed('KeyE')) {
+      G._btsRide = false;
+      p.group.visible = true;
+      p.group.position.set(b.mesh.position.x, 13.9, -8);
+      p.velocity.set(0, 0, 0);
+    }
+    return;
+  }
+  if (GAMEPLAY.btsHijack && !p.inVehicle && p.group.position.y > 12 &&
+      Math.abs(p.group.position.x - b.mesh.position.x) < 10 && Math.abs(p.group.position.z) < 5.5) {
+    G.hud.showPrompt('Press <b>E</b> to ride the BTS', 0.4);
+    if (G.input.pressed('KeyE')) {
+      G._btsRide = true;
+      p.group.visible = false;
+    }
+  }
+}
+
+export function updateCover(dt) {
+  const p = G.player;
+  p.inCover = false;
+  p.coverPeek = null;
+  if (!GAMEPLAY.cover || p.inVehicle || G._btsRide) return;
+  const aiming = G.input.rightDown || (p.activeWeapon !== 'fists' && G.input.down('ControlLeft'));
+  if (!aiming) return;
+  const pos = p.group.position;
+  const list = buildingsNear(pos.x, pos.z);
+  let best = null, bd = 1.25;
+  for (const b of list) {
+    const dx = pos.x - b.pos.x, dz = pos.z - b.pos.z;
+    const px = Math.abs(dx) - b.size.x / 2, pz = Math.abs(dz) - b.size.z / 2;
+    const dist = Math.max(px, pz);
+    if (dist > -0.2 && dist < bd) { bd = dist; best = b; }
+  }
+  if (!best) return;
+  p.inCover = true;
+  const dx = pos.x - best.pos.x, dz = pos.z - best.pos.z;
+  const alongX = (best.size.x / 2) - Math.abs(dx) < (best.size.z / 2) - Math.abs(dz);
+  const nx = alongX ? Math.sign(dx) || 1 : 0;
+  const nz = alongX ? 0 : (Math.sign(dz) || 1);
+  const tx = alongX ? 0 : 1, tz = alongX ? 1 : 0;
+  const peek = (G.input.down('KeyA') ? -1 : G.input.down('KeyD') ? 1 : 0);
+  p.coverPeek = {
+    x: best.pos.x + nx * (best.size.x / 2 + 0.55) + tx * peek * 0.7,
+    y: pos.y + 1.4,
+    z: best.pos.z + nz * (best.size.z / 2 + 0.55) + tz * peek * 0.7,
+  };
+  pos.x = lerp(pos.x, best.pos.x + nx * (best.size.x / 2 + 0.42), 0.25);
+  pos.z = lerp(pos.z, best.pos.z + nz * (best.size.z / 2 + 0.42), 0.25);
 }
 
 // Spin/bob the hidden amulets and collect them on touch.
@@ -238,7 +297,43 @@ export function updateCollectibles(dt) {
 
 export function updateInteraction(dt) {
   const p = G.player;
-  if (p.inVehicle) return;
+  if (p.inVehicle || G._btsRide) return;
+
+  const gym = G.world.poi && G.world.poi.gym;
+  if (gym && dist2(p.group.position, gym) < 4 * 4) {
+    G.hud.showPrompt('Press <b>E</b> to train (stamina → melee)', 0.4);
+    if (G.input.pressed('KeyE') && p.stam > 25) {
+      p.stam = Math.max(0, p.stam - 35);
+      G.econ.upgrades.melee = Math.min(3, (G.econ.upgrades.melee || 0) + 1);
+      G.hud.showNotif('Gym — melee ' + G.econ.upgrades.melee + '/3');
+      if (G.audio && G.audio.whack) G.audio.whack();
+    }
+    return;
+  }
+  const cleaver = G.world.cleaver;
+  if (cleaver && !cleaver.taken && dist2(p.group.position, cleaver.pos) < 3 * 3) {
+    G.hud.showPrompt('Press <b>E</b> to take the cleaver', 0.4);
+    if (G.input.pressed('KeyE')) {
+      cleaver.taken = true;
+      if (cleaver.mesh) { G.scene.remove(cleaver.mesh); }
+      p.weapons.cleaver = true; p.activeWeapon = 'cleaver';
+      G.hud.showNotif('Cleaver picked up');
+      updateAmmoHud();
+    }
+    return;
+  }
+  const bottle = G.world.bottle;
+  if (bottle && !bottle.taken && dist2(p.group.position, bottle.pos) < 3 * 3) {
+    G.hud.showPrompt('Press <b>E</b> to take a fish-sauce bottle', 0.4);
+    if (G.input.pressed('KeyE')) {
+      bottle.taken = true;
+      if (bottle.mesh) G.scene.remove(bottle.mesh);
+      p.weapons.bottle = true;
+      G.hud.showNotif('Throwable — cycle to BOTTLE');
+      updateAmmoHud();
+    }
+    return;
+  }
 
   // Inside the garage shed, let updateGarageOwnership own the E key (rent/retrieve)
   // so the enter-vehicle prompt doesn't fight it. The garage door sits just

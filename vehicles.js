@@ -100,6 +100,15 @@ export function updatePlayerInVehicle(dt) {
     }, 6000);
     return;
   }
+  if (GAMEPLAY.fireAtTen && v.hp < 10 && v.hp > 0) {
+    if (!v._burning) {
+      v._burning = true;
+      if (!v.smoke) v.smoke = makeSmokeEmitter(v.mesh.position, 1.4);
+      else v.smoke.intensity = Math.max(v.smoke.intensity || 1, 1.4);
+    }
+    v.hp -= 5 * dt;
+  }
+
   // exit
   if (G.input.pressed('KeyE')) {
     p.inVehicle = null;
@@ -233,6 +242,18 @@ export function updatePlayerInVehicle(dt) {
   if (roadVehicle && Math.abs(v.latVel || 0) > 2.5 && Math.abs(v.vel) > 4) {
     spawnSkid(v);
   }
+  if (GAMEPLAY.bikeLowside && spec.kind === 'bike' && Math.abs(v.latVel || 0) > 7.2 && Math.abs(v.vel) > 7) {
+    p.inVehicle = null; v.driver = null; p.group.visible = true;
+    p.group.position.set(v.pos.x + Math.cos(v.heading) * 1.6, 0, v.pos.z - Math.sin(v.heading) * 1.6);
+    p.velocity.set(0, 0, 0);
+    v.vel = 0; v.latVel = 0; v.yawRate = 0;
+    if (v.audio) { v.audio.kill(); v.audio = null; }
+    damagePlayer(8);
+    G.camRig.shake = Math.max(G.camRig.shake || 0, 0.35);
+    if (G.audio && G.audio.hit) G.audio.hit();
+    G.hud.showNotif('Lowside!');
+    return;
+  }
 
   // apply motion
   const rightX = Math.cos(v.heading), rightZ = -Math.sin(v.heading);
@@ -278,7 +299,9 @@ export function updatePlayerInVehicle(dt) {
   if (!v.audio) {
     v.audio = (v.spec.kind === 'tuktuk') ? G.audio.tukTukLoop() : G.audio.engineLoop({ rpmBase: v.spec.kind === 'bike' ? 110 : 70, harsh: v.spec.kind === 'bike' });
   }
-  v.audio.set(clamp(Math.abs(v.vel)/spec.topSpeed, 0, 1), true, v.throttle || 0);
+  const speed01Audio = clamp(Math.abs(v.vel)/spec.topSpeed, 0, 1);
+  v._rpm01 = clamp(speed01Audio * 0.65 + (v.throttle || 0) * 0.28, 0, 1);
+  v.audio.set(speed01Audio, true, v.throttle || 0);
 
   // honk
   if (G.input.pressed('KeyH')) G.audio.honk();
@@ -346,6 +369,14 @@ export function updateVehicles(dt) {
     if (v.hp < 30 && !v.smoke) {
       v.smoke = makeSmokeEmitter(v.mesh.position, 0.5);
     }
+    if (GAMEPLAY.fireAtTen && v.hp < 10 && v.hp > 0) {
+      if (!v._burning) {
+        v._burning = true;
+        if (!v.smoke) v.smoke = makeSmokeEmitter(v.mesh.position, 1.4);
+        else v.smoke.intensity = Math.max(v.smoke.intensity || 1, 1.4);
+      }
+      v.hp -= 5 * dt;
+    }
     if (GAMEPLAY.vehicleLimp && v.hp < 40 && !v._dented && v.mesh) {
       v._dented = true;
       v.mesh.traverse(o => { if (o.material && o.material.color && o.material.color.lerp) o.material.color.lerp(_blackColor, 0.22); });
@@ -397,8 +428,10 @@ function pickTrafficDest(v) {
   }
   dx = clamp(dx, -GRID_I + 1, GRID_I);
   dz = clamp(dz, -GRID_I, GRID_I);
-  if (v.spec && v.spec.kind !== 'bike' && v.spec.kind !== 'tuktuk' && inYaowarat(dx * BLOCK, dz * BLOCK)) {
-    dx = clamp(ix + (ix >= 0 ? 2 : -2), -GRID_I + 1, GRID_I);
+  if (v.spec && v.spec.kind !== 'bike' && v.spec.kind !== 'tuktuk') {
+    if (inYaowarat(dx * BLOCK, dz * BLOCK) || onSoi(dx * BLOCK, dz * BLOCK)) {
+      dx = clamp(ix + (ix >= 0 ? 2 : -2), -GRID_I + 1, GRID_I);
+    }
   }
   v.npc.destI = dx; v.npc.destJ = dz;
 }
@@ -466,7 +499,7 @@ function spawnAmbientTraffic(playerPos) {
 export function updateTrafficCar(v, dt) {
   const npc = v.npc;
   const prevHeading = v.heading;
-  v.latVel = 0;
+  if (!(npc.ramPanic > 0)) v.latVel = 0;
   npc.ramPanic = Math.max(0, (npc.ramPanic || 0) - dt);
   if (npc.dir === undefined) npc.dir = inferDir(v.heading);
   let dir = npc.dir;
@@ -554,6 +587,13 @@ export function updateTrafficCar(v, dt) {
   // --- move along the cardinal, keep the lane, ease the visual heading around ---
   v.pos.x += hx * v.vel * dt;
   v.pos.z += hz * v.vel * dt;
+  if (npc.ramPanic > 0) {
+    const rx = Math.cos(v.heading), rz = -Math.sin(v.heading);
+    v.pos.x += rx * (v.latVel || 0) * dt;
+    v.pos.z += rz * (v.latVel || 0) * dt;
+    v.heading += (v.latVel || 0) * 0.12 * dt;
+    v.latVel = (v.latVel || 0) * Math.pow(0.22, dt);
+  }
   const blockedForBike = v.spec.kind === 'bike' && obstacleTarget < npc.cruiseSpeed * 0.35 && v.vel < npc.cruiseSpeed * 0.3 && signalTarget > 0.1;
   if (blockedForBike) laneTarget += LANESIGN[dir] * (GAMEPLAY.bikeFilterWide ? 2.05 : 1.05);
   if (GAMEPLAY.bikeFilterWide && blockedForBike && v.vel < 4) laneTarget += LANESIGN[dir] * 0.85;
@@ -647,7 +687,11 @@ export function updateCamera(dt) {
     rig.targetDistance = baseDist + speed01 * (v.spec.kind === 'boat' ? 1.2 : 2.1) + (rig._followStretch || 0);
     rig.pitch = lerp(rig.pitch, -0.13 - speed01 * 0.07, 1 - Math.pow(0.975, dt * 60));
   } else {
-    _camTarget.copy(p.group.position); _camTarget.y += 1.5;
+    if (p.inCover && p.coverPeek) {
+      _camTarget.set(p.coverPeek.x, p.coverPeek.y, p.coverPeek.z);
+    } else {
+      _camTarget.copy(p.group.position); _camTarget.y += 1.5;
+    }
     if (p.isSprinting) {
       rig._sprintBobPhase = (rig._sprintBobPhase || 0) + dt * 13.5;
       _camTarget.y += Math.sin(rig._sprintBobPhase) * 0.03;
