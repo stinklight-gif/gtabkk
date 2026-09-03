@@ -269,6 +269,7 @@ export const GAMEPLAY = {
   btsMotosai: true,       // extra orange-vest stand at the Asok BTS escalator mouth
   rainPack: true,         // food stalls pack tarps and queues when the rain hits
   btsSongthaew: true,     // parked songthaew + hawker at the Asok BTS exit
+  iceCart: true,          // vendor ice carts patrol the sois and ding
 };
 G.gameplay = GAMEPLAY;
 

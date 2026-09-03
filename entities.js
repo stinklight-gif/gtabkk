@@ -1342,6 +1342,47 @@ export function spawnMotosaiStands(scene) {
   }
 }
 
+export function makeIceCartMesh() {
+  const g = new THREE.Group();
+  g.name = 'ice-cart';
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 1.15), new THREE.MeshStandardMaterial({ color: 0xf0f4f8, roughness: 0.55 }));
+  box.position.y = 0.55; g.add(box);
+  const lid = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.08, 1.18), new THREE.MeshStandardMaterial({ color: 0x2a7d8e, roughness: 0.5 }));
+  lid.position.y = 0.94; g.add(lid);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.9, 5), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+  pole.position.y = 1.35; g.add(pole);
+  const umb = new THREE.Mesh(new THREE.ConeGeometry(0.7, 0.28, 8), new THREE.MeshStandardMaterial({ color: 0xff6a9a, roughness: 0.7 }));
+  umb.position.y = 1.85; umb.rotation.x = PI; g.add(umb);
+  const tire = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+  for (const z of [-0.38, 0.38]) for (const x of [-0.28, 0.28]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 8), tire);
+    w.rotation.z = PI / 2; w.position.set(x, 0.12, z); g.add(w);
+  }
+  return g;
+}
+
+export function spawnIceCarts(scene) {
+  if (!GAMEPLAY.iceCart) return;
+  const sois = (G.world && G.world.sois) || [];
+  G.iceCarts = [];
+  const n = Math.min(2, sois.length);
+  for (let i = 0; i < n; i++) {
+    const s = sois[i];
+    const alongZ = s.axis === 'z';
+    const t0 = 0.28 + i * 0.22;
+    const x = alongZ ? (s.x0 + s.x1) * 0.5 : s.x0 + (s.x1 - s.x0) * t0;
+    const z = alongZ ? s.z0 + (s.z1 - s.z0) * t0 : (s.z0 + s.z1) * 0.5;
+    const mesh = makeIceCartMesh();
+    mesh.position.set(x, 0, z);
+    scene.add(mesh);
+    const vendor = spawnPed(scene, new THREE.Vector3(x, 0, z), 'vendor');
+    vendor.iceCart = true;
+    vendor.anchor = { slot: vendor.mesh.position.clone(), facing: alongZ ? 0 : PI / 2 };
+    vendor.speed = 0;
+    G.iceCarts.push({ mesh, vendor, soi: s, alongZ, t: t0, dir: 1, ding: rand(2, 6) });
+  }
+}
+
 export function spawnBtsSongthaew(scene) {
   if (!GAMEPLAY.btsSongthaew) return;
   const bts = G.world && G.world.bts;
