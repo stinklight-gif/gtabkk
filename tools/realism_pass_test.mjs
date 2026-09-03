@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -1012,6 +1012,31 @@ async function main() {
     assert(kids.flag && kids.bts, 'schoolKids flag on and BTS exists');
     assert(kids.n >= 4 && kids.toward >= 3 && kids.white, `morning uniforms walk toward the BTS (${kids.n} kids)`);
     assert(kids.gone, 'schoolkids disperse after morning');
+
+    console.log('\n[30] midday shade-seeking');
+    const shade = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      G.time.dayT = 12.5 / 24;
+      G.time.weather = 'clear';
+      G.time.rainStrength = 0;
+      G._shadeT = 1;
+      main.updateSeekShade(0.5);
+      const assigned = G.peds.filter(p => p && p.shade).length;
+      const sample = G.peds.find(p => p && p.shade);
+      if (sample) {
+        sample.mesh.position.x += 4;
+        main.updatePeds(0.05);
+      }
+      const moving = !!(sample && sample.state === 'shade' && sample.speed > 0.2);
+      G.time.dayT = 20 / 24;
+      G._shadeOn = true;
+      main.updateSeekShade(0.05);
+      const cleared = G.peds.filter(p => p && p.shade).length;
+      return { flag: !!(G.gameplay && G.gameplay.seekShade), assigned, moving, cleared, ways: (G.world.walkways || []).length };
+    });
+    assert(shade.flag && shade.ways > 10, 'seekShade flag on and walkways exist');
+    assert(shade.assigned >= 4 && shade.moving, `noon wanderers pull into shade (${shade.assigned})`);
+    assert(shade.cleared === 0, 'shade-seeking clears after the heat');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

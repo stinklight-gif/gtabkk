@@ -297,6 +297,11 @@ export function updatePeds(dt) {
         ped.state = 'social';
         ped.heading = ped.social.facing + Math.sin((ped.social.idlePhase || 0) + performance.now() * 0.001) * 0.12;
       }
+    } else if (ped.shade) {
+      const dx = ped.shade.x - ped.mesh.position.x, dz = ped.shade.z - ped.mesh.position.z;
+      const d = Math.hypot(dx, dz);
+      if (d > 0.7) { ped.heading = Math.atan2(dx, dz); ped.speed = 1.15; ped.state = 'shade'; }
+      else { ped.speed = 0; ped.state = 'shade'; }
     } else if (ped.state === 'waitingCrossing') {
       ped.speed = 0;
       const road = ped.crossRoad;
@@ -846,6 +851,36 @@ export function updateSchoolKids(dt) {
       ped.school = false;
     }
     G._schoolKids = [];
+  }
+}
+
+export function updateSeekShade(dt) {
+  if (!GAMEPLAY.seekShade) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const dry = (G.time.rainStrength || 0) < 0.22;
+  const hot = dry && ((h >= 11 && h < 16) || (GAMEPLAY.burningHaze && G.time.weather === 'haze'));
+  if (!hot) {
+    if (G._shadeOn) {
+      for (const ped of G.peds) {
+        if (ped && ped.shade) { ped.shade = null; if (ped.state === 'shade') ped.state = 'walking'; }
+      }
+      G._shadeOn = false;
+    }
+    return;
+  }
+  G._shadeOn = true;
+  G._shadeT = (G._shadeT || 0) + dt;
+  if (G._shadeT < 0.45) return;
+  G._shadeT = 0;
+  let n = 0;
+  for (const ped of G.peds) {
+    if (n >= 22) break;
+    if (!ped || ped.dead || ped.anchor || ped.gang || ped.pillion || ped.alms || ped.school || ped.panicT > 0) continue;
+    if (ped.social || ped.isMugger || ped.isTarget || ped.motosaiRider || ped.motosaiWait) continue;
+    const w = nearestWalkway(ped.mesh.position.x, ped.mesh.position.z);
+    if (!w) continue;
+    ped.shade = { x: clamp(ped.mesh.position.x, w.x0, w.x1), z: clamp(ped.mesh.position.z, w.z0, w.z1) };
+    n++;
   }
 }
 

@@ -257,6 +257,7 @@ export const GAMEPLAY = {
   motosaiStands: true,    // orange-vest bikes waiting at soi mouths; traffic bikes carry pillions
   burningHaze: true,      // third weather: burning-season haze (noon goes dirty, headlights, fog)
   schoolKids: true,       // morning uniforms walking the sois toward the BTS
+  seekShade: true,        // midday / haze: wanderers pull onto walkways and stop
 };
 G.gameplay = GAMEPLAY;
 
