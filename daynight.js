@@ -174,6 +174,17 @@ export function updateDayNight(dt) {
       G._weatherUntil = G._weatherT + rand(70, 150);
     }
   }
+  const hour = t * 24;
+  if (hour < 6) G._stormToday = false;
+  if (GAMEPLAY.afternoonStorm && !G._stormToday && hour >= 14.5 && hour < 17.2 && G.time.weather !== 'rain') {
+    G.time.weather = 'rain';
+    G._rainTarget = 0.88;
+    G._stormToday = true;
+    G._weatherUntil = (G._weatherT || 0) + rand(45, 85);
+    if (G.hud && G.hud.setWeather) G.hud.setWeather('STORM · 28°C');
+    if (G.hud && G.hud.showNotif) G.hud.showNotif('The heat breaks — afternoon storm.');
+    if (G.audio && G.audio.thunder) G.audio.thunder();
+  }
   // dt-correct: 0.012/frame at 60 fps is a ~5.7 s half-life, now expressed as one
   G.time.rainStrength = lerp(G.time.rainStrength, G._rainTarget, 1 - Math.pow(0.5, dt / 5.7));
   updateWetSurfaces(dt);

@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -1225,6 +1225,31 @@ async function main() {
     assert(commute.flag && commute.bts, 'officeCommute flag on and BTS exists');
     assert(commute.n >= 5 && commute.toward >= 4 && commute.pale, `evening office crowd walks toward the BTS (${commute.n})`);
     assert(commute.gone, 'office commute disperses after evening');
+
+    console.log('\n[37] afternoon thunderstorm');
+    const storm = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      G.time.dayT = 15.2 / 24;
+      G.time.weather = 'clear';
+      G.time.rainStrength = 0;
+      G._rainTarget = 0;
+      G._stormToday = false;
+      G._weatherT = 0;
+      G._weatherUntil = 1e9;
+      main.updateDayNight(0.05);
+      const tag = document.getElementById('weather-tag') && document.getElementById('weather-tag').textContent;
+      const fired = G.time.weather === 'rain' && (G._rainTarget || 0) > 0.7 && G._stormToday;
+      G.time.dayT = 5.2 / 24;
+      main.updateDayNight(0.05);
+      const reset = G._stormToday === false;
+      return {
+        flag: !!(G.gameplay && G.gameplay.afternoonStorm),
+        fired, tag, reset, weather: G.time.weather,
+      };
+    });
+    assert(storm.flag, 'afternoonStorm flag on');
+    assert(storm.fired && /STORM/.test(storm.tag || ''), `heat breaks into an afternoon storm ("${storm.tag}")`);
+    assert(storm.reset, 'storm flag clears before dawn so the next day can fire');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

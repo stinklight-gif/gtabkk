@@ -264,6 +264,7 @@ export const GAMEPLAY = {
   btsPlatform: true,      // commuters wait on Asok / Phrom Phong; PA when the train pulls in
   bikeHelmets: true,      // helmeted riders on bikes; stand/pillion heads get lids too
   officeCommute: true,    // evening office crowd walking the sois toward the BTS
+  afternoonStorm: true,   // after the heat, a Gulf thunderstorm breaks mid-afternoon
 };
 G.gameplay = GAMEPLAY;
 
