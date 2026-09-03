@@ -55,6 +55,11 @@ function updateWetSurfaces(dt) {
     sm.puddleMat.envMapIntensity = 0.4 + wet * 1.2;
     sm.puddleMat.needsUpdate = true;
   }
+  if (sm.floodMat) {
+    const flood = GAMEPLAY.floodPatches && rain > 0.7 ? clamp((rain - 0.7) / 0.3, 0, 1) * 0.55 : 0;
+    sm.floodMat.opacity = flood;
+    sm.floodMat.needsUpdate = true;
+  }
 }
 
 export function updateDayNight(dt) {

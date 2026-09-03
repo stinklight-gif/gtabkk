@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, TRAFFIC_TARGET, trafficTarget, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 
 // 4. PLAYER + CAMERA
@@ -218,21 +218,33 @@ function applyVehicleRealismSpec(spec, kind) {
   if (family === 'bike') {
     spec.wheelbase = spec.wheelbase || 1.3;
     spec.grip = spec.grip || 11;
+    spec.frictionFloor = 0.12;
+    spec.powerYaw = 0;
   } else if (family === 'tuktuk') {
     spec.wheelbase = spec.wheelbase || 2.0;
     spec.grip = spec.grip || 7.5;
+    spec.frictionFloor = 0.22;
+    spec.powerYaw = 0.35;
   } else if (family === 'hilux' || family === 'songthaew' || family === 'cop' || family === 'fortuner') {
     spec.wheelbase = spec.wheelbase || 2.9;
     spec.grip = spec.grip || 8.5;
+    spec.frictionFloor = 0.20;
+    spec.powerYaw = 0;
   } else if (family === 'bus' || family === 'swat') {
     spec.wheelbase = spec.wheelbase || 4.8;
     spec.grip = spec.grip || 8.0;
+    spec.frictionFloor = 0.24;
+    spec.powerYaw = 0;
   } else if (family === 'supercar') {
     spec.wheelbase = spec.wheelbase || 2.6;
     spec.grip = spec.grip || 11.5;
+    spec.frictionFloor = 0.08;
+    spec.powerYaw = 0;
   } else if (family !== 'boat') {
     spec.wheelbase = spec.wheelbase || 2.6;
     spec.grip = spec.grip || 9.5;
+    spec.frictionFloor = 0.18;
+    spec.powerYaw = 0;
   }
   return spec;
 }
@@ -637,17 +649,41 @@ export function makeVehicle(kind, scene) {
 // skin (Bangkok heat) so recoloring the torso never leaves mismatched sleeves.
 // Shoes parent to the legs and hands to the arms, so they ride the walk swing for
 // free; a short neck bridges shoulders to head so it doesn't float.
-export function makePedMesh(forcedKind = null) {
-  const g = new THREE.Group();
+function pickPedKind(pos) {
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const poi = G.world && G.world.poi;
+  if (poi && poi.temple && pos && dist2(pos, poi.temple) < 46 * 46) {
+    const r = Math.random();
+    return r < 0.42 ? 'monk' : r < 0.75 ? 'tourist' : 'local';
+  }
+  if (poi && poi.yaowarat && pos && dist2(pos, poi.yaowarat) < 62 * 62) {
+    const r = Math.random();
+    return r < 0.38 ? 'vendor' : r < 0.7 ? 'local' : 'laborer';
+  }
   const roll = Math.random();
-  let kind;
-  if (forcedKind) kind = forcedKind;
-  else if (roll < 0.07) kind = 'monk';
-  else if (roll < 0.20) kind = 'tourist';
-  else if (roll < 0.34) kind = 'office';
-  else if (roll < 0.44) kind = 'vendor';
-  else if (roll < 0.55) kind = 'laborer';
-  else kind = 'local';
+  if (h >= 5 && h < 7) {
+    if (roll < 0.22) return 'monk';
+    if (roll < 0.38) return 'vendor';
+    if (roll < 0.52) return 'laborer';
+    return 'local';
+  }
+  if ((h >= 7.5 && h < 9.2) || (h >= 17 && h < 19.2)) {
+    if (roll < 0.40) return 'office';
+    if (roll < 0.52) return 'local';
+    if (roll < 0.62) return 'vendor';
+    return roll < 0.78 ? 'laborer' : 'tourist';
+  }
+  if (roll < 0.07) return 'monk';
+  if (roll < 0.20) return 'tourist';
+  if (roll < 0.34) return 'office';
+  if (roll < 0.44) return 'vendor';
+  if (roll < 0.55) return 'laborer';
+  return 'local';
+}
+
+export function makePedMesh(forcedKind = null, pos = null) {
+  const g = new THREE.Group();
+  const kind = forcedKind || pickPedKind(pos);
 
   const skin = pick([0xc69472, 0xb88060, 0xd6a785, 0xa57755, 0x8d5a3a]);
   const skinMat = new THREE.MeshStandardMaterial({ color: skin, roughness: 0.7 });
@@ -898,7 +934,7 @@ export function sidewalkPos(cx, cz, radius) {
 }
 
 export function spawnPed(scene, pos) {
-  const m = makePedMesh();
+  const m = makePedMesh(null, pos);
   m.position.copy(pos);
   m.userData.heading = rand(0, TAU);
   scene.add(m);
@@ -906,6 +942,7 @@ export function spawnPed(scene, pos) {
   const ped = {
     mesh: m,
     heading: m.userData.heading,
+    kind: m.userData.kind,
     speed: rand(0.9, 1.7) * speedMul,
     speedMul,
     state: 'walking',
@@ -975,10 +1012,19 @@ export function spawnDog(scene, pos) {
   return dog;
 }
 
+function trafficMix() {
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  if (h >= 2 && h < 5) return ['bike', 'bike', 'tuktuk', 'songthaew', 'camry', 'sedan'];
+  if (h >= 5 && h < 7) return ['songthaew', 'songthaew', 'bike', 'tuktuk', 'camry', 'hilux'];
+  if (h >= 21 || h < 2) return ['bike', 'bike', 'tuktuk', 'luxsedan', 'sedan', 'camry'];
+  return ['camry', 'camry', 'camry', 'sedan', 'sedan', 'tuktuk', 'hilux', 'songthaew', 'songthaew', 'bus', 'luxsedan', 'luxsedan', 'bike', 'bike'];
+}
+
 export function spawnTraffic(scene) {
   // Each road segment can hold some cars. We sample edges and place vehicles.
-  const kinds = ['camry','camry','camry','sedan','sedan','tuktuk','hilux','songthaew','songthaew','bus','luxsedan','luxsedan','bike','bike'];
-  for (let n = 0; n < 28; n++) {
+  const nSpawn = GAMEPLAY.trafficDensity ? trafficTarget() : TRAFFIC_TARGET;
+  for (let n = 0; n < nSpawn; n++) {
+    const kinds = trafficMix();
     let kind = pick(kinds);
     if (Math.random() < 0.04) kind = 'supercar';   // rare spawn
     const v = makeVehicle(kind, scene);
@@ -1005,11 +1051,12 @@ export function spawnTraffic(scene) {
       seed,
       cruiseMul: rand(0.85, 1.15),
       cruiseSpeed: cruiseBase,
-      followMul: rand(0.8, 1.3),
+      followMul: kind === 'bus' ? rand(1.4, 1.8) : rand(0.8, 1.3),
       amberRunner: seed > 0.7,
+      patience: seed,
       wanderAmp: rand(0.06, 0.14),
       reactionT: 0,
-      stopT: 0,
+      stopT: kind === 'songthaew' ? rand(8, 16) : 0,
       honkCooldown: rand(5, 20),
     };
     v.npc.cruiseSpeed *= v.npc.cruiseMul;
@@ -1067,7 +1114,17 @@ export function spawnPeds(scene, n) {
 
 export function spawnDogs(scene, n) {
   for (let i = 0; i < n; i++) {
-    spawnDog(scene, new THREE.Vector3(rand(-HALF+20, HALF-20), 0, rand(-HALF+20, HALF-20)));
+    let pos;
+    if (GAMEPLAY.dogRoadLife && i < n * 0.4) {
+      const road = irand(-GRID / 2 + 1, GRID / 2) * BLOCK;
+      const along = rand(-HALF + 20, HALF - 20);
+      const curb = ROAD_WIDTH / 2 - 0.55;
+      if (Math.random() < 0.5) pos = new THREE.Vector3(road + (Math.random() < 0.5 ? -curb : curb), 0, along);
+      else pos = new THREE.Vector3(along, 0, road + (Math.random() < 0.5 ? -curb : curb));
+    } else {
+      pos = new THREE.Vector3(rand(-HALF + 20, HALF - 20), 0, rand(-HALF + 20, HALF - 20));
+    }
+    spawnDog(scene, pos);
   }
 }
 

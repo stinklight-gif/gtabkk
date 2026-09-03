@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, UPGRADES, rankDiscount, ROAD_WIDTH, PED_TARGET, GAMEPLAY, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, UPGRADES, rankDiscount, ROAD_WIDTH, PED_TARGET, GAMEPLAY, trafficTarget, inYaowarat, inFlood, onSoi, onCarriageway, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { tip, cycleWeapon, damagePlayer, firePistol, fireSMG, fireShotgun, makeExplosion, makeSmokeEmitter, makeVehicle, onCopKilled, raiseWanted, resolveVehicleVsBuildings, resolveVehicleVsVehicles, saveGame, spawnSkid, updateCop, vehicleName } from './main.js';
 import { lightFor } from './traffic.js';
@@ -39,6 +39,11 @@ function applyLooseImpactMotion(v, dt) {
   v.pos.x = clamp(v.pos.x, -HALF + 2, HALF - 2);
   v.pos.z = clamp(v.pos.z, -HALF + 2, HALF - 2);
   if (v.mesh) { v.mesh.position.copy(v.pos); v.mesh.rotation.y = v.heading; }
+}
+
+function exciteVehicleKerb(v) {
+  if (!v || !v.spec || v.spec.kind === 'boat') return;
+  v._suspVel = (v._suspVel || 0) + 0.28;
 }
 
 function applyVehicleSuspensionVisual(v, dt, opts = {}) {
@@ -146,9 +151,21 @@ export function updatePlayerInVehicle(dt) {
     v.vel -= Math.sign(v.vel) * Math.min(resist, Math.abs(v.vel));   // never drags through zero
   }
   if (forward === 0 && Math.abs(v.vel) < 0.12) v.vel = 0;
-  if (handbrake) v.vel *= Math.pow(spec.kind === 'bike' ? 0.965 : 0.93, dt * 60);
-  const speedMul = v.tiresBlown ? 0.5 : 1;   // spike strips halve your top speed
+  if (handbrake) {
+    v.vel *= Math.pow(spec.kind === 'bike' ? 0.94 : 0.93, dt * 60);
+    if (GAMEPLAY.vehicleKindFeel && spec.kind === 'bike') v.latVel = (v.latVel || 0) + v.steerAngle * dt * 28;
+  }
+  const limp = (GAMEPLAY.vehicleLimp && v.hp < 30) ? 0.55 : 1;
+  const speedMul = (v.tiresBlown ? 0.5 : 1) * limp;
   v.vel = clamp(v.vel, -spec.topSpeed * 0.4 * speedMul, spec.topSpeed * (boost ? (spec.nitroTop || 1.15) : 1) * speedMul);
+  if (GAMEPLAY.floodPatches && (G.time.rainStrength || 0) > 0.7 && inFlood(v.pos.x, v.pos.z) && spec.kind !== 'bike' && spec.kind !== 'boat') {
+    if (v.vel > 4) v.vel = lerp(v.vel, 4, 1 - Math.pow(0.2, dt));
+  }
+  if (GAMEPLAY.yaowaratCarHostility && spec.kind !== 'bike' && spec.kind !== 'tuktuk' && spec.kind !== 'boat' && inYaowarat(v.pos.x, v.pos.z)) {
+    v.vel = clamp(v.vel, -6, 6);
+    v._yaoHonk = (v._yaoHonk || 0) - dt;
+    if (v._yaoHonk <= 0) { G.audio.honk(); v._yaoHonk = 1.3; }
+  }
   const speed01 = Math.min(1, Math.abs(v.vel) / Math.max(1, spec.topSpeed));
   // Weight transfer, using last frame's longitudinal accel (stored below). Braking
   // loads the front axle and gives the car a touch more bite; getting on the power
@@ -156,7 +173,7 @@ export function updatePlayerInVehicle(dt) {
   // on this same number, so what you see and what the car does finally agree.
   // Capped at +/-12% — texture, not a handling rewrite.
   const loadFront = roadVehicle ? clamp(-(v._aLong || 0) / 9, -1, 1) : 0;
-  const steerLimit = (roadVehicle ? lerp(0.76, 0.48, speed01) : lerp(0.55, 0.34, speed01)) * (1 + 0.12 * loadFront);
+  const steerLimit = (roadVehicle ? lerp(0.76, 0.48, speed01) : lerp(0.55, 0.34, speed01)) * (1 + 0.12 * loadFront) * (limp < 1 ? 0.72 : 1);
   const steerResponse = roadVehicle ? 0.32 : 0.18;
   v.steerAngle = lerp(v.steerAngle || 0, v.steerInput * steerLimit, steerResponse);
   const lowSpeed = roadVehicle ? clamp(Math.abs(v.vel) / 0.9, 0.48, 1) : clamp(Math.abs(v.vel) / 1.2, 0.28, 1);
@@ -186,7 +203,8 @@ export function updatePlayerInVehicle(dt) {
     const aLong = (v.vel - prevVel) / Math.max(0.001, dt);
     v._aLong = aLong;                        // read next frame by the weight-transfer term
     const longUse = clamp(Math.abs(aLong) / Math.max(1, aMax), 0, 1);
-    const aMaxLat = aMax * Math.sqrt(Math.max(0.18, 1 - longUse * longUse));
+    const floor = (GAMEPLAY.vehicleKindFeel && spec.frictionFloor != null) ? spec.frictionFloor : 0.18;
+    const aMaxLat = aMax * Math.sqrt(Math.max(floor, 1 - longUse * longUse));
     const demanded = v.vel * (v.yawRate || 0);
     const capped = clamp(demanded, -aMaxLat, aMaxLat);
     let excess = demanded - capped;
@@ -203,6 +221,13 @@ export function updatePlayerInVehicle(dt) {
     }
   } else {
     v.latVel = 0;
+  }
+  if (GAMEPLAY.vehicleKindFeel && spec.powerYaw && v.throttle > 0.5 && Math.abs(v.steerAngle) > 0.04) {
+    v.yawRate += spec.powerYaw * v.steerAngle * dt * 10;
+  }
+  if (v.tiresBlown) {
+    v._spikeT = (v._spikeT || 0) + dt;
+    v.steerAngle += 0.10 + Math.sin(v._spikeT * 3.2) * 0.08;
   }
   v.heading += v.yawRate * dt;
   if (roadVehicle && Math.abs(v.latVel || 0) > 2.5 && Math.abs(v.vel) > 4) {
@@ -239,6 +264,10 @@ export function updatePlayerInVehicle(dt) {
   if (v.spec.kind !== 'boat') {
     resolveVehicleVsBuildings(v);
     resolveVehicleVsVehicles(v);
+    if (GAMEPLAY.kerbScrub && !onCarriageway(v.pos.x, v.pos.z) && Math.abs(v.vel) > 4) {
+      v.vel *= Math.pow(0.52, dt);
+      exciteVehicleKerb(v);
+    }
   }
 
   // place player at seat (invisible while inside)
@@ -249,7 +278,7 @@ export function updatePlayerInVehicle(dt) {
   if (!v.audio) {
     v.audio = (v.spec.kind === 'tuktuk') ? G.audio.tukTukLoop() : G.audio.engineLoop({ rpmBase: v.spec.kind === 'bike' ? 110 : 70, harsh: v.spec.kind === 'bike' });
   }
-  v.audio.set(clamp(Math.abs(v.vel)/spec.topSpeed, 0, 1), true);
+  v.audio.set(clamp(Math.abs(v.vel)/spec.topSpeed, 0, 1), true, v.throttle || 0);
 
   // honk
   if (G.input.pressed('KeyH')) G.audio.honk();
@@ -264,8 +293,8 @@ export function updatePlayerInVehicle(dt) {
     const w = p.activeWeapon;            // 'pistol' | 'smg' | 'shotgun'
     const cd = w === 'smg' ? 0.07 : w === 'shotgun' ? 0.8 : 0.18;
     if (firing && p.attackCooldown <= 0) {
-      if (w === 'smg') fireSMG(); else if (w === 'shotgun') fireShotgun(); else firePistol();
-      p.attackCooldown = cd; p.gunRecoil = 1;
+      const ok = w === 'smg' ? fireSMG() : w === 'shotgun' ? fireShotgun() : firePistol();
+      if (ok) { p.attackCooldown = cd; p.gunRecoil = 1; }
     }
   } else {
     G.hud.setCrosshair(false);
@@ -297,7 +326,7 @@ export function killPed(ped) {
     G.scene.remove(ped.mesh);
     disposeObject(ped.mesh);
     const i = G.peds.indexOf(ped); if (i >= 0) G.peds.splice(i, 1);
-  }, 8000);
+  }, 25000);
 }
 
 export function updateVehicles(dt) {
@@ -316,6 +345,10 @@ export function updateVehicles(dt) {
     // damage smoke
     if (v.hp < 30 && !v.smoke) {
       v.smoke = makeSmokeEmitter(v.mesh.position, 0.5);
+    }
+    if (GAMEPLAY.vehicleLimp && v.hp < 40 && !v._dented && v.mesh) {
+      v._dented = true;
+      v.mesh.traverse(o => { if (o.material && o.material.color && o.material.color.lerp) o.material.color.lerp(_blackColor, 0.22); });
     }
     if (v.hp <= 0 && !v.fire) {
       v.fire = true;
@@ -354,6 +387,82 @@ function inferDir(h) {
   return best;
 }
 
+function pickTrafficDest(v) {
+  const ix = Math.round(v.pos.x / BLOCK), iz = Math.round(v.pos.z / BLOCK);
+  let dx = ix, dz = iz;
+  const hops = irand(2, 5);
+  for (let n = 0; n < hops; n++) {
+    if (Math.random() < 0.5) dx += Math.random() < 0.5 ? -1 : 1;
+    else dz += Math.random() < 0.5 ? -1 : 1;
+  }
+  dx = clamp(dx, -GRID_I + 1, GRID_I);
+  dz = clamp(dz, -GRID_I, GRID_I);
+  if (v.spec && v.spec.kind !== 'bike' && v.spec.kind !== 'tuktuk' && inYaowarat(dx * BLOCK, dz * BLOCK)) {
+    dx = clamp(ix + (ix >= 0 ? 2 : -2), -GRID_I + 1, GRID_I);
+  }
+  v.npc.destI = dx; v.npc.destJ = dz;
+}
+function nextTrafficDir(v, ix, iz) {
+  if (v.npc.destI == null) pickTrafficDest(v);
+  const di = v.npc.destI - ix, dj = v.npc.destJ - iz;
+  if (Math.abs(di) + Math.abs(dj) < 1) { pickTrafficDest(v); return null; }
+  if (Math.abs(di) >= Math.abs(dj) && di !== 0) return di > 0 ? 1 : 3;
+  if (dj !== 0) return dj > 0 ? 0 : 2;
+  return di > 0 ? 1 : 3;
+}
+
+function isAmbientTraffic(v) {
+  return !!(v && v.npc && v.npc.kind === 'traffic' && !v.isCop && v.driver !== 'player' && !v.dead && v.spec && v.spec.kind !== 'boat');
+}
+
+export function updateTrafficPopulation(dt) {
+  if (!GAMEPLAY.trafficDensity) return;
+  const target = trafficTarget();
+  let n = 0;
+  for (const v of G.vehicles) if (isAmbientTraffic(v)) n++;
+  G._trafAcc = Math.min(4, (G._trafAcc || 0) + dt * 6);
+  const pp = G.player.group.position;
+  if (n < target && G._trafAcc >= 1) {
+    G._trafAcc -= 1;
+    spawnAmbientTraffic(pp);
+  } else if (n > target && G._trafAcc >= 1) {
+    G._trafAcc -= 1;
+    let fi = -1, fd = 80 * 80;
+    for (let i = 0; i < G.vehicles.length; i++) {
+      const v = G.vehicles[i];
+      if (!isAmbientTraffic(v) || v === G.player.inVehicle) continue;
+      const d = dist2(v.pos, pp);
+      if (d > fd) { fd = d; fi = i; }
+    }
+    if (fi >= 0) {
+      const v = G.vehicles[fi];
+      if (v.audio) { v.audio.kill(); v.audio = null; }
+      G.scene.remove(v.mesh); disposeObject(v.mesh);
+      G.vehicles.splice(fi, 1);
+    }
+  }
+}
+
+function spawnAmbientTraffic(playerPos) {
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const mix = (h >= 2 && h < 5)
+    ? ['bike', 'bike', 'tuktuk', 'songthaew', 'camry']
+    : (h >= 21 || h < 2)
+      ? ['bike', 'bike', 'tuktuk', 'luxsedan', 'sedan']
+      : ['camry', 'sedan', 'tuktuk', 'hilux', 'songthaew', 'bus', 'bike'];
+  const v = makeVehicle(pick(mix), G.scene);
+  const seed = Math.random();
+  v.npc = {
+    kind: 'traffic', seed, cruiseMul: rand(0.85, 1.15), cruiseSpeed: rand(8, 14),
+    followMul: v.spec.kind === 'bus' ? 1.5 : rand(0.8, 1.3),
+    amberRunner: seed > 0.7, wanderAmp: rand(0.06, 0.14), honkCooldown: rand(5, 20),
+    stopT: v.spec.kind === 'songthaew' ? rand(8, 16) : 0,
+  };
+  v.npc.cruiseSpeed *= v.npc.cruiseMul;
+  respawnTraffic(v, playerPos);
+  return v;
+}
+
 export function updateTrafficCar(v, dt) {
   const npc = v.npc;
   const prevHeading = v.heading;
@@ -369,13 +478,18 @@ export function updateTrafficCar(v, dt) {
   npc.turnCD = Math.max(0, (npc.turnCD || 0) - dt);
   if (Math.abs(alongVal - grid) < 2.2 && npc.turnCD === 0) {
     npc.turnCD = 1.3;
-    if (Math.random() < 0.45) {
-      const nd = Math.random() < 0.5 ? (dir + 1) % 4 : (dir + 3) % 4;   // right / left
-      const ix = Math.round(v.pos.x / BLOCK), iz = Math.round(v.pos.z / BLOCK);
+    const ix = Math.round(v.pos.x / BLOCK), iz = Math.round(v.pos.z / BLOCK);
+    let nd = null;
+    if (GAMEPLAY.trafficDestinations && npc.kind === 'traffic') {
+      nd = nextTrafficDir(v, ix, iz);
+    } else if (Math.random() < 0.45) {
+      nd = Math.random() < 0.5 ? (dir + 1) % 4 : (dir + 3) % 4;
+    }
+    if (nd != null && nd !== dir) {
       const nx = ix + DVX[nd], nz = iz + DVZ[nd];
-      if (nx >= -GRID_I + 1 && nx <= GRID_I && nz >= -GRID_I && nz <= GRID_I) {  // keep out of the river col + off-map
+      if (nx >= -GRID_I + 1 && nx <= GRID_I && nz >= -GRID_I && nz <= GRID_I) {
         dir = npc.dir = nd;
-        if (even) v.pos.z = grid; else v.pos.x = grid;                  // pivot on the intersection
+        if (even) v.pos.z = grid; else v.pos.x = grid;
       }
     }
   }
@@ -395,6 +509,7 @@ export function updateTrafficCar(v, dt) {
   };
   for (const o of G.vehicles) if (o !== v) consider(o.pos.x, o.pos.z, 1.8);
   for (const ped of G.peds) if (!ped.dead) consider(ped.mesh.position.x, ped.mesh.position.z, 1.3);
+  if (GAMEPLAY.dogRoadLife) for (const dog of G.dogs) if (dog && dog.mesh) consider(dog.mesh.position.x, dog.mesh.position.z, 1.1);
   const pp = G.player.group.position;
   if (G.player.inVehicle) consider(G.player.inVehicle.pos.x, G.player.inVehicle.pos.z, 2.6); // yield to the player's vehicle
   else consider(pp.x, pp.z, 1.6);   // yield to the player on foot
@@ -420,6 +535,17 @@ export function updateTrafficCar(v, dt) {
     else signalTarget = npc.cruiseSpeed * clamp(fwdToLine / 6, 0, 1);
   }
 
+  if (v.spec.kind === 'songthaew') {
+    npc.stopT = (npc.stopT || rand(10, 18)) - dt;
+    if (npc.stopT > 0 && npc.stopT < 2.4) obstacleTarget = Math.min(obstacleTarget, 0);
+    if (npc.stopT <= 0) npc.stopT = rand(12, 22);
+  }
+  if (GAMEPLAY.yaowaratCarHostility && v.spec.kind !== 'bike' && v.spec.kind !== 'tuktuk' && inYaowarat(v.pos.x, v.pos.z)) {
+    obstacleTarget = Math.min(obstacleTarget, 5);
+  }
+  if (GAMEPLAY.floodPatches && (G.time.rainStrength || 0) > 0.7 && inFlood(v.pos.x, v.pos.z) && v.spec.kind !== 'bike') {
+    obstacleTarget = Math.min(obstacleTarget, 4);
+  }
   const target = Math.min(obstacleTarget, signalTarget);
   const braking = target < v.vel - 0.1;
   if (v.vel < target) v.vel = Math.min(target, v.vel + v.spec.accel * dt);
@@ -429,7 +555,8 @@ export function updateTrafficCar(v, dt) {
   v.pos.x += hx * v.vel * dt;
   v.pos.z += hz * v.vel * dt;
   const blockedForBike = v.spec.kind === 'bike' && obstacleTarget < npc.cruiseSpeed * 0.35 && v.vel < npc.cruiseSpeed * 0.3 && signalTarget > 0.1;
-  if (blockedForBike) laneTarget += LANESIGN[dir] * 1.05;
+  if (blockedForBike) laneTarget += LANESIGN[dir] * (GAMEPLAY.bikeFilterWide ? 2.05 : 1.05);
+  if (GAMEPLAY.bikeFilterWide && blockedForBike && v.vel < 4) laneTarget += LANESIGN[dir] * 0.85;
   laneTarget += Math.sin((performance.now() * 0.001) * 0.3 + (npc.seed || 0)) * (npc.wanderAmp || 0.12);
   const laneEase = Math.min(1, dt * (npc.ramPanic > 0 ? 0.65 : (blockedForBike ? 2.0 : 4)));
   if (even2) v.pos.x = lerp(v.pos.x, laneTarget, laneEase);
@@ -460,7 +587,11 @@ export function updateTrafficCar(v, dt) {
   v.mesh.rotation.y = v.heading;
   const baseRoll = v.spec.kind === 'bike' ? -v.steerAngle * 0.42 : v.spec.kind === 'tuktuk' ? -v.steerAngle * 0.24 : 0;
   updateVehicleVisuals(v, dt, { braking, reverse: v.vel < -0.1, aLat: v.vel * v._visualYawRate, baseRoll });
-  if (v.spec.kind !== 'boat') resolveVehicleVsVehicles(v);
+  if (v.spec.kind !== 'boat') {
+    resolveVehicleVsVehicles(v);
+    const onLane = Math.abs(((dir % 2 === 0 ? v.pos.x : v.pos.z) - road)) < 4;
+    if (npc.ramPanic > 0 || !onLane) resolveVehicleVsBuildings(v);
+  }
 
   // honk only when something's actually blocking us while the light is green —
   // not while we're simply waiting our turn at a red.
@@ -486,6 +617,7 @@ export function respawnTraffic(v, playerPos) {
   v.heading = DH[dir]; v.npc.dir = dir; v.npc.turnCD = 0.6;
   v.vel = v.npc.cruiseSpeed * 0.7;
   v.latVel = 0; v.yawRate = 0; v._impactVX = 0; v._impactVZ = 0; v._impactSpin = 0;
+  if (v.npc) pickTrafficDest(v);
   v.mesh.position.copy(v.pos); v.mesh.rotation.y = v.heading;
 }
 
@@ -511,7 +643,8 @@ export function updateCamera(dt) {
     _camTarget.z += -Math.sin(v.heading) * side;
     const followYaw = v.heading + PI; // behind
     rig.yaw = lerpAngle(rig.yaw, followYaw, dt * lerp(1.15, 2.45, speed01));
-    rig.targetDistance = (v.spec.kind === 'bike' ? 4.8 : 6.4) + speed01 * (v.spec.kind === 'boat' ? 1.2 : 2.1) + (rig._followStretch || 0);
+    const baseDist = v.spec.kind === 'bike' ? 4.8 : v.spec.kind === 'tuktuk' ? 5.6 : 6.4;
+    rig.targetDistance = baseDist + speed01 * (v.spec.kind === 'boat' ? 1.2 : 2.1) + (rig._followStretch || 0);
     rig.pitch = lerp(rig.pitch, -0.13 - speed01 * 0.07, 1 - Math.pow(0.975, dt * 60));
   } else {
     _camTarget.copy(p.group.position); _camTarget.y += 1.5;
