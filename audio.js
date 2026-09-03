@@ -507,8 +507,9 @@ export function makeAudio() {
     }
   }
   function buildingsNearSafe(x, z) {
-    const cells = G.world && G.world.buildingCells;
-    if (!cells) return (G.world && G.world.buildings) || [];
+    const G = window.GAME;
+    const cells = G && G.world && G.world.buildingCells;
+    if (!cells) return (G && G.world && G.world.buildings) || [];
     const BLOCK = 50;
     const i = Math.round(x / BLOCK), j = Math.round(z / BLOCK);
     const out = [];
