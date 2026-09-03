@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','burningHaze']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -465,7 +465,7 @@ async function main() {
     const peds = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
       const ways = (G.world.walkways || []).length;
-      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget);
+      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait);
       const b = G.world.buildings.find(x => x.size.y > 8 && x.size.x > 4 && x.size.z > 4) || G.world.buildings[0];
       const insideBefore = wanderer && b && Math.abs(wanderer.mesh.position.x - b.pos.x) < b.size.x / 2 && Math.abs(wanderer.mesh.position.z - b.pos.z) < b.size.z / 2;
       if (wanderer && b) {
@@ -790,7 +790,7 @@ async function main() {
         for (const s of sois) if (x >= s.x0 && x <= s.x1 && z >= s.z0 && z <= s.z1) return true;
         return false;
       };
-      const bike = G.vehicles.find(v => v && v.spec && v.spec.kind === 'bike' && !v.dead) || main.makeVehicle('bike', G.scene);
+      const bike = G.vehicles.find(v => v && v.spec && v.spec.kind === 'bike' && !v.dead && !v.motosaiStand) || main.makeVehicle('bike', G.scene);
       G.player.inVehicle = bike; bike.driver = 'player'; bike.npc = null;
       bike.pos.set(0, 0, -130); bike.heading = 0; bike.vel = 0;
       bike.mesh.position.copy(bike.pos); bike.mesh.rotation.y = 0;
@@ -844,6 +844,54 @@ async function main() {
     assert(sai.pillionOn, 'pillion rider sits on the bike after pickup');
     assert(sai.filtered, 'filtering traffic raises the motosai bonus');
     assert(sai.paidMore && sai.idle && sai.pillionOff && sai.fares >= 1, `motosai pays base+filter and hops off (฿${sai.payout})`);
+
+    console.log('\n[27] motosai stands + traffic pillions');
+    const stands = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = (G.world && G.world.motosaiStands) || [];
+      const onSoi = (x, z) => {
+        const sois = (G.world && G.world.sois) || [];
+        for (const s of sois) if (x >= s.x0 && x <= s.x1 && z >= s.z0 && z <= s.z1) return true;
+        return false;
+      };
+      const first = list.find(s => s && s.bike && s.bike.motosaiStand && s.rider && s.waiter) || list[0];
+      const vest = !!(first && first.rider && (first.rider.motosaiVest || (first.rider.mesh && first.rider.mesh.getObjectByName('motosai-vest'))));
+      const mouth = !!(first && ((first.x != null && onSoi(first.x, first.z)) || (first.bike && onSoi(first.bike.pos.x, first.bike.pos.z)) || first.soi));
+      let pillionBike = G.vehicles.find(v => v && v.spec && v.spec.kind === 'bike' && v.pillionPed && v.npc);
+      if (!pillionBike) {
+        const tBike = G.vehicles.find(v => v && v.spec && v.spec.kind === 'bike' && v.npc && v.driver !== 'player');
+        if (tBike && main.attachTrafficPillion) pillionBike = tBike, main.attachTrafficPillion(tBike);
+      }
+      G.player.inVehicle = null;
+      G.player.group.visible = true;
+      if (first && first.bike) {
+        G.player.group.position.copy(first.bike.pos);
+        first.bike.driver = null;
+        const near = first.bike;
+        G.player.inVehicle = near;
+        near.driver = 'player';
+        near.npc = null;
+        near.motosaiStand = false;
+        if (near.standRider) {
+          near.standRider.anchor = null;
+          near.standRider.motosaiRider = false;
+          near.standRider = null;
+        }
+      }
+      return {
+        flag: !!(G.gameplay && G.gameplay.motosaiStands),
+        n: list.length,
+        vest,
+        mouth,
+        waiter: !!(first && first.waiter),
+        pillionTraffic: !!(pillionBike && pillionBike.pillionPed && pillionBike.pillionPed.pillion),
+        took: !!(first && first.bike && first.bike.driver === 'player' && !first.bike.motosaiStand),
+      };
+    });
+    assert(stands.flag && stands.n >= 3, `motosai stands at soi mouths (${stands.n})`);
+    assert(stands.vest && stands.mouth && stands.waiter, 'orange-vest rider and waiter wait on a soi');
+    assert(stands.pillionTraffic, 'some traffic bikes carry a pillion');
+    assert(stands.took, 'a stand bike is enterable and the rider hops off');
 
     console.log('\n[26] burning-season haze');
     const haze = await page.evaluate(() => {

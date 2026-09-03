@@ -6,6 +6,7 @@ import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, UPGRADES, rankDiscount, ROAD_WIDTH, PED_TARGET, GAMEPLAY, trafficTarget, inYaowarat, inFlood, onSoi, onCarriageway, inAirport, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { tip, cycleWeapon, damagePlayer, firePistol, fireSMG, fireShotgun, makeExplosion, makeSmokeEmitter, makeVehicle, onCopKilled, raiseWanted, resolveVehicleVsBuildings, resolveVehicleVsVehicles, saveGame, spawnSkid, updateCop, vehicleName } from './main.js';
+import { attachTrafficPillion } from './entities.js';
 import { lightFor } from './traffic.js';
 
 export function updateVehicleVisuals(v, dt, opts={}) {
@@ -480,6 +481,11 @@ export function updateTrafficPopulation(dt) {
     }
     if (fi >= 0) {
       const v = G.vehicles[fi];
+      if (v.pillionPed) {
+        const i = G.peds.indexOf(v.pillionPed);
+        if (i >= 0) G.peds.splice(i, 1);
+        v.pillionPed = null;
+      }
       if (v.audio) { v.audio.kill(); v.audio = null; }
       G.scene.remove(v.mesh); disposeObject(v.mesh);
       G.vehicles.splice(fi, 1);
@@ -504,6 +510,7 @@ function spawnAmbientTraffic(playerPos) {
   };
   v.npc.cruiseSpeed *= v.npc.cruiseMul;
   respawnTraffic(v, playerPos);
+  if (v.spec && v.spec.kind === 'bike' && GAMEPLAY.motosaiStands && Math.random() < 0.4) attachTrafficPillion(v);
   return v;
 }
 

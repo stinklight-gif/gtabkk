@@ -212,7 +212,8 @@ export function bindHud() {
     out.push({ name: 'Arcade · Tuk-Tuk Dash', status: 'mall floor 1', dist: d(poi.terminal) });
     out.push({ name: 'Riverside boats', status: 'longtails', dist: d(poi.pier) });
     out.push({ name: 'Taxi · press J', status: (G.taxi && G.taxi.stage && G.taxi.stage !== 'idle') ? 'fare active' : 'available', dist: null });
-    out.push({ name: 'Motosai · press J', status: (G.motosai && G.motosai.stage && G.motosai.stage !== 'idle') ? 'fare active' : 'bike · sois', dist: null });
+    const stand = G.world && G.world.motosaiStands && G.world.motosaiStands.find(s => s.bike && !s.bike.driver);
+    out.push({ name: 'Motosai · press J', status: (G.motosai && G.motosai.stage && G.motosai.stage !== 'idle') ? 'fare active' : 'bike · sois', dist: stand && stand.bike ? d(stand.bike.pos) : null });
     const qd = G.quickDrop;
     const qdStatus = qd && qd.stage !== 'idle'
       ? (qd.stage === 'toPickup' ? 'pickup' : `drop-off · streak ${qd.streak || 0}`)

@@ -22,7 +22,7 @@ export * from './traffic.js';
 import { buildTrafficLights, updateTrafficLights } from './traffic.js';
 export * from './entities.js';
 import {
-  animateWalk, makeCamera, makeDogMesh, makePedMesh, makePlayer, makeRain, makeVehicle, makeVehicleMesh, sidewalkPos, spawnBoat, spawnDog, spawnDogs, spawnParkedCars, spawnPed, spawnPeds, spawnTraffic, updateEntityLod
+  animateWalk, makeCamera, makeDogMesh, makePedMesh, makePlayer, makeRain, makeVehicle, makeVehicleMesh, sidewalkPos, spawnBoat, spawnDog, spawnDogs, spawnMotosaiStands, spawnParkedCars, spawnPed, spawnPeds, spawnTraffic, updateEntityLod
 } from './entities.js';
 import { spawnAirportPlanes } from './airport.js';
 export * from './wanted.js';
@@ -498,6 +498,7 @@ async function init() {
   // Spawn vehicles, peds, dogs
   spawnTraffic(scene);
   spawnParkedCars(scene);
+  spawnMotosaiStands(scene);
   spawnBoat(scene);
   spawnAirportPlanes(scene);
   // a parked, enterable cop car — the Vigilante ride

@@ -432,12 +432,25 @@ export function updateInteraction(dt) {
       G.audio.blip({ freq: 280, dur: 0.06, gain: 0.1 });
     }
   } else if (near) {
-    G.hud.showPrompt('Press <b>E</b> to enter ' + vehicleName(near.kind), 0.5);
+    const motosai = GAMEPLAY.motosaiStands && near.motosaiStand;
+    G.hud.showPrompt(motosai ? 'Press <b>E</b> to take the motosai' : 'Press <b>E</b> to enter ' + vehicleName(near.kind), 0.5);
     if (G.input.pressed('KeyE')) {
       p.inVehicle = near;
       near.driver = 'player';
       near.npc = null;   // take over from the traffic AI if it was a moving car
       applyUpgrades(near);   // your garage tuning rides with you
+      if (motosai) {
+        near.motosaiStand = false;
+        const rider = near.standRider;
+        if (rider) {
+          rider.anchor = null;
+          rider.motosaiRider = false;
+          rider.speed = 1.3;
+          rider.panicT = 1.2;
+          near.standRider = null;
+        }
+        G.hud.showNotif('Motosai — press J for a soi fare');
+      }
       G.audio.blip({freq:300, dur:0.05, gain:0.08});
     }
   } else {

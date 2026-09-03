@@ -1102,6 +1102,70 @@ export function spawnTraffic(scene) {
     };
     v.npc.cruiseSpeed *= v.npc.cruiseMul;
     v.vel = v.npc.cruiseSpeed;
+    if (kind === 'bike' && GAMEPLAY.motosaiStands && (Math.random() < 0.4 || !G._motosaiPillionSeeded)) {
+      attachTrafficPillion(v);
+      G._motosaiPillionSeeded = true;
+    }
+  }
+}
+
+export function dressMotosaiVest(ped) {
+  if (!ped || !ped.mesh) return;
+  recolorTorso(ped.mesh.userData.parts, 0xff6a18, 0.7);
+  const vest = new THREE.Mesh(
+    new THREE.BoxGeometry(0.4, 0.36, 0.26),
+    new THREE.MeshStandardMaterial({ color: 0xff7a1a, roughness: 0.65, emissive: 0xff6a18, emissiveIntensity: 0.18 }),
+  );
+  vest.name = 'motosai-vest';
+  vest.position.set(0, 1.18, 0.04);
+  ped.mesh.add(vest);
+  ped.motosaiVest = true;
+}
+
+export function attachTrafficPillion(bike) {
+  if (!bike || bike.pillionPed) return null;
+  const ped = spawnPed(G.scene, bike.pos.clone());
+  ped.pillion = true;
+  ped.speed = 0;
+  ped.state = 'idle';
+  G.scene.remove(ped.mesh);
+  bike.mesh.add(ped.mesh);
+  ped.mesh.position.set(0, 0.02, -0.42);
+  ped.mesh.rotation.set(0.16, 0, 0);
+  bike.pillionPed = ped;
+  return ped;
+}
+
+export function spawnMotosaiStands(scene) {
+  if (!GAMEPLAY.motosaiStands) return;
+  const sois = (G.world && G.world.sois) || [];
+  G.world.motosaiStands = [];
+  const n = Math.min(4, sois.length);
+  for (let i = 0; i < n; i++) {
+    const s = sois[i];
+    const alongZ = s.axis === 'z';
+    const x = alongZ ? (s.x0 + s.x1) / 2 : s.x0 + 2.8;
+    const z = alongZ ? s.z0 + 2.8 : (s.z0 + s.z1) / 2;
+    const heading = alongZ ? 0 : PI / 2;
+    const bike = makeVehicle('bike', scene);
+    bike.pos.set(x, 0, z);
+    bike.heading = heading;
+    bike.mesh.position.copy(bike.pos);
+    bike.mesh.rotation.y = heading;
+    bike.driver = null;
+    bike.vel = 0;
+    bike.motosaiStand = true;
+    const rider = spawnPed(scene, new THREE.Vector3(x + (alongZ ? 1.15 : 0), 0, z + (alongZ ? 0 : 1.15)));
+    dressMotosaiVest(rider);
+    rider.anchor = { slot: rider.mesh.position.clone(), facing: heading + PI };
+    rider.motosaiRider = true;
+    rider.speed = 0;
+    const waiter = spawnPed(scene, new THREE.Vector3(x + (alongZ ? 1.7 : 0.4), 0, z + (alongZ ? 0.4 : 1.7)));
+    waiter.anchor = { slot: waiter.mesh.position.clone(), facing: heading + PI };
+    waiter.motosaiWait = true;
+    waiter.speed = 0;
+    bike.standRider = rider;
+    G.world.motosaiStands.push({ bike, rider, waiter, soi: s, x, z });
   }
 }
 
