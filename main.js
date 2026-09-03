@@ -366,12 +366,22 @@ async function init() {
   scene.fog = new THREE.FogExp2(0x556677, 0.0015);
   G.scene = scene;
 
-  // preserveDrawingBuffer so a paused frame can be CDP-screenshotted (smoke).
-  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+  // ?smoke=1 is the CI/headless path. PCF-soft 2048 shadows + MSAA + bloom RTs
+  // deadlock SwiftShader (page.screenshot hung 120s after "fonts loaded").
+  // Freeze GPU before the first rAF so the harness can present one cheap frame.
+  const smoke = new URLSearchParams(location.search).has('smoke');
+  if (smoke) { G.noBloom = true; G._holdFrame = true; }
+
+  // preserveDrawingBuffer so a paused frame can be read back (smoke toDataURL).
+  const renderer = new THREE.WebGLRenderer({
+    antialias: !smoke,
+    powerPreference: smoke ? 'low-power' : 'high-performance',
+    preserveDrawingBuffer: true,
+  });
+  renderer.setPixelRatio(smoke ? 1 : Math.min(window.devicePixelRatio, 1.5));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.enabled = !smoke;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
@@ -381,8 +391,8 @@ async function init() {
   // Sun (directional light)
   const sun = new THREE.DirectionalLight(0xffe0a0, 1.3);
   sun.position.set(80, 100, 40);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
+  sun.castShadow = !smoke;
+  sun.shadow.mapSize.set(smoke ? 256 : 2048, smoke ? 256 : 2048);
   const d = 80;
   sun.shadow.camera.left = -d; sun.shadow.camera.right = d;
   sun.shadow.camera.top = d; sun.shadow.camera.bottom = -d;
@@ -435,8 +445,8 @@ async function init() {
   // much more cinematic, less-flat look. Scene renders to an offscreen RT; bright
   // pixels are extracted at half-res, blurred (separable Gaussian, two widths) and
   // composited additively. Cheap — a few half-res fullscreen passes, no per-scene-
-  // fragment cost (unlike a global IBL env). ----
-  {
+  // fragment cost (unlike a global IBL env). Skip the MSAA HDR targets in smoke. ----
+  if (!smoke) {
     const w = window.innerWidth, h = window.innerHeight;
     const sceneRT = new THREE.WebGLRenderTarget(w, h, { samples: 2, type: THREE.HalfFloatType });
     sceneRT.texture.colorSpace = THREE.LinearSRGBColorSpace;   // linear HDR; tone-mapping happens in the composite
@@ -1629,8 +1639,8 @@ export function loop() {
     if (G.input.endFrame) G.input.endFrame();
   }
 
-  // Smoke/CDP screenshot: skip GPU so captureScreenshot is not racing a frame.
-  // Caller presents once, then sets _holdFrame; preserveDrawingBuffer keeps it.
+  // Smoke: skip GPU so SwiftShader is not mid-frame when the harness presents.
+  // ?smoke=1 sets _holdFrame before the first rAF; the harness renders once.
   if (G._holdFrame) return;
 
   renderBloom();
