@@ -1093,16 +1093,20 @@ async function main() {
       main.updateShrines(0.016);
       window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
       if (G.input && G.input.endFrame) G.input.endFrame();
+      const smoke = s.mesh && s.mesh.getObjectByName('incense');
       return {
         flag: !!(G.gameplay && G.gameplay.spiritWai),
         n: (G.world.shrines || []).length,
         paid: G.cash === 40,
         cooled: G.wanted.lastSeenAt < seen0 - 1000,
         count: G._waiCount,
+        incense: !!smoke,
+        lit: (s.incenseT || 0) > 4,
       };
     });
     assert(wai.flag && wai.n >= 4, `spirit houses exist (${wai.n})`);
     assert(wai.paid && wai.cooled && wai.count >= 1, 'wai costs ฿10 and cools wanted contact');
+    assert(wai.incense && wai.lit, 'wai lights the incense plume');
 
     console.log('\n[33] soi cats at stalls');
     const cats = await page.evaluate(() => {

@@ -631,9 +631,18 @@ export function updateFoodStalls(dt) {
 }
 
 export function updateShrines(dt) {
-  if (!GAMEPLAY.spiritWai || G.player.inVehicle || G._eating) return;
   const list = G.world && G.world.shrines;
   if (!list || !list.length) return;
+  for (const s of list) {
+    const smoke = s.mesh && s.mesh.getObjectByName('incense');
+    if (smoke && smoke.material) {
+      s.incenseT = Math.max(0.35, (s.incenseT || 0.4) - dt * 0.35);
+      smoke.material.opacity = 0.12 + Math.min(0.55, s.incenseT * 0.06);
+      smoke.scale.y = 1 + Math.min(1.4, s.incenseT * 0.12);
+      smoke.position.y = 2.15 + Math.sin(performance.now() * 0.003 + (s.pos.x || 0)) * 0.04;
+    }
+  }
+  if (!GAMEPLAY.spiritWai || G.player.inVehicle || G._eating) return;
   const pp = G.player.group.position;
   const now = performance.now();
   for (const s of list) {
@@ -644,6 +653,7 @@ export function updateShrines(dt) {
       if (G.cash < 10) { G.hud.showNotif('Need ฿10 for incense'); return; }
       G.cash -= 10; G.hud.setCash(G.cash);
       s.readyAt = now + 16000;
+      s.incenseT = 8;
       G.wanted.lastSeenAt = Math.max(0, (G.wanted.lastSeenAt || now) - 16000);
       G._waiCount = (G._waiCount || 0) + 1;
       G.hud.showNotif('The spirit house accepts your wai');

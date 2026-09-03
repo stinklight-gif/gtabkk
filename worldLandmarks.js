@@ -452,9 +452,16 @@ export function buildLandmarks(env) {
     pole.position.y = 1; shrine.add(pole);
     const pl = new THREE.PointLight(0xffcf4a, 0.6, 10, 2);
     pl.position.y = 2; shrine.add(pl);
+    const incense = new THREE.Mesh(
+      new THREE.ConeGeometry(0.12, 0.7, 6),
+      new THREE.MeshBasicMaterial({ color: 0xddd8d0, transparent: true, opacity: 0.22, depthWrite: false })
+    );
+    incense.name = 'incense';
+    incense.position.set(0.25, 2.15, 0.2);
+    shrine.add(incense);
     shrine.position.copy(sp);
     scene.add(shrine);
-    world.shrines.push({ pos: sp.clone(), mesh: shrine, readyAt: 0 });
+    world.shrines.push({ pos: sp.clone(), mesh: shrine, readyAt: 0, incenseT: 0.4 });
   }
 
   // ---- Mission marker: Uncle Seng's gold shop (yellow pillar of light) ----
