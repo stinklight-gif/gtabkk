@@ -950,6 +950,40 @@ export function updateSeekShade(dt) {
   }
 }
 
+export function updateCats(dt) {
+  if (!GAMEPLAY.soiCats || !G.cats) return;
+  const pp = G.player.inVehicle ? G.player.inVehicle.pos : G.player.group.position;
+  for (const c of G.cats) {
+    const d = Math.hypot(c.mesh.position.x - pp.x, c.mesh.position.z - pp.z);
+    c.timer -= dt;
+    if (d < 3.2) c.state = 'bolt';
+    else if (c.state === 'bolt' && d > 7) c.state = 'return';
+    if (c.state === 'loaf') {
+      if (c.timer <= 0) { c.heading += rand(-0.8, 0.8); c.timer = rand(1.4, 3.2); }
+      c.mesh.position.x += Math.sin(c.heading) * 0.25 * dt;
+      c.mesh.position.z += Math.cos(c.heading) * 0.25 * dt;
+    } else if (c.state === 'bolt') {
+      const dx = c.mesh.position.x - pp.x, dz = c.mesh.position.z - pp.z;
+      const len = Math.hypot(dx, dz) || 1;
+      c.heading = Math.atan2(dx, dz);
+      c.mesh.position.x += dx / len * 3.4 * dt;
+      c.mesh.position.z += dz / len * 3.4 * dt;
+    } else {
+      const dx = c.home.x - c.mesh.position.x, dz = c.home.z - c.mesh.position.z;
+      const len = Math.hypot(dx, dz) || 1;
+      if (len < 0.5) c.state = 'loaf';
+      else {
+        c.heading = Math.atan2(dx, dz);
+        c.mesh.position.x += dx / len * 1.4 * dt;
+        c.mesh.position.z += dz / len * 1.4 * dt;
+      }
+    }
+    c.mesh.position.x = clamp(c.mesh.position.x, -HALF + 4, HALF - 4);
+    c.mesh.position.z = clamp(c.mesh.position.z, -HALF + 4, HALF - 4);
+    c.mesh.rotation.y = c.heading;
+  }
+}
+
 export function updateDogs(dt) {
   const playerPos = G.player.group.position;
   for (const dog of G.dogs) {

@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -1103,6 +1103,22 @@ async function main() {
     });
     assert(wai.flag && wai.n >= 4, `spirit houses exist (${wai.n})`);
     assert(wai.paid && wai.cooled && wai.count >= 1, 'wai costs ฿10 and cools wanted contact');
+
+    console.log('\n[33] soi cats at stalls');
+    const cats = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const n = (G.cats || []).length;
+      const c = G.cats && G.cats[0];
+      if (!c) return { flag: !!(G.gameplay && G.gameplay.soiCats), n };
+      G.player.inVehicle = null;
+      G.player.group.position.set(c.mesh.position.x + 1.1, 0, c.mesh.position.z);
+      const start = { x: c.mesh.position.x, z: c.mesh.position.z };
+      for (let i = 0; i < 20; i++) main.updateCats(0.1);
+      const moved = Math.hypot(c.mesh.position.x - start.x, c.mesh.position.z - start.z);
+      return { flag: !!(G.gameplay && G.gameplay.soiCats), n, bolted: c.state === 'bolt' || c.state === 'return', moved };
+    });
+    assert(cats.flag && cats.n >= 3, `cats loaf at stalls (${cats.n})`);
+    assert(cats.bolted && cats.moved > 0.8, `cats bolt when the player gets close (${cats.moved.toFixed(1)}m)`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

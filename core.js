@@ -260,6 +260,7 @@ export const GAMEPLAY = {
   seekShade: true,        // midday / haze: wanderers pull onto walkways and stop
   stallSit: true,         // E to sit at a food stall, pay, eat, heal
   spiritWai: true,        // E at a spirit house: incense, heat cools
+  soiCats: true,          // cats loaf at food stalls and bolt when you get close
 };
 G.gameplay = GAMEPLAY;
 

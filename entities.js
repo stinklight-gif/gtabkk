@@ -973,6 +973,41 @@ export function makeDogMesh() {
   return g;
 }
 
+export function makeCatMesh() {
+  const g = new THREE.Group();
+  const fur = new THREE.MeshStandardMaterial({ color: pick([0xc8b090, 0x3a3a3a, 0xe8dcc8, 0xb06030, 0xf0f0f0]), roughness: 0.85 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.16, 0.38), fur);
+  body.position.y = 0.2; g.add(body);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.14, 0.16), fur);
+  head.position.set(0, 0.28, 0.22); g.add(head);
+  for (const x of [-0.05, 0.05]) {
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.08, 4), fur);
+    ear.position.set(x, 0.38, 0.2); g.add(ear);
+  }
+  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.28), fur);
+  tail.position.set(0.06, 0.26, -0.24); tail.rotation.y = 0.4; g.add(tail);
+  for (const z of [-0.1, 0.1]) for (const x of [-0.06, 0.06]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.12, 0.045), fur);
+    leg.position.set(x, 0.06, z); g.add(leg);
+  }
+  return g;
+}
+
+export function spawnCats(scene) {
+  if (!GAMEPLAY.soiCats) return;
+  G.cats = [];
+  const stalls = (G.world && G.world.foodStalls) || [];
+  const n = Math.min(5, stalls.length);
+  for (let i = 0; i < n; i++) {
+    const f = stalls[i];
+    const pos = new THREE.Vector3(f.pos.x + rand(-1.4, 1.4), 0, f.pos.z + rand(-1.4, 1.4));
+    const mesh = makeCatMesh();
+    mesh.position.copy(pos);
+    scene.add(mesh);
+    G.cats.push({ mesh, home: f.pos.clone(), heading: rand(0, TAU), state: 'loaf', timer: rand(1, 3) });
+  }
+}
+
 // A point on a sidewalk near (cx,cz): sample within `radius`, then snap onto the
 // band just outside the nearer road centerline so peds populate the pavements
 // (and read as a crowd down whatever street the camera faces) rather than a
