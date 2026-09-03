@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','burningHaze']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -844,6 +844,43 @@ async function main() {
     assert(sai.pillionOn, 'pillion rider sits on the bike after pickup');
     assert(sai.filtered, 'filtering traffic raises the motosai bonus');
     assert(sai.paidMore && sai.idle && sai.pillionOff && sai.fares >= 1, `motosai pays base+filter and hops off (฿${sai.payout})`);
+
+    console.log('\n[26] burning-season haze');
+    const haze = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const car = G.vehicles.find(v => v && v.spec && v.spec.kind === 'camry' && v.mesh) || main.makeVehicle('camry', G.scene);
+      G.time.dayT = 0.5;
+      G.time.weather = 'clear';
+      G.time.rainStrength = 0;
+      G._rainTarget = 0;
+      G._weatherUntil = 1e9;
+      main.updateDayNight(0.05);
+      main.updateVehicleVisuals(car, 0.05, {});
+      const heads = (car.mesh.userData.visual && car.mesh.userData.visual.headlights) || [];
+      const clearFog = G.scene.fog.density;
+      const clearHead = heads[0] && heads[0].material ? heads[0].material.opacity : 0;
+      const clearSun = G.sun.intensity;
+      G.time.weather = 'haze';
+      main.updateDayNight(0.05);
+      main.updateVehicleVisuals(car, 0.05, {});
+      const hazeFog = G.scene.fog.density;
+      const hazeHead = heads[0] && heads[0].material ? heads[0].material.opacity : 0;
+      const hazeSun = G.sun.intensity;
+      const tag = document.getElementById('weather-tag').textContent;
+      const bg = G.scene.background.getHex();
+      G.time.weather = 'clear';
+      main.updateDayNight(0.05);
+      return {
+        flag: !!(G.gameplay && G.gameplay.burningHaze),
+        clearFog, hazeFog, clearHead, hazeHead, clearSun, hazeSun, tag, bg,
+        hazeK: G._hazeK,
+      };
+    });
+    assert(haze.flag, 'GAMEPLAY.burningHaze defaults on');
+    assert(haze.hazeFog > haze.clearFog * 1.8, `noon haze kills distance (fog ${haze.clearFog.toFixed(4)} → ${haze.hazeFog.toFixed(4)})`);
+    assert(haze.hazeHead > 0.85 && haze.hazeHead > haze.clearHead, `headlights come on in the haze (${haze.clearHead.toFixed(2)} → ${haze.hazeHead.toFixed(2)})`);
+    assert(haze.hazeSun < haze.clearSun * 0.75, `noon sun is dirtier in haze (${haze.clearSun.toFixed(2)} → ${haze.hazeSun.toFixed(2)})`);
+    assert(/HAZE/.test(haze.tag), `weather tag reads haze ("${haze.tag}")`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

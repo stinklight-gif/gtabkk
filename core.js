@@ -254,6 +254,7 @@ export const GAMEPLAY = {
   boatHijack: true,
   sevenInterior: true,
   motosai: true,          // pillion motorcycle taxi, soi-only, pays more if you filter traffic
+  burningHaze: true,      // third weather: burning-season haze (noon goes dirty, headlights, fog)
 };
 G.gameplay = GAMEPLAY;
 

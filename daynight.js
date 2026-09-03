@@ -98,16 +98,27 @@ export function updateDayNight(dt) {
   G.scene.background.copy(sky);
   G.scene.fog.color.copy(sky);
   G.scene.fog.density = lerp(0.0012, 0.0035, 1 - dayK) + G.time.rainStrength * 0.004;
+  G.sun.color.setHex(0xffe0a0);
+  G._hazeK = 0;
   if (G.time.weather === 'overcast') {
     G.sun.intensity *= 0.55;
     G.hemi.intensity *= 0.82;
     G.scene.fog.density += 0.0014;
     G.renderer.toneMappingExposure *= 0.92;
-  } else if (G.time.weather === 'haze') {
-    G.sun.intensity *= 0.7;
-    G.scene.fog.color.setHex(0x9a8060);
-    G.scene.fog.density += 0.0026;
-    G.scene.background.lerp(new THREE.Color(0xc4a070), 0.35);
+  } else if (GAMEPLAY.burningHaze && G.time.weather === 'haze') {
+    // Burning season: noon is the dirty hour. Distance dies, the sun goes ochre,
+    // headlights read in the brown air (see vehicles.js). Not a landmark.
+    const noonDirty = clamp(dayK, 0, 1);
+    G._hazeK = noonDirty;
+    G.sun.intensity *= 0.38 + (1 - noonDirty) * 0.28;
+    G.sun.color.setHex(0xffb060);
+    G.hemi.intensity *= 0.62;
+    G.amb.intensity = Math.min(0.42, G.amb.intensity + 0.10);
+    G.renderer.toneMappingExposure *= 0.72;
+    G.scene.fog.color.setHex(0xb8945a);
+    G.scene.fog.density = 0.0048 + noonDirty * 0.0062 + G.time.rainStrength * 0.002;
+    G.scene.background.lerp(new THREE.Color(0xc4a070), 0.58 + noonDirty * 0.22);
+    if (G.hud && G.hud.setWeather) G.hud.setWeather('HAZE · 34°C');
   }
 
   // neon/lamp/window emissive + accent lights: brighter at night.
@@ -141,18 +152,18 @@ export function updateDayNight(dt) {
         G.hud.showNotif(G._rainTarget > 0.7 ? 'The sky opens up.' : 'It starts to rain.');
         G.audio.thunder();
         G._weatherUntil = G._weatherT + rand(40, 90);
-      } else if (roll < 0.75) {
-        G.time.weather = 'overcast';
-        G._rainTarget = 0;
-        G.hud.setWeather('OVERCAST · 30°C');
-        G.hud.showNotif('Clouds pile up over the Gulf.');
-        G._weatherUntil = G._weatherT + rand(50, 100);
-      } else {
+      } else if (GAMEPLAY.burningHaze && roll < 0.78) {
         G.time.weather = 'haze';
         G._rainTarget = 0;
         G.hud.setWeather('HAZE · 34°C');
         G.hud.showNotif('Burning-season haze rolls in.');
         G._weatherUntil = G._weatherT + rand(50, 110);
+      } else {
+        G.time.weather = 'overcast';
+        G._rainTarget = 0;
+        G.hud.setWeather('OVERCAST · 30°C');
+        G.hud.showNotif('Clouds pile up over the Gulf.');
+        G._weatherUntil = G._weatherT + rand(50, 100);
       }
     } else {
       G.time.weather = 'clear';

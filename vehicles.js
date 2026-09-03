@@ -17,7 +17,8 @@ export function updateVehicleVisuals(v, dt, opts={}) {
     if (w.spin) w.spin.rotation.x = -v.wheelSpin / Math.max(0.1, w.radius || 0.3);
     if (w.front && w.mount) w.mount.rotation.y = lerp(w.mount.rotation.y || 0, steer, 0.3);
   }
-  const headOpacity = (G.nightK || 0) > 0.25 || G.time.weather === 'rain' ? 0.95 : 0.58;
+  const hazeOn = GAMEPLAY.burningHaze && G.time.weather === 'haze';
+  const headOpacity = (G.nightK || 0) > 0.25 || G.time.weather === 'rain' || hazeOn ? 0.95 : 0.58;
   const brakeOpacity = opts.braking ? 1.0 : 0.48;
   const reverseOpacity = opts.reverse || v.vel < -0.2 ? 0.95 : 0.24;
   for (const l of visual.headlights || []) if (l.material && l.material.opacity != null) l.material.opacity = headOpacity;
@@ -364,7 +365,8 @@ export function updateVehicles(dt) {
   for (const v of G.vehicles) {
     if (v.dead) continue;
     if (v.lights) {
-      const base = G.nightK || 0;
+      const hazeOn = GAMEPLAY.burningHaze && G.time.weather === 'haze';
+      const base = Math.max(G.nightK || 0, hazeOn ? 0.85 : 0);
       v.lights[0].emissiveIntensity = base;   // headlights
       const braking = v.driver === 'player' && (G.input.down('KeyS') || G.input.down('Space'));
       v.lights[1].emissiveIntensity = braking ? Math.max(base, 0.9) : base;  // tail/brake lights
