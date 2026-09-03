@@ -1202,6 +1202,21 @@ export function updateIceCarts(dt) {
       if (G.audio && G.audio.blip) G.audio.blip({ freq: 980, dur: 0.08, type: 'sine', gain: 0.08 });
     }
   }
+  if (G.player.inVehicle || G._eating) return;
+  const pp = G.player.group.position;
+  for (const c of G.iceCarts) {
+    if (!c.mesh || dist2(c.mesh.position, pp) > 2.2 * 2.2) continue;
+    G.hud.showPrompt('Press <b>E</b> for ice cream · ฿20', 0.4);
+    if (G.input.pressed('KeyE')) {
+      if (G.cash < 20) { G.hud.showNotif('Need ฿20 for ice cream'); return; }
+      G.cash -= 20;
+      G.player.stam = G.player.stamMax;
+      if (G.hud.setCash) G.hud.setCash(G.cash);
+      G.hud.showNotif('Ice cream — เย็น');
+      if (G.audio && G.audio.chime) G.audio.chime();
+    }
+    return;
+  }
 }
 
 export function updateCats(dt) {

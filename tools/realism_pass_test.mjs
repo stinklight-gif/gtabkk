@@ -1362,10 +1362,24 @@ async function main() {
       for (let i = 0; i < 12; i++) main.updateIceCarts(0.2);
       const moved = !!(c0 && start && Math.hypot(c0.mesh.position.x - start.x, c0.mesh.position.z - start.z) > 0.4);
       const onSoi = !!(c0 && c0.soi);
-      return { flag: !!(G.gameplay && G.gameplay.iceCart), n, vendor, moved, onSoi };
+      G.player.inVehicle = null;
+      G.player.group.visible = true;
+      G._eating = null;
+      G.cash = 80;
+      G.player.stam = 10;
+      if (c0 && c0.mesh) G.player.group.position.copy(c0.mesh.position);
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+      main.updateIceCarts(0.016);
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      return {
+        flag: !!(G.gameplay && G.gameplay.iceCart), n, vendor, moved, onSoi,
+        paid: G.cash === 60, stam: G.player.stam === G.player.stamMax,
+      };
     });
     assert(ice.flag && ice.n >= 2 && ice.vendor >= 2, `ice carts roll the sois (${ice.n})`);
     assert(ice.moved && ice.onSoi, 'ice carts move along a soi');
+    assert(ice.paid && ice.stam, 'E buys ice cream for ฿20 and fills stamina');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

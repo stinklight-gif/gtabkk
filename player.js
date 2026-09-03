@@ -372,6 +372,9 @@ export function updateInteraction(dt) {
   if (GAMEPLAY.spiritWai && G.world.shrines) {
     for (const s of G.world.shrines) if (dist2(s.pos, pp0) < 3.2 * 3.2) return;
   }
+  if (GAMEPLAY.iceCart && G.iceCarts) {
+    for (const c of G.iceCarts) if (c.mesh && dist2(c.mesh.position, pp0) < 2.2 * 2.2) return;
+  }
 
   const crate = G.world.yaowaratCrate;
   if (crate && !crate.taken && dist2(p.group.position, crate.pos) < 2.6 * 2.6) {
