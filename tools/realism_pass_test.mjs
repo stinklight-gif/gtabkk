@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -465,7 +465,7 @@ async function main() {
     const peds = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
       const ways = (G.world.walkways || []).length;
-      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school);
+      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait);
       const b = G.world.buildings.find(x => x.size.y > 8 && x.size.x > 4 && x.size.z > 4) || G.world.buildings[0];
       const insideBefore = wanderer && b && Math.abs(wanderer.mesh.position.x - b.pos.x) < b.size.x / 2 && Math.abs(wanderer.mesh.position.z - b.pos.z) < b.size.z / 2;
       if (wanderer && b) {
@@ -1119,6 +1119,45 @@ async function main() {
     });
     assert(cats.flag && cats.n >= 3, `cats loaf at stalls (${cats.n})`);
     assert(cats.bolted && cats.moved > 0.8, `cats bolt when the player gets close (${cats.moved.toFixed(1)}m)`);
+
+    console.log('\n[34] BTS platform waiters + PA');
+    const plat = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      G._btsPa = null;
+      if (G.bts) G.bts._announced = false;
+      main.updateBtsPlatform(0.05);
+      const list = G._btsWaiters || [];
+      const asok = list.filter(p => p && p.btsWait && p.btsStop === 'Asok' && p.mesh);
+      const yOk = asok.filter(p => p.mesh.position.y > 12).length;
+      const visible = asok.filter(p => p.mesh.visible && !p.btsBoarded).length;
+      if (G.bts && G.bts.mesh) {
+        G.bts.mesh.position.x = -50;
+        G.bts.dir = 1;
+        G.bts._announced = false;
+      }
+      main.updateBTS(0.05);
+      main.updateBtsPlatform(0.05);
+      const boarded = (G._btsWaiters || []).filter(p => p && p.btsStop === 'Asok' && p.btsBoarded).length;
+      const pa = G._btsPa || {};
+      if (G.bts && G.bts.mesh) {
+        G.bts.mesh.position.x = 0;
+        G.bts._announced = false;
+      }
+      main.updateBtsPlatform(0.05);
+      const back = (G._btsWaiters || []).filter(p => p && p.btsStop === 'Asok' && p.mesh && p.mesh.visible && !p.btsBoarded).length;
+      return {
+        flag: !!(G.gameplay && G.gameplay.btsPlatform),
+        n: list.length,
+        asok: asok.length,
+        yOk, visible, boarded, back,
+        paStop: pa.stop, paNext: pa.next,
+      };
+    });
+    assert(plat.flag && plat.n >= 6 && plat.asok >= 4, `waiters stand on both platforms (${plat.n}, Asok ${plat.asok})`);
+    assert(plat.yOk >= 4 && plat.visible >= 4, `Asok waiters stand on the platform (y, ${plat.yOk} visible)`);
+    assert(plat.paStop === 'Asok' && plat.paNext, `PA names the stop (${plat.paStop} → ${plat.paNext})`);
+    assert(plat.boarded >= 3, `waiters board when the train pulls in (${plat.boarded})`);
+    assert(plat.back >= 3, `waiters return after the train leaves (${plat.back})`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

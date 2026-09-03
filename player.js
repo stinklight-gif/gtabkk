@@ -236,7 +236,23 @@ export function updateBTS(dt) {
   const stops = btsStops();
   const atStop = nearestBtsStop(b.mesh.position.x);
   if (atStop.dist < 8) {
-    if (!b._announced && G.audio.btsChime) { G.audio.btsChime(); b._announced = true; }
+    if (!b._announced) {
+      b._announced = true;
+      if (G.audio && G.audio.btsChime) G.audio.btsChime();
+      if (GAMEPLAY.btsPlatform) {
+        const nxt = stops.find(s => Math.abs(s.x - atStop.stop.x) > 20) || stops[stops.length - 1];
+        G._btsPa = { stop: atStop.stop.name, next: nxt && nxt.name };
+        const ppos = G.player && G.player.group && G.player.group.position;
+        const near = ppos && (Math.hypot(ppos.x - atStop.stop.x, ppos.z - (atStop.stop.z || 0)) < 95 || ppos.y > 12);
+        if (near && G.hud && G.hud.showSubtitle) {
+          const th = { Asok: 'อโศก', 'Phrom Phong': 'พร้อมพงษ์' };
+          G.hud.showSubtitle(
+            `${atStop.stop.name} — next train to ${nxt && nxt.name ? nxt.name : 'the next stop'}`,
+            `${th[atStop.stop.name] || atStop.stop.name} — ขบวนต่อไป ${th[nxt && nxt.name] || (nxt && nxt.name) || ''}`
+          );
+        }
+      }
+    }
   } else b._announced = false;
 
   const p = G.player;

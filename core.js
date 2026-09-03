@@ -261,6 +261,7 @@ export const GAMEPLAY = {
   stallSit: true,         // E to sit at a food stall, pay, eat, heal
   spiritWai: true,        // E at a spirit house: incense, heat cools
   soiCats: true,          // cats loaf at food stalls and bolt when you get close
+  btsPlatform: true,      // commuters wait on Asok / Phrom Phong; PA when the train pulls in
 };
 G.gameplay = GAMEPLAY;
 

@@ -197,14 +197,14 @@ export function resyncCrowd() {
   // pull stray wanderers onto nearby sidewalks so the count near the camera
   // reflects the hour immediately (harness-only; gameplay distributes gradually)
   for (const ped of G.peds) {
-    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school) continue;
+    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait) continue;
     if (dist2(ped.mesh.position, pp) > 95 * 95) ped.mesh.position.copy(sidewalkPos(pp.x, pp.z, 88));
   }
   for (let guard = 0; G.peds.length > target && guard < 500; guard++) {
     let fi = -1, fd = -1;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait) continue;
       const d = dist2(ped.mesh.position, pp);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -224,6 +224,30 @@ export function updatePeds(dt) {
     const ped = G.peds[pedIdx];
     if (ped.dead) continue;
     if (ped.pillion) continue;
+    if (ped.btsWait) {
+      const y = ped.btsY || 13.9;
+      if (ped.btsBoarded || !ped.mesh.visible) {
+        ped.speed = 0;
+      } else if (ped.btsApproach) {
+        ped.heading = ped.mesh.position.z >= 0 ? PI : 0;
+        ped.speed = 1.55;
+        ped.mesh.position.x += Math.sin(ped.heading) * ped.speed * dt;
+        ped.mesh.position.z += Math.cos(ped.heading) * ped.speed * dt;
+      } else if (ped.btsSlot) {
+        ped.speed = 0;
+        ped.heading = ped.btsSlot.facing;
+        const ease = 1 - Math.pow(0.08, dt);
+        ped.mesh.position.x = lerp(ped.mesh.position.x, ped.btsSlot.x, ease);
+        ped.mesh.position.z = lerp(ped.mesh.position.z, ped.btsSlot.z, ease);
+      } else ped.speed = 0;
+      ped.mesh.position.y = y;
+      ped.mesh.rotation.y = ped.heading;
+      if (ped.mesh.visible) {
+        updatePedRainProp(ped);
+        animateWalk(ped.mesh, ped.speed, dt, ped.speed > 0.05);
+      }
+      continue;
+    }
     if (!ped.gang && ped.panicT <= 0 && !ped.anchor) {
       for (const v of G.vehicles) {
         if (!v || v.dead || Math.abs(v.vel || 0) < 7) continue;
@@ -444,7 +468,7 @@ export function updatePeds(dt) {
     let fi = -1, fd = 60 * 60;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait) continue;
       const d = dist2(ped.mesh.position, playerPos);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -920,6 +944,79 @@ export function updateSchoolKids(dt) {
   }
 }
 
+function btsStopList() {
+  return (G.bts && G.bts.stops) || (G.world && G.world.bts && G.world.bts.stops) || [
+    { x: -50, y: 13.9, name: 'Asok' },
+    { x: 100, y: 13.9, name: 'Phrom Phong' },
+  ];
+}
+function btsWaiterKind() {
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  if (h >= 6.2 && h < 8.7) return Math.random() < 0.45 ? 'school' : 'office';
+  if (h >= 17 && h < 19.5) return Math.random() < 0.7 ? 'office' : 'local';
+  if (h >= 22 || h < 5) return pick(['local', 'tourist', 'vendor']);
+  return pick(['local', 'office', 'tourist', 'vendor']);
+}
+function spawnBtsWaiter(stop) {
+  const y = stop.y || 13.9;
+  const side = Math.random() < 0.5 ? -1 : 1;
+  const slot = {
+    x: stop.x + rand(-6.5, 6.5),
+    z: side * rand(2.7, 3.9),
+    y,
+    facing: side > 0 ? PI : 0,
+  };
+  const ped = spawnPed(G.scene, new THREE.Vector3(slot.x, y, slot.z), btsWaiterKind());
+  ped.btsWait = true;
+  ped.btsStop = stop.name;
+  ped.btsSlot = slot;
+  ped.btsY = y;
+  ped.btsBoarded = false;
+  ped.btsApproach = false;
+  ped.anchor = null;
+  ped.speed = 0;
+  ped.state = 'idle';
+  ped.heading = slot.facing;
+  ped.mesh.rotation.y = slot.facing;
+  ped.mesh.position.y = y;
+  return ped;
+}
+
+export function updateBtsPlatform(dt) {
+  if (!GAMEPLAY.btsPlatform) return;
+  const stops = btsStopList();
+  G._btsWaiters = (G._btsWaiters || []).filter(p => p && !p.dead && p.mesh);
+  const want = 4;
+  for (const stop of stops) {
+    const live = G._btsWaiters.filter(p => p.btsStop === stop.name);
+    while (live.length < want) {
+      const ped = spawnBtsWaiter(stop);
+      G._btsWaiters.push(ped);
+      live.push(ped);
+    }
+  }
+  const trainX = G.bts && G.bts.mesh ? G.bts.mesh.position.x : 1e9;
+  for (const ped of G._btsWaiters) {
+    const stop = stops.find(s => s.name === ped.btsStop);
+    if (!stop || !ped.btsSlot) continue;
+    const d = Math.abs(trainX - stop.x);
+    if (d < 28) ped.btsApproach = true;
+    else if (!ped.btsBoarded) ped.btsApproach = false;
+    if (d < 10 && !ped.btsBoarded) {
+      ped.btsBoarded = true;
+      ped.mesh.visible = false;
+      ped.speed = 0;
+    } else if (d > 32 && ped.btsBoarded) {
+      ped.btsBoarded = false;
+      ped.btsApproach = false;
+      ped.mesh.visible = true;
+      ped.mesh.position.set(ped.btsSlot.x, ped.btsSlot.y, ped.btsSlot.z);
+      ped.heading = ped.btsSlot.facing;
+      ped.mesh.rotation.y = ped.heading;
+    }
+  }
+}
+
 export function updateSeekShade(dt) {
   if (!GAMEPLAY.seekShade) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
@@ -941,7 +1038,7 @@ export function updateSeekShade(dt) {
   let n = 0;
   for (const ped of G.peds) {
     if (n >= 22) break;
-    if (!ped || ped.dead || ped.anchor || ped.gang || ped.pillion || ped.alms || ped.school || ped.panicT > 0) continue;
+    if (!ped || ped.dead || ped.anchor || ped.gang || ped.pillion || ped.alms || ped.school || ped.btsWait || ped.panicT > 0) continue;
     if (ped.social || ped.isMugger || ped.isTarget || ped.motosaiRider || ped.motosaiWait) continue;
     const w = nearestWalkway(ped.mesh.position.x, ped.mesh.position.z);
     if (!w) continue;
