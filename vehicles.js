@@ -365,7 +365,7 @@ export function killPed(ped) {
 export function updateVehicles(dt) {
   for (const v of G.vehicles) {
     if (v.dead) continue;
-    if ((v.btsSongthaew || v.motosaiStand) && v.driver !== 'player' && v._standHome) {
+    if (v._standHome && v.driver !== 'player') {
       v.pos.set(v._standHome.x, 0, v._standHome.z);
       v.heading = v._standHome.heading;
       v.vel = 0; v.latVel = 0; v.yawRate = 0;

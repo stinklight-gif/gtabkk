@@ -266,7 +266,7 @@ export function resolveVehicleVsVehicles(v) {
     const vIsPlayer = v.driver === 'player';
     const oIsPlayer = o.driver === 'player';
     const playerHit = vIsPlayer || oIsPlayer;
-    const oLocked = (o.driver && o.driver !== 'player' && !playerHit) || o.btsSongthaew || o.motosaiStand;
+    const oLocked = (o.driver && o.driver !== 'player' && !playerHit) || (o._standHome && o.driver !== 'player');
     const vShare = playerHit ? (vIsPlayer ? 0.24 : 0.82) : (oLocked ? 0.85 : 0.55);
     const oShare = playerHit ? (vIsPlayer ? 0.76 : 0.08) : (oLocked ? 0.15 : 0.45);
     v.pos.x += nx * overlap * vShare;

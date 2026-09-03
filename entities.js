@@ -1405,6 +1405,28 @@ export function spawnBtsSongthaew(scene) {
   G.world.btsSongthaew = { vehicle: v, waiter, x, z };
 }
 
+export function spawnBtsTuktuk(scene) {
+  if (!GAMEPLAY.btsTuktuk) return;
+  const bts = G.world && G.world.bts;
+  if (!bts) return;
+  const x = bts.x + 11.5, z = -14.2, heading = PI / 2;
+  const v = makeVehicle('tuktuk', scene);
+  v.pos.set(x, 0, z);
+  v.heading = heading;
+  v.mesh.position.copy(v.pos);
+  v.mesh.rotation.y = heading;
+  v.driver = null;
+  v.vel = 0;
+  v.btsTuktuk = true;
+  v._standHome = { x, z, heading };
+  const waiter = spawnPed(scene, new THREE.Vector3(x + 1.8, 0, z + 0.5), 'vendor');
+  waiter.anchor = { slot: waiter.mesh.position.clone(), facing: heading + PI };
+  waiter.btsTuktuk = true;
+  waiter.speed = 0;
+  waiter.state = 'idle';
+  G.world.btsTuktuk = { vehicle: v, waiter, x, z };
+}
+
 // A handful of parked, enterable cars at the curb so there's always a ride (and a
 // songthaew for the taxi job) without chasing moving traffic on foot.
 export function spawnParkedCars(scene) {

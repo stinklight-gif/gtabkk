@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -1384,6 +1384,25 @@ async function main() {
     assert(ice.flag && ice.n >= 2 && ice.vendor >= 2, `ice carts roll the sois (${ice.n})`);
     assert(ice.moved && ice.onSoi, 'ice carts move along a soi');
     assert(ice.paid && ice.stam, 'E buys ice cream for ฿20 and fills stamina');
+
+    console.log('\n[43] BTS tuk-tuk rank');
+    const tuk = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      main.updateVehicles(0.016);
+      const rec = G.world && G.world.btsTuktuk;
+      const bts = G.world && G.world.bts;
+      const v = rec && rec.vehicle;
+      const dist = (v && bts) ? Math.hypot(v.pos.x - bts.x, v.pos.z - (bts.z || 0)) : null;
+      return {
+        flag: !!(G.gameplay && G.gameplay.btsTuktuk),
+        kind: v && v.kind,
+        stand: !!(v && v.btsTuktuk && v.driver !== 'player' && v._standHome),
+        near: dist != null && dist < 40,
+        waiter: !!(rec && rec.waiter && rec.waiter.btsTuktuk),
+      };
+    });
+    assert(tuk.flag && tuk.kind === 'tuktuk' && tuk.near, 'a tuk-tuk waits at the BTS');
+    assert(tuk.stand && tuk.waiter, 'BTS tuk-tuk is pinned and has a driver waiting');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
