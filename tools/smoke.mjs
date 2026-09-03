@@ -89,6 +89,7 @@ async function main() {
     // 1024×576 keeps the screenshots clear while cutting ~40% of the per-frame
     // SwiftShader render cost — needed now that the suite has 10 shots.
     const page = await browser.newPage({ viewport: { width: 854, height: 480 } });
+    page.setDefaultTimeout(90_000);
     page.on('pageerror', err => errors.push(`pageerror: ${err.message}`));
     page.on('console', msg => {
       if (msg.type() !== 'error') return;
@@ -97,7 +98,8 @@ async function main() {
     });
 
     console.log(`serving ${ROOT} on :${PORT}, booting game…`);
-    await page.goto(`http://127.0.0.1:${PORT}/`, { waitUntil: 'commit', timeout: 60_000 });
+    // ?smoke=1: no MSAA/shadows/bloom, GPU frozen before the first rAF.
+    await page.goto(`http://127.0.0.1:${PORT}/?smoke=1`, { waitUntil: 'commit', timeout: 60_000 });
     // Playwright auto-waits for the button to become clickable (the .ready class
     // drops its pointer-events:none). World build is CPU-rendered → generous timeout.
     await page.click('#slots button', { timeout: 180_000 });
@@ -106,10 +108,32 @@ async function main() {
       null, { timeout: 180_000 },
     );
     console.log('game started');
+    const gpuProbe = await page.evaluate(() => {
+      const GAME = window.GAME;
+      return {
+        fonts: document.fonts ? document.fonts.status : 'unknown',
+        loading: document.fonts ? [...document.fonts].filter(f => f.status === 'loading').map(f => f.family) : [],
+        hold: !!GAME._holdFrame,
+        noBloom: !!GAME.noBloom,
+        shadows: !!(GAME.renderer && GAME.renderer.shadowMap.enabled),
+        pixelRatio: GAME.renderer ? GAME.renderer.getPixelRatio() : null,
+      };
+    });
+    if (gpuProbe.fonts === 'loading' || gpuProbe.loading.length) {
+      errors.push(`document.fonts still loading after boot (${gpuProbe.fonts}: ${gpuProbe.loading.join(', ') || 'ready pending'})`);
+    } else {
+      console.log(`fonts: ${gpuProbe.fonts}`);
+    }
+    console.log(`gpu: hold=${gpuProbe.hold} shadows=${gpuProbe.shadows} bloom=${gpuProbe.noBloom ? 'off' : 'on'} pr=${gpuProbe.pixelRatio}`);
+    if (!gpuProbe.hold) errors.push('smoke mode did not freeze GPU before the first frame');
+    if (gpuProbe.shadows) errors.push('smoke mode left shadow maps on (SwiftShader deadlock)');
+    if (!gpuProbe.noBloom) errors.push('smoke mode left bloom on');
 
     for (const shot of SHOTS) {
+      console.log(`capturing ${shot.name}…`);
       await page.evaluate(({ dayT, festival, waypoint, tabmap, mall, bts, heli, river, bank }) => {
         const GAME = window.GAME;
+        GAME._holdFrame = true;                                  // never let rAF start a GPU frame
         GAME.state = 'playing';                                  // force-resume if pointer lock dropped
         document.getElementById('pause').classList.remove('show');
         document.getElementById('fullmap-wrap').classList.remove('show');  // clear a prior TAB-map shot
@@ -184,12 +208,36 @@ async function main() {
         GAME.camRig.shake = 0;
         if (GAME.resyncCrowd) GAME.resyncCrowd();                // snap crowd to this hour (busy noon vs dead 3am)
       }, shot);
-      await waitFrames(page, (shot.festival || shot.waypoint || shot.tabmap || shot.mall || shot.bts || shot.heli || shot.river || shot.bank) ? 20 : 12);  // let day/night + camera settle
-      await page.screenshot({ path: path.join(ROOT, shot.name), timeout: 120_000 });
+      await waitFrames(page, (shot.festival || shot.waypoint || shot.tabmap || shot.mall || shot.bts || shot.heli || shot.river || shot.bank) ? 20 : 12);  // CPU settle; GPU stays frozen
+      // Do not use Playwright page.screenshot: after living-city, CDP
+      // captureScreenshot deadlocks SwiftShader (fonts loaded, then 120s hang).
+      // Present one frame on a frozen GPU, then read the canvas in-page.
+      const captured = await page.evaluate(({ tabmap }) => {
+        const GAME = window.GAME;
+        const t0 = performance.now();
+        GAME.noBloom = true;
+        GAME._holdFrame = true;
+        if (GAME.renderer) GAME.renderer.shadowMap.enabled = false;
+        if (tabmap) {
+          const c = document.getElementById('fullmap');
+          if (!c) throw new Error('fullmap canvas missing');
+          const dataUrl = c.toDataURL('image/png');
+          return { dataUrl, ms: performance.now() - t0, w: c.width, h: c.height };
+        }
+        if (!GAME.renderer || !GAME.scene || !GAME.camera) throw new Error('renderer missing');
+        GAME.renderer.setRenderTarget(null);
+        GAME.renderer.render(GAME.scene, GAME.camera);
+        if (GAME.hud && GAME.hud.drawWaypoint) GAME.hud.drawWaypoint();
+        const dataUrl = GAME.renderer.domElement.toDataURL('image/png');
+        return { dataUrl, ms: performance.now() - t0, w: GAME.renderer.domElement.width, h: GAME.renderer.domElement.height };
+      }, { tabmap: !!shot.tabmap });
+      if (!captured || !captured.dataUrl || !captured.dataUrl.startsWith('data:image/png')) throw new Error(`canvas capture failed for ${shot.name}`);
+      fs.writeFileSync(path.join(ROOT, shot.name), Buffer.from(captured.dataUrl.split(',')[1], 'base64'));
       const size = fs.statSync(path.join(ROOT, shot.name)).size;
       const calls = await page.evaluate(() => window.GAME.renderer.info.render.calls);
-      console.log(`${shot.name}: ${(size / 1024).toFixed(0)} KB, draw calls = ${calls}`);
+      console.log(`${shot.name}: ${(size / 1024).toFixed(0)} KB, draw calls = ${calls}, present ${captured.ms.toFixed(0)} ms ${captured.w}x${captured.h}`);
       if (size < 20_480) errors.push(`${shot.name} is suspiciously small (${size} bytes)`);
+      if (captured.ms > 60_000) errors.push(`${shot.name} GPU present took ${captured.ms.toFixed(0)}ms`);
     }
   } catch (err) {
     errors.push(`harness: ${err.message}`);

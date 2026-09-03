@@ -877,7 +877,11 @@ function makeThaiSignAtlas() {
     const col = i % 4, row = i >> 2;
     g.fillStyle = colors[i]; g.fillRect(col * 128, row * 128, 128, 128);
     g.fillStyle = '#f5e9c8';
-    g.font = 'bold 32px "Noto Sans Thai", "Sarabun", system-ui, sans-serif';
+    // system-ui only: naming "Noto Sans Thai" / "Sarabun" without an @font-face
+    // makes Chromium keep a pending FontFace. Playwright's page.screenshot waits
+    // on document.fonts.ready and then CDP-captures the WebGL canvas — that pair
+    // deadlocks under SwiftShader CI (fonts loaded, screenshot never returns).
+    g.font = 'bold 32px system-ui, sans-serif';
     g.fillText(names[i], col * 128 + 64, row * 128 + 64);
   }
   const tex = new THREE.CanvasTexture(c);

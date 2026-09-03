@@ -84,7 +84,7 @@ export function buildAirport(scene, world) {
   const thai = document.createElement('canvas'); thai.width = 256; thai.height = 48;
   const tctx = thai.getContext('2d');
   tctx.fillStyle = '#4a1a58'; tctx.fillRect(0, 0, 256, 48);
-  tctx.fillStyle = '#c9a020'; tctx.font = 'bold 28px system-ui, sans-serif';
+  tctx.fillStyle = '#c9a020'; tctx.font = 'bold 28px system-ui, sans-serif'; // no named webfonts — see makeThaiSignAtlas
   tctx.textAlign = 'center'; tctx.textBaseline = 'middle';
   tctx.fillText('สุวรรณภูมิ', 128, 24);
   const thaiTex = new THREE.CanvasTexture(thai);

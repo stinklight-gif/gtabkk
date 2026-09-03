@@ -55,7 +55,7 @@ async function main() {
     page.on('console', msg => { if (msg.type() === 'error') errors.push(`console.error: ${msg.text()}`); });
 
     console.log(`serving ${ROOT} on :${PORT}, booting game...`);
-    await page.goto(`http://127.0.0.1:${PORT}/?debug=1`, { waitUntil: 'commit', timeout: 180_000 });
+    await page.goto(`http://127.0.0.1:${PORT}/?debug=1&smoke=1`, { waitUntil: 'commit', timeout: 180_000 });
     await page.click('#slots button', { timeout: 180_000 });
     await page.waitForFunction(
       () => window.GAME && (window.GAME.state === 'playing' || window.GAME.state === 'paused'),
