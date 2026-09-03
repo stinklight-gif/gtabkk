@@ -19,6 +19,7 @@ const MIME = {
   '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript',
   '.json': 'application/json', '.css': 'text/css', '.png': 'image/png',
   '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.md': 'text/plain',
+  '.gltf': 'model/gltf+json', '.bin': 'application/octet-stream',
 };
 
 function serve() {
@@ -50,7 +51,7 @@ async function main() {
 
   try {
     const page = await browser.newPage({ viewport: { width: 854, height: 480 } });
-    page.on('pageerror', err => errors.push(`pageerror: ${err.message}`));
+    page.on('pageerror', err => errors.push(`pageerror: ${err.message}${err.stack ? ' | ' + String(err.stack).split('\n').slice(0, 4).join(' > ') : ''}`));
     page.on('console', msg => { if (msg.type() === 'error') errors.push(`console.error: ${msg.text()}`); });
 
     console.log(`serving ${ROOT} on :${PORT}, booting game...`);
@@ -229,8 +230,10 @@ async function main() {
         if (v.group) { v.group.position.copy(v.pos); v.group.rotation.y = v.heading; }
       };
       const cars = G.vehicles.filter(v => v && v.spec && v.boundsHalf && !v.dead && v.spec.kind !== 'boat');
-      const playerCar = cars.find(v => ['sedan', 'camry', 'hilux', 'tuktuk'].includes(v.kind)) || cars[0];
-      const blocker = cars.find(v => v !== playerCar && !v.isCop) || cars[1];
+      let playerCar = cars.find(v => ['sedan', 'camry', 'hilux'].includes(v.kind));
+      if (!playerCar) { playerCar = main.makeVehicle('camry', G.scene); playerCar.pos.set(0, 0, -140); }
+      let blocker = cars.find(v => v !== playerCar && !v.isCop && v.spec.kind !== 'bike' && v.spec.kind !== 'bus');
+      if (!blocker) { blocker = main.makeVehicle('sedan', G.scene); blocker.pos.set(20, 0, -100); }
       const trafficCar = G.vehicles.find(v => v !== playerCar && v !== blocker && v.npc && v.npc.kind === 'traffic' && !v.dead);
       if (!playerCar || !blocker || !trafficCar) throw new Error('not enough vehicles for driving probe');
       for (const v of G.vehicles) {
@@ -332,6 +335,7 @@ async function main() {
         car.pos.set(0, 0, -140); car.heading = 0; car.vel = v;
         car.yawRate = 0; car.steerAngle = 0; car.steerInput = 0;
         car.throttle = 0; car.brakeInput = 0; car.latVel = 0; car._aLong = 0;
+        car.hp = 100; car._burning = false; car.dead = false; car.tiresBlown = false;
         car.mesh.position.copy(car.pos); car.mesh.rotation.y = car.heading;
         G.player.group.position.copy(car.pos);
       };
@@ -452,9 +456,10 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
+    assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
 
     console.log('\n[8] P1 pedestrians vs buildings + walkways');
     const peds = await page.evaluate(() => {
@@ -567,16 +572,99 @@ async function main() {
       const sub = document.getElementById('ammo-sub').textContent;
       const v = G.vehicles.find(x => x && x.spec && x.spec.kind !== 'boat');
       G.player.inVehicle = v; v.driver = 'player'; v.vel = 10;
-      if (G.hud.setSpeed) G.hud.setSpeed(v.vel, true);
+      if (G.hud.setSpeed) G.hud.setSpeed(v.vel, true, 0.6);
       const speedo = document.getElementById('speedo');
+      const tachRow = document.getElementById('tach-row');
+      const tach = document.getElementById('tach-fill');
       return {
         ammo, sub,
         speedShown: speedo && speedo.style.display !== 'none',
         speedText: speedo && speedo.textContent,
+        tachShown: tachRow && tachRow.style.display !== 'none',
+        tachW: tach && tach.style.width,
       };
     });
     assert(/12/.test(ui.ammo) && /36/.test(ui.ammo), `ammo HUD shows mag | reserve ("${ui.ammo}")`);
     assert(ui.speedShown && /km\/h/.test(ui.speedText), `speedo shows km/h ("${ui.speedText}")`);
+    assert(ui.tachShown && parseFloat(ui.tachW) > 0, `tach bar visible ("${ui.tachW}")`);
+
+    console.log('\n[15] P8.0 bike lowside + vehicle LOS');
+    const p80 = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const bike = G.vehicles.find(v => v && v.spec && v.spec.kind === 'bike' && !v.dead) || main.makeVehicle('bike', G.scene);
+      G.player.inVehicle = bike; bike.driver = 'player'; bike.npc = null;
+      bike.pos.set(0, 0, -140); bike.heading = 0; bike.vel = 12; bike.latVel = 9; bike.hp = 100;
+      bike.mesh.position.copy(bike.pos);
+      main.updatePlayerInVehicle(0.05);
+      const dumped = G.player.inVehicle === null;
+      const bus = G.vehicles.find(v => v && v.spec && v.spec.kind === 'bus') || main.makeVehicle('bus', G.scene);
+      bus.pos.set(20, 0, -120); bus.heading = 0; bus.dead = false;
+      if (bus.boundsHalf) {
+        /* keep */
+      }
+      const blocked = main.hasLineOfSight(20, 1.5, -130, 20, 1.5, -110);
+      const clear = main.hasLineOfSight(-40, 1.5, -80, -40, 1.5, -70);
+      return { dumped, blocked, clear, weatherCycle: true };
+    });
+    assert(p80.dumped, 'extreme bike latVel dumps the player (lowside)');
+    assert(p80.blocked === false, 'line of sight is blocked by a vehicle AABB');
+    assert(p80.clear === true, 'open ground still has line of sight');
+
+    console.log('\n[16] P8.1 hero GLTF bike');
+    await page.waitForFunction(() => {
+      const G = window.GAME;
+      if (!G.gameplay.gltf) return true;
+      const bike = G.vehicles.find(v => v && v.kind === 'bike' && v.mesh);
+      return !!(bike && bike.mesh.getObjectByName('gltf-hero'));
+    }, null, { timeout: 20_000 }).catch(() => {});
+    const gltf = await page.evaluate(() => {
+      const G = window.GAME;
+      const bike = G.vehicles.find(v => v && v.kind === 'bike' && v.mesh);
+      return {
+        flag: !!(G.gameplay && G.gameplay.gltf),
+        hero: !!(bike && bike.mesh.getObjectByName('gltf-hero')),
+      };
+    });
+    assert(gltf.flag && gltf.hero, 'hero Wave GLTF attached as gltf-hero on a bike');
+
+    console.log('\n[17] P8.2 Klong Toey pocket + Customs');
+    const port = await page.evaluate(() => {
+      const G = window.GAME;
+      G.player.group.position.set(-150, 0, 150);
+      window.__REALISM_MAIN.updateDistrict();
+      const names = G.mission && G.mission.missions ? Object.keys(G.mission.missions) : [];
+      G.mission.start('customs');
+      return {
+        district: G._districtName,
+        poi: !!(G.world.poi && G.world.poi.klongToey),
+        names,
+        mission: G.mission.active && G.mission.active.name,
+        buildings: G.world.buildings.length,
+      };
+    });
+    assert(port.poi && port.district === 'Klong Toey', `Klong Toey banner/POI (${port.district})`);
+    assert(port.names.indexOf('customs') >= 0 && /Customs/i.test(port.mission), 'Customs Issue starts');
+
+    console.log('\n[18] follow-on cover/clinch/cleaver/alms/fire/radio');
+    const more = await page.evaluate(() => {
+      const G = window.GAME;
+      const stations = (G.audio.radio && G.audio.radio.names) || [];
+      return {
+        cover: !!G.gameplay.cover,
+        clinch: !!G.gameplay.clinch,
+        gym: !!(G.world.poi && G.world.poi.gym),
+        cleaver: !!(G.world.cleaver && G.world.cleaver.mesh),
+        bottle: !!(G.world.bottle),
+        morlam: stations.indexOf('MOR LAM EXPRESS') >= 0,
+        cowboy: stations.indexOf('SOI COWBOY CLASSICS') >= 0,
+        nightSoi: !!(G.mission.missions && G.mission.missions.nightSoi),
+        fireAtTen: !!G.gameplay.fireAtTen,
+        rapierOff: G.gameplay.rapier === false,
+      };
+    });
+    assert(more.cover && more.clinch && more.gym && more.cleaver && more.bottle, 'cover, clinch, gym, cleaver, bottle exist');
+    assert(more.morlam && more.cowboy, 'Mor Lam and Soi Cowboy stations exist');
+    assert(more.nightSoi && more.fireAtTen && more.rapierOff, 'night race + fire-at-10 + rapier off');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

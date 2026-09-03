@@ -21,6 +21,7 @@ const MIME = {
   '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript',
   '.json': 'application/json', '.css': 'text/css', '.png': 'image/png',
   '.svg': 'image/svg+xml', '.md': 'text/plain',
+  '.gltf': 'model/gltf+json', '.bin': 'application/octet-stream',
 };
 
 function serve() {
