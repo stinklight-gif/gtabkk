@@ -1432,6 +1432,22 @@ async function main() {
     assert(tuk.flag && tuk.kind === 'tuktuk' && tuk.near, 'a tuk-tuk waits at the BTS');
     assert(tuk.stand && tuk.waiter, 'BTS tuk-tuk is pinned and has a driver waiting');
 
+    console.log('\n[46] for-hire roof signs');
+    const hire = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const song = G.world && G.world.btsSongthaew && G.world.btsSongthaew.vehicle;
+      const tukV = G.world && G.world.btsTuktuk && G.world.btsTuktuk.vehicle;
+      const songSign = !!(song && (song.hireSign || (song.mesh && song.mesh.getObjectByName('hire-sign'))));
+      const tukSign = !!(tukV && (tukV.hireSign || (tukV.mesh && tukV.mesh.getObjectByName('hire-sign'))));
+      if (song) { song.driver = 'player'; main.updateVehicles(0.016); }
+      const hidden = !!(song && song.hireSign && song.hireSign.visible === false);
+      if (song) { song.driver = null; main.updateVehicles(0.016); }
+      const back = !!(song && song.hireSign && song.hireSign.visible);
+      return { songSign, tukSign, hidden, back };
+    });
+    assert(hire.songSign && hire.tukSign, 'BTS songthaew and tuk-tuk wear for-hire signs');
+    assert(hire.hidden && hire.back, 'hire sign hides when you take the ride and returns on the rank');
+
     console.log('\n[44] khlong water monitors');
     const mon = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;

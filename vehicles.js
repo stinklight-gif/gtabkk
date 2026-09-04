@@ -371,9 +371,11 @@ export function updateVehicles(dt) {
       v.vel = 0; v.latVel = 0; v.yawRate = 0;
       v._impactVX = 0; v._impactVZ = 0; v._impactSpin = 0;
       if (v.mesh) { v.mesh.position.copy(v.pos); v.mesh.rotation.y = v.heading; }
+      if (v.hireSign) v.hireSign.visible = true;
       if (GAMEPLAY.bikeHelmets && v.spec && v.spec.kind === 'bike') syncBikeRider(v);
       continue;
     }
+    if (v.hireSign) v.hireSign.visible = v.driver !== 'player';
     if (GAMEPLAY.bikeHelmets && v.spec && v.spec.kind === 'bike') syncBikeRider(v);
     if (v.lights) {
       const hazeOn = GAMEPLAY.burningHaze && G.time.weather === 'haze';

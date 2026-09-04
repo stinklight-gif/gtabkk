@@ -1442,6 +1442,19 @@ export function spawnIceCarts(scene) {
   }
 }
 
+export function addHireSign(v, color = 0xffcf4a) {
+  if (!v || !v.mesh || v.hireSign) return;
+  const sign = new THREE.Mesh(
+    new THREE.BoxGeometry(0.58, 0.22, 0.14),
+    new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.4, roughness: 0.45 })
+  );
+  sign.name = 'hire-sign';
+  const y = (v.spec && v.spec.kind === 'tuktuk') ? 1.72 : 2.05;
+  sign.position.set(0, y, 0.15);
+  v.mesh.add(sign);
+  v.hireSign = sign;
+}
+
 export function spawnBtsSongthaew(scene) {
   if (!GAMEPLAY.btsSongthaew) return;
   const bts = G.world && G.world.bts;
@@ -1456,6 +1469,7 @@ export function spawnBtsSongthaew(scene) {
   v.vel = 0;
   v.btsSongthaew = true;
   v._standHome = { x, z, heading };
+  addHireSign(v, 0xffcf4a);
   const waiter = spawnPed(scene, new THREE.Vector3(x + 2.4, 0, z + 0.4), 'laborer');
   waiter.anchor = { slot: waiter.mesh.position.clone(), facing: heading + PI };
   waiter.btsSongthaew = true;
@@ -1478,6 +1492,7 @@ export function spawnBtsTuktuk(scene) {
   v.vel = 0;
   v.btsTuktuk = true;
   v._standHome = { x, z, heading };
+  addHireSign(v, 0x21f0ff);
   const waiter = spawnPed(scene, new THREE.Vector3(x + 1.8, 0, z + 0.5), 'vendor');
   waiter.anchor = { slot: waiter.mesh.position.clone(), facing: heading + PI };
   waiter.btsTuktuk = true;
