@@ -929,10 +929,12 @@ export function updateSchoolKids(dt) {
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const bts = G.world && G.world.bts;
   const dest = { x: bts ? bts.x : -50, z: (bts && bts.z) || 0 };
-  if (h >= 6.2 && h < 8.7) {
+  const morning = h >= 6.2 && h < 8.7;
+  const homeward = h >= 15 && h < 16.5;
+  if (morning || homeward) {
     G._schoolKids = G._schoolKids || [];
     while (G._schoolKids.length < 5) {
-      const ang = rand(0, TAU), r = rand(22, 70);
+      const ang = rand(0, TAU), r = homeward ? rand(4, 14) : rand(22, 70);
       const pos = new THREE.Vector3(
         clamp(dest.x + Math.cos(ang) * r, -HALF + 8, HALF - 8), 0,
         clamp(dest.z + Math.sin(ang) * r, -HALF + 8, HALF - 8));
@@ -940,14 +942,20 @@ export function updateSchoolKids(dt) {
       ped.school = true;
       ped.anchor = null;
       ped.state = 'walking';
-      ped.heading = Math.atan2(dest.x - pos.x, dest.z - pos.z);
+      ped.heading = homeward
+        ? Math.atan2(pos.x - dest.x, pos.z - dest.z)
+        : Math.atan2(dest.x - pos.x, dest.z - pos.z);
       G._schoolKids.push(ped);
     }
     for (const ped of G._schoolKids) {
       if (!ped || ped.dead) continue;
       const dx = dest.x - ped.mesh.position.x, dz = dest.z - ped.mesh.position.z;
       const d = Math.hypot(dx, dz);
-      if (d > 8) { ped.heading = Math.atan2(dx, dz); ped.speed = 1.35; ped.state = 'walking'; }
+      if (homeward) {
+        ped.heading = Math.atan2(-dx, -dz);
+        ped.speed = 1.35;
+        ped.state = 'walking';
+      } else if (d > 8) { ped.heading = Math.atan2(dx, dz); ped.speed = 1.35; ped.state = 'walking'; }
       else { ped.speed = 0.15; ped.state = 'idle'; }
     }
   } else if (G._schoolKids && G._schoolKids.length) {
@@ -1043,7 +1051,7 @@ export function updateCrossingGuards(dt) {
   const cx = bts ? bts.x : -50;
   const cz = (bts && bts.z) || 0;
   const kerb = ROAD_WIDTH / 2 + 1.35;
-  if (h >= 6.2 && h < 8.7) {
+  if ((h >= 6.2 && h < 8.7) || (h >= 15 && h < 16.5)) {
     G._crossingGuards = G._crossingGuards || [];
     const slots = [
       { x: cx + kerb, z: cz - kerb, facing: PI / 2 },

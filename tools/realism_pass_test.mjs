@@ -1012,11 +1012,25 @@ async function main() {
       G.time.dayT = 12 / 24;
       main.updateSchoolKids(0.05);
       const gone = !(G._schoolKids && G._schoolKids.length);
-      return { flag: !!(G.gameplay && G.gameplay.schoolKids), n, toward, white, gone, bts: !!(bts) };
+      G.time.dayT = 15.4 / 24;
+      main.updateSchoolKids(0.05);
+      const pm = G._schoolKids || [];
+      const nPm = pm.filter(p => p && p.school).length;
+      let away = 0;
+      for (const p of pm) {
+        if (!p || !p.mesh) continue;
+        const dx = dest.x - p.mesh.position.x, dz = dest.z - p.mesh.position.z;
+        const want = Math.atan2(-dx, -dz);
+        let d = Math.abs(p.heading - want);
+        while (d > Math.PI) d = Math.abs(d - Math.PI * 2);
+        if (d < 0.6) away++;
+      }
+      return { flag: !!(G.gameplay && G.gameplay.schoolKids), n, toward, white, gone, bts: !!(bts), nPm, away };
     });
     assert(kids.flag && kids.bts, 'schoolKids flag on and BTS exists');
     assert(kids.n >= 4 && kids.toward >= 3 && kids.white, `morning uniforms walk toward the BTS (${kids.n} kids)`);
     assert(kids.gone, 'schoolkids disperse after morning');
+    assert(kids.nPm >= 4 && kids.away >= 3, `afternoon uniforms walk home from the BTS (${kids.nPm})`);
 
     console.log('\n[30] midday shade-seeking');
     const shade = await page.evaluate(() => {
@@ -1269,12 +1283,19 @@ async function main() {
       const nearBts = !!(g0 && g0.mesh && bts && Math.hypot(g0.mesh.position.x - bts.x, g0.mesh.position.z - (bts.z || 0)) < 18);
       G.time.dayT = 12 / 24;
       main.updateCrossingGuards(0.05);
-      const gone = !(G._crossingGuards && G._crossingGuards.length);
-      return { flag: !!(G.gameplay && G.gameplay.crossingGuard), n, vest, paddle, nearBts, gone };
+      const goneNoon = !(G._crossingGuards && G._crossingGuards.length);
+      G.time.dayT = 15.4 / 24;
+      main.updateCrossingGuards(0.05);
+      const pm = (G._crossingGuards || []).filter(p => p && p.crossingGuard).length;
+      G.time.dayT = 18 / 24;
+      main.updateCrossingGuards(0.05);
+      const goneEve = !(G._crossingGuards && G._crossingGuards.length);
+      return { flag: !!(G.gameplay && G.gameplay.crossingGuard), n, vest, paddle, nearBts, goneNoon, pm, goneEve };
     });
     assert(guard.flag && guard.n >= 2 && guard.nearBts, `crossing guards stand at Asok (${guard.n})`);
     assert(guard.vest && guard.paddle, 'yellow vest and stop paddle');
-    assert(guard.gone, 'crossing guards leave after morning');
+    assert(guard.goneNoon, 'crossing guards leave after morning');
+    assert(guard.pm >= 2 && guard.goneEve, 'crossing guards return for the afternoon pickup');
 
     console.log('\n[39] BTS motosai rank');
     const rank = await page.evaluate(() => {
@@ -1362,8 +1383,8 @@ async function main() {
       const vendor = list.filter(c => c && c.vendor && c.vendor.iceCart).length;
       const c0 = list[0];
       const start = c0 && c0.mesh ? { x: c0.mesh.position.x, z: c0.mesh.position.z } : null;
-      if (c0) { c0.t = 0.2; c0.dir = 1; }
-      for (let i = 0; i < 12; i++) main.updateIceCarts(0.2);
+      if (c0) { c0.t = 0.15; c0.dir = 1; }
+      for (let i = 0; i < 40; i++) main.updateIceCarts(0.25);
       const moved = !!(c0 && start && Math.hypot(c0.mesh.position.x - start.x, c0.mesh.position.z - start.z) > 0.4);
       const onSoi = !!(c0 && c0.soi);
       G.player.inVehicle = null;
