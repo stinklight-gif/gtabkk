@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -465,7 +465,7 @@ async function main() {
     const peds = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
       const ways = (G.world.walkways || []).length;
-      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football);
+      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop);
       const b = G.world.buildings.find(x => x.size.y > 8 && x.size.x > 4 && x.size.z > 4) || G.world.buildings[0];
       const insideBefore = wanderer && b && Math.abs(wanderer.mesh.position.x - b.pos.x) < b.size.x / 2 && Math.abs(wanderer.mesh.position.z - b.pos.z) < b.size.z / 2;
       if (wanderer && b) {
@@ -1504,6 +1504,33 @@ async function main() {
     assert(kick.flag && kick.n >= 3 && kick.soi, `kids kick about in a soi (${kick.n})`);
     assert(kick.moved && kick.loft, 'the ball travels between kids');
     assert(kick.gone, 'the kickabout packs up after evening');
+
+    console.log('\n[48] mall shoppers to the BTS');
+    const bags = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      G.time.dayT = 18.2 / 24;
+      main.updateMallShoppers(0.05);
+      const list = G._mallShoppers || [];
+      const n = list.filter(p => p && p.mallShop && !p.dead).length;
+      const bts = G.world.bts;
+      const dest = { x: bts ? bts.x : 0, z: (bts && bts.z) || 0 };
+      let toward = 0;
+      for (const p of list) {
+        if (!p || !p.mesh) continue;
+        const dx = dest.x - p.mesh.position.x, dz = dest.z - p.mesh.position.z;
+        const want = Math.atan2(dx, dz);
+        let d = Math.abs(p.heading - want);
+        while (d > Math.PI) d = Math.abs(d - Math.PI * 2);
+        if (d < 0.6 || Math.hypot(dx, dz) < 10) toward++;
+      }
+      const mall = G.world.poi && G.world.poi.terminal21;
+      G.time.dayT = 12 / 24;
+      main.updateMallShoppers(0.05);
+      const gone = !(G._mallShoppers && G._mallShoppers.length);
+      return { flag: !!(G.gameplay && G.gameplay.mallShoppers), n, toward, gone, mall: !!mall };
+    });
+    assert(bags.flag && bags.mall && bags.n >= 3, `mall shoppers walk from Terminal 21 (${bags.n})`);
+    assert(bags.toward >= 2 && bags.gone, 'they head to the BTS and clear after evening');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

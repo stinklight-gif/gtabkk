@@ -35,7 +35,7 @@ import {
 } from './physics.js';
 export * from './npcs.js';
 import {
-  CROWD_CURVE, buildClusterAnchors, crowdFactor, crowdTarget, makeBarkSprite, resyncCrowd, spawnAnchoredPed, spawnBark, spawnSpikeStrip, updateAlms, updateArmorPickups, updateBarks, updateCats, updateClusters, updateDogs, updateFoodStalls, updateMuggings, updatePeds, updateSchoolKids, updateSeekShade, updateShrines, updateSpikes, updateTurf, updateVigilante, updateYaowaratNight, updateBtsPlatform, updateOfficeCommute, updateCrossingGuards, updateRainPack, updateIceCarts, updateMonitors, updateGeckos, updateSoiFootball, vigilanteEnd, vigilanteSpawnTarget
+  CROWD_CURVE, buildClusterAnchors, crowdFactor, crowdTarget, makeBarkSprite, resyncCrowd, spawnAnchoredPed, spawnBark, spawnSpikeStrip, updateAlms, updateArmorPickups, updateBarks, updateCats, updateClusters, updateDogs, updateFoodStalls, updateMuggings, updatePeds, updateSchoolKids, updateSeekShade, updateShrines, updateSpikes, updateTurf, updateVigilante, updateYaowaratNight, updateBtsPlatform, updateOfficeCommute, updateCrossingGuards, updateRainPack, updateIceCarts, updateMonitors, updateGeckos, updateSoiFootball, updateMallShoppers, vigilanteEnd, vigilanteSpawnTarget
 } from './npcs.js';
 export * from './combat.js';
 import {
@@ -1724,6 +1724,7 @@ export function loop() {
     updateSchoolKids(dt);
     updateCrossingGuards(dt);
     updateOfficeCommute(dt);
+    updateMallShoppers(dt);
     updateBtsPlatform(dt);
     updateSeekShade(dt);
     updateYaowaratNight(dt);

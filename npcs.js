@@ -197,14 +197,14 @@ export function resyncCrowd() {
   // pull stray wanderers onto nearby sidewalks so the count near the camera
   // reflects the hour immediately (harness-only; gameplay distributes gradually)
   for (const ped of G.peds) {
-    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football) continue;
+    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop) continue;
     if (dist2(ped.mesh.position, pp) > 95 * 95) ped.mesh.position.copy(sidewalkPos(pp.x, pp.z, 88));
   }
   for (let guard = 0; G.peds.length > target && guard < 500; guard++) {
     let fi = -1, fd = -1;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop) continue;
       const d = dist2(ped.mesh.position, pp);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -468,7 +468,7 @@ export function updatePeds(dt) {
     let fi = -1, fd = 60 * 60;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop) continue;
       const d = dist2(ped.mesh.position, playerPos);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -1070,6 +1070,41 @@ export function updateCrossingGuards(dt) {
       ped.anchor = null;
     }
     G._crossingGuards = [];
+  }
+}
+
+export function updateMallShoppers(dt) {
+  if (!GAMEPLAY.mallShoppers) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const mall = G.world && G.world.poi && G.world.poi.terminal21;
+  const bts = G.world && G.world.bts;
+  const dest = { x: bts ? bts.x : -50, z: (bts && bts.z) || 0 };
+  const from = mall || { x: dest.x + 18, z: dest.z - 22 };
+  if (h >= 17 && h < 20) {
+    G._mallShoppers = G._mallShoppers || [];
+    while (G._mallShoppers.length < 4) {
+      const pos = new THREE.Vector3(
+        from.x + rand(-6, 6), 0, from.z + rand(-6, 6));
+      const ped = spawnPed(G.scene, pos, Math.random() < 0.6 ? 'office' : 'tourist');
+      ped.mallShop = true;
+      ped.anchor = null;
+      ped.state = 'walking';
+      ped.heading = Math.atan2(dest.x - pos.x, dest.z - pos.z);
+      G._mallShoppers.push(ped);
+    }
+    for (const ped of G._mallShoppers) {
+      if (!ped || ped.dead) continue;
+      const dx = dest.x - ped.mesh.position.x, dz = dest.z - ped.mesh.position.z;
+      const d = Math.hypot(dx, dz);
+      if (d > 8) { ped.heading = Math.atan2(dx, dz); ped.speed = 1.25; ped.state = 'walking'; }
+      else { ped.speed = 0.2; ped.state = 'idle'; }
+    }
+  } else if (G._mallShoppers && G._mallShoppers.length) {
+    for (const ped of G._mallShoppers) {
+      if (!ped || ped.dead) continue;
+      ped.mallShop = false;
+    }
+    G._mallShoppers = [];
   }
 }
 
