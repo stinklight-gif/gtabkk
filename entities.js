@@ -1010,6 +1010,36 @@ export function makeMonitorMesh() {
   return g;
 }
 
+export function makeGeckoMesh() {
+  const g = new THREE.Group();
+  g.name = 'stall-gecko';
+  const hide = new THREE.MeshStandardMaterial({ color: pick([0xc8c070, 0xb0a060, 0xd0c898]), roughness: 0.85 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.03, 0.14), hide);
+  g.add(body);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.03, 0.05), hide);
+  head.position.z = 0.09; g.add(head);
+  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.02, 0.1), hide);
+  tail.position.z = -0.11; tail.rotation.y = 0.3; g.add(tail);
+  return g;
+}
+
+export function spawnGeckos(scene) {
+  if (!GAMEPLAY.stallGecko) return;
+  G.geckos = [];
+  const stalls = (G.world && G.world.foodStalls) || [];
+  const n = Math.min(4, stalls.length);
+  for (let i = 0; i < n; i++) {
+    const f = stalls[i];
+    const mesh = makeGeckoMesh();
+    const ox = rand(-0.4, 0.4), oz = rand(-0.3, 0.3);
+    mesh.position.set(f.pos.x + ox, 1.72, f.pos.z + oz);
+    mesh.rotation.x = -0.2;
+    mesh.visible = false;
+    scene.add(mesh);
+    G.geckos.push({ mesh, home: { x: f.pos.x + ox, y: 1.72, z: f.pos.z + oz }, heading: rand(0, TAU), timer: rand(0.8, 2.4), chirp: rand(2, 6) });
+  }
+}
+
 export function spawnMonitors(scene) {
   if (!GAMEPLAY.khlongMonitor) return;
   G.monitors = [];

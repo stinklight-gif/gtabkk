@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -1452,6 +1452,22 @@ async function main() {
     });
     assert(mon.flag && mon.n >= 2, `water monitors loaf on the khlong (${mon.n})`);
     assert(mon.bolted && mon.moved > 0.8 && mon.bank, `monitors bolt along the bank (${mon.moved.toFixed(1)}m)`);
+
+    console.log('\n[45] stall geckos after dark');
+    const gecko = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = G.geckos || [];
+      G.nightK = 0.1;
+      main.updateGeckos(0.05);
+      const dayHide = list.filter(g => g && g.mesh && g.mesh.visible).length;
+      G.nightK = 0.8;
+      main.updateGeckos(0.05);
+      const nightShow = list.filter(g => g && g.mesh && g.mesh.visible).length;
+      const onStall = list[0] && list[0].mesh && list[0].mesh.position.y > 1.4;
+      return { flag: !!(G.gameplay && G.gameplay.stallGecko), n: list.length, dayHide, nightShow, onStall };
+    });
+    assert(gecko.flag && gecko.n >= 3, `geckos exist on stalls (${gecko.n})`);
+    assert(gecko.dayHide === 0 && gecko.nightShow >= 3 && gecko.onStall, 'geckos hide by day and sit on parasols at night');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

@@ -272,6 +272,7 @@ export const GAMEPLAY = {
   iceCart: true,          // vendor ice carts patrol the sois and ding
   btsTuktuk: true,        // parked tuk-tuk + driver at the Asok BTS exit
   khlongMonitor: true,    // water monitors loaf on the river bank and bolt
+  stallGecko: true,       // tiny geckos on stall parasols after dark
 };
 G.gameplay = GAMEPLAY;
 

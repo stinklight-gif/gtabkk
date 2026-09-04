@@ -1237,6 +1237,28 @@ export function updateIceCarts(dt) {
   }
 }
 
+export function updateGeckos(dt) {
+  if (!GAMEPLAY.stallGecko || !G.geckos) return;
+  const night = (G.nightK || 0) > 0.45;
+  for (const g of G.geckos) {
+    g.mesh.visible = night;
+    if (!night) continue;
+    g.timer -= dt;
+    g.chirp -= dt;
+    if (g.timer <= 0) {
+      g.heading += rand(-0.8, 0.8);
+      g.timer = rand(0.6, 1.8);
+    }
+    g.mesh.position.x = g.home.x + Math.sin(g.heading) * 0.08;
+    g.mesh.position.z = g.home.z + Math.cos(g.heading) * 0.08;
+    g.mesh.rotation.y = g.heading;
+    if (g.chirp <= 0) {
+      g.chirp = rand(3, 8);
+      if (G.audio && G.audio.blip) G.audio.blip({ freq: 2100, dur: 0.04, type: 'square', gain: 0.03 });
+    }
+  }
+}
+
 export function updateMonitors(dt) {
   if (!GAMEPLAY.khlongMonitor || !G.monitors) return;
   const pp = G.player.inVehicle ? G.player.inVehicle.pos : G.player.group.position;
