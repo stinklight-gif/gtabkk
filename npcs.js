@@ -197,14 +197,14 @@ export function resyncCrowd() {
   // pull stray wanderers onto nearby sidewalks so the count near the camera
   // reflects the hour immediately (harness-only; gameplay distributes gradually)
   for (const ped of G.peds) {
-    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart) continue;
+    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football) continue;
     if (dist2(ped.mesh.position, pp) > 95 * 95) ped.mesh.position.copy(sidewalkPos(pp.x, pp.z, 88));
   }
   for (let guard = 0; G.peds.length > target && guard < 500; guard++) {
     let fi = -1, fd = -1;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football) continue;
       const d = dist2(ped.mesh.position, pp);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -468,7 +468,7 @@ export function updatePeds(dt) {
     let fi = -1, fd = 60 * 60;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football) continue;
       const d = dist2(ped.mesh.position, playerPos);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -1234,6 +1234,71 @@ export function updateIceCarts(dt) {
       if (G.audio && G.audio.chime) G.audio.chime();
     }
     return;
+  }
+}
+
+export function updateSoiFootball(dt) {
+  if (!GAMEPLAY.soiFootball) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const sois = (G.world && G.world.sois) || [];
+  if (h >= 16.8 && h < 18.8 && sois.length) {
+    if (!G._soiFootball) {
+      const s = sois[Math.min(2, sois.length - 1)];
+      const cx = (s.x0 + s.x1) * 0.5, cz = (s.z0 + s.z1) * 0.5;
+      const kids = [];
+      for (let i = 0; i < 3; i++) {
+        const ang = i * TAU / 3;
+        const pos = new THREE.Vector3(cx + Math.cos(ang) * 2.4, 0, cz + Math.sin(ang) * 2.4);
+        const ped = spawnPed(G.scene, pos, 'school');
+        ped.school = true;
+        ped.football = true;
+        ped.anchor = { slot: pos.clone(), facing: Math.atan2(cx - pos.x, cz - pos.z) };
+        ped.speed = 0;
+        kids.push(ped);
+      }
+      const ball = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 8, 6),
+        new THREE.MeshStandardMaterial({ color: 0xf0f0f0, roughness: 0.6 })
+      );
+      ball.name = 'soi-ball';
+      ball.position.set(cx, 0.12, cz);
+      G.scene.add(ball);
+      G._soiFootball = { kids, ball, soi: s, t: 0, from: 0, to: 1 };
+    }
+    const g = G._soiFootball;
+    g.t += dt * 1.15;
+    if (g.t >= 1) {
+      g.t = 0;
+      g.from = g.to;
+      g.to = (g.to + 1) % g.kids.length;
+    }
+    const a = g.kids[g.from], b = g.kids[g.to];
+    if (g.ball && a && a.mesh && b && b.mesh) {
+      const k = g.t * g.t * (3 - 2 * g.t);
+      g.ball.position.x = lerp(a.mesh.position.x, b.mesh.position.x, k);
+      g.ball.position.z = lerp(a.mesh.position.z, b.mesh.position.z, k);
+      g.ball.position.y = 0.12 + Math.sin(g.t * Math.PI) * 0.85;
+    }
+    for (const ped of g.kids) {
+      if (!ped || ped.dead || !ped.mesh) continue;
+      ped.football = true;
+      ped.school = true;
+      const other = g.kids[g.to];
+      if (other && other.mesh) ped.heading = Math.atan2(other.mesh.position.x - ped.mesh.position.x, other.mesh.position.z - ped.mesh.position.z);
+      ped.speed = 0;
+    }
+  } else if (G._soiFootball) {
+    for (const ped of G._soiFootball.kids || []) {
+      if (!ped || ped.dead) continue;
+      ped.football = false;
+      ped.school = false;
+      ped.anchor = null;
+    }
+    if (G._soiFootball.ball) {
+      G.scene.remove(G._soiFootball.ball);
+      disposeObject(G._soiFootball.ball);
+    }
+    G._soiFootball = null;
   }
 }
 

@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -465,7 +465,7 @@ async function main() {
     const peds = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
       const ways = (G.world.walkways || []).length;
-      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart);
+      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football);
       const b = G.world.buildings.find(x => x.size.y > 8 && x.size.x > 4 && x.size.z > 4) || G.world.buildings[0];
       const insideBefore = wanderer && b && Math.abs(wanderer.mesh.position.x - b.pos.x) < b.size.x / 2 && Math.abs(wanderer.mesh.position.z - b.pos.z) < b.size.z / 2;
       if (wanderer && b) {
@@ -1484,6 +1484,26 @@ async function main() {
     });
     assert(gecko.flag && gecko.n >= 3, `geckos exist on stalls (${gecko.n})`);
     assert(gecko.dayHide === 0 && gecko.nightShow >= 3 && gecko.onStall, 'geckos hide by day and sit on parasols at night');
+
+    console.log('\n[47] soi football after school');
+    const kick = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      G.time.dayT = 17.4 / 24;
+      main.updateSoiFootball(0.05);
+      const g = G._soiFootball;
+      const n = g && g.kids ? g.kids.filter(p => p && p.football).length : 0;
+      const ball0 = g && g.ball && { x: g.ball.position.x, y: g.ball.position.y, z: g.ball.position.z };
+      for (let i = 0; i < 12; i++) main.updateSoiFootball(0.08);
+      const moved = !!(g && g.ball && ball0 && Math.hypot(g.ball.position.x - ball0.x, g.ball.position.z - ball0.z) > 0.3);
+      const loft = !!(g && g.ball && g.ball.position.y > 0.2);
+      G.time.dayT = 12 / 24;
+      main.updateSoiFootball(0.05);
+      const gone = !G._soiFootball;
+      return { flag: !!(G.gameplay && G.gameplay.soiFootball), n, moved, loft, gone, soi: !!(g && g.soi) };
+    });
+    assert(kick.flag && kick.n >= 3 && kick.soi, `kids kick about in a soi (${kick.n})`);
+    assert(kick.moved && kick.loft, 'the ball travels between kids');
+    assert(kick.gone, 'the kickabout packs up after evening');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

@@ -273,6 +273,7 @@ export const GAMEPLAY = {
   btsTuktuk: true,        // parked tuk-tuk + driver at the Asok BTS exit
   khlongMonitor: true,    // water monitors loaf on the river bank and bolt
   stallGecko: true,       // tiny geckos on stall parasols after dark
+  soiFootball: true,      // after-school kickabout in a soi
 };
 G.gameplay = GAMEPLAY;
 
