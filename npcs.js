@@ -1237,6 +1237,40 @@ export function updateIceCarts(dt) {
   }
 }
 
+export function updateMonitors(dt) {
+  if (!GAMEPLAY.khlongMonitor || !G.monitors) return;
+  const pp = G.player.inVehicle ? G.player.inVehicle.pos : G.player.group.position;
+  for (const m of G.monitors) {
+    const d = Math.hypot(m.mesh.position.x - pp.x, m.mesh.position.z - pp.z);
+    m.timer -= dt;
+    if (d < 4.2) m.state = 'bolt';
+    else if (m.state === 'bolt' && d > 9) m.state = 'return';
+    if (m.state === 'loaf') {
+      if (m.timer <= 0) { m.heading += rand(-0.6, 0.6); m.timer = rand(1.6, 3.5); }
+      m.mesh.position.x += Math.sin(m.heading) * 0.35 * dt;
+      m.mesh.position.z += Math.cos(m.heading) * 0.35 * dt;
+    } else if (m.state === 'bolt') {
+      const dx = m.mesh.position.x - pp.x, dz = m.mesh.position.z - pp.z;
+      const len = Math.hypot(dx, dz) || 1;
+      m.heading = Math.atan2(dx, dz);
+      m.mesh.position.x += dx / len * 4.2 * dt;
+      m.mesh.position.z += dz / len * 4.2 * dt;
+    } else {
+      const dx = m.home.x - m.mesh.position.x, dz = m.home.z - m.mesh.position.z;
+      const len = Math.hypot(dx, dz) || 1;
+      if (len < 0.6) m.state = 'loaf';
+      else {
+        m.heading = Math.atan2(dx, dz);
+        m.mesh.position.x += dx / len * 1.6 * dt;
+        m.mesh.position.z += dz / len * 1.6 * dt;
+      }
+    }
+    m.mesh.position.x = clamp(m.mesh.position.x, -228, -204);
+    m.mesh.position.z = clamp(m.mesh.position.z, -HALF + 8, HALF - 8);
+    m.mesh.rotation.y = m.heading;
+  }
+}
+
 export function updateCats(dt) {
   if (!GAMEPLAY.soiCats || !G.cats) return;
   const pp = G.player.inVehicle ? G.player.inVehicle.pos : G.player.group.position;

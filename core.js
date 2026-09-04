@@ -271,6 +271,7 @@ export const GAMEPLAY = {
   btsSongthaew: true,     // parked songthaew + hawker at the Asok BTS exit
   iceCart: true,          // vendor ice carts patrol the sois and ding
   btsTuktuk: true,        // parked tuk-tuk + driver at the Asok BTS exit
+  khlongMonitor: true,    // water monitors loaf on the river bank and bolt
 };
 G.gameplay = GAMEPLAY;
 

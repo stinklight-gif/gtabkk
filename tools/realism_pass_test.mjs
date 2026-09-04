@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -1063,17 +1063,24 @@ async function main() {
       const f = (G.world.foodStalls || [])[0];
       if (!f) return { flag: false };
       G.player.inVehicle = null;
+      G._btsRide = null;
       G.player.group.visible = true;
       G.player.group.position.copy(f.pos);
       G._eating = null;
       G.cash = 120;
       G.player.hp = 40;
+      G.time.rainStrength = 0;
+      G._rainTarget = 0;
       f.visited = false;
       f.readyAt = 0;
-      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
-      main.updateFoodStalls(0.016);
-      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
-      if (G.input && G.input.endFrame) G.input.endFrame();
+      f.packed = false;
+      if (main.updateRainPack) main.updateRainPack(0.05);
+      for (let i = 0; i < 4 && !G._eating; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateFoodStalls(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+      }
       const sitting = !!(G._eating && G._eating.t > 0);
       const cashMid = G.cash;
       main.updateFoodStalls(2.5);
@@ -1424,6 +1431,27 @@ async function main() {
     });
     assert(tuk.flag && tuk.kind === 'tuktuk' && tuk.near, 'a tuk-tuk waits at the BTS');
     assert(tuk.stand && tuk.waiter, 'BTS tuk-tuk is pinned and has a driver waiting');
+
+    console.log('\n[44] khlong water monitors');
+    const mon = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = G.monitors || [];
+      const n = list.filter(m => m && m.mesh).length;
+      const m0 = list[0];
+      if (!m0) return { flag: !!(G.gameplay && G.gameplay.khlongMonitor), n };
+      G.player.inVehicle = null;
+      G.player.group.position.set(m0.mesh.position.x + 1.2, 0, m0.mesh.position.z);
+      const start = { x: m0.mesh.position.x, z: m0.mesh.position.z };
+      for (let i = 0; i < 20; i++) main.updateMonitors(0.1);
+      const moved = Math.hypot(m0.mesh.position.x - start.x, m0.mesh.position.z - start.z);
+      const bank = m0.mesh.position.x < -200;
+      return {
+        flag: !!(G.gameplay && G.gameplay.khlongMonitor),
+        n, bolted: m0.state === 'bolt' || m0.state === 'return', moved, bank,
+      };
+    });
+    assert(mon.flag && mon.n >= 2, `water monitors loaf on the khlong (${mon.n})`);
+    assert(mon.bolted && mon.moved > 0.8 && mon.bank, `monitors bolt along the bank (${mon.moved.toFixed(1)}m)`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

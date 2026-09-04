@@ -993,6 +993,35 @@ export function makeCatMesh() {
   return g;
 }
 
+export function makeMonitorMesh() {
+  const g = new THREE.Group();
+  g.name = 'khlong-monitor';
+  const hide = new THREE.MeshStandardMaterial({ color: pick([0x4a5a38, 0x3a4a30, 0x5a4a28]), roughness: 0.9 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.12, 0.85), hide);
+  body.position.y = 0.14; g.add(body);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.1, 0.22), hide);
+  head.position.set(0, 0.16, 0.48); g.add(head);
+  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.07, 0.7), hide);
+  tail.position.set(0, 0.12, -0.7); tail.rotation.y = 0.15; g.add(tail);
+  for (const z of [-0.28, 0.22]) for (const x of [-0.1, 0.1]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.1, 0.12), hide);
+    leg.position.set(x, 0.05, z); g.add(leg);
+  }
+  return g;
+}
+
+export function spawnMonitors(scene) {
+  if (!GAMEPLAY.khlongMonitor) return;
+  G.monitors = [];
+  for (const z of [-90, 40, 130]) {
+    const home = new THREE.Vector3(-214, 0, z);
+    const mesh = makeMonitorMesh();
+    mesh.position.copy(home);
+    scene.add(mesh);
+    G.monitors.push({ mesh, home: home.clone(), heading: rand(0, TAU), state: 'loaf', timer: rand(1, 3) });
+  }
+}
+
 export function spawnCats(scene) {
   if (!GAMEPLAY.soiCats) return;
   G.cats = [];
