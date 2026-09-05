@@ -282,6 +282,7 @@ export const GAMEPLAY = {
   nightCheckpoint: true,  // night cones + flashlight cop; blow through and you get a star
   sevenBikes: true,       // parked motorbike cluster outside the walk-in 7-Eleven
   hyacinth: true,         // water hyacinth mats drift on the khlong
+  btsSitters: true,       // people sit on the Asok BTS escalator with their phones
 };
 G.gameplay = GAMEPLAY;
 

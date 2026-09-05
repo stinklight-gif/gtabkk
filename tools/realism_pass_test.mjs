@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -1721,6 +1721,26 @@ async function main() {
     });
     assert(weed.flag && weed.n >= 4 && weed.onRiver >= 4, `hyacinth mats on the khlong (${weed.n})`);
     assert(weed.wet >= 4 && weed.moved, 'mats sit on the water and drift with the current');
+
+    console.log('\n[56] BTS escalator sitters');
+    const sit = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      main.updatePeds(0.05);
+      const list = G.btsSitters || [];
+      const n = list.filter(p => p && p.btsSit && p.mesh).length;
+      const bts = G.world && G.world.bts;
+      const sx = bts ? bts.x : -50;
+      const atAsok = list.filter(p => p && p.mesh && Math.abs(p.mesh.position.x - sx) < 8).length;
+      const onStairs = list.filter(p => p && p.mesh && p.mesh.position.y > 2).length;
+      const folded = list.filter(p => {
+        const parts = p && p.mesh && p.mesh.userData && p.mesh.userData.parts;
+        return !!(parts && parts.legL && parts.legL.rotation.x > 0.8);
+      }).length;
+      const still = list.filter(p => p && p.speed === 0).length;
+      return { flag: !!(G.gameplay && G.gameplay.btsSitters), n, atAsok, onStairs, folded, still };
+    });
+    assert(sit.flag && sit.n >= 2 && sit.atAsok >= 2, `people sit the Asok escalator (${sit.n})`);
+    assert(sit.onStairs >= 1 && sit.folded >= 2 && sit.still >= 2, 'at least one is up the stairs, legs folded');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

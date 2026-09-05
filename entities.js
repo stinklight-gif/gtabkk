@@ -1718,6 +1718,31 @@ export function spawnSevenBikes(scene) {
   }
 }
 
+export function spawnBtsSitters(scene) {
+  if (!GAMEPLAY.btsSitters) return;
+  const bts = G.world && G.world.bts;
+  const sx = bts ? bts.x : -50;
+  const PY = (bts && bts.platformY) || 13.9;
+  const yAt = (z) => ((z + 25) / 20) * PY;
+  const slots = [
+    { x: sx - 3.2, z: -24.4, y: 0.42, facing: PI / 2, kind: 'office' },
+    { x: sx - 2.15, z: -17.2, y: yAt(-17.2) + 0.42, facing: PI / 2, kind: 'tourist' },
+    { x: sx + 2.15, z: -11.4, y: yAt(-11.4) + 0.42, facing: -PI / 2, kind: 'office' },
+  ];
+  G.btsSitters = [];
+  for (const slot of slots) {
+    const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
+    ped.btsSit = true;
+    ped.anchor = { slot: new THREE.Vector3(slot.x, slot.y, slot.z), facing: slot.facing };
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = slot.facing;
+    ped.mesh.position.set(slot.x, slot.y, slot.z);
+    ped.mesh.rotation.y = slot.facing;
+    G.btsSitters.push(ped);
+  }
+}
+
 export function spawnCoconutCarts(scene) {
   if (!GAMEPLAY.coconutCart) return;
   const sois = (G.world && G.world.sois) || [];
