@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -1860,6 +1860,37 @@ async function main() {
     });
     assert(drink.flag && drink.onSoi && drink.chairs >= 2 && drink.crates >= 2, `chairs and crates on a soi (${drink.chairs})`);
     assert(drink.night >= 2 && drink.dayGone, 'drinkers sit after dark and clear by day');
+
+    console.log('\n[62] soi mechanic');
+    const wrench = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const shop = G.soiMechanic;
+      const ped = shop && shop.ped;
+      const bike = shop && shop.bike;
+      const stand = shop && shop.stand && shop.stand.name === 'paddock-stand';
+      const tool = !!(ped && ped.mesh && ped.mesh.getObjectByName('wrench'));
+      const pinned = !!(bike && bike._standHome && bike.driver !== 'player');
+      const car = G.vehicles.find(v => v && v.spec && v.spec.kind !== 'boat' && v.spec.kind !== 'airliner' && v !== bike) || main.makeVehicle('camry', G.scene);
+      G.player.inVehicle = car;
+      car.driver = 'player';
+      car.hp = 40;
+      car.tiresBlown = true;
+      car.pos.set(shop.x, 0, shop.z);
+      G.cash = 200;
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+      main.updateSoiMechanic(0.016);
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      const fixed = car.hp === 100 && car.tiresBlown === false && G.cash === 120;
+      G.player.inVehicle = null;
+      car.driver = car.npc ? 'npc' : null;
+      return {
+        flag: !!(G.gameplay && G.gameplay.soiMechanic),
+        ped: !!(ped && ped.soiMechanic), stand, tool, pinned, onSoi: !!(shop && shop.soi), fixed,
+      };
+    });
+    assert(wrench.flag && wrench.ped && wrench.stand && wrench.tool && wrench.onSoi, 'a mechanic waits with a bike on a stand');
+    assert(wrench.pinned && wrench.fixed, 'the shop bike stays put and E patches a wreck for ฿80');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

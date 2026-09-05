@@ -366,7 +366,7 @@ export function updateVehicles(dt) {
   for (const v of G.vehicles) {
     if (v.dead) continue;
     if (v._standHome && v.driver !== 'player') {
-      v.pos.set(v._standHome.x, 0, v._standHome.z);
+      v.pos.set(v._standHome.x, v._standHome.y || 0, v._standHome.z);
       v.heading = v._standHome.heading;
       v.vel = 0; v.latVel = 0; v.yawRate = 0;
       v._impactVX = 0; v._impactVZ = 0; v._impactSpin = 0;

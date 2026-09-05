@@ -1694,6 +1694,52 @@ export function spawnSoiChairs(scene) {
   }
 }
 
+export function spawnSoiMechanic(scene) {
+  if (!GAMEPLAY.soiMechanic) return;
+  const sois = (G.world && G.world.sois) || [];
+  if (sois.length < 4) return;
+  const s = sois[3];
+  const alongZ = s.axis === 'z';
+  const t = 0.22;
+  const x = alongZ ? (s.x0 + s.x1) * 0.5 + 1.8 : s.x0 + (s.x1 - s.x0) * t;
+  const z = alongZ ? s.z0 + (s.z1 - s.z0) * t : (s.z0 + s.z1) * 0.5 + 1.8;
+  const heading = alongZ ? PI / 2 : 0;
+  const stand = new THREE.Group();
+  stand.name = 'paddock-stand';
+  const steel = new THREE.MeshStandardMaterial({ color: 0x4a4a50, roughness: 0.45, metalness: 0.4 });
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.55, 0.08), steel);
+  bar.position.y = 0.28; stand.add(bar);
+  const base = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.06, 0.28), steel);
+  base.position.y = 0.03; stand.add(base);
+  stand.position.set(x, 0, z);
+  scene.add(stand);
+  const bike = makeVehicle('bike', scene);
+  bike.pos.set(x, 0, z);
+  bike.heading = heading;
+  bike.mesh.position.set(x, 0.28, z);
+  bike.mesh.rotation.y = heading;
+  bike.driver = null;
+  bike.vel = 0;
+  bike.soiMechanic = true;
+  bike._standHome = { x, y: 0.28, z, heading };
+  const ped = spawnPed(scene, new THREE.Vector3(x + (alongZ ? 0 : 1.1), 0, z + (alongZ ? 1.1 : 0)), 'laborer');
+  ped.soiMechanic = true;
+  ped.anchor = { slot: ped.mesh.position.clone(), facing: heading + PI };
+  ped.speed = 0;
+  ped.state = 'idle';
+  ped.heading = heading + PI;
+  ped.mesh.rotation.y = ped.heading;
+  const wrench = new THREE.Mesh(
+    new THREE.BoxGeometry(0.04, 0.04, 0.28),
+    new THREE.MeshStandardMaterial({ color: 0x888890, metalness: 0.5, roughness: 0.35 })
+  );
+  wrench.name = 'wrench';
+  const pp = ped.mesh.userData.parts;
+  if (pp && pp.foreR) { wrench.position.set(0.02, -0.22, 0.08); pp.foreR.add(wrench); }
+  else { wrench.position.set(0.22, 1.05, 0.12); ped.mesh.add(wrench); }
+  G.soiMechanic = { ped, bike, stand, soi: s, x, z };
+}
+
 function makeCheckpointCone() {
   const g = new THREE.Group();
   g.name = 'checkpoint-cone';

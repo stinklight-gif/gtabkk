@@ -288,6 +288,7 @@ export const GAMEPLAY = {
   sevenGuard: true,       // plastic-chair security at the walk-in 7-Eleven
   soiPa: true,            // village PA horns on soi poles; crackle at dawn and afternoon
   soiChairs: true,        // plastic chairs + beer crates; drinkers sit after dark
+  soiMechanic: true,      // paddock-stand bike + mechanic; E repairs your ride for ฿80
 };
 G.gameplay = GAMEPLAY;
 

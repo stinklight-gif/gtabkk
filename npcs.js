@@ -197,14 +197,14 @@ export function resyncCrowd() {
   // pull stray wanderers onto nearby sidewalks so the count near the camera
   // reflects the hour immediately (harness-only; gameplay distributes gradually)
   for (const ped of G.peds) {
-    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink) continue;
+    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic) continue;
     if (dist2(ped.mesh.position, pp) > 95 * 95) ped.mesh.position.copy(sidewalkPos(pp.x, pp.z, 88));
   }
   for (let guard = 0; G.peds.length > target && guard < 500; guard++) {
     let fi = -1, fd = -1;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic) continue;
       const d = dist2(ped.mesh.position, pp);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -490,7 +490,7 @@ export function updatePeds(dt) {
     let fi = -1, fd = 60 * 60;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic) continue;
       const d = dist2(ped.mesh.position, playerPos);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -1124,6 +1124,37 @@ export function updateSoiChairs(dt) {
   }
 }
 
+export function updateSoiMechanic(dt) {
+  if (!GAMEPLAY.soiMechanic || !G.soiMechanic) return;
+  const shop = G.soiMechanic;
+  const ped = shop.ped;
+  if (ped && ped.mesh && ped.anchor && ped.anchor.slot) {
+    ped.soiMechanic = true;
+    ped.mesh.position.set(ped.anchor.slot.x, 0, ped.anchor.slot.z);
+    ped.heading = ped.anchor.facing;
+    ped.mesh.rotation.y = ped.heading;
+    ped.speed = 0;
+    ped.state = 'idle';
+  }
+  const v = G.player && G.player.inVehicle;
+  if (!v || v.dead) return;
+  if (dist2(v.pos, shop) > 4.8 * 4.8) return;
+  if (v.hp >= 100 && !v.tiresBlown) {
+    G.hud.showPrompt('Soi mechanic — ride looks fine', 0.35);
+    return;
+  }
+  G.hud.showPrompt('Press <b>E</b> to patch the ride · ฿80', 0.4);
+  if (!G.input.pressed('KeyE')) return;
+  if (G.cash < 80) { G.hud.showNotif('Need ฿80 for a patch'); return; }
+  G.cash -= 80;
+  v.hp = 100;
+  v.tiresBlown = false;
+  if (v.smoke) { v.smoke.life = 0; v.smoke = null; }
+  if (G.hud.setCash) G.hud.setCash(G.cash);
+  G.hud.showNotif('Patched — ซ่อมแล้ว');
+  if (G.audio && G.audio.chime) G.audio.chime();
+}
+
 export function updateSevenGuard(dt) {
   if (!GAMEPLAY.sevenGuard || !G.sevenGuard) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
@@ -1340,7 +1371,7 @@ export function updateSeekShade(dt) {
   let n = 0;
   for (const ped of G.peds) {
     if (n >= 22) break;
-    if (!ped || ped.dead || ped.anchor || ped.gang || ped.pillion || ped.alms || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.checkpoint || ped.btsSit || ped.sevenGuard || ped.soiDrink || ped.panicT > 0) continue;
+    if (!ped || ped.dead || ped.anchor || ped.gang || ped.pillion || ped.alms || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.checkpoint || ped.btsSit || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.panicT > 0) continue;
     if (ped.social || ped.isMugger || ped.isTarget || ped.motosaiRider || ped.motosaiWait) continue;
     const w = nearestWalkway(ped.mesh.position.x, ped.mesh.position.z);
     if (!w) continue;
