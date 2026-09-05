@@ -653,6 +653,17 @@ export function buildWorld(scene) {
       bake(flatBaker, g, floodMat, cx, 0.06, cz, 0, -PI / 2, 0, false, false);
       g.dispose();
     }
+    if (GAMEPLAY.floodSois) {
+      const n = Math.min(3, (world.sois || []).length);
+      for (let i = 0; i < n; i++) {
+        const s = world.sois[i];
+        world.flood.push({ x0: s.x0, x1: s.x1, z0: s.z0, z1: s.z1, soi: true });
+        const w = s.x1 - s.x0, d = s.z1 - s.z0;
+        const g = new THREE.PlaneGeometry(w, d);
+        bake(flatBaker, g, floodMat, (s.x0 + s.x1) / 2, 0.07, (s.z0 + s.z1) / 2, 0, -PI / 2, 0, false, false);
+        g.dispose();
+      }
+    }
   }
 
   // ---- Build rooftop-decor InstancedMeshes from the matrices gathered above ----

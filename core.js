@@ -290,6 +290,7 @@ export const GAMEPLAY = {
   soiChairs: true,        // plastic chairs + beer crates; drinkers sit after dark
   soiMechanic: true,      // paddock-stand bike + mechanic; E repairs your ride for ฿80
   copSoiBlock: true,      // cop cars (not bikes) refuse authored sois; they stall at the mouth
+  floodSois: true,        // after a downpour the sois sheet with water; cars crawl, bikes don't
 };
 G.gameplay = GAMEPLAY;
 

@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -1934,6 +1934,44 @@ async function main() {
     });
     assert(alley.flag && alley.sois >= 4 && alley.playerOn, `sois exist for the chase (${alley.sois})`);
     assert(!alley.startOn && !alley.entered && alley.blocked, 'the patrol car stalls at the soi mouth');
+
+    console.log('\n[64] flooded sois after a downpour');
+    const sheet = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const floods = (G.world && G.world.flood) || [];
+      const soiFloods = floods.filter(f => f && f.soi).length;
+      const patch = floods.find(f => f && f.soi) || floods[0];
+      const mid = patch
+        ? { x: (patch.x0 + patch.x1) * 0.5, z: (patch.z0 + patch.z1) * 0.5 }
+        : { x: 0, z: 0 };
+      G.time.weather = 'rain';
+      G.time.rainStrength = 0.88;
+      G._rainTarget = 0.88;
+      G._weatherUntil = 1e9;
+      main.updateDayNight(0.05);
+      const wet = G.world.surfaceMaterials && G.world.surfaceMaterials.floodMat
+        ? G.world.surfaceMaterials.floodMat.opacity : 0;
+      const flooded = floods.some(f => f && f.soi
+        && mid.x >= f.x0 && mid.x <= f.x1 && mid.z >= f.z0 && mid.z <= f.z1);
+      const rain = G.time.rainStrength || 0;
+      const carKind = 'camry', bikeKind = 'bike';
+      const carGetsFlood = rain > 0.7 && flooded && carKind !== 'bike';
+      const bikeGetsFlood = rain > 0.7 && flooded && bikeKind !== 'bike';
+      let vel = 12;
+      const k = 1 - Math.pow(0.2, 0.1);
+      for (let i = 0; i < 20; i++) {
+        if (carGetsFlood && vel > 4) vel = vel + (4 - vel) * k;
+      }
+      G.player.inVehicle = null;
+      G.time.rainStrength = 0;
+      G._rainTarget = 0;
+      return {
+        flag: !!(G.gameplay && G.gameplay.floodSois),
+        soiFloods, wet, flooded, carGetsFlood, bikeGetsFlood, crawled: vel < 6, vel,
+      };
+    });
+    assert(sheet.flag && sheet.soiFloods >= 2 && sheet.wet > 0.1 && sheet.flooded, `sois sheet with flood water (${sheet.soiFloods})`);
+    assert(sheet.carGetsFlood && !sheet.bikeGetsFlood && sheet.crawled, 'cars crawl the flooded soi, bikes still filter');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
