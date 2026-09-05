@@ -1764,6 +1764,52 @@ export function spawnSevenBikes(scene) {
   }
 }
 
+export function spawnSevenGuard(scene) {
+  if (!GAMEPLAY.sevenGuard) return;
+  const seven = G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0]));
+  if (!seven || !seven.pos) return;
+  const hz = seven.hz || 4;
+  const x = seven.pos.x - 3.1, z = seven.pos.z + hz + 1.15;
+  const chair = new THREE.Group();
+  chair.name = 'seven-chair';
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.04, 0.42), new THREE.MeshStandardMaterial({ color: 0xd8d0c0, roughness: 0.7 }));
+  seat.position.y = 0.42; chair.add(seat);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.46, 0.04), seat.material);
+  back.position.set(0, 0.65, -0.2); chair.add(back);
+  for (const [sx, sz] of [[-0.16, -0.16], [0.16, -0.16], [-0.16, 0.16], [0.16, 0.16]]) {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.42, 5), new THREE.MeshStandardMaterial({ color: 0x888890, roughness: 0.5, metalness: 0.3 }));
+    leg.position.set(sx, 0.21, sz); chair.add(leg);
+  }
+  chair.position.set(x, 0, z);
+  scene.add(chair);
+  const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'laborer');
+  recolorTorso(ped.mesh.userData.parts, 0x1a3a6a, 0.7);
+  ped.sevenGuard = true;
+  ped.anchor = { slot: new THREE.Vector3(x, 0.42, z), facing: PI };
+  ped.speed = 0;
+  ped.state = 'idle';
+  ped.heading = PI;
+  ped.mesh.position.set(x, 0.42, z);
+  ped.mesh.rotation.y = PI;
+  const torch = new THREE.Group();
+  torch.name = 'flashlight';
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.16, 6), new THREE.MeshStandardMaterial({ color: 0x1a1a1e, roughness: 0.45 }));
+  handle.rotation.x = PI / 2; torch.add(handle);
+  const beam = new THREE.Mesh(
+    new THREE.ConeGeometry(0.35, 1.6, 8, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xffe6a0, transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide })
+  );
+  beam.name = 'flashlight-beam';
+  beam.rotation.x = PI / 2; beam.position.z = 0.95; torch.add(beam);
+  const light = new THREE.PointLight(0xffe0a0, 0, 10, 2);
+  light.position.z = 0.2; torch.add(light);
+  const pp = ped.mesh.userData.parts;
+  if (pp && pp.foreR) { torch.position.set(0.02, -0.2, 0.08); pp.foreR.add(torch); }
+  else { torch.position.set(0.2, 0.9, 0.15); ped.mesh.add(torch); }
+  beam.visible = false;
+  G.sevenGuard = { ped, chair, light, beam, x, z };
+}
+
 export function spawnBtsSitters(scene) {
   if (!GAMEPLAY.btsSitters) return;
   const bts = G.world && G.world.bts;
