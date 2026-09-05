@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -1842,6 +1842,24 @@ async function main() {
     });
     assert(pa.flag && pa.n >= 2 && pa.horns >= 2 && pa.onSoi >= 2, `soi PA horns on the alleys (${pa.n})`);
     assert(pa.morning && pa.midday && pa.afternoon, 'PA crackles at morning and afternoon, not midday');
+
+    console.log('\n[61] soi chairs and beer crates');
+    const drink = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const set = G.soiChairs;
+      const chairs = set && set.seats ? set.seats.filter(s => s && s.mesh && s.mesh.name === 'plastic-chair').length : 0;
+      const crates = set && set.crates ? set.crates.filter(c => c && c.name === 'beer-crate').length : 0;
+      G.time.dayT = 20.2 / 24;
+      main.updateSoiChairs(0.05);
+      main.updatePeds(0.05);
+      const night = (G._soiDrinkers || []).filter(p => p && p.soiDrink && p.mesh && p.mesh.position.y >= 0.3).length;
+      G.time.dayT = 12 / 24;
+      main.updateSoiChairs(0.05);
+      const dayGone = !(G._soiDrinkers && G._soiDrinkers.length);
+      return { flag: !!(G.gameplay && G.gameplay.soiChairs), chairs, crates, night, dayGone, onSoi: !!(set && set.soi) };
+    });
+    assert(drink.flag && drink.onSoi && drink.chairs >= 2 && drink.crates >= 2, `chairs and crates on a soi (${drink.chairs})`);
+    assert(drink.night >= 2 && drink.dayGone, 'drinkers sit after dark and clear by day');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

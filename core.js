@@ -287,6 +287,7 @@ export const GAMEPLAY = {
   watTurtles: true,       // turtles paddle the pond at the wat
   sevenGuard: true,       // plastic-chair security at the walk-in 7-Eleven
   soiPa: true,            // village PA horns on soi poles; crackle at dawn and afternoon
+  soiChairs: true,        // plastic chairs + beer crates; drinkers sit after dark
 };
 G.gameplay = GAMEPLAY;
 

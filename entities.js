@@ -1645,6 +1645,55 @@ export function spawnSoiPa(scene) {
   }
 }
 
+function makePlasticChair() {
+  const g = new THREE.Group();
+  g.name = 'plastic-chair';
+  const mat = new THREE.MeshStandardMaterial({ color: 0xd8d0c0, roughness: 0.7 });
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.04, 0.42), mat);
+  seat.position.y = 0.42; g.add(seat);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.46, 0.04), mat);
+  back.position.set(0, 0.65, -0.2); g.add(back);
+  const steel = new THREE.MeshStandardMaterial({ color: 0x888890, roughness: 0.5, metalness: 0.3 });
+  for (const [sx, sz] of [[-0.16, -0.16], [0.16, -0.16], [-0.16, 0.16], [0.16, 0.16]]) {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.42, 5), steel);
+    leg.position.set(sx, 0.21, sz); g.add(leg);
+  }
+  return g;
+}
+
+export function spawnSoiChairs(scene) {
+  if (!GAMEPLAY.soiChairs) return;
+  const sois = (G.world && G.world.sois) || [];
+  if (sois.length < 3) return;
+  const s = sois[2];
+  const alongZ = s.axis === 'z';
+  const t = 0.72;
+  const midX = alongZ ? (s.x0 + s.x1) * 0.5 : s.x0 + (s.x1 - s.x0) * t;
+  const midZ = alongZ ? s.z0 + (s.z1 - s.z0) * t : (s.z0 + s.z1) * 0.5;
+  const ox = alongZ ? 1.7 : 0, oz = alongZ ? 0 : 1.7;
+  const facing = alongZ ? -PI / 2 : 0;
+  G.soiChairs = { soi: s, seats: [], crates: [], x: midX + ox, z: midZ + oz };
+  const crateMat = new THREE.MeshStandardMaterial({ color: 0xc45a1a, roughness: 0.75 });
+  for (let i = 0; i < 2; i++) {
+    const chair = makePlasticChair();
+    const x = midX + ox + (alongZ ? 0 : (i - 0.5) * 0.85);
+    const z = midZ + oz + (alongZ ? (i - 0.5) * 0.85 : 0);
+    chair.position.set(x, 0, z);
+    chair.rotation.y = facing;
+    scene.add(chair);
+    G.soiChairs.seats.push({ mesh: chair, x, z, facing });
+  }
+  for (let i = 0; i < 2; i++) {
+    const crate = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.28, 0.38), crateMat);
+    crate.name = 'beer-crate';
+    const x = midX + ox + (alongZ ? 0.55 : (i - 0.5) * 0.5);
+    const z = midZ + oz + (alongZ ? (i - 0.5) * 0.5 : 0.55);
+    crate.position.set(x, 0.14, z);
+    scene.add(crate);
+    G.soiChairs.crates.push(crate);
+  }
+}
+
 function makeCheckpointCone() {
   const g = new THREE.Group();
   g.name = 'checkpoint-cone';
