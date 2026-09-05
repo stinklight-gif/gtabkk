@@ -382,6 +382,11 @@ export function updateInteraction(dt) {
   if (GAMEPLAY.mooPing && G.mooPing) {
     for (const c of G.mooPing) if (c.mesh && dist2(c.mesh.position, pp0) < 2.2 * 2.2) return;
   }
+  if (GAMEPLAY.dawnAlms && G._alms) {
+    for (const ped of G._alms) {
+      if (ped && ped.mesh && !ped.dead && dist2(ped.mesh.position, pp0) < 2.2 * 2.2) return;
+    }
+  }
 
   const crate = G.world.yaowaratCrate;
   if (crate && !crate.taken && dist2(p.group.position, crate.pos) < 2.6 * 2.6) {

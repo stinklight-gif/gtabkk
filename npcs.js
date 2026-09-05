@@ -246,6 +246,12 @@ export function updatePeds(dt) {
       }
       continue;
     }
+    if (ped.alms && ped._almsSoi) {
+      ped.mesh.rotation.y = ped.heading;
+      updatePedRainProp(ped);
+      animateWalk(ped.mesh, ped.speed, dt, ped.speed > 0.05);
+      continue;
+    }
     if (ped.btsWait) {
       const y = ped.btsY || 13.9;
       if (ped.btsBoarded || !ped.mesh.visible) {
@@ -911,31 +917,92 @@ export function updateVigilante(dt) {
 }
 
 export function updateAlms(dt) {
+  if (!GAMEPLAY.dawnAlms) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const sois = (G.world && G.world.sois) || [];
   const temple = G.world && G.world.poi && G.world.poi.temple;
-  if (!temple) return;
   if (h >= 5 && h < 7) {
     G._alms = G._alms || [];
-    const ways = (G.world.walkways || []).filter(w => {
-      const mx = (w.x0 + w.x1) / 2, mz = (w.z0 + w.z1) / 2;
-      return dist2({ x: mx, z: mz }, temple) < 80 * 80;
-    });
+    // soi[2] sits on the wat's north–south column (i=2); tak bat walks the alley, not the wat lawn.
+    const s = sois[2] || sois[0] || null;
+    const alongZ = !!(s && s.axis === 'z');
     while (G._alms.length < 3) {
-      const w = ways[G._alms.length] || ways[0] || null;
-      const pos = w
-        ? new THREE.Vector3((w.x0 + w.x1) / 2, 0, (w.z0 + w.z1) / 2)
-        : new THREE.Vector3(temple.x + rand(-12, 12), 0, temple.z + rand(-12, 12));
-      const ped = spawnPed(G.scene, pos);
-      ped.kind = 'monk'; ped.mesh.userData.kind = 'monk';
-      ped.anchor = null; ped.state = 'walking'; ped.alms = true;
-      ped.heading = Math.atan2(temple.x - pos.x, temple.z - pos.z);
+      const i = G._alms.length;
+      const t = 0.18 + i * 0.16;
+      let pos;
+      if (s) {
+        pos = new THREE.Vector3(
+          alongZ ? (s.x0 + s.x1) * 0.5 : s.x0 + (s.x1 - s.x0) * t,
+          0,
+          alongZ ? s.z0 + (s.z1 - s.z0) * t : (s.z0 + s.z1) * 0.5,
+        );
+      } else if (temple) {
+        pos = new THREE.Vector3(temple.x + rand(-12, 12), 0, temple.z + rand(-12, 12));
+      } else return;
+      const ped = spawnPed(G.scene, pos, 'monk');
+      ped.kind = 'monk';
+      if (ped.mesh) ped.mesh.userData.kind = 'monk';
+      ped.anchor = null;
+      ped.state = 'walking';
+      ped.alms = true;
+      ped._almsT = t;
+      ped._almsDir = 1;
+      ped._almsSoi = s;
+      ped._almsGiven = false;
+      ped.heading = alongZ ? 0 : PI / 2;
+      ped.speed = 0.85;
       G._alms.push(ped);
     }
+    const pp = G.player && G.player.group && G.player.group.position;
+    const onFoot = !!(pp && !G.player.inVehicle && !G._eating);
     for (const ped of G._alms) {
-      if (!ped || ped.dead) continue;
-      const dx = temple.x - ped.mesh.position.x, dz = temple.z - ped.mesh.position.z;
-      if (Math.hypot(dx, dz) > 6) { ped.heading = Math.atan2(dx, dz); ped.speed = 0.85; }
-      else ped.speed = 0.4;
+      if (!ped || ped.dead || !ped.mesh) continue;
+      ped.alms = true;
+      const soi = ped._almsSoi || s;
+      const near = onFoot && dist2(ped.mesh.position, pp) < 2.2 * 2.2;
+      if (soi) {
+        const az = soi.axis === 'z';
+        if (!near) {
+          ped._almsT += (ped._almsDir || 1) * dt * 0.028;
+          if (ped._almsT > 0.88) { ped._almsT = 0.88; ped._almsDir = -1; }
+          if (ped._almsT < 0.12) { ped._almsT = 0.12; ped._almsDir = 1; }
+        }
+        const t = ped._almsT;
+        const x = az ? (soi.x0 + soi.x1) * 0.5 : soi.x0 + (soi.x1 - soi.x0) * t;
+        const z = az ? soi.z0 + (soi.z1 - soi.z0) * t : (soi.z0 + soi.z1) * 0.5;
+        ped.mesh.position.set(x, 0, z);
+        ped.heading = az ? ((ped._almsDir || 1) > 0 ? 0 : PI) : ((ped._almsDir || 1) > 0 ? PI / 2 : -PI / 2);
+        ped.mesh.rotation.y = ped.heading;
+        ped.speed = near ? 0 : 0.85;
+        ped.state = near ? 'idle' : 'walking';
+      } else if (temple) {
+        const dx = temple.x - ped.mesh.position.x, dz = temple.z - ped.mesh.position.z;
+        if (Math.hypot(dx, dz) > 6) { ped.heading = Math.atan2(dx, dz); ped.speed = near ? 0 : 0.85; }
+        else ped.speed = near ? 0 : 0.4;
+        ped.mesh.rotation.y = ped.heading;
+      }
+    }
+    if (!onFoot) return;
+    for (const ped of G._alms) {
+      if (!ped || ped.dead || !ped.mesh) continue;
+      if (dist2(ped.mesh.position, pp) > 2.2 * 2.2) continue;
+      if (ped._almsGiven) {
+        G.hud.showPrompt('The monk has already received', 0.35);
+        return;
+      }
+      G.hud.showPrompt('Press <b>E</b> to offer alms · ฿20', 0.4);
+      if (G.input.pressed('KeyE')) {
+        if (G.cash < 20) { G.hud.showNotif('Need ฿20 for alms'); return; }
+        G.cash -= 20;
+        if (G.hud.setCash) G.hud.setCash(G.cash);
+        ped._almsGiven = true;
+        G.wanted.lastSeenAt = Math.max(0, (G.wanted.lastSeenAt || performance.now()) - 14000);
+        G._almsOffered = (G._almsOffered || 0) + 1;
+        G.hud.showNotif('Alms offered — ทำบุญ');
+        if (G.audio && G.audio.bell) G.audio.bell();
+        else if (G.audio && G.audio.chime) G.audio.chime();
+      }
+      return;
     }
   } else if (G._alms && G._alms.length) {
     for (const ped of G._alms) {

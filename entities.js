@@ -843,6 +843,7 @@ export function makePedMesh(forcedKind = null, pos = null) {
     bag.position.set(0, -0.56, 0.02); armR.add(bag);                    // hangs from the hand, swings with the arm
   } else if (kind === 'monk') {
     const bowl = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6, 0, TAU, 0, PI/2), new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.7 }));
+    bowl.name = 'alms-bowl';
     bowl.rotation.x = PI; bowl.position.set(0, 1.0, 0.2); g.add(bowl);
   } else if (kind === 'school') {
     const pack = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.34, 0.16), new THREE.MeshStandardMaterial({ color: pick([0x1c355e, 0xc44a3a, 0x2a5a3a]), roughness: 0.82 }));

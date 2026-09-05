@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -1869,19 +1869,39 @@ async function main() {
       const bike = shop && shop.bike;
       const stand = shop && shop.stand && shop.stand.name === 'paddock-stand';
       const tool = !!(ped && ped.mesh && ped.mesh.getObjectByName('wrench'));
+      if (bike && bike._standHome) {
+        bike.driver = null;
+        bike.vel = 0;
+        bike.pos.set(bike._standHome.x, 0, bike._standHome.z);
+        if (bike.mesh) {
+          bike.mesh.position.set(bike._standHome.x, bike._standHome.y || 0.28, bike._standHome.z);
+          bike.mesh.rotation.y = bike._standHome.heading || 0;
+        }
+      }
       const pinned = !!(bike && bike._standHome && bike.driver !== 'player');
       const car = G.vehicles.find(v => v && v.spec && v.spec.kind !== 'boat' && v.spec.kind !== 'airliner' && v !== bike) || main.makeVehicle('camry', G.scene);
       G.player.inVehicle = car;
+      G._eating = null;
       car.driver = 'player';
+      car.dead = false;
       car.hp = 40;
       car.tiresBlown = true;
-      car.pos.set(shop.x, 0, shop.z);
+      if (shop) {
+        car.pos.set(shop.x, 0, shop.z);
+        if (car.mesh) car.mesh.position.copy(car.pos);
+        G.player.group.position.set(shop.x, 0, shop.z);
+      }
       G.cash = 200;
-      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
-      main.updateSoiMechanic(0.016);
       window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
       if (G.input && G.input.endFrame) G.input.endFrame();
-      const fixed = car.hp === 100 && car.tiresBlown === false && G.cash === 120;
+      let fixed = false;
+      for (let i = 0; i < 4 && !fixed; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateSoiMechanic(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        fixed = car.hp === 100 && car.tiresBlown === false && G.cash === 120;
+      }
       G.player.inVehicle = null;
       car.driver = car.npc ? 'npc' : null;
       return {
@@ -1972,6 +1992,54 @@ async function main() {
     });
     assert(sheet.flag && sheet.soiFloods >= 2 && sheet.wet > 0.1 && sheet.flooded, `sois sheet with flood water (${sheet.soiFloods})`);
     assert(sheet.carGetsFlood && !sheet.bikeGetsFlood && sheet.crawled, 'cars crawl the flooded soi, bikes still filter');
+
+    console.log('\n[65] dawn alms on a soi');
+    const takbat = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      G.time.dayT = 5.6 / 24;
+      G.player.inVehicle = null;
+      G._eating = null;
+      G.player.group.visible = true;
+      G._almsOffered = 0;
+      main.updateAlms(0.05);
+      const monks = (G._alms || []).filter(p => p && p.alms && p.kind === 'monk');
+      const sois = (G.world && G.world.sois) || [];
+      const onSoi = (x, z) => sois.some(c => x >= c.x0 && x <= c.x1 && z >= c.z0 && z <= c.z1);
+      const placed = monks.filter(p => p.mesh && onSoi(p.mesh.position.x, p.mesh.position.z)).length;
+      const m0 = monks[0];
+      const start = m0 && m0.mesh ? { x: m0.mesh.position.x, z: m0.mesh.position.z } : null;
+      if (m0 && m0.mesh) G.player.group.position.set(m0.mesh.position.x + 50, 0, m0.mesh.position.z + 50);
+      for (let i = 0; i < 40; i++) main.updateAlms(0.25);
+      const moved = !!(m0 && start && Math.hypot(m0.mesh.position.x - start.x, m0.mesh.position.z - start.z) > 0.4);
+      const bowl = !!(m0 && m0.mesh && m0.mesh.getObjectByName('alms-bowl'));
+      if (m0 && m0.mesh) G.player.group.position.copy(m0.mesh.position);
+      G.cash = 80;
+      G.wanted.stars = 2;
+      G.wanted.lastSeenAt = performance.now();
+      const seen0 = G.wanted.lastSeenAt;
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let paid = false;
+      for (let i = 0; i < 4 && !paid; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateAlms(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        paid = G.cash === 60;
+      }
+      const cooled = G.wanted.lastSeenAt < seen0 - 1000;
+      G.time.dayT = 12 / 24;
+      main.updateAlms(0.05);
+      const gone = !(G._alms && G._alms.length);
+      return {
+        flag: !!(G.gameplay && G.gameplay.dawnAlms),
+        n: monks.length, placed, moved, bowl, paid, cooled, offered: G._almsOffered, gone,
+      };
+    });
+    assert(takbat.flag && takbat.n >= 3 && takbat.placed >= 2 && takbat.bowl, `dawn monks walk a soi (${takbat.n})`);
+    assert(takbat.moved, 'alms round moves along the soi');
+    assert(takbat.paid && takbat.cooled && takbat.offered >= 1, 'E offers ฿20 and cools heat');
+    assert(takbat.gone, 'monks end the round after morning');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

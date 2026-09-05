@@ -291,6 +291,7 @@ export const GAMEPLAY = {
   soiMechanic: true,      // paddock-stand bike + mechanic; E repairs your ride for ฿80
   copSoiBlock: true,      // cop cars (not bikes) refuse authored sois; they stall at the mouth
   floodSois: true,        // after a downpour the sois sheet with water; cars crawl, bikes don't
+  dawnAlms: true,         // 5–7h tak bat: monks walk a soi; E offers ฿20 and cools heat
 };
 G.gameplay = GAMEPLAY;
 
