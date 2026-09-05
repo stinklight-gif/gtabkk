@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, TURFS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, yaowaratNightOpen, inYaowarat, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
-import { animateWalk, damagePlayer, recolorTorso, resolvePedVsBuildings, saveGame, sidewalkPos, spawnPed, spawnWalkingPair } from './main.js';
+import { animateWalk, damagePlayer, raiseWanted, recolorTorso, resolvePedVsBuildings, saveGame, sidewalkPos, spawnPed, spawnWalkingPair } from './main.js';
 import { lightFor } from './traffic.js';
 
 // 13. PEDESTRIANS + DOGS
@@ -197,14 +197,14 @@ export function resyncCrowd() {
   // pull stray wanderers onto nearby sidewalks so the count near the camera
   // reflects the hour immediately (harness-only; gameplay distributes gradually)
   for (const ped of G.peds) {
-    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart) continue;
+    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint) continue;
     if (dist2(ped.mesh.position, pp) > 95 * 95) ped.mesh.position.copy(sidewalkPos(pp.x, pp.z, 88));
   }
   for (let guard = 0; G.peds.length > target && guard < 500; guard++) {
     let fi = -1, fd = -1;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint) continue;
       const d = dist2(ped.mesh.position, pp);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -468,7 +468,7 @@ export function updatePeds(dt) {
     let fi = -1, fd = 60 * 60;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint) continue;
       const d = dist2(ped.mesh.position, playerPos);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -1073,6 +1073,40 @@ export function updateCrossingGuards(dt) {
   }
 }
 
+export function updateCheckpoint(dt) {
+  if (!GAMEPLAY.nightCheckpoint || !G.checkpoint) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const night = h >= 21 || h < 5.2;
+  const cp = G.checkpoint;
+  cp.active = night;
+  const cop = cp.cop;
+  if (cop && cop.mesh) {
+    cop.mesh.visible = night;
+    cop.checkpoint = true;
+    if (cop.anchor && cop.anchor.slot) {
+      cop.mesh.position.set(cop.anchor.slot.x, 0, cop.anchor.slot.z);
+      cop.heading = cop.anchor.facing;
+      cop.mesh.rotation.y = cop.heading;
+      cop.speed = 0;
+      cop.state = 'idle';
+    }
+  }
+  if (cp.light) cp.light.intensity = night ? 1.6 : 0;
+  if (cp.beam) cp.beam.visible = night;
+  if (!night) { cp.flagged = false; return; }
+  const p = G.player;
+  const v = p && p.inVehicle;
+  if (v && v.driver === 'player' && !cp.flagged) {
+    if (dist2(v.pos, cp) < 9 * 9 && Math.abs(v.vel || 0) > 8) {
+      cp.flagged = true;
+      raiseWanted(1, 2);
+      if (G.hud && G.hud.showNotif) G.hud.showNotif('Ran the checkpoint');
+    }
+  } else if (!v && p && p.group && dist2(p.group.position, cp) < 7 * 7) {
+    if (G.hud && G.hud.showPrompt) G.hud.showPrompt('Checkpoint — slow down', 0.35);
+  }
+}
+
 export function updateLottery(dt) {
   if (!GAMEPLAY.lottery || !G.lottery) return;
   if (G.player.inVehicle || G._eating) return;
@@ -1235,7 +1269,7 @@ export function updateSeekShade(dt) {
   let n = 0;
   for (const ped of G.peds) {
     if (n >= 22) break;
-    if (!ped || ped.dead || ped.anchor || ped.gang || ped.pillion || ped.alms || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.panicT > 0) continue;
+    if (!ped || ped.dead || ped.anchor || ped.gang || ped.pillion || ped.alms || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.checkpoint || ped.panicT > 0) continue;
     if (ped.social || ped.isMugger || ped.isTarget || ped.motosaiRider || ped.motosaiWait) continue;
     const w = nearestWalkway(ped.mesh.position.x, ped.mesh.position.z);
     if (!w) continue;

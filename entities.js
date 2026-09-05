@@ -1521,6 +1521,140 @@ export function spawnLaundry(scene) {
   }
 }
 
+function makeCheckpointCone() {
+  const g = new THREE.Group();
+  g.name = 'checkpoint-cone';
+  const body = new THREE.Mesh(
+    new THREE.ConeGeometry(0.18, 0.56, 7),
+    new THREE.MeshStandardMaterial({ color: 0xff6a1a, roughness: 0.55, emissive: 0xff3a00, emissiveIntensity: 0.14 })
+  );
+  body.position.y = 0.28;
+  g.add(body);
+  const stripe = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.11, 0.14, 0.055, 7),
+    new THREE.MeshStandardMaterial({ color: 0xf4f4f4, roughness: 0.45 })
+  );
+  stripe.position.y = 0.2;
+  g.add(stripe);
+  return g;
+}
+
+function dressCheckpointCop(ped, slot) {
+  const pp = ped.mesh.userData.parts;
+  recolorTorso(pp, 0x8a7f4a, 0.7);
+  const pants = new THREE.MeshStandardMaterial({ color: 0x4a4030, roughness: 0.8 });
+  for (const part of (pp.pantsParts || [pp.legL, pp.legR])) if (part) part.material = pants;
+  const vest = new THREE.Mesh(
+    new THREE.BoxGeometry(0.42, 0.38, 0.28),
+    new THREE.MeshStandardMaterial({ color: 0xc8e04a, roughness: 0.6, emissive: 0x88aa20, emissiveIntensity: 0.16 })
+  );
+  vest.name = 'checkpoint-vest';
+  vest.position.set(0, 1.18, 0.04);
+  ped.mesh.add(vest);
+  if (pp.head) {
+    const cap = new THREE.Group();
+    cap.name = 'cop-cap';
+    const crown = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.1, 0.12, 0.08, 8),
+      new THREE.MeshStandardMaterial({ color: 0x3a3424, roughness: 0.7 })
+    );
+    crown.position.y = 0.14;
+    cap.add(crown);
+    const brim = new THREE.Mesh(
+      new THREE.BoxGeometry(0.22, 0.02, 0.28),
+      new THREE.MeshStandardMaterial({ color: 0x2a261c, roughness: 0.65 })
+    );
+    brim.position.set(0, 0.1, 0.04);
+    cap.add(brim);
+    pp.head.add(cap);
+  }
+  const torch = new THREE.Group();
+  torch.name = 'flashlight';
+  const handle = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.022, 0.022, 0.18, 6),
+    new THREE.MeshStandardMaterial({ color: 0x1a1a1e, roughness: 0.45, metalness: 0.35 })
+  );
+  handle.rotation.x = PI / 2;
+  torch.add(handle);
+  const head = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.038, 0.03, 0.07, 6),
+    new THREE.MeshStandardMaterial({ color: 0x2a2a30, roughness: 0.4, metalness: 0.4 })
+  );
+  head.rotation.x = PI / 2;
+  head.position.z = 0.12;
+  torch.add(head);
+  const lens = new THREE.Mesh(
+    new THREE.CircleGeometry(0.032, 8),
+    new THREE.MeshStandardMaterial({ color: 0xfff2c0, emissive: 0xffe080, emissiveIntensity: 1.4, roughness: 0.2 })
+  );
+  lens.position.z = 0.16;
+  torch.add(lens);
+  const beam = new THREE.Mesh(
+    new THREE.ConeGeometry(0.42, 2.1, 8, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xffe6a0, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide })
+  );
+  beam.name = 'flashlight-beam';
+  beam.rotation.x = PI / 2;
+  beam.position.z = 1.22;
+  torch.add(beam);
+  const light = new THREE.PointLight(0xffe0a0, 0, 16, 2);
+  light.position.z = 0.2;
+  torch.add(light);
+  if (pp.foreR) {
+    torch.position.set(0.02, -0.22, 0.1);
+    torch.rotation.set(-0.4, 0, 0.15);
+    pp.foreR.add(torch);
+  } else {
+    torch.position.set(0.22, 1.1, 0.18);
+    ped.mesh.add(torch);
+  }
+  ped.checkpoint = true;
+  ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
+  ped.speed = 0;
+  ped.state = 'idle';
+  ped.heading = slot.facing;
+  ped.mesh.rotation.y = slot.facing;
+  ped.mesh.position.set(slot.x, 0, slot.z);
+  return { torch, light, beam };
+}
+
+export function spawnCheckpoint(scene) {
+  if (!GAMEPLAY.nightCheckpoint) return;
+  const x = 50, z = 100;
+  const g = new THREE.Group();
+  g.name = 'checkpoint';
+  const cones = [];
+  for (let i = 0; i < 5; i++) {
+    const cone = makeCheckpointCone();
+    cone.position.set(x - 2.5, 0, z - 8 + i * 4);
+    g.add(cone);
+    cones.push(cone);
+  }
+  const bar = new THREE.Mesh(
+    new THREE.BoxGeometry(1.6, 0.12, 0.08),
+    new THREE.MeshStandardMaterial({ color: 0xc03030, roughness: 0.5 })
+  );
+  bar.position.set(x - 2.5, 0.95, z + 10);
+  g.add(bar);
+  const post = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.03, 0.03, 0.95, 5),
+    new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.6 })
+  );
+  post.position.set(x - 2.5, 0.48, z + 10);
+  g.add(post);
+  scene.add(g);
+  const slot = { x: x + ROAD_WIDTH / 2 + 1.35, z, facing: -PI / 2 };
+  const cop = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), 'office');
+  const kit = dressCheckpointCop(cop, slot);
+  cop.mesh.visible = false;
+  if (kit.beam) kit.beam.visible = false;
+  if (G.nightLights) G.nightLights.push({ light: kit.light, base: 1.6 });
+  G.checkpoint = {
+    x, z, mesh: g, cones, cop, light: kit.light, beam: kit.beam,
+    active: false, flagged: false,
+  };
+}
+
 export function spawnCoconutCarts(scene) {
   if (!GAMEPLAY.coconutCart) return;
   const sois = (G.world && G.world.sois) || [];

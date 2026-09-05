@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -1628,6 +1628,63 @@ async function main() {
     });
     assert(wash.flag && wash.n >= 2 && wash.onSoi >= 2, `laundry lines span the sois (${wash.n})`);
     assert(wash.high >= 2, 'shirts hang above head height');
+
+    console.log('\n[53] night checkpoint');
+    const stop = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const cp = G.checkpoint;
+      const cones = cp && cp.cones ? cp.cones.filter(c => c && c.name === 'checkpoint-cone').length : 0;
+      const torch = !!(cp && cp.cop && cp.cop.mesh && cp.cop.mesh.getObjectByName('flashlight'));
+      G.time.dayT = 12 / 24;
+      main.updateCheckpoint(0.05);
+      const dayOff = !cp.active && cp.cop && cp.cop.mesh && cp.cop.mesh.visible === false && (cp.light ? cp.light.intensity === 0 : true);
+      G.time.dayT = 22.4 / 24;
+      G.policeOff = false;
+      G.wanted.stars = 0;
+      G.wanted.crime = 0;
+      cp.flagged = false;
+      main.updateCheckpoint(0.05);
+      const nightOn = !!(cp.active && cp.cop && cp.cop.mesh && cp.cop.mesh.visible && cp.light && cp.light.intensity > 0.5);
+      G.player.inVehicle = null;
+      G.player.group.position.set(cp.x + 8, 0, cp.z);
+      G.player.group.visible = true;
+      const car = G.vehicles.find(v => v && v.npc && v.spec && v.spec.kind !== 'boat' && v.spec.kind !== 'airliner' && v.driver !== 'player') || main.makeVehicle('camry', G.scene);
+      if (!car.npc) car.npc = { kind: 'traffic', cruiseSpeed: 12, followMul: 1, dir: 0 };
+      car.pos.set(cp.x - 2.5, 0, cp.z);
+      if (car.mesh) { car.mesh.position.copy(car.pos); car.mesh.rotation.y = 0; }
+      car.heading = 0;
+      car.vel = 12;
+      car.npc.dir = 0;
+      car.npc.cruiseSpeed = 12;
+      car.npc.turnCD = 99;
+      for (let i = 0; i < 16; i++) main.updateTrafficCar(car, 0.1);
+      const slowed = car.vel < 6;
+      const ride = G.vehicles.find(v => v && v.spec && v.spec.kind !== 'boat' && v.spec.kind !== 'airliner' && v !== car) || car;
+      G.player.inVehicle = ride;
+      ride.driver = 'player';
+      ride.pos.set(cp.x, 0, cp.z);
+      ride.vel = 14;
+      cp.flagged = false;
+      G.wanted.stars = 0;
+      G.wanted.crime = 0;
+      main.updateCheckpoint(0.016);
+      const stars = G.wanted.stars;
+      G.wanted.stars = 0;
+      G.wanted.crime = 0;
+      G.player.inVehicle = null;
+      ride.driver = ride.npc ? 'npc' : null;
+      ride.vel = 0;
+      G.time.dayT = 12 / 24;
+      main.updateCheckpoint(0.05);
+      return {
+        flag: !!(G.gameplay && G.gameplay.nightCheckpoint),
+        cones, torch, dayOff, nightOn, slowed, stars, cop: !!(cp && cp.cop),
+      };
+    });
+    assert(stop.flag && stop.cones >= 4 && stop.cop && stop.torch, `checkpoint cones and cop (${stop.cones})`);
+    assert(stop.dayOff && stop.nightOn, 'flashlight cop only works the night shift');
+    assert(stop.slowed, 'traffic crawls through the checkpoint');
+    assert(stop.stars >= 1, 'blowing the checkpoint at speed is a star');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

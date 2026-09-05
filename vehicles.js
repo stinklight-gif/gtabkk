@@ -613,6 +613,13 @@ export function updateTrafficCar(v, dt) {
   if (GAMEPLAY.floodPatches && (G.time.rainStrength || 0) > 0.7 && inFlood(v.pos.x, v.pos.z) && v.spec.kind !== 'bike') {
     obstacleTarget = Math.min(obstacleTarget, 4);
   }
+  if (GAMEPLAY.nightCheckpoint && G.checkpoint && G.checkpoint.active) {
+    const dx = v.pos.x - G.checkpoint.x, dz = v.pos.z - G.checkpoint.z;
+    if (dx * dx + dz * dz < 18 * 18) {
+      obstacleTarget = Math.min(obstacleTarget, 3.2);
+      signalTarget = Math.min(signalTarget, 3.2);
+    }
+  }
   const target = Math.min(obstacleTarget, signalTarget);
   const braking = target < v.vel - 0.1;
   if (v.vel < target) v.vel = Math.min(target, v.vel + v.spec.accel * dt);
