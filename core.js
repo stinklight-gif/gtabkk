@@ -289,6 +289,7 @@ export const GAMEPLAY = {
   soiPa: true,            // village PA horns on soi poles; crackle at dawn and afternoon
   soiChairs: true,        // plastic chairs + beer crates; drinkers sit after dark
   soiMechanic: true,      // paddock-stand bike + mechanic; E repairs your ride for ฿80
+  copSoiBlock: true,      // cop cars (not bikes) refuse authored sois; they stall at the mouth
 };
 G.gameplay = GAMEPLAY;
 

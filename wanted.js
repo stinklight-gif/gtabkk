@@ -383,6 +383,27 @@ export function updateCop(v, dt) {
   const target = d > 8 ? v.spec.topSpeed * 0.7 : (d < 4 ? 0 : 4);
   if (v.vel < target) v.vel += v.spec.accel * dt;
   else v.vel -= v.spec.brake * dt;
+  // Bangkok sois are too tight for a patrol car. Foot cops still walk them;
+  // four-wheel units dump speed at the mouth instead of grinding the laundry.
+  const fat = v.spec && v.spec.kind !== 'bike' && v.spec.kind !== 'tuktuk' && v.spec.kind !== 'boat';
+  if (GAMEPLAY.copSoiBlock && fat) {
+    const look = Math.max(3.2, Math.abs(v.vel) * 0.35);
+    const nx = v.pos.x + Math.sin(v.heading) * look;
+    const nz = v.pos.z + Math.cos(v.heading) * look;
+    const here = onSoi(v.pos.x, v.pos.z);
+    const ahead = onSoi(nx, nz);
+    if (ahead && !here) {
+      v.vel = Math.max(0, v.vel - v.spec.brake * 2.2 * dt);
+      v._soiBlocked = true;
+    } else if (here) {
+      const roadX = Math.round(v.pos.x / BLOCK) * BLOCK;
+      const roadZ = Math.round(v.pos.z / BLOCK) * BLOCK;
+      const preferX = Math.abs(v.pos.x - roadX) <= Math.abs(v.pos.z - roadZ);
+      v.heading = preferX ? (v.pos.x < roadX ? PI / 2 : -PI / 2) : (v.pos.z < roadZ ? 0 : PI);
+      v.vel = Math.max(3.5, v.vel);
+      v._soiBlocked = true;
+    } else v._soiBlocked = false;
+  }
   let headingDelta = v.heading - prevHeading;
   while (headingDelta > PI) headingDelta -= TAU;
   while (headingDelta < -PI) headingDelta += TAU;

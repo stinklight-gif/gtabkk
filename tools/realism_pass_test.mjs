@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -1891,6 +1891,49 @@ async function main() {
     });
     assert(wrench.flag && wrench.ped && wrench.stand && wrench.tool && wrench.onSoi, 'a mechanic waits with a bike on a stand');
     assert(wrench.pinned && wrench.fixed, 'the shop bike stays put and E patches a wreck for ฿80');
+
+    console.log('\n[63] cop cars cannot fit the soi');
+    const alley = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const sois = (G.world && G.world.sois) || [];
+      const s = sois[0];
+      if (!s) return { flag: !!(G.gameplay && G.gameplay.copSoiBlock), sois: 0 };
+      const alongZ = s.axis === 'z';
+      const midX = (s.x0 + s.x1) * 0.5, midZ = (s.z0 + s.z1) * 0.5;
+      const inside = alongZ
+        ? { x: midX, z: s.z0 + (s.z1 - s.z0) * 0.55 }
+        : { x: s.x0 + (s.x1 - s.x0) * 0.55, z: midZ };
+      const mouth = alongZ
+        ? { x: midX, z: s.z0 - 4.2, heading: 0 }
+        : { x: s.x0 - 4.2, z: midZ, heading: Math.PI / 2 };
+      G.player.inVehicle = null;
+      G.player.group.visible = true;
+      G.player.group.position.set(inside.x, 0, inside.z);
+      G.wanted.stars = 2;
+      G.wanted.crime = 5;
+      let cop = G.vehicles.find(v => v && v.isCop && v.spec && v.spec.kind === 'cop');
+      if (!cop) cop = main.spawnCopCar(G.scene, G.player.group.position);
+      cop.driver = 'cop';
+      cop.dead = false;
+      cop.pos.set(mouth.x, 0, mouth.z);
+      cop.heading = mouth.heading;
+      cop.vel = 12;
+      if (cop.mesh) { cop.mesh.position.copy(cop.pos); cop.mesh.rotation.y = cop.heading; }
+      const onSoi = (x, z) => (sois || []).some(c => x >= c.x0 && x <= c.x1 && z >= c.z0 && z <= c.z1);
+      const startOn = onSoi(cop.pos.x, cop.pos.z);
+      for (let i = 0; i < 24; i++) main.updateCop(cop, 0.12);
+      const entered = onSoi(cop.pos.x, cop.pos.z);
+      const blocked = !!cop._soiBlocked;
+      const playerOn = onSoi(inside.x, inside.z);
+      G.wanted.stars = 0;
+      G.wanted.crime = 0;
+      return {
+        flag: !!(G.gameplay && G.gameplay.copSoiBlock),
+        sois: sois.length, startOn, entered, blocked, playerOn, vel: cop.vel,
+      };
+    });
+    assert(alley.flag && alley.sois >= 4 && alley.playerOn, `sois exist for the chase (${alley.sois})`);
+    assert(!alley.startOn && !alley.entered && alley.blocked, 'the patrol car stalls at the soi mouth');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
