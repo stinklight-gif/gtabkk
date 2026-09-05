@@ -276,6 +276,7 @@ export const GAMEPLAY = {
   soiFootball: true,      // after-school kickabout in a soi
   mallShoppers: true,     // evening bags walking from Terminal 21 to the BTS
   lottery: true,          // Government Lottery board outside 7-Eleven; E buys a ticket
+  watChant: true,         // dawn and dusk chant from the wat when you're nearby
 };
 G.gameplay = GAMEPLAY;
 

@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -1562,6 +1562,29 @@ async function main() {
     });
     assert(lotto.flag && lotto.seller && lotto.board && lotto.near, 'a lottery board waits outside 7-Eleven');
     assert(lotto.last && lotto.last.spent === 80 && lotto.last.win === 1200 && lotto.cash === 1320, 'E buys a ticket (฿80) and can pay out');
+
+    console.log('\n[50] wat chant at dawn and dusk');
+    const chant = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const temple = G.world && G.world.poi && G.world.poi.temple;
+      if (temple) G.player.group.position.set(temple.x, 0, temple.z);
+      G._watChantSlot = null;
+      G._watChant = null;
+      G.time.dayT = 6.1 / 24;
+      G._weatherUntil = 1e9;
+      main.updateDayNight(0.05);
+      const dawn = G._watChant && G._watChant.slot === 'dawn' && G._watChant.near;
+      G.time.dayT = 12 / 24;
+      main.updateDayNight(0.05);
+      const midday = G._watChantSlot == null;
+      G._watChantSlot = null;
+      G.time.dayT = 18.3 / 24;
+      main.updateDayNight(0.05);
+      const dusk = G._watChant && G._watChant.slot === 'dusk' && G._watChant.near;
+      return { flag: !!(G.gameplay && G.gameplay.watChant), temple: !!temple, dawn, midday, dusk };
+    });
+    assert(chant.flag && chant.temple, 'watChant flag on and the wat exists');
+    assert(chant.dawn && chant.midday && chant.dusk, 'chant fires at dawn and dusk, not midday');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

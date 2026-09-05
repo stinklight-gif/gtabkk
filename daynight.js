@@ -208,6 +208,26 @@ export function updateDayNight(dt) {
     G.audio.bell();
   }
   if (hourSlot < 5) G._bellSeen.clear();
+
+  if (GAMEPLAY.watChant) {
+    const hour = t * 24;
+    const slot = (hour >= 5.5 && hour < 6.8) ? 'dawn' : (hour >= 18 && hour < 19) ? 'dusk' : null;
+    if (slot && G._watChantSlot !== slot) {
+      const temple = G.world && G.world.poi && G.world.poi.temple;
+      const pp = G.player && G.player.group && G.player.group.position;
+      const near = !!(temple && pp && Math.hypot(pp.x - temple.x, pp.z - temple.z) < 95);
+      G._watChantSlot = slot;
+      G._watChant = { slot, near };
+      if (near && G.hud && G.hud.showSubtitle) {
+        G.hud.showSubtitle(
+          slot === 'dawn' ? 'The wat begins morning chant.' : 'Evening chant from the wat.',
+          slot === 'dawn' ? 'วัดสวดมนต์เช้า' : 'วัดสวดมนต์เย็น'
+        );
+        if (G.audio && G.audio.bell) G.audio.bell();
+      }
+    }
+    if (!slot) G._watChantSlot = null;
+  }
 }
 
 // =============================================================================
