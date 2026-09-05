@@ -197,14 +197,14 @@ export function resyncCrowd() {
   // pull stray wanderers onto nearby sidewalks so the count near the camera
   // reflects the hour immediately (harness-only; gameplay distributes gradually)
   for (const ped of G.peds) {
-    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit) continue;
+    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing) continue;
     if (dist2(ped.mesh.position, pp) > 95 * 95) ped.mesh.position.copy(sidewalkPos(pp.x, pp.z, 88));
   }
   for (let guard = 0; G.peds.length > target && guard < 500; guard++) {
     let fi = -1, fd = -1;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing) continue;
       const d = dist2(ped.mesh.position, pp);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -490,7 +490,7 @@ export function updatePeds(dt) {
     let fi = -1, fd = 60 * 60;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing) continue;
       const d = dist2(ped.mesh.position, playerPos);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -1354,6 +1354,53 @@ export function updateCoconutCarts(dt) {
       G.player.stam = G.player.stamMax;
       if (G.hud.setCash) G.hud.setCash(G.cash);
       G.hud.showNotif('Coconut water — มะพร้าว');
+      if (G.audio && G.audio.chime) G.audio.chime();
+    }
+    return;
+  }
+}
+
+export function updateMooPing(dt) {
+  if (!GAMEPLAY.mooPing || !G.mooPing) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const glow = (h >= 16 && h < 22) ? 1.15 : 0.5;
+  for (const c of G.mooPing) {
+    if (!c.mesh || !c.soi) continue;
+    c.t += c.dir * dt * 0.038;
+    if (c.t > 0.9) { c.t = 0.9; c.dir = -1; }
+    if (c.t < 0.1) { c.t = 0.1; c.dir = 1; }
+    const s = c.soi;
+    const x = c.alongZ ? (s.x0 + s.x1) * 0.5 : s.x0 + (s.x1 - s.x0) * c.t;
+    const z = c.alongZ ? s.z0 + (s.z1 - s.z0) * c.t : (s.z0 + s.z1) * 0.5;
+    const yaw = c.alongZ ? (c.dir > 0 ? 0 : PI) : (c.dir > 0 ? PI / 2 : -PI / 2);
+    c.mesh.position.set(x, 0, z);
+    c.mesh.rotation.y = yaw;
+    if (c.coalMat) c.coalMat.emissiveIntensity = glow;
+    const puff = c.mesh.getObjectByName('mooping-smoke');
+    if (puff) {
+      puff.position.y = 1.15 + Math.sin(performance.now() * 0.003) * 0.08;
+      puff.scale.setScalar(0.9 + Math.sin(performance.now() * 0.002) * 0.12);
+    }
+    if (c.vendor && c.vendor.mesh && !c.vendor.dead) {
+      c.vendor.mooPing = true;
+      c.vendor.mesh.position.set(x, 0, z);
+      c.vendor.heading = yaw;
+      c.vendor.mesh.rotation.y = yaw;
+      if (c.vendor.anchor && c.vendor.anchor.slot) c.vendor.anchor.slot.set(x, 0, z);
+      c.vendor.speed = 0.5;
+    }
+  }
+  if (G.player.inVehicle || G._eating) return;
+  const pp = G.player.group.position;
+  for (const c of G.mooPing) {
+    if (!c.mesh || dist2(c.mesh.position, pp) > 2.2 * 2.2) continue;
+    G.hud.showPrompt('Press <b>E</b> for moo ping · ฿35', 0.4);
+    if (G.input.pressed('KeyE')) {
+      if (G.cash < 35) { G.hud.showNotif('Need ฿35 for moo ping'); return; }
+      G.cash -= 35;
+      G.player.hp = Math.min(G.player.hpMax, G.player.hp + 22);
+      if (G.hud.setCash) G.hud.setCash(G.cash);
+      G.hud.showNotif('Moo ping — หมูปิ้ง');
       if (G.audio && G.audio.chime) G.audio.chime();
     }
     return;

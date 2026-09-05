@@ -283,6 +283,7 @@ export const GAMEPLAY = {
   sevenBikes: true,       // parked motorbike cluster outside the walk-in 7-Eleven
   hyacinth: true,         // water hyacinth mats drift on the khlong
   btsSitters: true,       // people sit on the Asok BTS escalator with their phones
+  mooPing: true,          // grilled-pork cart on a soi; E for a skewer
 };
 G.gameplay = GAMEPLAY;
 

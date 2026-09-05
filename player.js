@@ -379,6 +379,9 @@ export function updateInteraction(dt) {
   if (GAMEPLAY.coconutCart && G.coconutCarts) {
     for (const c of G.coconutCarts) if (c.mesh && dist2(c.mesh.position, pp0) < 2.2 * 2.2) return;
   }
+  if (GAMEPLAY.mooPing && G.mooPing) {
+    for (const c of G.mooPing) if (c.mesh && dist2(c.mesh.position, pp0) < 2.2 * 2.2) return;
+  }
 
   const crate = G.world.yaowaratCrate;
   if (crate && !crate.taken && dist2(p.group.position, crate.pos) < 2.6 * 2.6) {

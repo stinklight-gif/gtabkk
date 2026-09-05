@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -1741,6 +1741,40 @@ async function main() {
     });
     assert(sit.flag && sit.n >= 2 && sit.atAsok >= 2, `people sit the Asok escalator (${sit.n})`);
     assert(sit.onStairs >= 1 && sit.folded >= 2 && sit.still >= 2, 'at least one is up the stairs, legs folded');
+
+    console.log('\n[57] moo ping cart');
+    const grill = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = G.mooPing || [];
+      const n = list.filter(c => c && c.mesh && c.mesh.name === 'mooping-cart').length;
+      const c0 = list[0];
+      const start = c0 && c0.mesh ? { x: c0.mesh.position.x, z: c0.mesh.position.z } : null;
+      if (c0) { c0.t = 0.12; c0.dir = 1; }
+      for (let i = 0; i < 50; i++) main.updateMooPing(0.3);
+      const moved = !!(c0 && start && Math.hypot(c0.mesh.position.x - start.x, c0.mesh.position.z - start.z) > 0.4);
+      const coals = !!(c0 && c0.mesh && c0.mesh.getObjectByName('mooping-coals'));
+      G.time.dayT = 18.5 / 24;
+      main.updateMooPing(0.05);
+      const duskGlow = !!(c0 && c0.coalMat && c0.coalMat.emissiveIntensity > 0.9);
+      G.player.inVehicle = null;
+      G._eating = null;
+      G.player.group.visible = true;
+      G.cash = 90;
+      G.player.hp = 40;
+      if (c0 && c0.mesh) G.player.group.position.copy(c0.mesh.position);
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+      main.updateMooPing(0.016);
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      return {
+        flag: !!(G.gameplay && G.gameplay.mooPing),
+        n, moved, onSoi: !!(c0 && c0.soi), coals, duskGlow,
+        paid: G.cash === 55, healed: G.player.hp > 40,
+      };
+    });
+    assert(grill.flag && grill.n >= 1 && grill.onSoi && grill.coals, `a moo ping cart works a soi (${grill.n})`);
+    assert(grill.moved, 'moo ping cart moves along the soi');
+    assert(grill.duskGlow && grill.paid && grill.healed, 'coals glow at dusk and E buys a skewer for ฿35');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

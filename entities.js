@@ -1515,6 +1515,52 @@ export function makeCoconutCartMesh() {
   return g;
 }
 
+export function makeMooPingMesh() {
+  const g = new THREE.Group();
+  g.name = 'mooping-cart';
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.5, 1.35), new THREE.MeshStandardMaterial({ color: 0x5a3a22, roughness: 0.82 }));
+  box.position.y = 0.48; g.add(box);
+  const coalMat = new THREE.MeshStandardMaterial({ color: 0x1a1210, roughness: 0.7, emissive: 0xff5510, emissiveIntensity: 0.55 });
+  const coals = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.08, 0.9), coalMat);
+  coals.name = 'mooping-coals';
+  coals.position.y = 0.78; g.add(coals);
+  const grate = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.02, 0.92), new THREE.MeshStandardMaterial({ color: 0x3a3a40, metalness: 0.45, roughness: 0.4 }));
+  grate.position.y = 0.84; g.add(grate);
+  const stickMat = new THREE.MeshStandardMaterial({ color: 0xc8a070, roughness: 0.7 });
+  const meatMat = new THREE.MeshStandardMaterial({ color: 0xa03a22, roughness: 0.65 });
+  for (let i = 0; i < 6; i++) {
+    const sk = new THREE.Group();
+    const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.7, 4), stickMat);
+    stick.rotation.x = PI / 2;
+    sk.add(stick);
+    for (let k = 0; k < 3; k++) {
+      const meat = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.04, 0.08), meatMat);
+      meat.position.z = -0.18 + k * 0.14;
+      sk.add(meat);
+    }
+    sk.position.set((i % 3 - 1) * 0.18, 0.9, i < 3 ? -0.12 : 0.18);
+    g.add(sk);
+  }
+  const umb = new THREE.Mesh(new THREE.ConeGeometry(0.7, 0.28, 8), new THREE.MeshStandardMaterial({ color: 0xc03030, roughness: 0.7, side: THREE.DoubleSide }));
+  umb.position.y = 1.95; umb.rotation.x = PI; g.add(umb);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.1, 5), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+  pole.position.y = 1.4; g.add(pole);
+  const puff = new THREE.Mesh(
+    new THREE.SphereGeometry(0.22, 6, 5),
+    new THREE.MeshBasicMaterial({ color: 0x887766, transparent: true, opacity: 0.22, depthWrite: false })
+  );
+  puff.name = 'mooping-smoke';
+  puff.position.set(0, 1.15, 0);
+  g.add(puff);
+  const tire = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+  for (const z of [-0.42, 0.42]) for (const x of [-0.34, 0.34]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 8), tire);
+    w.rotation.z = PI / 2; w.position.set(x, 0.12, z); g.add(w);
+  }
+  g.userData.coalMat = coalMat;
+  return g;
+}
+
 export function spawnLaundry(scene) {
   if (!GAMEPLAY.soiLaundry) return;
   const sois = (G.world && G.world.sois) || [];
@@ -1765,6 +1811,31 @@ export function spawnCoconutCarts(scene) {
   vendor.anchor = { slot: vendor.mesh.position.clone(), facing: alongZ ? 0 : PI / 2 };
   vendor.speed = 0;
   G.coconutCarts.push({ mesh, vendor, soi: s, alongZ, t: t0, dir: 1 });
+}
+
+export function spawnMooPing(scene) {
+  if (!GAMEPLAY.mooPing) return;
+  const sois = (G.world && G.world.sois) || [];
+  G.mooPing = [];
+  if (!sois.length) return;
+  const ranked = sois.slice().sort((a, b) => {
+    const la = a.axis === 'z' ? (a.z1 - a.z0) : (a.x1 - a.x0);
+    const lb = b.axis === 'z' ? (b.z1 - b.z0) : (b.x1 - b.x0);
+    return lb - la;
+  });
+  const s = ranked[1] || ranked[0];
+  const alongZ = s.axis === 'z';
+  const t0 = 0.55;
+  const x = alongZ ? (s.x0 + s.x1) * 0.5 : s.x0 + (s.x1 - s.x0) * t0;
+  const z = alongZ ? s.z0 + (s.z1 - s.z0) * t0 : (s.z0 + s.z1) * 0.5;
+  const mesh = makeMooPingMesh();
+  mesh.position.set(x, 0, z);
+  scene.add(mesh);
+  const vendor = spawnPed(scene, new THREE.Vector3(x, 0, z), 'vendor');
+  vendor.mooPing = true;
+  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: alongZ ? 0 : PI / 2 };
+  vendor.speed = 0;
+  G.mooPing.push({ mesh, vendor, soi: s, alongZ, t: t0, dir: 1, coalMat: mesh.userData.coalMat });
 }
 
 export function spawnIceCarts(scene) {
