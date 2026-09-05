@@ -375,6 +375,7 @@ export function updateInteraction(dt) {
   if (GAMEPLAY.iceCart && G.iceCarts) {
     for (const c of G.iceCarts) if (c.mesh && dist2(c.mesh.position, pp0) < 2.2 * 2.2) return;
   }
+  if (GAMEPLAY.lottery && G.lottery && G.lottery.pos && dist2(G.lottery.pos, pp0) < 2.4 * 2.4) return;
 
   const crate = G.world.yaowaratCrate;
   if (crate && !crate.taken && dist2(p.group.position, crate.pos) < 2.6 * 2.6) {

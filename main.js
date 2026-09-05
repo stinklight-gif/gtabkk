@@ -22,7 +22,7 @@ export * from './traffic.js';
 import { buildTrafficLights, updateTrafficLights } from './traffic.js';
 export * from './entities.js';
 import {
-  animateWalk, makeCamera, makeCatMesh, makeDogMesh, makePedMesh, makePlayer, makeRain, makeVehicle, makeVehicleMesh, sidewalkPos, spawnBoat, spawnCats, spawnDog, spawnDogs, spawnMotosaiStands, spawnBtsSongthaew, spawnBtsTuktuk, spawnIceCarts, spawnMonitors, spawnGeckos, spawnParkedCars, spawnPed, spawnPeds, spawnTraffic, updateEntityLod, wearBikeHelmet
+  animateWalk, makeCamera, makeCatMesh, makeDogMesh, makePedMesh, makePlayer, makeRain, makeVehicle, makeVehicleMesh, sidewalkPos, spawnBoat, spawnCats, spawnDog, spawnDogs, spawnMotosaiStands, spawnBtsSongthaew, spawnBtsTuktuk, spawnIceCarts, spawnMonitors, spawnGeckos, spawnLottery, spawnParkedCars, spawnPed, spawnPeds, spawnTraffic, updateEntityLod, wearBikeHelmet
 } from './entities.js';
 import { spawnAirportPlanes } from './airport.js';
 export * from './wanted.js';
@@ -35,7 +35,7 @@ import {
 } from './physics.js';
 export * from './npcs.js';
 import {
-  CROWD_CURVE, buildClusterAnchors, crowdFactor, crowdTarget, makeBarkSprite, resyncCrowd, spawnAnchoredPed, spawnBark, spawnSpikeStrip, updateAlms, updateArmorPickups, updateBarks, updateCats, updateClusters, updateDogs, updateFoodStalls, updateMuggings, updatePeds, updateSchoolKids, updateSeekShade, updateShrines, updateSpikes, updateTurf, updateVigilante, updateYaowaratNight, updateBtsPlatform, updateOfficeCommute, updateCrossingGuards, updateRainPack, updateIceCarts, updateMonitors, updateGeckos, updateSoiFootball, updateMallShoppers, vigilanteEnd, vigilanteSpawnTarget
+  CROWD_CURVE, buildClusterAnchors, crowdFactor, crowdTarget, makeBarkSprite, resyncCrowd, spawnAnchoredPed, spawnBark, spawnSpikeStrip, updateAlms, updateArmorPickups, updateBarks, updateCats, updateClusters, updateDogs, updateFoodStalls, updateMuggings, updatePeds, updateSchoolKids, updateSeekShade, updateShrines, updateSpikes, updateTurf, updateVigilante, updateYaowaratNight, updateBtsPlatform, updateOfficeCommute, updateCrossingGuards, updateRainPack, updateIceCarts, updateMonitors, updateGeckos, updateSoiFootball, updateMallShoppers, updateLottery, vigilanteEnd, vigilanteSpawnTarget
 } from './npcs.js';
 export * from './combat.js';
 import {
@@ -511,6 +511,7 @@ async function init() {
   spawnMonitors(scene);
   spawnGeckos(scene);
   spawnIceCarts(scene);
+  spawnLottery(scene);
   buildClusterAnchors();
   for (const f of (G.world.foodStalls || [])) {
     const sp = f.pos.clone(); sp.y = 1.15;
@@ -1694,6 +1695,7 @@ export function loop() {
     updateFoodStalls(dt);
     updateRainPack(dt);
     updateShrines(dt);
+    updateLottery(dt);
     updateArmorPickups(dt);
     updateInteraction(dt);
     updateGarage(dt);

@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -465,7 +465,7 @@ async function main() {
     const peds = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
       const ways = (G.world.walkways || []).length;
-      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop);
+      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery);
       const b = G.world.buildings.find(x => x.size.y > 8 && x.size.x > 4 && x.size.z > 4) || G.world.buildings[0];
       const insideBefore = wanderer && b && Math.abs(wanderer.mesh.position.x - b.pos.x) < b.size.x / 2 && Math.abs(wanderer.mesh.position.z - b.pos.z) < b.size.z / 2;
       if (wanderer && b) {
@@ -1531,6 +1531,37 @@ async function main() {
     });
     assert(bags.flag && bags.mall && bags.n >= 3, `mall shoppers walk from Terminal 21 (${bags.n})`);
     assert(bags.toward >= 2 && bags.gone, 'they head to the BTS and clear after evening');
+
+    console.log('\n[49] lottery seller at 7-Eleven');
+    const lotto = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const L = G.lottery;
+      const seven = G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0]));
+      const near = !!(L && L.pos && seven && Math.hypot(L.pos.x - seven.pos.x, L.pos.z - seven.pos.z) < 12);
+      const board = !!(L && L.board && L.board.name === 'lottery-board');
+      const seller = !!(L && L.ped && L.ped.lottery);
+      G.player.inVehicle = null;
+      G._eating = null;
+      G._btsRide = null;
+      G.player.group.visible = true;
+      G.cash = 200;
+      G._lotteryForce = 1200;
+      G._lotteryLast = null;
+      if (L && L.pos) G.player.group.position.copy(L.pos);
+      if (L) L.readyAt = 0;
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+      main.updateLottery(0.016);
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      return {
+        flag: !!(G.gameplay && G.gameplay.lottery),
+        near, board, seller,
+        last: G._lotteryLast,
+        cash: G.cash,
+      };
+    });
+    assert(lotto.flag && lotto.seller && lotto.board && lotto.near, 'a lottery board waits outside 7-Eleven');
+    assert(lotto.last && lotto.last.spent === 80 && lotto.last.win === 1200 && lotto.cash === 1320, 'E buys a ticket (฿80) and can pay out');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

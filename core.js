@@ -275,6 +275,7 @@ export const GAMEPLAY = {
   stallGecko: true,       // tiny geckos on stall parasols after dark
   soiFootball: true,      // after-school kickabout in a soi
   mallShoppers: true,     // evening bags walking from Terminal 21 to the BTS
+  lottery: true,          // Government Lottery board outside 7-Eleven; E buys a ticket
 };
 G.gameplay = GAMEPLAY;
 
