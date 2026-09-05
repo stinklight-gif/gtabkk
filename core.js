@@ -281,6 +281,7 @@ export const GAMEPLAY = {
   soiLaundry: true,       // clothes lines strung across sois
   nightCheckpoint: true,  // night cones + flashlight cop; blow through and you get a star
   sevenBikes: true,       // parked motorbike cluster outside the walk-in 7-Eleven
+  hyacinth: true,         // water hyacinth mats drift on the khlong
 };
 G.gameplay = GAMEPLAY;
 

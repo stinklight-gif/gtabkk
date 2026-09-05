@@ -1052,6 +1052,44 @@ export function spawnMonitors(scene) {
   }
 }
 
+function makeHyacinthMesh() {
+  const g = new THREE.Group();
+  g.name = 'hyacinth';
+  const leafMat = new THREE.MeshStandardMaterial({ color: pick([0x2f7a3a, 0x3a8a40, 0x256838]), roughness: 0.85, side: THREE.DoubleSide });
+  const n = 6;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU + rand(-0.2, 0.2);
+    const r = 0.22 + (i % 3) * 0.12;
+    const leaf = new THREE.Mesh(new THREE.CircleGeometry(0.18 + (i % 2) * 0.06, 7), leafMat);
+    leaf.rotation.x = -PI / 2 + rand(-0.12, 0.12);
+    leaf.position.set(Math.sin(a) * r, 0.02, Math.cos(a) * r);
+    g.add(leaf);
+  }
+  const bloom = new THREE.Mesh(
+    new THREE.ConeGeometry(0.05, 0.16, 5),
+    new THREE.MeshStandardMaterial({ color: 0x7a4aaa, roughness: 0.55, emissive: 0x4a2060, emissiveIntensity: 0.12 })
+  );
+  bloom.position.y = 0.12;
+  g.add(bloom);
+  return g;
+}
+
+export function spawnHyacinth(scene) {
+  if (!GAMEPLAY.hyacinth) return;
+  const cx = -229;
+  G.hyacinth = [];
+  const zs = [-170, -110, -40, 20, 90, 155];
+  for (let i = 0; i < zs.length; i++) {
+    const mesh = makeHyacinthMesh();
+    const x = cx + (i % 2 === 0 ? 8.5 : -7.2);
+    const z = zs[i];
+    mesh.position.set(x, 0.1, z);
+    mesh.rotation.y = rand(0, TAU);
+    scene.add(mesh);
+    G.hyacinth.push({ mesh, phase: rand(0, TAU), drift: 0.32 + i * 0.03, x, z });
+  }
+}
+
 export function spawnCats(scene) {
   if (!GAMEPLAY.soiCats) return;
   G.cats = [];

@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -1705,6 +1705,22 @@ async function main() {
     });
     assert(rack.flag && rack.seven && rack.n >= 4 && rack.near >= 4, `bikes cluster outside 7-Eleven (${rack.n})`);
     assert(rack.pinned >= 4 && rack.open >= 4, 'the rack is pinned and enterable');
+
+    console.log('\n[55] khlong water hyacinth');
+    const weed = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = G.hyacinth || [];
+      const n = list.filter(h => h && h.mesh && h.mesh.name === 'hyacinth').length;
+      const onRiver = list.filter(h => h && h.mesh && h.mesh.position.x < -210 && h.mesh.position.x > -248).length;
+      const wet = list.filter(h => h && h.mesh && h.mesh.position.y < 0.4).length;
+      const h0 = list[0];
+      const start = h0 && h0.mesh ? h0.mesh.position.z : 0;
+      for (let i = 0; i < 40; i++) main.updateHyacinth(0.25);
+      const moved = !!(h0 && h0.mesh && Math.abs(h0.mesh.position.z - start) > 0.4);
+      return { flag: !!(G.gameplay && G.gameplay.hyacinth), n, onRiver, wet, moved };
+    });
+    assert(weed.flag && weed.n >= 4 && weed.onRiver >= 4, `hyacinth mats on the khlong (${weed.n})`);
+    assert(weed.wet >= 4 && weed.moved, 'mats sit on the water and drift with the current');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

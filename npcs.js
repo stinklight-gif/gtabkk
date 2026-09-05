@@ -1503,6 +1503,19 @@ export function updateMonitors(dt) {
   }
 }
 
+export function updateHyacinth(dt) {
+  if (!GAMEPLAY.hyacinth || !G.hyacinth) return;
+  const t = (G.time && G.time.dayT ? G.time.dayT : 0) * TAU * 6;
+  for (const h of G.hyacinth) {
+    if (!h.mesh) continue;
+    h.z += (h.drift || 0.35) * dt;
+    if (h.z > HALF - 10) h.z = -HALF + 10;
+    h.mesh.position.z = h.z;
+    h.mesh.position.y = 0.1 + Math.sin(t + h.phase) * 0.045;
+    h.mesh.rotation.y += dt * 0.08;
+  }
+}
+
 export function updateCats(dt) {
   if (!GAMEPLAY.soiCats || !G.cats) return;
   const pp = G.player.inVehicle ? G.player.inVehicle.pos : G.player.group.position;
