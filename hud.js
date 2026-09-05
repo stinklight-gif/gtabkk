@@ -188,11 +188,30 @@ export function bindHud() {
     const m = G.mission && G.mission.active;
     const nextJob = !G._welcomeDone ? 'welcome' : !G._soiRunWon ? 'soiRun' : !G._hitDone ? 'hit' : !G._deliveryDone ? 'delivery' : !G._mallJobDone ? 'mallJob' : !G._getawayDone ? 'getaway' : !G._repoRunDone ? 'repoRun' : !G._courierDone ? 'courier' : !G._holdYardDone ? 'holdYard' : !G._boutDone ? 'bout' : 'monsoon';
     out.push({ name: 'Jobs · Uncle Seng', status: (m && m.markerPos) ? `active: ${m.name}` : 'available', dist: d(poi.goldShop), job: nextJob });
-    if (G._welcomeDone) out.push({ name: 'Soi Run', status: G._soiRunWon ? 'done · replay' : 'available', job: 'soiRun', dist: null });
+    const soi0 = (G.world && G.world.sois && G.world.sois[0]) || null;
+    const soiMid = soi0 ? { x: (soi0.x0 + soi0.x1) * 0.5, z: (soi0.z0 + soi0.z1) * 0.5 } : { x: -150, z: -150 };
+    const soiRunStart = (G.mission && G.mission.missions && G.mission.missions.soiRun && G.mission.missions.soiRun.startLine) || soiMid;
+    const nearestVeh = pred => {
+      let best = null, bd = 1e9;
+      for (const v of G.vehicles || []) {
+        if (!v || v.dead || !v.pos || v.driver === 'player') continue;
+        if (!pred(v)) continue;
+        const dd = Math.hypot(v.pos.x - p.x, v.pos.z - p.z);
+        if (dd < bd) { bd = dd; best = v.pos; }
+      }
+      return best;
+    };
+    let bizLoc = null, bizD = 1e9;
+    for (const b of BUSINESSES) {
+      if (!b.pos) continue;
+      const dd = Math.hypot(b.pos.x - p.x, b.pos.z - p.z);
+      if (dd < bizD) { bizD = dd; bizLoc = b.pos; }
+    }
+    if (G._welcomeDone) out.push({ name: 'Soi Run', status: G._soiRunWon ? 'done · replay' : 'available', job: 'soiRun', dist: GAMEPLAY.phonePlaces ? d(soiRunStart) : null });
     if (G._holdYardDone) out.push({ name: 'Lumpinee Bout', status: G._boutDone ? 'done · replay' : 'available', job: 'bout', dist: d(poi.temple) });
     if (G._boutDone) out.push({ name: 'Monsoon', status: G._monsoonDone ? 'done · replay' : 'available', job: 'monsoon', dist: d(poi.pier) });
     if (G._monsoonDone) out.push({ name: 'Customs Issue', status: G._customsDone ? 'done · replay' : 'available', job: 'customs', dist: d(poi.klongToey) });
-    out.push({ name: '2 AM Soi Race', status: G._nightSoiDone ? 'done · replay' : 'bikes · night', job: 'nightSoi', dist: null });
+    out.push({ name: '2 AM Soi Race', status: G._nightSoiDone ? 'done · replay' : 'bikes · night', job: 'nightSoi', dist: GAMEPLAY.phonePlaces ? d(soiMid) : null });
     if (poi.gym) out.push({ name: 'Muay Thai gym', status: `melee ${((G.econ.upgrades && G.econ.upgrades.melee) || 0)}/3`, dist: d(poi.gym) });
     if (poi.suvarnabhumi) out.push({ name: 'Suvarnabhumi', status: 'taxi an airliner', dist: d(poi.suvarnabhumi) });
     if (G.world && G.world.bts) out.push({ name: 'BTS Asok', status: 'ride the skytrain', dist: d({ x: G.world.bts.x, z: G.world.bts.z || 0 }) });
@@ -211,20 +230,20 @@ export function bindHud() {
     }
     let owned = 0, rate = 0;
     for (const b of BUSINESSES) { const s = G.econ.businesses[b.id]; if (s && s.owned) { owned++; rate += bizRate(b, s); } }
-    out.push({ name: 'Properties', status: `${owned}/${BUSINESSES.length} · ฿${rate}/s`, dist: null });
+    out.push({ name: 'Properties', status: `${owned}/${BUSINESSES.length} · ฿${rate}/s`, dist: GAMEPLAY.phonePlaces ? d(bizLoc) : null });
     let held = 0; for (const t of TURFS) if (G.turfs && G.turfs[t.id] && G.turfs[t.id].owned) held++;
     const nt = TURFS.map(t => d(t.center)).filter(x => x != null).sort((a, b) => a - b)[0];
     out.push({ name: 'Gang turf', status: `${held}/${TURFS.length} held`, dist: nt == null ? null : nt });
     out.push({ name: 'Arcade · Tuk-Tuk Dash', status: 'mall floor 1', dist: d(poi.terminal) });
     out.push({ name: 'Riverside boats', status: 'longtails', dist: d(poi.pier) });
-    out.push({ name: 'Taxi · press J', status: (G.taxi && G.taxi.stage && G.taxi.stage !== 'idle') ? 'fare active' : 'available', dist: null });
+    out.push({ name: 'Taxi · press J', status: (G.taxi && G.taxi.stage && G.taxi.stage !== 'idle') ? 'fare active' : 'available', dist: GAMEPLAY.phonePlaces ? d(nearestVeh(v => v.kind === 'songthaew')) : null });
     const stand = G.world && G.world.motosaiStands && G.world.motosaiStands.find(s => s.bike && !s.bike.driver);
     out.push({ name: 'Motosai · press J', status: (G.motosai && G.motosai.stage && G.motosai.stage !== 'idle') ? 'fare active' : 'bike · sois', dist: stand && stand.bike ? d(stand.bike.pos) : null });
     const qd = G.quickDrop;
     const qdStatus = qd && qd.stage !== 'idle'
       ? (qd.stage === 'toPickup' ? 'pickup' : `drop-off · streak ${qd.streak || 0}`)
       : 'bike/tuk delivery';
-    out.push({ name: 'Moto Drop · Y/J', status: qdStatus, dist: null });
+    out.push({ name: 'Moto Drop · Y/J', status: qdStatus, dist: GAMEPLAY.phonePlaces ? d(nearestVeh(v => v.kind === 'bike' || v.kind === 'tuktuk')) : null });
     out.sort((a, b) => (a.dist == null ? 1e9 : a.dist) - (b.dist == null ? 1e9 : b.dist));
     return out;
   }

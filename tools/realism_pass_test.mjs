@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -2071,6 +2071,33 @@ async function main() {
     assert(cowboy.flag && cowboy.n >= 4 && cowboy.neons >= 4 && cowboy.poi, `Soi Cowboy neon strip (${cowboy.n})`);
     assert(cowboy.nearBar >= 4 && cowboy.dayGlow < 0.7 && cowboy.nightGlow > 1.0, 'neon wakes up after 20:00');
     assert(cowboy.dayTouts === 0 && cowboy.nightTouts >= 3 && cowboy.lit >= 3, 'touts and lights only after dark');
+
+    console.log('\n[67] phone jobs that need a place');
+    const book = await page.evaluate(() => {
+      const G = window.GAME;
+      G._welcomeDone = true;
+      if (G.hud && G.hud.setPhoneStats) G.hud.setPhoneStats();
+      const rows = {};
+      document.querySelectorAll('#ph-activities .act').forEach(el => {
+        const name = (el.querySelector('.a-name') && el.querySelector('.a-name').textContent) || '';
+        const meta = (el.querySelector('.a-meta') && el.querySelector('.a-meta').textContent) || '';
+        const m = meta.match(/(\d+)\s*m\s*$/);
+        rows[name] = m ? Number(m[1]) : null;
+      });
+      return {
+        flag: !!(G.gameplay && G.gameplay.phonePlaces),
+        soiRun: rows['Soi Run'],
+        night: rows['2 AM Soi Race'],
+        taxi: rows['Taxi · press J'],
+        drop: rows['Moto Drop · Y/J'],
+        props: rows['Properties'],
+        cowboy: rows['Soi Cowboy'],
+      };
+    });
+    assert(book.flag, 'phonePlaces flag on');
+    assert(book.soiRun != null && book.night != null, `Soi Run and 2 AM race have places (${book.soiRun}m, ${book.night}m)`);
+    assert(book.taxi != null && book.drop != null && book.props != null, `taxi, moto drop and properties have places (${book.taxi}m)`);
+    assert(book.cowboy != null, 'Soi Cowboy still lists a distance');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
