@@ -286,6 +286,7 @@ export const GAMEPLAY = {
   mooPing: true,          // grilled-pork cart on a soi; E for a skewer
   watTurtles: true,       // turtles paddle the pond at the wat
   sevenGuard: true,       // plastic-chair security at the walk-in 7-Eleven
+  soiPa: true,            // village PA horns on soi poles; crackle at dawn and afternoon
 };
 G.gameplay = GAMEPLAY;
 

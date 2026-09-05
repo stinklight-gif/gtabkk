@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -1815,6 +1815,33 @@ async function main() {
     });
     assert(booth.flag && booth.seated && booth.chair && booth.near, 'a guard sits outside 7-Eleven');
     assert(booth.torch && booth.dayOff && booth.nightOn, 'the guard torch only comes on at night');
+
+    console.log('\n[60] soi PA speakers');
+    const pa = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = G.soiPa || [];
+      const n = list.filter(s => s && s.mesh && s.mesh.name === 'soi-pa').length;
+      const horns = list.filter(s => s && s.mesh && s.mesh.getObjectByName('pa-horn')).length;
+      const onSoi = list.filter(s => s && s.soi).length;
+      const s0 = list[0];
+      if (s0) G.player.group.position.set(s0.x, 0, s0.z);
+      G._soiPaSlot = null;
+      G._soiPa = null;
+      G.time.dayT = 7.2 / 24;
+      G._weatherUntil = 1e9;
+      main.updateDayNight(0.05);
+      const morning = G._soiPa && G._soiPa.slot === 'morning' && G._soiPa.near;
+      G.time.dayT = 12 / 24;
+      main.updateDayNight(0.05);
+      const midday = G._soiPaSlot == null;
+      G._soiPaSlot = null;
+      G.time.dayT = 16.8 / 24;
+      main.updateDayNight(0.05);
+      const afternoon = G._soiPa && G._soiPa.slot === 'afternoon' && G._soiPa.near;
+      return { flag: !!(G.gameplay && G.gameplay.soiPa), n, horns, onSoi, morning, midday, afternoon };
+    });
+    assert(pa.flag && pa.n >= 2 && pa.horns >= 2 && pa.onSoi >= 2, `soi PA horns on the alleys (${pa.n})`);
+    assert(pa.morning && pa.midday && pa.afternoon, 'PA crackles at morning and afternoon, not midday');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

@@ -228,6 +228,30 @@ export function updateDayNight(dt) {
     }
     if (!slot) G._watChantSlot = null;
   }
+
+  if (GAMEPLAY.soiPa && G.soiPa && G.soiPa.length) {
+    const hour = t * 24;
+    const slot = (hour >= 6.9 && hour < 7.9) ? 'morning' : (hour >= 16.2 && hour < 17.5) ? 'afternoon' : null;
+    if (slot && G._soiPaSlot !== slot) {
+      const pp = G.player && G.player.group && G.player.group.position;
+      let near = false;
+      if (pp) {
+        for (const s of G.soiPa) {
+          if (s && Math.hypot(pp.x - s.x, pp.z - s.z) < 70) { near = true; break; }
+        }
+      }
+      G._soiPaSlot = slot;
+      G._soiPa = { slot, near };
+      if (near && G.hud && G.hud.showSubtitle) {
+        G.hud.showSubtitle(
+          slot === 'morning' ? 'The soi PA crackles — community news.' : 'The soi PA reminds everyone about the meeting.',
+          slot === 'morning' ? 'เสียงตามสาย' : 'ประกาศซอย'
+        );
+        if (G.audio && G.audio.blip) G.audio.blip({ freq: 780, dur: 0.18, type: 'square', gain: 0.07, freqEnd: 420 });
+      }
+    }
+    if (!slot) G._soiPaSlot = null;
+  }
 }
 
 // =============================================================================

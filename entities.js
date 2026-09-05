@@ -1605,6 +1605,46 @@ export function spawnLaundry(scene) {
   }
 }
 
+export function spawnSoiPa(scene) {
+  if (!GAMEPLAY.soiPa) return;
+  const sois = (G.world && G.world.sois) || [];
+  G.soiPa = [];
+  const n = Math.min(3, sois.length);
+  for (let i = 0; i < n; i++) {
+    const s = sois[sois.length - 1 - i];
+    const alongZ = s.axis === 'z';
+    const t = 0.28 + i * 0.18;
+    const x = alongZ ? (s.x0 + s.x1) * 0.5 + (alongZ ? 1.6 : 0) : s.x0 + (s.x1 - s.x0) * t;
+    const z = alongZ ? s.z0 + (s.z1 - s.z0) * t : (s.z0 + s.z1) * 0.5 + 1.6;
+    const g = new THREE.Group();
+    g.name = 'soi-pa';
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.07, 0.09, 4.4, 6),
+      new THREE.MeshStandardMaterial({ color: 0x8a8a82, roughness: 0.7, metalness: 0.2 })
+    );
+    pole.position.y = 2.2;
+    g.add(pole);
+    const horn = new THREE.Mesh(
+      new THREE.ConeGeometry(0.28, 0.55, 8),
+      new THREE.MeshStandardMaterial({ color: 0x3a3a40, roughness: 0.45, metalness: 0.35 })
+    );
+    horn.name = 'pa-horn';
+    horn.position.set(alongZ ? 0.22 : 0, 3.85, alongZ ? 0 : 0.22);
+    if (alongZ) horn.rotation.z = -PI / 2;
+    else horn.rotation.x = PI / 2;
+    g.add(horn);
+    const box = new THREE.Mesh(
+      new THREE.BoxGeometry(0.22, 0.28, 0.16),
+      new THREE.MeshStandardMaterial({ color: 0x2a2a28, roughness: 0.6 })
+    );
+    box.position.y = 3.5;
+    g.add(box);
+    g.position.set(x, 0, z);
+    scene.add(g);
+    G.soiPa.push({ mesh: g, soi: s, x, z });
+  }
+}
+
 function makeCheckpointCone() {
   const g = new THREE.Group();
   g.name = 'checkpoint-cone';
