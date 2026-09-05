@@ -236,6 +236,9 @@ export function bindHud() {
     out.push({ name: 'Gang turf', status: `${held}/${TURFS.length} held`, dist: nt == null ? null : nt });
     out.push({ name: 'Arcade · Tuk-Tuk Dash', status: 'mall floor 1', dist: d(poi.terminal) });
     out.push({ name: 'Riverside boats', status: 'longtails', dist: d(poi.pier) });
+    if (G.boatNoodle && G.boatNoodle.mesh) {
+      out.push({ name: 'Boat noodles', status: 'ก๋วยเตี๋ยวเรือ · ฿50', dist: d(G.boatNoodle.mesh.position) });
+    }
     out.push({ name: 'Taxi · press J', status: (G.taxi && G.taxi.stage && G.taxi.stage !== 'idle') ? 'fare active' : 'available', dist: GAMEPLAY.phonePlaces ? d(nearestVeh(v => v.kind === 'songthaew')) : null });
     const stand = G.world && G.world.motosaiStands && G.world.motosaiStands.find(s => s.bike && !s.bike.driver);
     out.push({ name: 'Motosai · press J', status: (G.motosai && G.motosai.stage && G.motosai.stage !== 'idle') ? 'fare active' : 'bike · sois', dist: stand && stand.bike ? d(stand.bike.pos) : null });

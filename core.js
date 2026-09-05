@@ -295,6 +295,7 @@ export const GAMEPLAY = {
   soiCowboy: true,        // neon bar strip at the Soi Cowboy kiosk; touts after 20:00
   phonePlaces: true,      // phone directory rows that were "somewhere" now point at a place
   longtailChase: true,    // steal a longtail with stars and river cops chase in the channel
+  boatNoodle: true,       // kuay teow reua: a noodle boat works the pier; E for a bowl
 };
 G.gameplay = GAMEPLAY;
 

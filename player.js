@@ -387,6 +387,7 @@ export function updateInteraction(dt) {
       if (ped && ped.mesh && !ped.dead && dist2(ped.mesh.position, pp0) < 2.2 * 2.2) return;
     }
   }
+  if (GAMEPLAY.boatNoodle && G.boatNoodle && G.boatNoodle.mesh && dist2(G.boatNoodle.mesh.position, pp0) < 3.6 * 3.6) return;
 
   const crate = G.world.yaowaratCrate;
   if (crate && !crate.taken && dist2(p.group.position, crate.pos) < 2.6 * 2.6) {

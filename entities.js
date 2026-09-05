@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.yaowaratNight || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.yaowaratNight || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -2218,6 +2218,62 @@ export function spawnParkedCars(scene) {
 }
 
 // One drivable longtail at the river pier gap (z=-50) — step through the embankment to board.
+export function spawnBoatNoodle(scene) {
+  if (!GAMEPLAY.boatNoodle) return;
+  const pier = G.world && G.world.poi && G.world.poi.pier;
+  const x = pier ? pier.x - 2.8 : -215;
+  const z = pier ? pier.z : -50;
+  const g = new THREE.Group();
+  g.name = 'noodle-boat';
+  const hull = new THREE.Mesh(
+    new THREE.BoxGeometry(1.35, 0.42, 4.2),
+    new THREE.MeshStandardMaterial({ color: 0x8a3a28, roughness: 0.72 })
+  );
+  hull.position.y = 0.28;
+  g.add(hull);
+  const trim = new THREE.Mesh(
+    new THREE.BoxGeometry(1.45, 0.1, 4.3),
+    new THREE.MeshStandardMaterial({ color: 0xd0b050, roughness: 0.55 })
+  );
+  trim.position.y = 0.5;
+  g.add(trim);
+  const pot = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.28, 0.32, 0.28, 8),
+    new THREE.MeshStandardMaterial({ color: 0x2a2a30, metalness: 0.45, roughness: 0.4, emissive: 0xff5510, emissiveIntensity: 0.25 })
+  );
+  pot.name = 'noodle-pot';
+  pot.position.set(0, 0.72, 0.4);
+  g.add(pot);
+  const puff = new THREE.Mesh(
+    new THREE.SphereGeometry(0.22, 6, 5),
+    new THREE.MeshBasicMaterial({ color: 0x887766, transparent: true, opacity: 0.22, depthWrite: false })
+  );
+  puff.name = 'noodle-steam';
+  puff.position.set(0, 1.05, 0.4);
+  g.add(puff);
+  const umb = new THREE.Mesh(
+    new THREE.ConeGeometry(0.85, 0.32, 8),
+    new THREE.MeshStandardMaterial({ color: 0xc44a2a, roughness: 0.7, side: THREE.DoubleSide })
+  );
+  umb.position.y = 1.85;
+  umb.rotation.x = PI;
+  g.add(umb);
+  const pole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.025, 0.025, 1.2, 5),
+    new THREE.MeshStandardMaterial({ color: 0x333333 })
+  );
+  pole.position.y = 1.25;
+  g.add(pole);
+  g.position.set(x, 0.22, z);
+  scene.add(g);
+  const vendor = spawnPed(scene, new THREE.Vector3(x, 0, z), 'vendor');
+  vendor.boatNoodle = true;
+  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI / 2 };
+  vendor.speed = 0;
+  vendor.state = 'idle';
+  G.boatNoodle = { mesh: g, vendor, x, z0: z, t: 0.5, dir: 1 };
+}
+
 export function spawnBoat(scene) {
   // A small fleet of driveable longtails along the channel (the one by the pier
   // at z=-50 plus two more) so the river is a real traversal option, not a

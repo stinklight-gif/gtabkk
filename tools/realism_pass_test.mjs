@@ -169,15 +169,12 @@ async function main() {
     });
     assert(heat.stars >= 1 && heat.heatLevel >= 1, 'Moto Drop escalates wanted pressure during the run');
 
-    await page.evaluate(() => {
+    const done = await page.evaluate(() => {
       const G = window.GAME, q = G.quickDrop, v = G.player.inVehicle;
       v.pos.copy(q.dest);
       v.mesh.position.copy(v.pos);
       G.player.group.position.copy(v.pos);
       window.__REALISM_MAIN.updateQuickDelivery(0.1);
-    });
-    const done = await page.evaluate(() => {
-      const G = window.GAME, q = G.quickDrop;
       return {
         stage: q.stage,
         deliveries: q.deliveries,
@@ -456,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -2150,6 +2147,46 @@ async function main() {
     });
     assert(river.flag && river.n >= 1 && river.lamps, `a river cop longtail joins the chase (${river.n})`);
     assert(river.inRiver && river.moved > 2, `the cop boat stays in the channel and closes (${river.moved.toFixed(1)}m)`);
+
+    console.log('\n[69] khlong boat noodles');
+    const bowl = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.boatNoodle;
+      const mesh = c && c.mesh;
+      const pot = !!(mesh && mesh.getObjectByName('noodle-pot'));
+      const steam = !!(mesh && mesh.getObjectByName('noodle-steam'));
+      const pier = G.world && G.world.poi && G.world.poi.pier;
+      const nearPier = !!(mesh && pier && Math.hypot(mesh.position.x - pier.x, mesh.position.z - pier.z) < 18);
+      const onRiver = !!(mesh && mesh.position.x < -200 && mesh.position.x > -248);
+      const start = mesh ? { x: mesh.position.x, z: mesh.position.z } : null;
+      G.player.inVehicle = null;
+      G._eating = null;
+      if (mesh) G.player.group.position.set(mesh.position.x + 40, 0, mesh.position.z + 40);
+      for (let i = 0; i < 40; i++) main.updateBoatNoodle(0.25);
+      const moved = !!(mesh && start && Math.hypot(mesh.position.x - start.x, mesh.position.z - start.z) > 0.4);
+      if (mesh) G.player.group.position.copy(mesh.position);
+      G.cash = 120;
+      G.player.hp = 40;
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let paid = false;
+      for (let i = 0; i < 4 && !paid; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateBoatNoodle(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        paid = G.cash === 70;
+      }
+      const vendor = !!(c && c.vendor && c.vendor.boatNoodle);
+      return {
+        flag: !!(G.gameplay && G.gameplay.boatNoodle),
+        named: !!(mesh && mesh.name === 'noodle-boat'),
+        pot, steam, nearPier, onRiver, moved, paid, healed: G.player.hp > 40, vendor,
+      };
+    });
+    assert(bowl.flag && bowl.named && bowl.pot && bowl.steam && bowl.vendor, 'a noodle boat works the pier');
+    assert(bowl.nearPier && bowl.onRiver && bowl.moved, 'the boat sits on the khlong and drifts');
+    assert(bowl.paid && bowl.healed, 'E buys boat noodles for ฿50');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
