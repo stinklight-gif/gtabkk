@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -1685,6 +1685,26 @@ async function main() {
     assert(stop.dayOff && stop.nightOn, 'flashlight cop only works the night shift');
     assert(stop.slowed, 'traffic crawls through the checkpoint');
     assert(stop.stars >= 1, 'blowing the checkpoint at speed is a star');
+
+    console.log('\n[54] 7-Eleven parked bikes');
+    const rack = await page.evaluate(() => {
+      const G = window.GAME;
+      const seven = G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0]));
+      const list = G.sevenBikes || [];
+      const n = list.filter(v => v && v.spec && v.spec.kind === 'bike' && v.sevenParked).length;
+      const pinned = list.filter(v => v && v._standHome && v.driver !== 'player').length;
+      let near = 0;
+      if (seven && seven.pos) {
+        for (const v of list) {
+          if (!v || !v.pos) continue;
+          if (Math.hypot(v.pos.x - seven.pos.x, v.pos.z - seven.pos.z) < 12) near++;
+        }
+      }
+      const open = list.filter(v => v && v.driver == null).length;
+      return { flag: !!(G.gameplay && G.gameplay.sevenBikes), n, pinned, near, open, seven: !!(seven && seven.pos) };
+    });
+    assert(rack.flag && rack.seven && rack.n >= 4 && rack.near >= 4, `bikes cluster outside 7-Eleven (${rack.n})`);
+    assert(rack.pinned >= 4 && rack.open >= 4, 'the rack is pinned and enterable');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

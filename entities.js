@@ -1655,6 +1655,31 @@ export function spawnCheckpoint(scene) {
   };
 }
 
+export function spawnSevenBikes(scene) {
+  if (!GAMEPLAY.sevenBikes) return;
+  const seven = G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0]));
+  if (!seven || !seven.pos) return;
+  const hx = seven.hx || 5;
+  const px = seven.pos.x - hx - 1.55;
+  const heading = PI / 2;
+  G.sevenBikes = [];
+  const n = 5;
+  for (let i = 0; i < n; i++) {
+    const z = seven.pos.z - 2.2 + i * 1.15;
+    const x = px + (i % 2) * 0.18;
+    const bike = makeVehicle('bike', scene);
+    bike.pos.set(x, 0, z);
+    bike.heading = heading;
+    bike.mesh.position.copy(bike.pos);
+    bike.mesh.rotation.y = heading;
+    bike.driver = null;
+    bike.vel = 0;
+    bike.sevenParked = true;
+    bike._standHome = { x, z, heading };
+    G.sevenBikes.push(bike);
+  }
+}
+
 export function spawnCoconutCarts(scene) {
   if (!GAMEPLAY.coconutCart) return;
   const sois = (G.world && G.world.sois) || [];

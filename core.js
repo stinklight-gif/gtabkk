@@ -280,6 +280,7 @@ export const GAMEPLAY = {
   coconutCart: true,      // green-coconut cart on a soi; E for a drink
   soiLaundry: true,       // clothes lines strung across sois
   nightCheckpoint: true,  // night cones + flashlight cop; blow through and you get a star
+  sevenBikes: true,       // parked motorbike cluster outside the walk-in 7-Eleven
 };
 G.gameplay = GAMEPLAY;
 
