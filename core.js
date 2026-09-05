@@ -278,6 +278,7 @@ export const GAMEPLAY = {
   lottery: true,          // Government Lottery board outside 7-Eleven; E buys a ticket
   watChant: true,         // dawn and dusk chant from the wat when you're nearby
   coconutCart: true,      // green-coconut cart on a soi; E for a drink
+  soiLaundry: true,       // clothes lines strung across sois
 };
 G.gameplay = GAMEPLAY;
 

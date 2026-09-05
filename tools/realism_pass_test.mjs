@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -1616,6 +1616,18 @@ async function main() {
     assert(coco.flag && coco.n >= 1 && coco.onSoi, `a coconut cart rolls a soi (${coco.n})`);
     assert(coco.moved, 'coconut cart moves along the soi');
     assert(coco.paid && coco.healed && coco.stam, 'E buys coconut water for ฿30');
+
+    console.log('\n[52] soi laundry lines');
+    const wash = await page.evaluate(() => {
+      const G = window.GAME;
+      const list = G.laundry || [];
+      const n = list.filter(l => l && l.mesh && l.mesh.name === 'laundry-line').length;
+      const high = list.filter(l => l && l.mesh && l.mesh.position.y === 0 && l.mesh.children.some(c => c.position.y > 1.8)).length;
+      const onSoi = list.filter(l => l && l.soi).length;
+      return { flag: !!(G.gameplay && G.gameplay.soiLaundry), n, high, onSoi };
+    });
+    assert(wash.flag && wash.n >= 2 && wash.onSoi >= 2, `laundry lines span the sois (${wash.n})`);
+    assert(wash.high >= 2, 'shirts hang above head height');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

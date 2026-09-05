@@ -1477,6 +1477,50 @@ export function makeCoconutCartMesh() {
   return g;
 }
 
+export function spawnLaundry(scene) {
+  if (!GAMEPLAY.soiLaundry) return;
+  const sois = (G.world && G.world.sois) || [];
+  G.laundry = [];
+  const n = Math.min(3, sois.length);
+  const shirtColors = [0xf0f0f0, 0xd44b3b, 0x2a5aad, 0x1e9a5e, 0xffcf4a];
+  for (let i = 0; i < n; i++) {
+    const s = sois[i];
+    const alongZ = s.axis === 'z';
+    const g = new THREE.Group();
+    g.name = 'laundry-line';
+    const midX = (s.x0 + s.x1) * 0.5, midZ = (s.z0 + s.z1) * 0.5;
+    const t = 0.35 + i * 0.12;
+    const cx = alongZ ? midX : s.x0 + (s.x1 - s.x0) * t;
+    const cz = alongZ ? s.z0 + (s.z1 - s.z0) * t : midZ;
+    const span = alongZ ? (s.x1 - s.x0) + 2.4 : (s.z1 - s.z0) + 2.4;
+    const rope = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.015, 0.015, span, 4),
+      new THREE.MeshStandardMaterial({ color: 0xc8b090, roughness: 0.7 })
+    );
+    rope.position.y = 2.35;
+    if (alongZ) rope.rotation.z = PI / 2;
+    else rope.rotation.x = PI / 2;
+    g.add(rope);
+    const count = 5;
+    for (let k = 0; k < count; k++) {
+      const u = (k + 0.5) / count - 0.5;
+      const shirt = new THREE.Mesh(
+        new THREE.BoxGeometry(0.28, 0.38, 0.04),
+        new THREE.MeshStandardMaterial({ color: shirtColors[(i + k) % shirtColors.length], roughness: 0.85 })
+      );
+      shirt.position.set(
+        alongZ ? u * span * 0.7 : 0,
+        2.1,
+        alongZ ? 0 : u * span * 0.7
+      );
+      g.add(shirt);
+    }
+    g.position.set(cx, 0, cz);
+    scene.add(g);
+    G.laundry.push({ mesh: g, soi: s, x: cx, z: cz });
+  }
+}
+
 export function spawnCoconutCarts(scene) {
   if (!GAMEPLAY.coconutCart) return;
   const sois = (G.world && G.world.sois) || [];
