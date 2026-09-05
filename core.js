@@ -253,6 +253,42 @@ export const GAMEPLAY = {
   yaowaratNight: true,
   boatHijack: true,
   sevenInterior: true,
+  motosai: true,          // pillion motorcycle taxi, soi-only, pays more if you filter traffic
+  motosaiStands: true,    // orange-vest bikes waiting at soi mouths; traffic bikes carry pillions
+  burningHaze: true,      // third weather: burning-season haze (noon goes dirty, headlights, fog)
+  schoolKids: true,       // morning uniforms walking the sois toward the BTS
+  seekShade: true,        // midday / haze: wanderers pull onto walkways and stop
+  stallSit: true,         // E to sit at a food stall, pay, eat, heal
+  spiritWai: true,        // E at a spirit house: incense, heat cools
+  soiCats: true,          // cats loaf at food stalls and bolt when you get close
+  btsPlatform: true,      // commuters wait on Asok / Phrom Phong; PA when the train pulls in
+  bikeHelmets: true,      // helmeted riders on bikes; stand/pillion heads get lids too
+  officeCommute: true,    // evening office crowd walking the sois toward the BTS
+  afternoonStorm: true,   // after the heat, a Gulf thunderstorm breaks mid-afternoon
+  crossingGuard: true,    // yellow-vest stop-paddle at Asok during the school walk
+  btsMotosai: true,       // extra orange-vest stand at the Asok BTS escalator mouth
+  rainPack: true,         // food stalls pack tarps and queues when the rain hits
+  btsSongthaew: true,     // parked songthaew + hawker at the Asok BTS exit
+  iceCart: true,          // vendor ice carts patrol the sois and ding
+  btsTuktuk: true,        // parked tuk-tuk + driver at the Asok BTS exit
+  khlongMonitor: true,    // water monitors loaf on the river bank and bolt
+  stallGecko: true,       // tiny geckos on stall parasols after dark
+  soiFootball: true,      // after-school kickabout in a soi
+  mallShoppers: true,     // evening bags walking from Terminal 21 to the BTS
+  lottery: true,          // Government Lottery board outside 7-Eleven; E buys a ticket
+  watChant: true,         // dawn and dusk chant from the wat when you're nearby
+  coconutCart: true,      // green-coconut cart on a soi; E for a drink
+  soiLaundry: true,       // clothes lines strung across sois
+  nightCheckpoint: true,  // night cones + flashlight cop; blow through and you get a star
+  sevenBikes: true,       // parked motorbike cluster outside the walk-in 7-Eleven
+  hyacinth: true,         // water hyacinth mats drift on the khlong
+  btsSitters: true,       // people sit on the Asok BTS escalator with their phones
+  mooPing: true,          // grilled-pork cart on a soi; E for a skewer
+  watTurtles: true,       // turtles paddle the pond at the wat
+  sevenGuard: true,       // plastic-chair security at the walk-in 7-Eleven
+  soiPa: true,            // village PA horns on soi poles; crackle at dawn and afternoon
+  soiChairs: true,        // plastic chairs + beer crates; drinkers sit after dark
+  soiMechanic: true,      // paddock-stand bike + mechanic; E repairs your ride for ฿80
 };
 G.gameplay = GAMEPLAY;
 

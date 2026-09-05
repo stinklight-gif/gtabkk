@@ -11,6 +11,10 @@ export function updatePlayer(dt) {
   const p = G.player;
   if (p.inVehicle) { updatePlayerInVehicle(dt); return; }
   if (G._btsRide) return;
+  if (G._eating) {
+    p.velocity.x = 0; p.velocity.z = 0;
+    return;
+  }
 
   // mouse look
   const [dx, dy] = G.input.consumeMouseDelta();
@@ -232,7 +236,23 @@ export function updateBTS(dt) {
   const stops = btsStops();
   const atStop = nearestBtsStop(b.mesh.position.x);
   if (atStop.dist < 8) {
-    if (!b._announced && G.audio.btsChime) { G.audio.btsChime(); b._announced = true; }
+    if (!b._announced) {
+      b._announced = true;
+      if (G.audio && G.audio.btsChime) G.audio.btsChime();
+      if (GAMEPLAY.btsPlatform) {
+        const nxt = stops.find(s => Math.abs(s.x - atStop.stop.x) > 20) || stops[stops.length - 1];
+        G._btsPa = { stop: atStop.stop.name, next: nxt && nxt.name };
+        const ppos = G.player && G.player.group && G.player.group.position;
+        const near = ppos && (Math.hypot(ppos.x - atStop.stop.x, ppos.z - (atStop.stop.z || 0)) < 95 || ppos.y > 12);
+        if (near && G.hud && G.hud.showSubtitle) {
+          const th = { Asok: 'อโศก', 'Phrom Phong': 'พร้อมพงษ์' };
+          G.hud.showSubtitle(
+            `${atStop.stop.name} — next train to ${nxt && nxt.name ? nxt.name : 'the next stop'}`,
+            `${th[atStop.stop.name] || atStop.stop.name} — ขบวนต่อไป ${th[nxt && nxt.name] || (nxt && nxt.name) || ''}`
+          );
+        }
+      }
+    }
   } else b._announced = false;
 
   const p = G.player;
@@ -344,7 +364,24 @@ export function updateCollectibles(dt) {
 
 export function updateInteraction(dt) {
   const p = G.player;
-  if (p.inVehicle || G._btsRide) return;
+  if (p.inVehicle || G._btsRide || G._eating) return;
+  const pp0 = p.group.position;
+  if (GAMEPLAY.stallSit && G.world.foodStalls) {
+    for (const f of G.world.foodStalls) if (dist2(f.pos, pp0) < 2.4 * 2.4) return;
+  }
+  if (GAMEPLAY.spiritWai && G.world.shrines) {
+    for (const s of G.world.shrines) if (dist2(s.pos, pp0) < 3.2 * 3.2) return;
+  }
+  if (GAMEPLAY.iceCart && G.iceCarts) {
+    for (const c of G.iceCarts) if (c.mesh && dist2(c.mesh.position, pp0) < 2.2 * 2.2) return;
+  }
+  if (GAMEPLAY.lottery && G.lottery && G.lottery.pos && dist2(G.lottery.pos, pp0) < 2.4 * 2.4) return;
+  if (GAMEPLAY.coconutCart && G.coconutCarts) {
+    for (const c of G.coconutCarts) if (c.mesh && dist2(c.mesh.position, pp0) < 2.2 * 2.2) return;
+  }
+  if (GAMEPLAY.mooPing && G.mooPing) {
+    for (const c of G.mooPing) if (c.mesh && dist2(c.mesh.position, pp0) < 2.2 * 2.2) return;
+  }
 
   const crate = G.world.yaowaratCrate;
   if (crate && !crate.taken && dist2(p.group.position, crate.pos) < 2.6 * 2.6) {
@@ -432,12 +469,25 @@ export function updateInteraction(dt) {
       G.audio.blip({ freq: 280, dur: 0.06, gain: 0.1 });
     }
   } else if (near) {
-    G.hud.showPrompt('Press <b>E</b> to enter ' + vehicleName(near.kind), 0.5);
+    const motosai = GAMEPLAY.motosaiStands && near.motosaiStand;
+    G.hud.showPrompt(motosai ? 'Press <b>E</b> to take the motosai' : 'Press <b>E</b> to enter ' + vehicleName(near.kind), 0.5);
     if (G.input.pressed('KeyE')) {
       p.inVehicle = near;
       near.driver = 'player';
       near.npc = null;   // take over from the traffic AI if it was a moving car
       applyUpgrades(near);   // your garage tuning rides with you
+      if (motosai) {
+        near.motosaiStand = false;
+        const rider = near.standRider;
+        if (rider) {
+          rider.anchor = null;
+          rider.motosaiRider = false;
+          rider.speed = 1.3;
+          rider.panicT = 1.2;
+          near.standRider = null;
+        }
+        G.hud.showNotif('Motosai — press J for a soi fare');
+      }
       G.audio.blip({freq:300, dur:0.05, gain:0.08});
     }
   } else {

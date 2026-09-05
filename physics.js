@@ -266,7 +266,7 @@ export function resolveVehicleVsVehicles(v) {
     const vIsPlayer = v.driver === 'player';
     const oIsPlayer = o.driver === 'player';
     const playerHit = vIsPlayer || oIsPlayer;
-    const oLocked = o.driver && o.driver !== 'player' && !playerHit;
+    const oLocked = (o.driver && o.driver !== 'player' && !playerHit) || (o._standHome && o.driver !== 'player');
     const vShare = playerHit ? (vIsPlayer ? 0.24 : 0.82) : (oLocked ? 0.85 : 0.55);
     const oShare = playerHit ? (vIsPlayer ? 0.76 : 0.08) : (oLocked ? 0.15 : 0.45);
     v.pos.x += nx * overlap * vShare;
@@ -289,16 +289,18 @@ export function resolveVehicleVsVehicles(v) {
       const dvx = j * nx / m1, dvz = j * nz / m1;
       const dox = -j * nx / m2, doz = -j * nz / m2;
       setVehicleWorldVelocity(v, vw.x + dvx, vw.z + dvz);
-      setVehicleWorldVelocity(o, ow.x + dox, ow.z + doz);
       const rvx = (o.pos.x - v.pos.x) * 0.5, rvz = (o.pos.z - v.pos.z) * 0.5;
       const spinV = clamp((rvx * (j * nz) - rvz * (j * nx)) * 0.0004 / Math.max(1, m1 / 1500), -1.6, 1.6);
       const spinO = clamp((rvx * (-j * nz) - rvz * (-j * nx)) * 0.0004 / Math.max(1, m2 / 1500), -1.8, 1.8);
       v.yawRate = clamp((v.yawRate || 0) + spinV, -2.2, 2.2);
-      o.yawRate = clamp((o.yawRate || 0) + spinO, -2.2, 2.2);
       exciteSuspension(v, rel);
-      exciteSuspension(o, rel);
-      if (o.driver !== 'player') addNpcImpact(o, dox, doz, spinO);
       if (v.driver !== 'player') addNpcImpact(v, dvx, dvz, spinV);
+      if (!oLocked) {
+        setVehicleWorldVelocity(o, ow.x + dox, ow.z + doz);
+        o.yawRate = clamp((o.yawRate || 0) + spinO, -2.2, 2.2);
+        exciteSuspension(o, rel);
+        if (o.driver !== 'player') addNpcImpact(o, dox, doz, spinO);
+      }
       if (playerHit) {
         const target = vIsPlayer ? o : oIsPlayer ? v : null;
         const rammer = vIsPlayer ? v : oIsPlayer ? o : null;
@@ -312,7 +314,7 @@ export function resolveVehicleVsVehicles(v) {
       v._vehHitAt = performance.now();
       const dmg = Math.max(1, (rel - 3.5) * 0.8) * (v.spec.armorMul != null ? v.spec.armorMul : 1);
       v.hp -= dmg;
-      o.hp -= Math.max(0.5, dmg * 0.65);
+      if (!oLocked) o.hp -= Math.max(0.5, dmg * 0.65);
       spawnDust((v.pos.x + o.pos.x) * 0.5, (v.pos.z + o.pos.z) * 0.5, playerHit ? 18 : 9);
       if (playerHit) {
         G.camRig.shake = Math.max(G.camRig.shake || 0, Math.min(0.38, rel * 0.025));

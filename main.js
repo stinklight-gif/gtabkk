@@ -22,7 +22,7 @@ export * from './traffic.js';
 import { buildTrafficLights, updateTrafficLights } from './traffic.js';
 export * from './entities.js';
 import {
-  animateWalk, makeCamera, makeDogMesh, makePedMesh, makePlayer, makeRain, makeVehicle, makeVehicleMesh, sidewalkPos, spawnBoat, spawnDog, spawnDogs, spawnParkedCars, spawnPed, spawnPeds, spawnTraffic, updateEntityLod
+  animateWalk, makeCamera, makeCatMesh, makeDogMesh, makePedMesh, makePlayer, makeRain, makeVehicle, makeVehicleMesh, sidewalkPos, spawnBoat, spawnCats, spawnDog, spawnDogs, spawnMotosaiStands, spawnBtsSongthaew, spawnBtsTuktuk, spawnIceCarts, spawnCoconutCarts, spawnMooPing, spawnLaundry, spawnSoiPa, spawnSoiChairs, spawnSoiMechanic, spawnCheckpoint, spawnSevenBikes, spawnSevenGuard, spawnBtsSitters, spawnWatTurtles, spawnMonitors, spawnHyacinth, spawnGeckos, spawnLottery, spawnParkedCars, spawnPed, spawnPeds, spawnTraffic, updateEntityLod, wearBikeHelmet
 } from './entities.js';
 import { spawnAirportPlanes } from './airport.js';
 export * from './wanted.js';
@@ -35,7 +35,7 @@ import {
 } from './physics.js';
 export * from './npcs.js';
 import {
-  CROWD_CURVE, buildClusterAnchors, crowdFactor, crowdTarget, makeBarkSprite, resyncCrowd, spawnAnchoredPed, spawnBark, spawnSpikeStrip, updateAlms, updateArmorPickups, updateBarks, updateClusters, updateDogs, updateFoodStalls, updateMuggings, updatePeds, updateSpikes, updateTurf, updateVigilante, updateYaowaratNight, vigilanteEnd, vigilanteSpawnTarget
+  CROWD_CURVE, buildClusterAnchors, crowdFactor, crowdTarget, makeBarkSprite, resyncCrowd, spawnAnchoredPed, spawnBark, spawnSpikeStrip, updateAlms, updateArmorPickups, updateBarks, updateCats, updateClusters, updateDogs, updateFoodStalls, updateMuggings, updatePeds, updateSchoolKids, updateSeekShade, updateShrines, updateSpikes, updateTurf, updateVigilante, updateYaowaratNight, updateBtsPlatform, updateOfficeCommute, updateCrossingGuards, updateCheckpoint, updateSevenGuard, updateSoiChairs, updateSoiMechanic, updateRainPack, updateIceCarts, updateCoconutCarts, updateMooPing, updateMonitors, updateHyacinth, updateWatTurtles, updateGeckos, updateSoiFootball, updateMallShoppers, updateLottery, vigilanteEnd, vigilanteSpawnTarget
 } from './npcs.js';
 export * from './combat.js';
 import {
@@ -56,7 +56,7 @@ import {
 } from './daynight.js';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G,
-  PRICE, PAINT_COLORS, BUSINESSES, TURFS, missionMilestones, ROAD_WIDTH, PED_TARGET, GAMEPLAY, inYaowarat, yaowaratNightOpen, _camTarget, _camOffset, _fireDir,
+  PRICE, PAINT_COLORS, BUSINESSES, TURFS, missionMilestones, ROAD_WIDTH, PED_TARGET, GAMEPLAY, inYaowarat, yaowaratNightOpen, onSoi, onCarriageway, _camTarget, _camOffset, _fireDir,
   _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 
@@ -498,12 +498,32 @@ async function init() {
   // Spawn vehicles, peds, dogs
   spawnTraffic(scene);
   spawnParkedCars(scene);
+  spawnMotosaiStands(scene);
+  spawnBtsSongthaew(scene);
+  spawnBtsTuktuk(scene);
   spawnBoat(scene);
   spawnAirportPlanes(scene);
   // a parked, enterable cop car — the Vigilante ride
   { const v = spawnCopCar(scene, new THREE.Vector3(50, 0, 90)); v.driver = null; v.vel = 0; v.heading = 0; v.mesh.rotation.y = 0; }
   spawnPeds(scene, 60);
   spawnDogs(scene, 16);
+  spawnCats(scene);
+  spawnMonitors(scene);
+  spawnHyacinth(scene);
+  spawnGeckos(scene);
+  spawnIceCarts(scene);
+  spawnCoconutCarts(scene);
+  spawnMooPing(scene);
+  spawnLaundry(scene);
+  spawnSoiPa(scene);
+  spawnSoiChairs(scene);
+  spawnSoiMechanic(scene);
+  spawnCheckpoint(scene);
+  spawnSevenBikes(scene);
+  spawnSevenGuard(scene);
+  spawnBtsSitters(scene);
+  spawnWatTurtles(scene);
+  spawnLottery(scene);
   buildClusterAnchors();
   for (const f of (G.world.foodStalls || [])) {
     const sp = f.pos.clone(); sp.y = 1.15;
@@ -733,6 +753,140 @@ export function taxiClear(t) {
   if (t.beam) t.beam.visible = false;
 }
 
+// Motosai — Bangkok motorcycle taxi. Not a songthaew: pickup/drop on sois, a
+// pillion rider on the seat, and a bonus if you filter through traffic.
+export function soiRandPoint(from, minD, maxD) {
+  const sois = (G.world && G.world.sois) || [];
+  if (!sois.length) return taxiRandPoint(from, maxD);
+  for (let tries = 0; tries < 48; tries++) {
+    const s = sois[irand(0, sois.length - 1)];
+    const x = rand(s.x0, s.x1), z = rand(s.z0, s.z1);
+    const dx = x - from.x, dz = z - from.z, d2 = dx * dx + dz * dz;
+    if (d2 >= minD * minD && d2 <= maxD * maxD) return new THREE.Vector3(x, 0, z);
+  }
+  let best = null, bestD = 0;
+  for (const s of sois) {
+    const x = (s.x0 + s.x1) / 2, z = (s.z0 + s.z1) / 2;
+    const d2 = dist2({ x, z }, from);
+    if (d2 > bestD && d2 <= maxD * maxD) { bestD = d2; best = new THREE.Vector3(x, 0, z); }
+  }
+  return best || taxiRandPoint(from, maxD);
+}
+function motosaiFiltering(v) {
+  if (!v || !v.spec || v.spec.kind !== 'bike' || Math.abs(v.vel) < 6) return false;
+  if (onSoi(v.pos.x, v.pos.z)) return false;
+  if (!onCarriageway(v.pos.x, v.pos.z)) return false;
+  for (const o of G.vehicles) {
+    if (!o || o === v || o.dead || !o.spec) continue;
+    if (o.spec.kind === 'bike' || o.spec.kind === 'boat' || o.spec.kind === 'airliner') continue;
+    const d = Math.hypot(o.pos.x - v.pos.x, o.pos.z - v.pos.z);
+    if (d < 2.6 && Math.abs(v.vel) > Math.abs(o.vel || 0) + 1.5) return true;
+  }
+  return false;
+}
+function attachMotosaiPillion(m, bike) {
+  if (m.pillion) return;
+  const ped = spawnPed(G.scene, bike.pos.clone());
+  ped.pillion = true;
+  ped.speed = 0;
+  ped.state = 'idle';
+  G.scene.remove(ped.mesh);
+  bike.mesh.add(ped.mesh);
+  ped.mesh.position.set(0, 0.02, -0.42);
+  ped.mesh.rotation.set(0.16, 0, 0);
+  wearBikeHelmet(ped, pick([0x1a1a1e, 0xb03030, 0xffcf2a, 0x2a5a8a]));
+  m.pillion = ped;
+}
+function detachMotosaiPillion(m, bike) {
+  const ped = m.pillion;
+  if (!ped) return;
+  if (ped.mesh && ped.mesh.parent) ped.mesh.parent.remove(ped.mesh);
+  if (ped.mesh) {
+    G.scene.add(ped.mesh);
+    const pos = (bike && bike.pos) || G.player.group.position;
+    ped.mesh.position.set(pos.x + 0.8, 0, pos.z);
+    ped.mesh.rotation.set(0, (bike && bike.heading) || 0, 0);
+  }
+  ped.pillion = false;
+  ped.speed = rand(0.9, 1.4);
+  m.pillion = null;
+}
+function motosaiClear(m, bike) {
+  detachMotosaiPillion(m, bike || (G.player && G.player.inVehicle));
+  m.stage = 'idle'; m.markerPos = null; m.dest = null;
+  m.timeLeft = 0; m.fareValue = 0; m.filterT = 0; m.filterMeters = 0; m.filterBonus = 0;
+  if (m.beam) m.beam.visible = false;
+}
+export function updateMotosai(dt) {
+  if (!GAMEPLAY.motosai) return;
+  const p = G.player;
+  const m = G.motosai || (G.motosai = {
+    stage: 'idle', markerPos: null, dest: null, beam: null,
+    timeLeft: 0, fares: 0, fareValue: 0, filterT: 0, filterMeters: 0, filterBonus: 0, pillion: null,
+  });
+  const v = p.inVehicle;
+  const onBike = v && v.kind === 'bike';
+  if (m.stage !== 'idle' && !onBike) {
+    G.hud.showNotif('Motosai bailed.');
+    motosaiClear(m, v);
+    return;
+  }
+  if (m.stage === 'idle') {
+    if (onBike && !(G.quickDrop && G.quickDrop.stage && G.quickDrop.stage !== 'idle')) {
+      G.hud.showPrompt('Press <b>J</b> for a motosai · <b>Y</b> for Moto Drop', 0.4);
+      if (G.input.pressed('KeyJ')) {
+        m.stage = 'toPickup';
+        m.filterT = 0; m.filterMeters = 0; m.filterBonus = 0;
+        m.markerPos = soiRandPoint(v.pos, 35, 130);
+        taxiBeam(m, m.markerPos, 0xff7a1a);
+        G.hud.showNotif('Motosai — pick up on the soi');
+        if (G.audio && G.audio.blip) G.audio.blip({ freq: 640, dur: 0.08, gain: 0.1 });
+      }
+    }
+    return;
+  }
+  if (m.stage === 'toPickup') {
+    G.hud.showPrompt('MOTOSAI · pick up on the soi', 0.4);
+    if (dist2(v.pos, m.markerPos) < 6.5 * 6.5) {
+      attachMotosaiPillion(m, v);
+      m.dest = soiRandPoint(v.pos, 50, 170);
+      m.markerPos = m.dest;
+      taxiBeam(m, m.dest, 0x39ff7a);
+      const d = Math.sqrt(dist2(v.pos, m.dest));
+      m.timeLeft = 22 + d / 10;
+      m.fareValue = Math.round(90 + d * 6);
+      m.filterT = 0; m.filterMeters = 0; m.filterBonus = 0;
+      m.stage = 'toDropoff';
+      G.hud.showNotif('Pillion on — soi drop-off. Filter traffic for extra.');
+      if (G.audio && G.audio.blip) G.audio.blip({ freq: 720, dur: 0.08, gain: 0.11 });
+    }
+    return;
+  }
+  m.timeLeft -= dt;
+  if (motosaiFiltering(v)) {
+    m.filterT += dt;
+    m.filterMeters += Math.abs(v.vel) * dt;
+  }
+  m.filterBonus = Math.round(Math.min(220, m.filterT * 55 + m.filterMeters * 1.15));
+  if (m.timeLeft <= 0) {
+    G.hud.showNotif('Motosai gave up — too slow.');
+    motosaiClear(m, v);
+    return;
+  }
+  const pay = m.fareValue + m.filterBonus;
+  G.hud.showPrompt(`MOTOSAI &nbsp; ⏱ ${m.timeLeft.toFixed(0)}s &nbsp;→&nbsp; ฿${pay}${m.filterBonus ? ` <span style="opacity:.7">+filter ฿${m.filterBonus}</span>` : ''}`, 0.4);
+  if (dist2(v.pos, m.dest) < 6.5 * 6.5) {
+    G.cash += pay; m.fares++;
+    G.hud.setCash(G.cash);
+    G.hud.showNotif(m.filterBonus
+      ? `Motosai +฿${pay} (฿${m.fareValue} + filter ฿${m.filterBonus})`
+      : `Motosai +฿${pay}`);
+    if (G.audio && G.audio.chime) G.audio.chime();
+    else if (G.audio && G.audio.blip) G.audio.blip({ freq: 800, dur: 0.1, gain: 0.12 });
+    motosaiClear(m, v);
+  }
+}
+
 export const PERFORMANCE_BUDGETS = {
   fps: { label: 'FPS', target: 55, failAt: 45, higherIsBetter: true, suffix: 'target 55+' },
   drawCalls: { label: 'draw calls', target: 900, failAt: 1200, suffix: 'budget 900' },
@@ -882,11 +1036,14 @@ export function updateQuickDelivery(dt) {
   const p = G.player;
   const v = p.inVehicle;
   const courierRide = v && (v.kind === 'bike' || v.kind === 'tuktuk');
+  const motosaiOwnsJ = GAMEPLAY.motosai && v && v.kind === 'bike';
   if (q.stage === 'idle') {
+    if (G.motosai && G.motosai.stage && G.motosai.stage !== 'idle') return;
     if (v && !courierRide) G.hud.showPrompt('Moto Drop needs a <b>bike</b> or <b>tuk-tuk</b>', 0.35);
     if (courierRide) {
-      G.hud.showPrompt('Press <b>Y</b>/<b>J</b> for Moto Drop', 0.4);
-      if (G.input.pressed('KeyY') || G.input.pressed('KeyJ')) {
+      if (!motosaiOwnsJ) G.hud.showPrompt('Press <b>Y</b>/<b>J</b> for Moto Drop', 0.4);
+      const start = G.input.pressed('KeyY') || (!motosaiOwnsJ && G.input.pressed('KeyJ'));
+      if (start) {
         q.stage = 'toPickup';
         q.pickup = taxiRandPoint(v.pos, 80);
         q.markerPos = q.pickup;
@@ -1165,6 +1322,13 @@ export function drawFullMap() {
     ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.arc(tx, tz, 12, 0, TAU); ctx.stroke();
   }
+  if (G.motosai && G.motosai.stage !== 'idle' && G.motosai.markerPos) {
+    const mx = to(G.motosai.markerPos.x), mz = to(G.motosai.markerPos.z);
+    ctx.fillStyle = G.motosai.stage === 'toDropoff' ? '#39ff7a' : '#ff7a1a';
+    ctx.beginPath(); ctx.arc(mx, mz, 7, 0, TAU); ctx.fill();
+    ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(mx, mz, 12, 0, TAU); ctx.stroke();
+  }
   if (G.quickDrop && G.quickDrop.stage !== 'idle' && G.quickDrop.markerPos) {
     const qx = to(G.quickDrop.markerPos.x), qz = to(G.quickDrop.markerPos.z);
     ctx.fillStyle = G.quickDrop.stage === 'toPickup' ? '#ffcf4a' : '#21f0ff';
@@ -1279,6 +1443,7 @@ export function drawFullMap() {
   if (G.heist && G.heist.active && G.heist.markerPos) { op = G.heist.markerPos; on = G.heist.stage === 2 ? 'Bank Heist — loot drop' : 'Bank Heist — crack the vault'; }
   else if (G.vigilante && G.vigilante.active && G.vigilante.markerPos) { op = G.vigilante.markerPos; on = `Vigilante target · ${Math.ceil(G.vigilante.timeLeft || 0)}s`; }
   else if (G.quickDrop && G.quickDrop.stage !== 'idle' && G.quickDrop.markerPos) { op = G.quickDrop.markerPos; on = G.quickDrop.stage === 'toDropoff' ? 'Moto Drop' : 'Moto pickup'; }
+  else if (G.motosai && G.motosai.stage && G.motosai.stage !== 'idle' && G.motosai.markerPos) { op = G.motosai.markerPos; on = G.motosai.stage === 'toDropoff' ? 'Motosai drop' : 'Motosai pick-up'; }
   else if (G.taxi && G.taxi.stage && G.taxi.stage !== 'idle' && G.taxi.markerPos) { op = G.taxi.markerPos; on = G.taxi.stage === 'toDropoff' ? 'Taxi drop-off' : 'Taxi pick-up'; }
   else if (G.mission && G.mission.active && G.mission.active.markerPos) { op = G.mission.active.markerPos; on = G.mission.active.name || 'Objective'; }
   if (op) {
@@ -1540,6 +1705,9 @@ export function loop() {
     updateDistrict();
     updateCollectibles(dt);
     updateFoodStalls(dt);
+    updateRainPack(dt);
+    updateShrines(dt);
+    updateLottery(dt);
     updateArmorPickups(dt);
     updateInteraction(dt);
     updateGarage(dt);
@@ -1547,6 +1715,7 @@ export function loop() {
     updateRadio(dt);
     if (G.audio && G.audio.updateMusic) G.audio.updateMusic(dt);   // dynamic music bed + G-watched audio events (alarm, boat motor)
     updateTaxi(dt);
+    updateMotosai(dt);
     updateQuickDelivery(dt);
     updateTrafficLights(dt);   // advance the signal phase before cars/peds read it
     updateVehicles(dt);
@@ -1560,7 +1729,26 @@ export function loop() {
     updateVigilante(dt);
     updateTurf(dt);
     updateDogs(dt);
+    updateCats(dt);
+    updateMonitors(dt);
+    updateHyacinth(dt);
+    updateWatTurtles(dt);
+    updateGeckos(dt);
+    updateSoiFootball(dt);
+    updateIceCarts(dt);
+    updateCoconutCarts(dt);
+    updateMooPing(dt);
     updateAlms(dt);
+    updateSchoolKids(dt);
+    updateCrossingGuards(dt);
+    updateCheckpoint(dt);
+    updateSevenGuard(dt);
+    updateSoiChairs(dt);
+    updateSoiMechanic(dt);
+    updateOfficeCommute(dt);
+    updateMallShoppers(dt);
+    updateBtsPlatform(dt);
+    updateSeekShade(dt);
     updateYaowaratNight(dt);
     updateFootCops(dt);
     updateBullets(dt);

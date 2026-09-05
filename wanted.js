@@ -172,7 +172,8 @@ export function updateWanted(dt) {
   // "See" means an actual unobstructed line — duck behind a building or into an
   // alley and contact breaks, which is what makes cover worth using.
   if (GAMEPLAY.wantedLOS && G.wanted.stars > 0) {
-    const seeR = 30 * 30;
+    const seeD = (GAMEPLAY.burningHaze && G.time.weather === 'haze') ? 18 : 30;
+    const seeR = seeD * seeD;
     let seen = false;
     for (const c of G.cops) {
       if (c.dead || c.state === 'bribed' || dist2(c.mesh.position, p) >= seeR) continue;

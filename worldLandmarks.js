@@ -437,6 +437,7 @@ export function buildLandmarks(env) {
   }
 
   // ---- Shrines (spirit houses) — small gold structures ----
+  world.shrines = [];
   for (let n = 0; n < 6; n++) {
     const sp = new THREE.Vector3(rand(-HALF+40, HALF-40), 0, rand(-HALF+40, HALF-40));
     // snap inside a block, not on a road
@@ -451,8 +452,16 @@ export function buildLandmarks(env) {
     pole.position.y = 1; shrine.add(pole);
     const pl = new THREE.PointLight(0xffcf4a, 0.6, 10, 2);
     pl.position.y = 2; shrine.add(pl);
+    const incense = new THREE.Mesh(
+      new THREE.ConeGeometry(0.12, 0.7, 6),
+      new THREE.MeshBasicMaterial({ color: 0xddd8d0, transparent: true, opacity: 0.22, depthWrite: false })
+    );
+    incense.name = 'incense';
+    incense.position.set(0.25, 2.15, 0.2);
+    shrine.add(incense);
     shrine.position.copy(sp);
     scene.add(shrine);
+    world.shrines.push({ pos: sp.clone(), mesh: shrine, readyAt: 0, incenseT: 0.4 });
   }
 
   // ---- Mission marker: Uncle Seng's gold shop (yellow pillar of light) ----
@@ -1064,9 +1073,15 @@ export function buildLandmarks(env) {
       const cart = new THREE.Mesh(cartGeo, cartMat); cart.position.y = 0.6; stall.add(cart);
       const glowColor = pick([0xffaa33, 0xff5a5a, 0x39c6c0]);
       const glowMat = new THREE.MeshStandardMaterial({ color: glowColor, emissive: glowColor, emissiveIntensity: 0.7, roughness: 0.5 });
-      const parasol = new THREE.Mesh(parasolGeo, glowMat); parasol.position.y = 1.9; stall.add(parasol);
+      const parasol = new THREE.Mesh(parasolGeo, glowMat); parasol.position.y = 1.9; parasol.name = 'parasol'; stall.add(parasol);
+      const stoolMat = new THREE.MeshStandardMaterial({ color: 0xd9d2c4, roughness: 0.7 });
+      for (const sx of [-0.7, 0.7]) {
+        const stool = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.2, 0.42, 8), stoolMat);
+        stool.name = 'stool';
+        stool.position.set(sx, 0.21, 0.85); stall.add(stool);
+      }
       stall.position.set(x, 0, z); scene.add(stall);
-      world.foodStalls.push({ pos: new THREE.Vector3(x, 0, z), visited: false, glowMat });
+      world.foodStalls.push({ pos: new THREE.Vector3(x, 0, z), visited: false, glowMat, readyAt: 0, mesh: stall });
     }
   }
 

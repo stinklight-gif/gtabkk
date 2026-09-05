@@ -6,6 +6,7 @@ import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, UPGRADES, rankDiscount, ROAD_WIDTH, PED_TARGET, GAMEPLAY, trafficTarget, inYaowarat, inFlood, onSoi, onCarriageway, inAirport, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { tip, cycleWeapon, damagePlayer, firePistol, fireSMG, fireShotgun, makeExplosion, makeSmokeEmitter, makeVehicle, onCopKilled, raiseWanted, resolveVehicleVsBuildings, resolveVehicleVsVehicles, saveGame, spawnSkid, updateCop, vehicleName } from './main.js';
+import { attachTrafficPillion, syncBikeRider } from './entities.js';
 import { lightFor } from './traffic.js';
 
 export function updateVehicleVisuals(v, dt, opts={}) {
@@ -17,7 +18,8 @@ export function updateVehicleVisuals(v, dt, opts={}) {
     if (w.spin) w.spin.rotation.x = -v.wheelSpin / Math.max(0.1, w.radius || 0.3);
     if (w.front && w.mount) w.mount.rotation.y = lerp(w.mount.rotation.y || 0, steer, 0.3);
   }
-  const headOpacity = (G.nightK || 0) > 0.25 || G.time.weather === 'rain' ? 0.95 : 0.58;
+  const hazeOn = GAMEPLAY.burningHaze && G.time.weather === 'haze';
+  const headOpacity = (G.nightK || 0) > 0.25 || G.time.weather === 'rain' || hazeOn ? 0.95 : 0.58;
   const brakeOpacity = opts.braking ? 1.0 : 0.48;
   const reverseOpacity = opts.reverse || v.vel < -0.2 ? 0.95 : 0.24;
   for (const l of visual.headlights || []) if (l.material && l.material.opacity != null) l.material.opacity = headOpacity;
@@ -335,7 +337,7 @@ export function updatePlayerInVehicle(dt) {
 
   // ramming peds
   for (const ped of G.peds) {
-    if (ped.dead) continue;
+    if (ped.dead || ped.pillion) continue;
     if (dist2(ped.mesh.position, v.pos) < 1.6*1.6 && Math.abs(v.vel) > 4) {
       killPed(ped);
       raiseWanted(2, 5);
@@ -363,8 +365,21 @@ export function killPed(ped) {
 export function updateVehicles(dt) {
   for (const v of G.vehicles) {
     if (v.dead) continue;
+    if (v._standHome && v.driver !== 'player') {
+      v.pos.set(v._standHome.x, v._standHome.y || 0, v._standHome.z);
+      v.heading = v._standHome.heading;
+      v.vel = 0; v.latVel = 0; v.yawRate = 0;
+      v._impactVX = 0; v._impactVZ = 0; v._impactSpin = 0;
+      if (v.mesh) { v.mesh.position.copy(v.pos); v.mesh.rotation.y = v.heading; }
+      if (v.hireSign) v.hireSign.visible = true;
+      if (GAMEPLAY.bikeHelmets && v.spec && v.spec.kind === 'bike') syncBikeRider(v);
+      continue;
+    }
+    if (v.hireSign) v.hireSign.visible = v.driver !== 'player';
+    if (GAMEPLAY.bikeHelmets && v.spec && v.spec.kind === 'bike') syncBikeRider(v);
     if (v.lights) {
-      const base = G.nightK || 0;
+      const hazeOn = GAMEPLAY.burningHaze && G.time.weather === 'haze';
+      const base = Math.max(G.nightK || 0, hazeOn ? 0.85 : 0);
       v.lights[0].emissiveIntensity = base;   // headlights
       const braking = v.driver === 'player' && (G.input.down('KeyS') || G.input.down('Space'));
       v.lights[1].emissiveIntensity = braking ? Math.max(base, 0.9) : base;  // tail/brake lights
@@ -478,6 +493,11 @@ export function updateTrafficPopulation(dt) {
     }
     if (fi >= 0) {
       const v = G.vehicles[fi];
+      if (v.pillionPed) {
+        const i = G.peds.indexOf(v.pillionPed);
+        if (i >= 0) G.peds.splice(i, 1);
+        v.pillionPed = null;
+      }
       if (v.audio) { v.audio.kill(); v.audio = null; }
       G.scene.remove(v.mesh); disposeObject(v.mesh);
       G.vehicles.splice(fi, 1);
@@ -502,6 +522,7 @@ function spawnAmbientTraffic(playerPos) {
   };
   v.npc.cruiseSpeed *= v.npc.cruiseMul;
   respawnTraffic(v, playerPos);
+  if (v.spec && v.spec.kind === 'bike' && GAMEPLAY.motosaiStands && Math.random() < 0.4) attachTrafficPillion(v);
   return v;
 }
 
@@ -582,11 +603,22 @@ export function updateTrafficCar(v, dt) {
     if (npc.stopT > 0 && npc.stopT < 2.4) obstacleTarget = Math.min(obstacleTarget, 0);
     if (npc.stopT <= 0) npc.stopT = rand(12, 22);
   }
+  if (GAMEPLAY.burningHaze && G.time.weather === 'haze' && v.spec.kind !== 'bike') {
+    obstacleTarget = Math.min(obstacleTarget, npc.cruiseSpeed * 0.68);
+    signalTarget = Math.min(signalTarget, npc.cruiseSpeed * 0.68);
+  }
   if (GAMEPLAY.yaowaratCarHostility && v.spec.kind !== 'bike' && v.spec.kind !== 'tuktuk' && inYaowarat(v.pos.x, v.pos.z)) {
     obstacleTarget = Math.min(obstacleTarget, 5);
   }
   if (GAMEPLAY.floodPatches && (G.time.rainStrength || 0) > 0.7 && inFlood(v.pos.x, v.pos.z) && v.spec.kind !== 'bike') {
     obstacleTarget = Math.min(obstacleTarget, 4);
+  }
+  if (GAMEPLAY.nightCheckpoint && G.checkpoint && G.checkpoint.active) {
+    const dx = v.pos.x - G.checkpoint.x, dz = v.pos.z - G.checkpoint.z;
+    if (dx * dx + dz * dz < 18 * 18) {
+      obstacleTarget = Math.min(obstacleTarget, 3.2);
+      signalTarget = Math.min(signalTarget, 3.2);
+    }
   }
   const target = Math.min(obstacleTarget, signalTarget);
   const braking = target < v.vel - 0.1;

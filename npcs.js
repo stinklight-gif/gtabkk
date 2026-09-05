@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, TURFS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, yaowaratNightOpen, inYaowarat, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
-import { animateWalk, damagePlayer, recolorTorso, resolvePedVsBuildings, saveGame, sidewalkPos, spawnPed, spawnWalkingPair } from './main.js';
+import { animateWalk, damagePlayer, raiseWanted, recolorTorso, resolvePedVsBuildings, saveGame, sidewalkPos, spawnPed, spawnWalkingPair } from './main.js';
 import { lightFor } from './traffic.js';
 
 // 13. PEDESTRIANS + DOGS
@@ -197,14 +197,14 @@ export function resyncCrowd() {
   // pull stray wanderers onto nearby sidewalks so the count near the camera
   // reflects the hour immediately (harness-only; gameplay distributes gradually)
   for (const ped of G.peds) {
-    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight) continue;
+    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic) continue;
     if (dist2(ped.mesh.position, pp) > 95 * 95) ped.mesh.position.copy(sidewalkPos(pp.x, pp.z, 88));
   }
   for (let guard = 0; G.peds.length > target && guard < 500; guard++) {
     let fi = -1, fd = -1;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic) continue;
       const d = dist2(ped.mesh.position, pp);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -223,6 +223,53 @@ export function updatePeds(dt) {
   for (let pedIdx = 0; pedIdx < G.peds.length; pedIdx++) {
     const ped = G.peds[pedIdx];
     if (ped.dead) continue;
+    if (ped.pillion) continue;
+    if (ped.btsSit || ped.sevenGuard || ped.soiDrink) {
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        ped.mesh.position.x = slot.x;
+        ped.mesh.position.z = slot.z;
+        ped.mesh.position.y = slot.y || 0.42;
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+      const p = ped.mesh.userData.parts;
+      if (p) {
+        if (p.legL) p.legL.rotation.x = 1.28;
+        if (p.legR) p.legR.rotation.x = 1.18;
+        if (p.shinL) p.shinL.rotation.x = -1.15;
+        if (p.shinR) p.shinR.rotation.x = -1.05;
+        if (p.armL) p.armL.rotation.x = -0.55;
+        if (p.armR) p.armR.rotation.x = -0.4;
+      }
+      continue;
+    }
+    if (ped.btsWait) {
+      const y = ped.btsY || 13.9;
+      if (ped.btsBoarded || !ped.mesh.visible) {
+        ped.speed = 0;
+      } else if (ped.btsApproach) {
+        ped.heading = ped.mesh.position.z >= 0 ? PI : 0;
+        ped.speed = 1.55;
+        ped.mesh.position.x += Math.sin(ped.heading) * ped.speed * dt;
+        ped.mesh.position.z += Math.cos(ped.heading) * ped.speed * dt;
+      } else if (ped.btsSlot) {
+        ped.speed = 0;
+        ped.heading = ped.btsSlot.facing;
+        const ease = 1 - Math.pow(0.08, dt);
+        ped.mesh.position.x = lerp(ped.mesh.position.x, ped.btsSlot.x, ease);
+        ped.mesh.position.z = lerp(ped.mesh.position.z, ped.btsSlot.z, ease);
+      } else ped.speed = 0;
+      ped.mesh.position.y = y;
+      ped.mesh.rotation.y = ped.heading;
+      if (ped.mesh.visible) {
+        updatePedRainProp(ped);
+        animateWalk(ped.mesh, ped.speed, dt, ped.speed > 0.05);
+      }
+      continue;
+    }
     if (!ped.gang && ped.panicT <= 0 && !ped.anchor) {
       for (const v of G.vehicles) {
         if (!v || v.dead || Math.abs(v.vel || 0) < 7) continue;
@@ -296,6 +343,11 @@ export function updatePeds(dt) {
         ped.state = 'social';
         ped.heading = ped.social.facing + Math.sin((ped.social.idlePhase || 0) + performance.now() * 0.001) * 0.12;
       }
+    } else if (ped.shade) {
+      const dx = ped.shade.x - ped.mesh.position.x, dz = ped.shade.z - ped.mesh.position.z;
+      const d = Math.hypot(dx, dz);
+      if (d > 0.7) { ped.heading = Math.atan2(dx, dz); ped.speed = 1.15; ped.state = 'shade'; }
+      else { ped.speed = 0; ped.state = 'shade'; }
     } else if (ped.state === 'waitingCrossing') {
       ped.speed = 0;
       const road = ped.crossRoad;
@@ -411,7 +463,7 @@ export function updatePeds(dt) {
 
     // recycle a wanderer that strayed too far back onto a sidewalk in view
     // (anchored cluster peds stay put — they belong to a stall/store)
-    if (!ped.anchor && dist2(ped.mesh.position, playerPos) > 170*170) {
+    if (!ped.anchor && !ped.school && !ped.commute && dist2(ped.mesh.position, playerPos) > 170*170) {
       ped.mesh.position.copy(sidewalkPos(playerPos.x, playerPos.z, 75));
       if (ped.social) {
         ped.social = null;
@@ -438,7 +490,7 @@ export function updatePeds(dt) {
     let fi = -1, fd = 60 * 60;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic) continue;
       const d = dist2(ped.mesh.position, playerPos);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -496,7 +548,8 @@ export function updateClusters(dt) {
     a.peds = a.peds.filter(p => !p.dead && p.anchor);  // drop any that died / got repurposed
     const near = dist2(a.pos, pp) < 135 * 135;
     const occ = a.kind === 'store' ? clamp(cf * 1.15, 0, 1) : cf;
-    const want = near ? Math.round(a.capacity * occ) : 0;
+    let want = near ? Math.round(a.capacity * occ) : 0;
+    if (GAMEPLAY.rainPack && a.kind === 'food' && (G.time.rainStrength || 0) > 0.45) want = 0;
     while (a.peds.length < want && a.peds.length < a.slots.length) {
       const used = new Set(a.peds.map(p => p._slotIdx));
       let si = -1;
@@ -534,21 +587,101 @@ export function updateArmorPickups(dt) {
   }
 }
 
-// Street-food stalls — visit on foot to eat (heal once) and tick the set.
+// Street-food stalls — sit (E), pay, eat, heal. First sit still ticks the set.
 export function updateFoodStalls(dt) {
   const fs = G.world.foodStalls;
-  if (!fs || G.player.inVehicle) return;
-  const pp = G.player.group.position;
-  for (const f of fs) {
-    if (f.visited) continue;
-    if (dist2(f.pos, pp) < 4 * 4) {
+  if (!fs) return;
+  const eat = G._eating;
+  if (eat) {
+    eat.t -= dt;
+    G.hud.showPrompt('Eating…', 0.4);
+    if (eat.t > 0) return;
+    const p = G.player;
+    p.hp = Math.min(p.hpMax, p.hp + 30);
+    p.stam = Math.min(p.stamMax, p.stam + p.stamMax * 0.45);
+    const f = eat.stall;
+    if (f && !f.visited) {
       f.visited = true;
       G.foodVisited = (G.foodVisited || 0) + 1;
-      G.player.hp = Math.min(G.player.hpMax, G.player.hp + 25);
-      f.glowMat.emissiveIntensity = 0; f.glowMat.color.setHex(0x555555);   // dim = visited
+      if (f.glowMat) { f.glowMat.emissiveIntensity = 0; f.glowMat.color.setHex(0x555555); }
       G.hud.showNotif(`Street food! +HP (${G.foodVisited}/${fs.length})`);
-      G.audio.chime();
+    } else {
+      G.hud.showNotif('Street food — +HP, stamina');
     }
+    if (f) f.readyAt = performance.now() + 8000;
+    if (G.audio && G.audio.chime) G.audio.chime();
+    G._eating = null;
+    return;
+  }
+  if (!GAMEPLAY.stallSit || G.player.inVehicle) {
+    if (G.player.inVehicle) return;
+    const pp = G.player.group.position;
+    for (const f of fs) {
+      if (f.visited) continue;
+      if (dist2(f.pos, pp) < 4 * 4) {
+        f.visited = true;
+        G.foodVisited = (G.foodVisited || 0) + 1;
+        G.player.hp = Math.min(G.player.hpMax, G.player.hp + 25);
+        f.glowMat.emissiveIntensity = 0; f.glowMat.color.setHex(0x555555);
+        G.hud.showNotif(`Street food! +HP (${G.foodVisited}/${fs.length})`);
+        G.audio.chime();
+      }
+    }
+    return;
+  }
+  const pp = G.player.group.position;
+  const now = performance.now();
+  for (const f of fs) {
+    if (dist2(f.pos, pp) > 2.4 * 2.4) continue;
+    if (GAMEPLAY.rainPack && f.packed) {
+      G.hud.showPrompt('Packed up — rain', 0.35);
+      return;
+    }
+    if (f.readyAt && now < f.readyAt) {
+      G.hud.showPrompt('Stall is busy', 0.35);
+      return;
+    }
+    G.hud.showPrompt('Press <b>E</b> to sit and eat · ฿40', 0.4);
+    if (G.input.pressed('KeyE')) {
+      if (G.cash < 40) { G.hud.showNotif('Need ฿40 for a plate'); return; }
+      G.cash -= 40; G.hud.setCash(G.cash);
+      G._eating = { t: 2.2, stall: f };
+      G.hud.showNotif('Sat down — eating');
+    }
+    return;
+  }
+}
+
+export function updateShrines(dt) {
+  const list = G.world && G.world.shrines;
+  if (!list || !list.length) return;
+  for (const s of list) {
+    const smoke = s.mesh && s.mesh.getObjectByName('incense');
+    if (smoke && smoke.material) {
+      s.incenseT = Math.max(0.35, (s.incenseT || 0.4) - dt * 0.35);
+      smoke.material.opacity = 0.12 + Math.min(0.55, s.incenseT * 0.06);
+      smoke.scale.y = 1 + Math.min(1.4, s.incenseT * 0.12);
+      smoke.position.y = 2.15 + Math.sin(performance.now() * 0.003 + (s.pos.x || 0)) * 0.04;
+    }
+  }
+  if (!GAMEPLAY.spiritWai || G.player.inVehicle || G._eating) return;
+  const pp = G.player.group.position;
+  const now = performance.now();
+  for (const s of list) {
+    if (dist2(s.pos, pp) > 3.2 * 3.2) continue;
+    G.hud.showPrompt('Press <b>E</b> to wai · ฿10 incense', 0.4);
+    if (G.input.pressed('KeyE')) {
+      if (s.readyAt && now < s.readyAt) { G.hud.showNotif('The incense is still burning'); return; }
+      if (G.cash < 10) { G.hud.showNotif('Need ฿10 for incense'); return; }
+      G.cash -= 10; G.hud.setCash(G.cash);
+      s.readyAt = now + 16000;
+      s.incenseT = 8;
+      G.wanted.lastSeenAt = Math.max(0, (G.wanted.lastSeenAt || now) - 16000);
+      G._waiCount = (G._waiCount || 0) + 1;
+      G.hud.showNotif('The spirit house accepts your wai');
+      if (G.audio && G.audio.bell) G.audio.bell();
+    }
+    return;
   }
 }
 
@@ -810,6 +943,771 @@ export function updateAlms(dt) {
       ped.alms = false;
     }
     G._alms = [];
+  }
+}
+
+export function updateSchoolKids(dt) {
+  if (!GAMEPLAY.schoolKids) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const bts = G.world && G.world.bts;
+  const dest = { x: bts ? bts.x : -50, z: (bts && bts.z) || 0 };
+  const morning = h >= 6.2 && h < 8.7;
+  const homeward = h >= 15 && h < 16.5;
+  if (morning || homeward) {
+    G._schoolKids = G._schoolKids || [];
+    while (G._schoolKids.length < 5) {
+      const ang = rand(0, TAU), r = homeward ? rand(4, 14) : rand(22, 70);
+      const pos = new THREE.Vector3(
+        clamp(dest.x + Math.cos(ang) * r, -HALF + 8, HALF - 8), 0,
+        clamp(dest.z + Math.sin(ang) * r, -HALF + 8, HALF - 8));
+      const ped = spawnPed(G.scene, pos, 'school');
+      ped.school = true;
+      ped.anchor = null;
+      ped.state = 'walking';
+      ped.heading = homeward
+        ? Math.atan2(pos.x - dest.x, pos.z - dest.z)
+        : Math.atan2(dest.x - pos.x, dest.z - pos.z);
+      G._schoolKids.push(ped);
+    }
+    for (const ped of G._schoolKids) {
+      if (!ped || ped.dead) continue;
+      const dx = dest.x - ped.mesh.position.x, dz = dest.z - ped.mesh.position.z;
+      const d = Math.hypot(dx, dz);
+      if (homeward) {
+        ped.heading = Math.atan2(-dx, -dz);
+        ped.speed = 1.35;
+        ped.state = 'walking';
+      } else if (d > 8) { ped.heading = Math.atan2(dx, dz); ped.speed = 1.35; ped.state = 'walking'; }
+      else { ped.speed = 0.15; ped.state = 'idle'; }
+    }
+  } else if (G._schoolKids && G._schoolKids.length) {
+    for (const ped of G._schoolKids) {
+      if (!ped || ped.dead) continue;
+      ped.school = false;
+    }
+    G._schoolKids = [];
+  }
+}
+
+function btsStopList() {
+  return (G.bts && G.bts.stops) || (G.world && G.world.bts && G.world.bts.stops) || [
+    { x: -50, y: 13.9, name: 'Asok' },
+    { x: 100, y: 13.9, name: 'Phrom Phong' },
+  ];
+}
+function btsWaiterKind() {
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  if (h >= 6.2 && h < 8.7) return Math.random() < 0.45 ? 'school' : 'office';
+  if (h >= 17 && h < 19.5) return Math.random() < 0.7 ? 'office' : 'local';
+  if (h >= 22 || h < 5) return pick(['local', 'tourist', 'vendor']);
+  return pick(['local', 'office', 'tourist', 'vendor']);
+}
+function spawnBtsWaiter(stop) {
+  const y = stop.y || 13.9;
+  const side = Math.random() < 0.5 ? -1 : 1;
+  const slot = {
+    x: stop.x + rand(-6.5, 6.5),
+    z: side * rand(2.7, 3.9),
+    y,
+    facing: side > 0 ? PI : 0,
+  };
+  const ped = spawnPed(G.scene, new THREE.Vector3(slot.x, y, slot.z), btsWaiterKind());
+  ped.btsWait = true;
+  ped.btsStop = stop.name;
+  ped.btsSlot = slot;
+  ped.btsY = y;
+  ped.btsBoarded = false;
+  ped.btsApproach = false;
+  ped.anchor = null;
+  ped.speed = 0;
+  ped.state = 'idle';
+  ped.heading = slot.facing;
+  ped.mesh.rotation.y = slot.facing;
+  ped.mesh.position.y = y;
+  return ped;
+}
+
+function dressCrossingGuard(ped, slot) {
+  recolorTorso(ped.mesh.userData.parts, 0xffd23a, 0.7);
+  const vest = new THREE.Mesh(
+    new THREE.BoxGeometry(0.42, 0.38, 0.28),
+    new THREE.MeshStandardMaterial({ color: 0xffcf4a, roughness: 0.65, emissive: 0xffb020, emissiveIntensity: 0.16 })
+  );
+  vest.name = 'guard-vest';
+  vest.position.set(0, 1.18, 0.04);
+  ped.mesh.add(vest);
+  const paddle = new THREE.Group();
+  paddle.name = 'stop-paddle';
+  const stick = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.018, 0.018, 0.55, 5),
+    new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.6 })
+  );
+  stick.position.y = 0.2;
+  paddle.add(stick);
+  const disc = new THREE.Mesh(
+    new THREE.BoxGeometry(0.28, 0.28, 0.03),
+    new THREE.MeshStandardMaterial({ color: 0xc03030, roughness: 0.5 })
+  );
+  disc.position.y = 0.5;
+  paddle.add(disc);
+  const parts = ped.mesh.userData.parts;
+  if (parts && parts.foreR) {
+    paddle.position.set(0.02, -0.28, 0.08);
+    parts.foreR.add(paddle);
+  } else {
+    paddle.position.set(0.22, 1.05, 0.12);
+    ped.mesh.add(paddle);
+  }
+  ped.crossingGuard = true;
+  ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
+  ped.speed = 0;
+  ped.state = 'idle';
+  ped.heading = slot.facing;
+  ped.mesh.rotation.y = slot.facing;
+}
+
+export function updateCrossingGuards(dt) {
+  if (!GAMEPLAY.crossingGuard) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const bts = G.world && G.world.bts;
+  const cx = bts ? bts.x : -50;
+  const cz = (bts && bts.z) || 0;
+  const kerb = ROAD_WIDTH / 2 + 1.35;
+  if ((h >= 6.2 && h < 8.7) || (h >= 15 && h < 16.5)) {
+    G._crossingGuards = G._crossingGuards || [];
+    const slots = [
+      { x: cx + kerb, z: cz - kerb, facing: PI / 2 },
+      { x: cx - kerb, z: cz + kerb, facing: -PI / 2 },
+    ];
+    while (G._crossingGuards.length < slots.length) {
+      const slot = slots[G._crossingGuards.length];
+      const ped = spawnPed(G.scene, new THREE.Vector3(slot.x, 0, slot.z), 'laborer');
+      dressCrossingGuard(ped, slot);
+      G._crossingGuards.push(ped);
+    }
+  } else if (G._crossingGuards && G._crossingGuards.length) {
+    for (const ped of G._crossingGuards) {
+      if (!ped || ped.dead) continue;
+      ped.crossingGuard = false;
+      ped.anchor = null;
+    }
+    G._crossingGuards = [];
+  }
+}
+
+export function updateSoiChairs(dt) {
+  if (!GAMEPLAY.soiChairs || !G.soiChairs) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const night = h >= 18.5 || h < 1.2;
+  const seats = G.soiChairs.seats || [];
+  if (night) {
+    G._soiDrinkers = G._soiDrinkers || [];
+    while (G._soiDrinkers.length < seats.length) {
+      const slot = seats[G._soiDrinkers.length];
+      const ped = spawnPed(G.scene, new THREE.Vector3(slot.x, 0, slot.z), Math.random() < 0.5 ? 'local' : 'laborer');
+      ped.soiDrink = true;
+      ped.anchor = { slot: new THREE.Vector3(slot.x, 0.42, slot.z), facing: slot.facing };
+      ped.speed = 0;
+      ped.state = 'idle';
+      ped.heading = slot.facing;
+      ped.mesh.position.set(slot.x, 0.42, slot.z);
+      ped.mesh.rotation.y = slot.facing;
+      G._soiDrinkers.push(ped);
+    }
+  } else if (G._soiDrinkers && G._soiDrinkers.length) {
+    for (const ped of G._soiDrinkers) {
+      if (!ped || ped.dead) continue;
+      ped.soiDrink = false;
+      ped.anchor = null;
+    }
+    G._soiDrinkers = [];
+  }
+}
+
+export function updateSoiMechanic(dt) {
+  if (!GAMEPLAY.soiMechanic || !G.soiMechanic) return;
+  const shop = G.soiMechanic;
+  const ped = shop.ped;
+  if (ped && ped.mesh && ped.anchor && ped.anchor.slot) {
+    ped.soiMechanic = true;
+    ped.mesh.position.set(ped.anchor.slot.x, 0, ped.anchor.slot.z);
+    ped.heading = ped.anchor.facing;
+    ped.mesh.rotation.y = ped.heading;
+    ped.speed = 0;
+    ped.state = 'idle';
+  }
+  const v = G.player && G.player.inVehicle;
+  if (!v || v.dead) return;
+  if (dist2(v.pos, shop) > 4.8 * 4.8) return;
+  if (v.hp >= 100 && !v.tiresBlown) {
+    G.hud.showPrompt('Soi mechanic — ride looks fine', 0.35);
+    return;
+  }
+  G.hud.showPrompt('Press <b>E</b> to patch the ride · ฿80', 0.4);
+  if (!G.input.pressed('KeyE')) return;
+  if (G.cash < 80) { G.hud.showNotif('Need ฿80 for a patch'); return; }
+  G.cash -= 80;
+  v.hp = 100;
+  v.tiresBlown = false;
+  if (v.smoke) { v.smoke.life = 0; v.smoke = null; }
+  if (G.hud.setCash) G.hud.setCash(G.cash);
+  G.hud.showNotif('Patched — ซ่อมแล้ว');
+  if (G.audio && G.audio.chime) G.audio.chime();
+}
+
+export function updateSevenGuard(dt) {
+  if (!GAMEPLAY.sevenGuard || !G.sevenGuard) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const night = h >= 19 || h < 6;
+  const g = G.sevenGuard;
+  if (g.light) g.light.intensity = night ? 1.1 : 0;
+  if (g.beam) g.beam.visible = night;
+  const ped = g.ped;
+  if (ped && ped.mesh) {
+    ped.sevenGuard = true;
+    ped.mesh.visible = true;
+    if (ped.anchor && ped.anchor.slot) {
+      ped.mesh.position.set(ped.anchor.slot.x, ped.anchor.slot.y || 0.42, ped.anchor.slot.z);
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+      ped.speed = 0;
+    }
+  }
+}
+
+export function updateCheckpoint(dt) {
+  if (!GAMEPLAY.nightCheckpoint || !G.checkpoint) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const night = h >= 21 || h < 5.2;
+  const cp = G.checkpoint;
+  cp.active = night;
+  const cop = cp.cop;
+  if (cop && cop.mesh) {
+    cop.mesh.visible = night;
+    cop.checkpoint = true;
+    if (cop.anchor && cop.anchor.slot) {
+      cop.mesh.position.set(cop.anchor.slot.x, 0, cop.anchor.slot.z);
+      cop.heading = cop.anchor.facing;
+      cop.mesh.rotation.y = cop.heading;
+      cop.speed = 0;
+      cop.state = 'idle';
+    }
+  }
+  if (cp.light) cp.light.intensity = night ? 1.6 : 0;
+  if (cp.beam) cp.beam.visible = night;
+  if (!night) { cp.flagged = false; return; }
+  const p = G.player;
+  const v = p && p.inVehicle;
+  if (v && v.driver === 'player' && !cp.flagged) {
+    if (dist2(v.pos, cp) < 9 * 9 && Math.abs(v.vel || 0) > 8) {
+      cp.flagged = true;
+      raiseWanted(1, 2);
+      if (G.hud && G.hud.showNotif) G.hud.showNotif('Ran the checkpoint');
+    }
+  } else if (!v && p && p.group && dist2(p.group.position, cp) < 7 * 7) {
+    if (G.hud && G.hud.showPrompt) G.hud.showPrompt('Checkpoint — slow down', 0.35);
+  }
+}
+
+export function updateLottery(dt) {
+  if (!GAMEPLAY.lottery || !G.lottery) return;
+  if (G.player.inVehicle || G._eating) return;
+  const pp = G.player.group.position;
+  if (dist2(G.lottery.pos, pp) > 2.4 * 2.4) return;
+  const now = performance.now();
+  if (G.lottery.readyAt && now < G.lottery.readyAt) {
+    G.hud.showPrompt('Counting out tickets…', 0.35);
+    return;
+  }
+  G.hud.showPrompt('Press <b>E</b> for a lottery ticket · ฿80', 0.4);
+  if (!G.input.pressed('KeyE')) return;
+  if (G.cash < 80) { G.hud.showNotif('Need ฿80 for a ticket'); return; }
+  G.cash -= 80;
+  if (G.hud.setCash) G.hud.setCash(G.cash);
+  G.lottery.readyAt = now + 1800;
+  const forced = G._lotteryForce;
+  G._lotteryForce = null;
+  const roll = forced != null ? 0 : Math.random();
+  let win = forced != null ? forced : 0;
+  if (forced == null) {
+    if (roll < 0.08) win = 1200;
+    else if (roll < 0.32) win = 240;
+  }
+  if (win) {
+    G.cash += win;
+    if (G.hud.setCash) G.hud.setCash(G.cash);
+    G.hud.showNotif(`Lottery +฿${win}`);
+    if (G.audio && G.audio.chime) G.audio.chime();
+  } else {
+    G.hud.showNotif('Not this time');
+    if (G.audio && G.audio.blip) G.audio.blip({ freq: 220, dur: 0.12, gain: 0.08 });
+  }
+  G._lotteryLast = { spent: 80, win };
+}
+
+export function updateMallShoppers(dt) {
+  if (!GAMEPLAY.mallShoppers) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const mall = G.world && G.world.poi && G.world.poi.terminal21;
+  const bts = G.world && G.world.bts;
+  const dest = { x: bts ? bts.x : -50, z: (bts && bts.z) || 0 };
+  const from = mall || { x: dest.x + 18, z: dest.z - 22 };
+  if (h >= 17 && h < 20) {
+    G._mallShoppers = G._mallShoppers || [];
+    while (G._mallShoppers.length < 4) {
+      const pos = new THREE.Vector3(
+        from.x + rand(-6, 6), 0, from.z + rand(-6, 6));
+      const ped = spawnPed(G.scene, pos, Math.random() < 0.6 ? 'office' : 'tourist');
+      ped.mallShop = true;
+      ped.anchor = null;
+      ped.state = 'walking';
+      ped.heading = Math.atan2(dest.x - pos.x, dest.z - pos.z);
+      G._mallShoppers.push(ped);
+    }
+    for (const ped of G._mallShoppers) {
+      if (!ped || ped.dead) continue;
+      const dx = dest.x - ped.mesh.position.x, dz = dest.z - ped.mesh.position.z;
+      const d = Math.hypot(dx, dz);
+      if (d > 8) { ped.heading = Math.atan2(dx, dz); ped.speed = 1.25; ped.state = 'walking'; }
+      else { ped.speed = 0.2; ped.state = 'idle'; }
+    }
+  } else if (G._mallShoppers && G._mallShoppers.length) {
+    for (const ped of G._mallShoppers) {
+      if (!ped || ped.dead) continue;
+      ped.mallShop = false;
+    }
+    G._mallShoppers = [];
+  }
+}
+
+export function updateOfficeCommute(dt) {
+  if (!GAMEPLAY.officeCommute) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const bts = G.world && G.world.bts;
+  const dest = { x: bts ? bts.x : -50, z: (bts && bts.z) || 0 };
+  if (h >= 17 && h < 19.6) {
+    G._officeCommute = G._officeCommute || [];
+    while (G._officeCommute.length < 6) {
+      const ang = rand(0, TAU), r = rand(28, 90);
+      const pos = new THREE.Vector3(
+        clamp(dest.x + Math.cos(ang) * r, -HALF + 8, HALF - 8), 0,
+        clamp(dest.z + Math.sin(ang) * r, -HALF + 8, HALF - 8));
+      const ped = spawnPed(G.scene, pos, 'office');
+      ped.commute = true;
+      ped.anchor = null;
+      ped.state = 'walking';
+      ped.heading = Math.atan2(dest.x - pos.x, dest.z - pos.z);
+      G._officeCommute.push(ped);
+    }
+    for (const ped of G._officeCommute) {
+      if (!ped || ped.dead) continue;
+      const dx = dest.x - ped.mesh.position.x, dz = dest.z - ped.mesh.position.z;
+      const d = Math.hypot(dx, dz);
+      if (d > 8) { ped.heading = Math.atan2(dx, dz); ped.speed = 1.45; ped.state = 'walking'; }
+      else { ped.speed = 0.2; ped.state = 'idle'; }
+    }
+  } else if (G._officeCommute && G._officeCommute.length) {
+    for (const ped of G._officeCommute) {
+      if (!ped || ped.dead) continue;
+      ped.commute = false;
+    }
+    G._officeCommute = [];
+  }
+}
+
+export function updateBtsPlatform(dt) {
+  if (!GAMEPLAY.btsPlatform) return;
+  const stops = btsStopList();
+  G._btsWaiters = (G._btsWaiters || []).filter(p => p && !p.dead && p.mesh);
+  const want = 4;
+  for (const stop of stops) {
+    const live = G._btsWaiters.filter(p => p.btsStop === stop.name);
+    while (live.length < want) {
+      const ped = spawnBtsWaiter(stop);
+      G._btsWaiters.push(ped);
+      live.push(ped);
+    }
+  }
+  const trainX = G.bts && G.bts.mesh ? G.bts.mesh.position.x : 1e9;
+  for (const ped of G._btsWaiters) {
+    const stop = stops.find(s => s.name === ped.btsStop);
+    if (!stop || !ped.btsSlot) continue;
+    const d = Math.abs(trainX - stop.x);
+    if (d < 28) ped.btsApproach = true;
+    else if (!ped.btsBoarded) ped.btsApproach = false;
+    if (d < 10 && !ped.btsBoarded) {
+      ped.btsBoarded = true;
+      ped.mesh.visible = false;
+      ped.speed = 0;
+    } else if (d > 32 && ped.btsBoarded) {
+      ped.btsBoarded = false;
+      ped.btsApproach = false;
+      ped.mesh.visible = true;
+      ped.mesh.position.set(ped.btsSlot.x, ped.btsSlot.y, ped.btsSlot.z);
+      ped.heading = ped.btsSlot.facing;
+      ped.mesh.rotation.y = ped.heading;
+    }
+  }
+}
+
+export function updateSeekShade(dt) {
+  if (!GAMEPLAY.seekShade) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const dry = (G.time.rainStrength || 0) < 0.22;
+  const hot = dry && ((h >= 11 && h < 16) || (GAMEPLAY.burningHaze && G.time.weather === 'haze'));
+  if (!hot) {
+    if (G._shadeOn) {
+      for (const ped of G.peds) {
+        if (ped && ped.shade) { ped.shade = null; if (ped.state === 'shade') ped.state = 'walking'; }
+      }
+      G._shadeOn = false;
+    }
+    return;
+  }
+  G._shadeOn = true;
+  G._shadeT = (G._shadeT || 0) + dt;
+  if (G._shadeT < 0.45) return;
+  G._shadeT = 0;
+  let n = 0;
+  for (const ped of G.peds) {
+    if (n >= 22) break;
+    if (!ped || ped.dead || ped.anchor || ped.gang || ped.pillion || ped.alms || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.checkpoint || ped.btsSit || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.panicT > 0) continue;
+    if (ped.social || ped.isMugger || ped.isTarget || ped.motosaiRider || ped.motosaiWait) continue;
+    const w = nearestWalkway(ped.mesh.position.x, ped.mesh.position.z);
+    if (!w) continue;
+    ped.shade = { x: clamp(ped.mesh.position.x, w.x0, w.x1), z: clamp(ped.mesh.position.z, w.z0, w.z1) };
+    n++;
+  }
+}
+
+export function updateRainPack(dt) {
+  if (!GAMEPLAY.rainPack) return;
+  const fs = G.world && G.world.foodStalls;
+  if (!fs) return;
+  const wet = (G.time.rainStrength || 0) > 0.45;
+  for (const f of fs) {
+    if (wet && !f.packed) {
+      f.packed = true;
+      const parasol = f.mesh && f.mesh.getObjectByName('parasol');
+      if (parasol) parasol.rotation.x = 1.15;
+      if (f.mesh) f.mesh.traverse(o => { if (o.name === 'stool') o.visible = false; });
+    } else if (!wet && f.packed) {
+      f.packed = false;
+      const parasol = f.mesh && f.mesh.getObjectByName('parasol');
+      if (parasol) parasol.rotation.x = 0;
+      if (f.mesh) f.mesh.traverse(o => { if (o.name === 'stool') o.visible = true; });
+    }
+  }
+}
+
+export function updateCoconutCarts(dt) {
+  if (!GAMEPLAY.coconutCart || !G.coconutCarts) return;
+  for (const c of G.coconutCarts) {
+    if (!c.mesh || !c.soi) continue;
+    c.t += c.dir * dt * 0.04;
+    if (c.t > 0.9) { c.t = 0.9; c.dir = -1; }
+    if (c.t < 0.1) { c.t = 0.1; c.dir = 1; }
+    const s = c.soi;
+    const x = c.alongZ ? (s.x0 + s.x1) * 0.5 : s.x0 + (s.x1 - s.x0) * c.t;
+    const z = c.alongZ ? s.z0 + (s.z1 - s.z0) * c.t : (s.z0 + s.z1) * 0.5;
+    const yaw = c.alongZ ? (c.dir > 0 ? 0 : PI) : (c.dir > 0 ? PI / 2 : -PI / 2);
+    c.mesh.position.set(x, 0, z);
+    c.mesh.rotation.y = yaw;
+    if (c.vendor && c.vendor.mesh && !c.vendor.dead) {
+      c.vendor.coconutCart = true;
+      c.vendor.mesh.position.set(x, 0, z);
+      c.vendor.heading = yaw;
+      c.vendor.mesh.rotation.y = yaw;
+      if (c.vendor.anchor && c.vendor.anchor.slot) c.vendor.anchor.slot.set(x, 0, z);
+      c.vendor.speed = 0.55;
+    }
+  }
+  if (G.player.inVehicle || G._eating) return;
+  const pp = G.player.group.position;
+  for (const c of G.coconutCarts) {
+    if (!c.mesh || dist2(c.mesh.position, pp) > 2.2 * 2.2) continue;
+    G.hud.showPrompt('Press <b>E</b> for coconut water · ฿30', 0.4);
+    if (G.input.pressed('KeyE')) {
+      if (G.cash < 30) { G.hud.showNotif('Need ฿30 for a coconut'); return; }
+      G.cash -= 30;
+      G.player.hp = Math.min(G.player.hpMax, G.player.hp + 25);
+      G.player.stam = G.player.stamMax;
+      if (G.hud.setCash) G.hud.setCash(G.cash);
+      G.hud.showNotif('Coconut water — มะพร้าว');
+      if (G.audio && G.audio.chime) G.audio.chime();
+    }
+    return;
+  }
+}
+
+export function updateMooPing(dt) {
+  if (!GAMEPLAY.mooPing || !G.mooPing) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const glow = (h >= 16 && h < 22) ? 1.15 : 0.5;
+  for (const c of G.mooPing) {
+    if (!c.mesh || !c.soi) continue;
+    c.t += c.dir * dt * 0.038;
+    if (c.t > 0.9) { c.t = 0.9; c.dir = -1; }
+    if (c.t < 0.1) { c.t = 0.1; c.dir = 1; }
+    const s = c.soi;
+    const x = c.alongZ ? (s.x0 + s.x1) * 0.5 : s.x0 + (s.x1 - s.x0) * c.t;
+    const z = c.alongZ ? s.z0 + (s.z1 - s.z0) * c.t : (s.z0 + s.z1) * 0.5;
+    const yaw = c.alongZ ? (c.dir > 0 ? 0 : PI) : (c.dir > 0 ? PI / 2 : -PI / 2);
+    c.mesh.position.set(x, 0, z);
+    c.mesh.rotation.y = yaw;
+    if (c.coalMat) c.coalMat.emissiveIntensity = glow;
+    const puff = c.mesh.getObjectByName('mooping-smoke');
+    if (puff) {
+      puff.position.y = 1.15 + Math.sin(performance.now() * 0.003) * 0.08;
+      puff.scale.setScalar(0.9 + Math.sin(performance.now() * 0.002) * 0.12);
+    }
+    if (c.vendor && c.vendor.mesh && !c.vendor.dead) {
+      c.vendor.mooPing = true;
+      c.vendor.mesh.position.set(x, 0, z);
+      c.vendor.heading = yaw;
+      c.vendor.mesh.rotation.y = yaw;
+      if (c.vendor.anchor && c.vendor.anchor.slot) c.vendor.anchor.slot.set(x, 0, z);
+      c.vendor.speed = 0.5;
+    }
+  }
+  if (G.player.inVehicle || G._eating) return;
+  const pp = G.player.group.position;
+  for (const c of G.mooPing) {
+    if (!c.mesh || dist2(c.mesh.position, pp) > 2.2 * 2.2) continue;
+    G.hud.showPrompt('Press <b>E</b> for moo ping · ฿35', 0.4);
+    if (G.input.pressed('KeyE')) {
+      if (G.cash < 35) { G.hud.showNotif('Need ฿35 for moo ping'); return; }
+      G.cash -= 35;
+      G.player.hp = Math.min(G.player.hpMax, G.player.hp + 22);
+      if (G.hud.setCash) G.hud.setCash(G.cash);
+      G.hud.showNotif('Moo ping — หมูปิ้ง');
+      if (G.audio && G.audio.chime) G.audio.chime();
+    }
+    return;
+  }
+}
+
+export function updateIceCarts(dt) {
+  if (!GAMEPLAY.iceCart || !G.iceCarts) return;
+  for (const c of G.iceCarts) {
+    if (!c.mesh || !c.soi) continue;
+    c.t += c.dir * dt * 0.035;
+    if (c.t > 0.9) { c.t = 0.9; c.dir = -1; }
+    if (c.t < 0.1) { c.t = 0.1; c.dir = 1; }
+    const s = c.soi;
+    const x = c.alongZ ? (s.x0 + s.x1) * 0.5 : s.x0 + (s.x1 - s.x0) * c.t;
+    const z = c.alongZ ? s.z0 + (s.z1 - s.z0) * c.t : (s.z0 + s.z1) * 0.5;
+    const yaw = c.alongZ ? (c.dir > 0 ? 0 : PI) : (c.dir > 0 ? PI / 2 : -PI / 2);
+    c.mesh.position.set(x, 0, z);
+    c.mesh.rotation.y = yaw;
+    if (c.vendor && c.vendor.mesh && !c.vendor.dead) {
+      c.vendor.iceCart = true;
+      c.vendor.mesh.position.set(x, 0, z);
+      c.vendor.heading = yaw;
+      c.vendor.mesh.rotation.y = yaw;
+      if (c.vendor.anchor && c.vendor.anchor.slot) c.vendor.anchor.slot.set(x, 0, z);
+      c.vendor.speed = 0.7;
+    }
+    c.ding -= dt;
+    if (c.ding <= 0) {
+      c.ding = rand(4, 9);
+      if (G.audio && G.audio.blip) G.audio.blip({ freq: 980, dur: 0.08, type: 'sine', gain: 0.08 });
+    }
+  }
+  if (G.player.inVehicle || G._eating) return;
+  const pp = G.player.group.position;
+  for (const c of G.iceCarts) {
+    if (!c.mesh || dist2(c.mesh.position, pp) > 2.2 * 2.2) continue;
+    G.hud.showPrompt('Press <b>E</b> for ice cream · ฿20', 0.4);
+    if (G.input.pressed('KeyE')) {
+      if (G.cash < 20) { G.hud.showNotif('Need ฿20 for ice cream'); return; }
+      G.cash -= 20;
+      G.player.stam = G.player.stamMax;
+      if (G.hud.setCash) G.hud.setCash(G.cash);
+      G.hud.showNotif('Ice cream — เย็น');
+      if (G.audio && G.audio.chime) G.audio.chime();
+    }
+    return;
+  }
+}
+
+export function updateSoiFootball(dt) {
+  if (!GAMEPLAY.soiFootball) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const sois = (G.world && G.world.sois) || [];
+  if (h >= 16.8 && h < 18.8 && sois.length) {
+    if (!G._soiFootball) {
+      const s = sois[Math.min(2, sois.length - 1)];
+      const cx = (s.x0 + s.x1) * 0.5, cz = (s.z0 + s.z1) * 0.5;
+      const kids = [];
+      for (let i = 0; i < 3; i++) {
+        const ang = i * TAU / 3;
+        const pos = new THREE.Vector3(cx + Math.cos(ang) * 2.4, 0, cz + Math.sin(ang) * 2.4);
+        const ped = spawnPed(G.scene, pos, 'school');
+        ped.school = true;
+        ped.football = true;
+        ped.anchor = { slot: pos.clone(), facing: Math.atan2(cx - pos.x, cz - pos.z) };
+        ped.speed = 0;
+        kids.push(ped);
+      }
+      const ball = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 8, 6),
+        new THREE.MeshStandardMaterial({ color: 0xf0f0f0, roughness: 0.6 })
+      );
+      ball.name = 'soi-ball';
+      ball.position.set(cx, 0.12, cz);
+      G.scene.add(ball);
+      G._soiFootball = { kids, ball, soi: s, t: 0, from: 0, to: 1 };
+    }
+    const g = G._soiFootball;
+    g.t += dt * 1.15;
+    if (g.t >= 1) {
+      g.t = 0;
+      g.from = g.to;
+      g.to = (g.to + 1) % g.kids.length;
+    }
+    const a = g.kids[g.from], b = g.kids[g.to];
+    if (g.ball && a && a.mesh && b && b.mesh) {
+      const k = g.t * g.t * (3 - 2 * g.t);
+      g.ball.position.x = lerp(a.mesh.position.x, b.mesh.position.x, k);
+      g.ball.position.z = lerp(a.mesh.position.z, b.mesh.position.z, k);
+      g.ball.position.y = 0.12 + Math.sin(g.t * Math.PI) * 0.85;
+    }
+    for (const ped of g.kids) {
+      if (!ped || ped.dead || !ped.mesh) continue;
+      ped.football = true;
+      ped.school = true;
+      const other = g.kids[g.to];
+      if (other && other.mesh) ped.heading = Math.atan2(other.mesh.position.x - ped.mesh.position.x, other.mesh.position.z - ped.mesh.position.z);
+      ped.speed = 0;
+    }
+  } else if (G._soiFootball) {
+    for (const ped of G._soiFootball.kids || []) {
+      if (!ped || ped.dead) continue;
+      ped.football = false;
+      ped.school = false;
+      ped.anchor = null;
+    }
+    if (G._soiFootball.ball) {
+      G.scene.remove(G._soiFootball.ball);
+      disposeObject(G._soiFootball.ball);
+    }
+    G._soiFootball = null;
+  }
+}
+
+export function updateGeckos(dt) {
+  if (!GAMEPLAY.stallGecko || !G.geckos) return;
+  const night = (G.nightK || 0) > 0.45;
+  for (const g of G.geckos) {
+    g.mesh.visible = night;
+    if (!night) continue;
+    g.timer -= dt;
+    g.chirp -= dt;
+    if (g.timer <= 0) {
+      g.heading += rand(-0.8, 0.8);
+      g.timer = rand(0.6, 1.8);
+    }
+    g.mesh.position.x = g.home.x + Math.sin(g.heading) * 0.08;
+    g.mesh.position.z = g.home.z + Math.cos(g.heading) * 0.08;
+    g.mesh.rotation.y = g.heading;
+    if (g.chirp <= 0) {
+      g.chirp = rand(3, 8);
+      if (G.audio && G.audio.blip) G.audio.blip({ freq: 2100, dur: 0.04, type: 'square', gain: 0.03 });
+    }
+  }
+}
+
+export function updateMonitors(dt) {
+  if (!GAMEPLAY.khlongMonitor || !G.monitors) return;
+  const pp = G.player.inVehicle ? G.player.inVehicle.pos : G.player.group.position;
+  for (const m of G.monitors) {
+    const d = Math.hypot(m.mesh.position.x - pp.x, m.mesh.position.z - pp.z);
+    m.timer -= dt;
+    if (d < 4.2) m.state = 'bolt';
+    else if (m.state === 'bolt' && d > 9) m.state = 'return';
+    if (m.state === 'loaf') {
+      if (m.timer <= 0) { m.heading += rand(-0.6, 0.6); m.timer = rand(1.6, 3.5); }
+      m.mesh.position.x += Math.sin(m.heading) * 0.35 * dt;
+      m.mesh.position.z += Math.cos(m.heading) * 0.35 * dt;
+    } else if (m.state === 'bolt') {
+      const dx = m.mesh.position.x - pp.x, dz = m.mesh.position.z - pp.z;
+      const len = Math.hypot(dx, dz) || 1;
+      m.heading = Math.atan2(dx, dz);
+      m.mesh.position.x += dx / len * 4.2 * dt;
+      m.mesh.position.z += dz / len * 4.2 * dt;
+    } else {
+      const dx = m.home.x - m.mesh.position.x, dz = m.home.z - m.mesh.position.z;
+      const len = Math.hypot(dx, dz) || 1;
+      if (len < 0.6) m.state = 'loaf';
+      else {
+        m.heading = Math.atan2(dx, dz);
+        m.mesh.position.x += dx / len * 1.6 * dt;
+        m.mesh.position.z += dz / len * 1.6 * dt;
+      }
+    }
+    m.mesh.position.x = clamp(m.mesh.position.x, -228, -204);
+    m.mesh.position.z = clamp(m.mesh.position.z, -HALF + 8, HALF - 8);
+    m.mesh.rotation.y = m.heading;
+  }
+}
+
+export function updateWatTurtles(dt) {
+  if (!GAMEPLAY.watTurtles || !G.watTurtles) return;
+  for (const t of G.watTurtles) {
+    if (!t.mesh) continue;
+    t.ang += t.spin * dt;
+    t.mesh.position.x = t.cx + Math.sin(t.ang) * t.r;
+    t.mesh.position.z = t.cz + Math.cos(t.ang) * t.r;
+    t.mesh.position.y = 0.12 + Math.sin(t.ang * 3) * 0.02;
+    t.mesh.rotation.y = t.ang + PI / 2;
+  }
+}
+
+export function updateHyacinth(dt) {
+  if (!GAMEPLAY.hyacinth || !G.hyacinth) return;
+  const t = (G.time && G.time.dayT ? G.time.dayT : 0) * TAU * 6;
+  for (const h of G.hyacinth) {
+    if (!h.mesh) continue;
+    h.z += (h.drift || 0.35) * dt;
+    if (h.z > HALF - 10) h.z = -HALF + 10;
+    h.mesh.position.z = h.z;
+    h.mesh.position.y = 0.1 + Math.sin(t + h.phase) * 0.045;
+    h.mesh.rotation.y += dt * 0.08;
+  }
+}
+
+export function updateCats(dt) {
+  if (!GAMEPLAY.soiCats || !G.cats) return;
+  const pp = G.player.inVehicle ? G.player.inVehicle.pos : G.player.group.position;
+  for (const c of G.cats) {
+    const d = Math.hypot(c.mesh.position.x - pp.x, c.mesh.position.z - pp.z);
+    c.timer -= dt;
+    if (d < 3.2) c.state = 'bolt';
+    else if (c.state === 'bolt' && d > 7) c.state = 'return';
+    if (c.state === 'loaf') {
+      if (c.timer <= 0) { c.heading += rand(-0.8, 0.8); c.timer = rand(1.4, 3.2); }
+      c.mesh.position.x += Math.sin(c.heading) * 0.25 * dt;
+      c.mesh.position.z += Math.cos(c.heading) * 0.25 * dt;
+    } else if (c.state === 'bolt') {
+      const dx = c.mesh.position.x - pp.x, dz = c.mesh.position.z - pp.z;
+      const len = Math.hypot(dx, dz) || 1;
+      c.heading = Math.atan2(dx, dz);
+      c.mesh.position.x += dx / len * 3.4 * dt;
+      c.mesh.position.z += dz / len * 3.4 * dt;
+    } else {
+      const dx = c.home.x - c.mesh.position.x, dz = c.home.z - c.mesh.position.z;
+      const len = Math.hypot(dx, dz) || 1;
+      if (len < 0.5) c.state = 'loaf';
+      else {
+        c.heading = Math.atan2(dx, dz);
+        c.mesh.position.x += dx / len * 1.4 * dt;
+        c.mesh.position.z += dz / len * 1.4 * dt;
+      }
+    }
+    c.mesh.position.x = clamp(c.mesh.position.x, -HALF + 4, HALF - 4);
+    c.mesh.position.z = clamp(c.mesh.position.z, -HALF + 4, HALF - 4);
+    c.mesh.rotation.y = c.heading;
   }
 }
 

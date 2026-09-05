@@ -132,9 +132,9 @@ async function main() {
     const pickup = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
       G.state = 'playing';
-      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyJ' }));
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyY' }));
       main.updateQuickDelivery(0.016);
-      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyJ' }));
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyY' }));
       if (G.input && G.input.endFrame) G.input.endFrame();
       main.updateQuickDelivery(0.016);
       const q = G.quickDrop;
@@ -196,9 +196,9 @@ async function main() {
     const failed = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN, v = G.player.inVehicle;
       G.wanted.stars = 0;
-      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyJ' }));
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyY' }));
       main.updateQuickDelivery(0.016);
-      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyJ' }));
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyY' }));
       if (G.input && G.input.endFrame) G.input.endFrame();
       main.updateQuickDelivery(0.016);
       const q = G.quickDrop;
@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -465,7 +465,7 @@ async function main() {
     const peds = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
       const ways = (G.world.walkways || []).length;
-      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget);
+      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart);
       const b = G.world.buildings.find(x => x.size.y > 8 && x.size.x > 4 && x.size.z > 4) || G.world.buildings[0];
       const insideBefore = wanderer && b && Math.abs(wanderer.mesh.position.x - b.pos.x) < b.size.x / 2 && Math.abs(wanderer.mesh.position.z - b.pos.z) < b.size.z / 2;
       if (wanderer && b) {
@@ -781,6 +781,1116 @@ async function main() {
       };
     });
     assert(seven.walkIn && seven.pos, 'walk-in 7-Eleven has ATM, microwave, clerk, shelves');
+
+    console.log('\n[25] Motosai pillion taxi');
+    const sai = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const onSoi = (x, z) => {
+        const sois = (G.world && G.world.sois) || [];
+        for (const s of sois) if (x >= s.x0 && x <= s.x1 && z >= s.z0 && z <= s.z1) return true;
+        return false;
+      };
+      const bike = G.vehicles.find(v => v && v.spec && v.spec.kind === 'bike' && !v.dead && !v.motosaiStand) || main.makeVehicle('bike', G.scene);
+      G.player.inVehicle = bike; bike.driver = 'player'; bike.npc = null;
+      bike.pos.set(0, 0, -130); bike.heading = 0; bike.vel = 0;
+      bike.mesh.position.copy(bike.pos); bike.mesh.rotation.y = 0;
+      G.player.group.position.copy(bike.pos); G.player.group.visible = false;
+      if (G.quickDrop) G.quickDrop.stage = 'idle';
+      if (G.motosai) { G.motosai.stage = 'idle'; G.motosai.pillion = null; }
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyJ' }));
+      main.updateMotosai(0.016);
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyJ' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      main.updateMotosai(0.016);
+      const m = G.motosai;
+      const pickupOnSoi = !!(m && m.markerPos && onSoi(m.markerPos.x, m.markerPos.z));
+      if (m && m.markerPos) {
+        bike.pos.copy(m.markerPos); bike.mesh.position.copy(bike.pos);
+        G.player.group.position.copy(bike.pos);
+      }
+      main.updateMotosai(0.05);
+      const pillionOn = !!(m && m.pillion && m.pillion.mesh && m.pillion.mesh.parent === bike.mesh);
+      const destOnSoi = !!(m && m.dest && onSoi(m.dest.x, m.dest.z));
+      const base = m && m.fareValue;
+      const car = G.vehicles.find(v => v && v.spec && v.spec.kind === 'camry' && v !== bike) || main.makeVehicle('camry', G.scene);
+      bike.pos.set(0, 0, -110); bike.vel = 12; bike.mesh.position.copy(bike.pos);
+      car.pos.set(1.4, 0, -110); car.vel = 4; if (car.mesh) car.mesh.position.copy(car.pos);
+      for (let i = 0; i < 8; i++) main.updateMotosai(0.1);
+      const filtered = (m && m.filterT) > 0.3 && (m && m.filterBonus) > 0;
+      const cash0 = G.cash;
+      if (m && m.dest) {
+        bike.pos.copy(m.dest); bike.mesh.position.copy(bike.pos);
+        G.player.group.position.copy(bike.pos);
+      }
+      main.updateMotosai(0.05);
+      return {
+        flag: !!(G.gameplay && G.gameplay.motosai),
+        started: pickupOnSoi,
+        pillionOn,
+        destOnSoi,
+        filtered,
+        paidMore: G.cash > cash0 && (G.cash - cash0) > base,
+        payout: G.cash - cash0,
+        base,
+        bonus: m && m.filterBonus,
+        fares: m && m.fares,
+        idle: m && m.stage === 'idle',
+        pillionOff: !(m && m.pillion),
+        sois: (G.world.sois || []).length,
+      };
+    });
+    assert(sai.flag && sai.sois >= 4, `motosai flag on and sois exist (${sai.sois})`);
+    assert(sai.started && sai.destOnSoi, 'motosai pickup and drop are on sois');
+    assert(sai.pillionOn, 'pillion rider sits on the bike after pickup');
+    assert(sai.filtered, 'filtering traffic raises the motosai bonus');
+    assert(sai.paidMore && sai.idle && sai.pillionOff && sai.fares >= 1, `motosai pays base+filter and hops off (฿${sai.payout})`);
+
+    console.log('\n[27] motosai stands + traffic pillions');
+    const stands = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = (G.world && G.world.motosaiStands) || [];
+      const onSoi = (x, z) => {
+        const sois = (G.world && G.world.sois) || [];
+        for (const s of sois) if (x >= s.x0 && x <= s.x1 && z >= s.z0 && z <= s.z1) return true;
+        return false;
+      };
+      const first = list.find(s => s && s.bike && s.bike.motosaiStand && s.rider && s.waiter) || list[0];
+      const vest = !!(first && first.rider && (first.rider.motosaiVest || (first.rider.mesh && first.rider.mesh.getObjectByName('motosai-vest'))));
+      const mouth = !!(first && ((first.x != null && onSoi(first.x, first.z)) || (first.bike && onSoi(first.bike.pos.x, first.bike.pos.z)) || first.soi));
+      let pillionBike = G.vehicles.find(v => v && v.spec && v.spec.kind === 'bike' && v.pillionPed && v.pillionPed.pillion && v.pillionPed.mesh);
+      if (!pillionBike) {
+        const tBike = G.vehicles.find(v => v && v.spec && v.spec.kind === 'bike' && v.driver !== 'player' && !v.motosaiStand) || main.makeVehicle('bike', G.scene);
+        if (tBike) {
+          tBike.npc = tBike.npc || { kind: 'traffic', cruiseSpeed: 12 };
+          tBike.pillionPed = null;
+          main.attachTrafficPillion(tBike);
+          pillionBike = tBike;
+        }
+      }
+      G.player.inVehicle = null;
+      G.player.group.visible = true;
+      if (first && first.bike) {
+        G.player.group.position.copy(first.bike.pos);
+        first.bike.driver = null;
+        const near = first.bike;
+        G.player.inVehicle = near;
+        near.driver = 'player';
+        near.npc = null;
+        near.motosaiStand = false;
+        if (near.standRider) {
+          near.standRider.anchor = null;
+          near.standRider.motosaiRider = false;
+          near.standRider = null;
+        }
+      }
+      return {
+        flag: !!(G.gameplay && G.gameplay.motosaiStands),
+        n: list.length,
+        vest,
+        mouth,
+        waiter: !!(first && first.waiter),
+        pillionTraffic: !!(pillionBike && pillionBike.pillionPed && pillionBike.pillionPed.pillion),
+        took: !!(first && first.bike && first.bike.driver === 'player' && !first.bike.motosaiStand),
+      };
+    });
+    assert(stands.flag && stands.n >= 3, `motosai stands at soi mouths (${stands.n})`);
+    assert(stands.vest && stands.mouth && stands.waiter, 'orange-vest rider and waiter wait on a soi');
+    assert(stands.pillionTraffic, 'some traffic bikes carry a pillion');
+    assert(stands.took, 'a stand bike is enterable and the rider hops off');
+
+    console.log('\n[26] burning-season haze');
+    const haze = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const car = G.vehicles.find(v => v && v.spec && v.spec.kind === 'camry' && v.mesh) || main.makeVehicle('camry', G.scene);
+      G.time.dayT = 0.5;
+      G.time.weather = 'clear';
+      G.time.rainStrength = 0;
+      G._rainTarget = 0;
+      G._weatherUntil = 1e9;
+      main.updateDayNight(0.05);
+      main.updateVehicleVisuals(car, 0.05, {});
+      const heads = (car.mesh.userData.visual && car.mesh.userData.visual.headlights) || [];
+      const clearFog = G.scene.fog.density;
+      const clearHead = heads[0] && heads[0].material ? heads[0].material.opacity : 0;
+      const clearSun = G.sun.intensity;
+      G.time.weather = 'haze';
+      main.updateDayNight(0.05);
+      main.updateVehicleVisuals(car, 0.05, {});
+      const hazeFog = G.scene.fog.density;
+      const hazeHead = heads[0] && heads[0].material ? heads[0].material.opacity : 0;
+      const hazeSun = G.sun.intensity;
+      const tag = document.getElementById('weather-tag').textContent;
+      const bg = G.scene.background.getHex();
+      G.time.weather = 'clear';
+      main.updateDayNight(0.05);
+      return {
+        flag: !!(G.gameplay && G.gameplay.burningHaze),
+        clearFog, hazeFog, clearHead, hazeHead, clearSun, hazeSun, tag, bg,
+        hazeK: G._hazeK,
+      };
+    });
+    assert(haze.flag, 'GAMEPLAY.burningHaze defaults on');
+    assert(haze.hazeFog > haze.clearFog * 1.8, `noon haze kills distance (fog ${haze.clearFog.toFixed(4)} → ${haze.hazeFog.toFixed(4)})`);
+    assert(haze.hazeHead > 0.85 && haze.hazeHead > haze.clearHead, `headlights come on in the haze (${haze.clearHead.toFixed(2)} → ${haze.hazeHead.toFixed(2)})`);
+    assert(haze.hazeSun < haze.clearSun * 0.75, `noon sun is dirtier in haze (${haze.clearSun.toFixed(2)} → ${haze.hazeSun.toFixed(2)})`);
+    assert(/HAZE/.test(haze.tag), `weather tag reads haze ("${haze.tag}")`);
+
+    console.log('\n[28] haze as city weather');
+    const city = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      G.player.inVehicle = null;
+      G.player.group.position.set(0, 0, -50);
+      G.player.group.visible = true;
+      let cop = G.cops.find(c => c && !c.dead);
+      if (!cop) cop = main.spawnCop(G.scene, new G.THREE.Vector3(0, 0, -72));
+      cop.mesh.position.set(0, 0, -72);
+      cop.dead = false;
+      cop.state = 'seeking';
+      G.wanted.stars = 1;
+      G.time.weather = 'clear';
+      G.time.rainStrength = 0;
+      G._weatherUntil = 1e9;
+      main.updateDayNight(0.05);
+      G.wanted.lastSeenAt = 0;
+      cop._losT = 0;
+      main.updateWanted(0.25);
+      const clearSeen = G.wanted.lastSeenAt > 0;
+      G.time.weather = 'haze';
+      main.updateDayNight(0.05);
+      G.wanted.lastSeenAt = 0;
+      cop._losT = 0;
+      main.updateWanted(0.25);
+      const hazeSeen = G.wanted.lastSeenAt > 0;
+      const tag = document.getElementById('weather-tag').textContent;
+      const pm25 = G.time.pm25;
+      const car = G.vehicles.find(v => v && v.npc && v.spec && v.spec.kind === 'camry') || main.makeVehicle('camry', G.scene);
+      if (!car.npc) car.npc = { kind: 'traffic', cruiseSpeed: 12, followMul: 1, dir: 0 };
+      const cruise = car.npc.cruiseSpeed;
+      car.pos.set(2.5, 0, -80); car.heading = 0; car.vel = cruise;
+      if (car.mesh) { car.mesh.position.copy(car.pos); car.mesh.rotation.y = 0; }
+      G.time.weather = 'haze';
+      main.updateDayNight(0.05);
+      for (let i = 0; i < 24; i++) main.updateTrafficCar(car, 0.1);
+      const hazeVel = car.vel;
+      G.time.weather = 'clear';
+      G.wanted.stars = 0;
+      main.updateDayNight(0.05);
+      return {
+        pm25,
+        tag,
+        clearSeen,
+        hazeSeen,
+        cruise,
+        hazeVel,
+      };
+    });
+    assert(/PM2\.5/.test(city.tag) && city.pm25 > 100, `haze HUD reports PM2.5 ("${city.tag}")`);
+    assert(city.clearSeen && !city.hazeSeen, 'cops lose you at 22m in the haze, not in clear air');
+    assert(city.hazeVel < city.cruise * 0.9, `cars crawl in the haze (${city.hazeVel.toFixed(1)} of cruise ${city.cruise.toFixed(1)})`);
+
+    console.log('\n[29] morning schoolkids');
+    const kids = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      G.time.dayT = 7.4 / 24;
+      G.time.weather = 'clear';
+      main.updateSchoolKids(0.05);
+      const list = G._schoolKids || [];
+      const n = list.filter(p => p && p.school && p.kind === 'school' && !p.dead).length;
+      const bts = G.world.bts;
+      const dest = { x: bts ? bts.x : 0, z: (bts && bts.z) || 0 };
+      let toward = 0;
+      for (const p of list) {
+        if (!p || !p.mesh) continue;
+        const dx = dest.x - p.mesh.position.x, dz = dest.z - p.mesh.position.z;
+        const want = Math.atan2(dx, dz);
+        let d = Math.abs(p.heading - want);
+        while (d > Math.PI) d = Math.abs(d - Math.PI * 2);
+        if (d < 0.6 || Math.hypot(dx, dz) < 10) toward++;
+      }
+      const shirt = list[0] && list[0].mesh && list[0].mesh.userData.parts && list[0].mesh.userData.parts.torso;
+      const white = shirt && shirt.material && shirt.material.color.getHex() > 0xe0e0e0;
+      G.time.dayT = 12 / 24;
+      main.updateSchoolKids(0.05);
+      const gone = !(G._schoolKids && G._schoolKids.length);
+      G.time.dayT = 15.4 / 24;
+      main.updateSchoolKids(0.05);
+      const pm = G._schoolKids || [];
+      const nPm = pm.filter(p => p && p.school).length;
+      let away = 0;
+      for (const p of pm) {
+        if (!p || !p.mesh) continue;
+        const dx = dest.x - p.mesh.position.x, dz = dest.z - p.mesh.position.z;
+        const want = Math.atan2(-dx, -dz);
+        let d = Math.abs(p.heading - want);
+        while (d > Math.PI) d = Math.abs(d - Math.PI * 2);
+        if (d < 0.6) away++;
+      }
+      return { flag: !!(G.gameplay && G.gameplay.schoolKids), n, toward, white, gone, bts: !!(bts), nPm, away };
+    });
+    assert(kids.flag && kids.bts, 'schoolKids flag on and BTS exists');
+    assert(kids.n >= 4 && kids.toward >= 3 && kids.white, `morning uniforms walk toward the BTS (${kids.n} kids)`);
+    assert(kids.gone, 'schoolkids disperse after morning');
+    assert(kids.nPm >= 4 && kids.away >= 3, `afternoon uniforms walk home from the BTS (${kids.nPm})`);
+
+    console.log('\n[30] midday shade-seeking');
+    const shade = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      G.time.dayT = 12.5 / 24;
+      G.time.weather = 'clear';
+      G.time.rainStrength = 0;
+      G._shadeT = 1;
+      main.updateSeekShade(0.5);
+      const assigned = G.peds.filter(p => p && p.shade).length;
+      const sample = G.peds.find(p => p && p.shade);
+      if (sample) {
+        sample.mesh.position.x += 4;
+        main.updatePeds(0.05);
+      }
+      const moving = !!(sample && sample.state === 'shade' && sample.speed > 0.2);
+      G.time.dayT = 20 / 24;
+      G._shadeOn = true;
+      main.updateSeekShade(0.05);
+      const cleared = G.peds.filter(p => p && p.shade).length;
+      return { flag: !!(G.gameplay && G.gameplay.seekShade), assigned, moving, cleared, ways: (G.world.walkways || []).length };
+    });
+    assert(shade.flag && shade.ways > 10, 'seekShade flag on and walkways exist');
+    assert(shade.assigned >= 4 && shade.moving, `noon wanderers pull into shade (${shade.assigned})`);
+    assert(shade.cleared === 0, 'shade-seeking clears after the heat');
+
+    console.log('\n[31] sit and eat at a stall');
+    const eat = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const f = (G.world.foodStalls || [])[0];
+      if (!f) return { flag: false };
+      G.player.inVehicle = null;
+      G._btsRide = null;
+      G.player.group.visible = true;
+      G.player.group.position.copy(f.pos);
+      G._eating = null;
+      G.cash = 120;
+      G.player.hp = 40;
+      G.time.rainStrength = 0;
+      G._rainTarget = 0;
+      f.visited = false;
+      f.readyAt = 0;
+      f.packed = false;
+      if (main.updateRainPack) main.updateRainPack(0.05);
+      for (let i = 0; i < 4 && !G._eating; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateFoodStalls(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+      }
+      const sitting = !!(G._eating && G._eating.t > 0);
+      const cashMid = G.cash;
+      main.updateFoodStalls(2.5);
+      return {
+        flag: !!(G.gameplay && G.gameplay.stallSit),
+        stools: f && G.world.foodStalls.length,
+        sitting,
+        paid: cashMid === 80,
+        healed: G.player.hp > 40,
+        visited: !!f.visited,
+        done: !G._eating,
+      };
+    });
+    assert(eat.flag && eat.stools >= 4, 'stallSit flag on and stalls exist');
+    assert(eat.sitting && eat.paid && eat.healed && eat.visited && eat.done, 'E sits you down, ฿40, heal, first visit ticks');
+
+    console.log('\n[32] wai at a spirit house');
+    const wai = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const s = (G.world.shrines || [])[0];
+      if (!s) return { flag: false };
+      G._eating = null;
+      G.player.inVehicle = null;
+      G.player.group.position.copy(s.pos);
+      G.cash = 50;
+      G.wanted.stars = 2;
+      G.wanted.lastSeenAt = performance.now();
+      s.readyAt = 0;
+      const seen0 = G.wanted.lastSeenAt;
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+      main.updateShrines(0.016);
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      const smoke = s.mesh && s.mesh.getObjectByName('incense');
+      return {
+        flag: !!(G.gameplay && G.gameplay.spiritWai),
+        n: (G.world.shrines || []).length,
+        paid: G.cash === 40,
+        cooled: G.wanted.lastSeenAt < seen0 - 1000,
+        count: G._waiCount,
+        incense: !!smoke,
+        lit: (s.incenseT || 0) > 4,
+      };
+    });
+    assert(wai.flag && wai.n >= 4, `spirit houses exist (${wai.n})`);
+    assert(wai.paid && wai.cooled && wai.count >= 1, 'wai costs ฿10 and cools wanted contact');
+    assert(wai.incense && wai.lit, 'wai lights the incense plume');
+
+    console.log('\n[33] soi cats at stalls');
+    const cats = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const n = (G.cats || []).length;
+      const c = G.cats && G.cats[0];
+      if (!c) return { flag: !!(G.gameplay && G.gameplay.soiCats), n };
+      G.player.inVehicle = null;
+      G.player.group.position.set(c.mesh.position.x + 1.1, 0, c.mesh.position.z);
+      const start = { x: c.mesh.position.x, z: c.mesh.position.z };
+      for (let i = 0; i < 20; i++) main.updateCats(0.1);
+      const moved = Math.hypot(c.mesh.position.x - start.x, c.mesh.position.z - start.z);
+      return { flag: !!(G.gameplay && G.gameplay.soiCats), n, bolted: c.state === 'bolt' || c.state === 'return', moved };
+    });
+    assert(cats.flag && cats.n >= 3, `cats loaf at stalls (${cats.n})`);
+    assert(cats.bolted && cats.moved > 0.8, `cats bolt when the player gets close (${cats.moved.toFixed(1)}m)`);
+
+    console.log('\n[34] BTS platform waiters + PA');
+    const plat = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      G._btsPa = null;
+      if (G.bts) G.bts._announced = false;
+      main.updateBtsPlatform(0.05);
+      const list = G._btsWaiters || [];
+      const asok = list.filter(p => p && p.btsWait && p.btsStop === 'Asok' && p.mesh);
+      const yOk = asok.filter(p => p.mesh.position.y > 12).length;
+      const visible = asok.filter(p => p.mesh.visible && !p.btsBoarded).length;
+      if (G.bts && G.bts.mesh) {
+        G.bts.mesh.position.x = -50;
+        G.bts.dir = 1;
+        G.bts._announced = false;
+      }
+      main.updateBTS(0.05);
+      main.updateBtsPlatform(0.05);
+      const boarded = (G._btsWaiters || []).filter(p => p && p.btsStop === 'Asok' && p.btsBoarded).length;
+      const pa = G._btsPa || {};
+      if (G.bts && G.bts.mesh) {
+        G.bts.mesh.position.x = 0;
+        G.bts._announced = false;
+      }
+      main.updateBtsPlatform(0.05);
+      const back = (G._btsWaiters || []).filter(p => p && p.btsStop === 'Asok' && p.mesh && p.mesh.visible && !p.btsBoarded).length;
+      return {
+        flag: !!(G.gameplay && G.gameplay.btsPlatform),
+        n: list.length,
+        asok: asok.length,
+        yOk, visible, boarded, back,
+        paStop: pa.stop, paNext: pa.next,
+      };
+    });
+    assert(plat.flag && plat.n >= 6 && plat.asok >= 4, `waiters stand on both platforms (${plat.n}, Asok ${plat.asok})`);
+    assert(plat.yOk >= 4 && plat.visible >= 4, `Asok waiters stand on the platform (y, ${plat.yOk} visible)`);
+    assert(plat.paStop === 'Asok' && plat.paNext, `PA names the stop (${plat.paStop} → ${plat.paNext})`);
+    assert(plat.boarded >= 3, `waiters board when the train pulls in (${plat.boarded})`);
+    assert(plat.back >= 3, `waiters return after the train leaves (${plat.back})`);
+
+    console.log('\n[35] bike helmets + seated riders');
+    const lids = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const stands = (G.world && G.world.motosaiStands) || [];
+      const rider = stands[0] && stands[0].rider;
+      const standHelm = !!(rider && (rider.bikeHelmet || (rider.mesh && rider.mesh.getObjectByName('bike-helmet'))));
+      let pillionBike = G.vehicles.find(v => v && v.spec && v.spec.kind === 'bike' && v.pillionPed && v.pillionPed.mesh);
+      if (!pillionBike) {
+        const tBike = G.vehicles.find(v => v && v.spec && v.spec.kind === 'bike' && v.driver !== 'player' && !v.motosaiStand) || main.makeVehicle('bike', G.scene);
+        if (tBike) {
+          tBike.npc = tBike.npc || { kind: 'traffic', cruiseSpeed: 12 };
+          tBike.pillionPed = null;
+          main.attachTrafficPillion(tBike);
+          pillionBike = tBike;
+        }
+      }
+      const pillionHelm = !!(pillionBike && pillionBike.pillionPed && (pillionBike.pillionPed.bikeHelmet || (pillionBike.pillionPed.mesh && pillionBike.pillionPed.mesh.getObjectByName('bike-helmet'))));
+      let npcBike = G.vehicles.find(v => v && v.spec && v.spec.kind === 'bike' && v.npc && v.driver !== 'player' && !v.motosaiStand) || pillionBike;
+      if (npcBike) main.syncBikeRider(npcBike);
+      const npcRider = !!(npcBike && npcBike.bikeRider && npcBike.bikeRider.visible && npcBike.bikeRider.getObjectByName('bike-helmet'));
+      const bike = G.vehicles.find(v => v && v.spec && v.spec.kind === 'bike' && !v.dead) || main.makeVehicle('bike', G.scene);
+      G.player.inVehicle = bike; bike.driver = 'player'; bike.npc = null;
+      main.syncBikeRider(bike);
+      const playerRider = !!(bike.bikeRider && bike.bikeRider.visible && bike.bikeRider.getObjectByName('bike-helmet'));
+      G.player.inVehicle = null; bike.driver = null;
+      main.syncBikeRider(bike);
+      const hoppedOff = !(bike.bikeRider && bike.bikeRider.visible);
+      return {
+        flag: !!(G.gameplay && G.gameplay.bikeHelmets),
+        standHelm, pillionHelm, npcRider, playerRider, hoppedOff,
+      };
+    });
+    assert(lids.flag, 'bikeHelmets flag on');
+    assert(lids.standHelm && lids.pillionHelm, 'stand riders and pillions wear helmets');
+    assert(lids.npcRider, 'traffic bikes show a helmeted rider');
+    assert(lids.playerRider && lids.hoppedOff, 'player bike shows a helmeted rider that hides on foot');
+
+    console.log('\n[36] evening office commute');
+    const commute = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      G.time.dayT = 18.2 / 24;
+      G.time.weather = 'clear';
+      main.updateOfficeCommute(0.05);
+      const list = G._officeCommute || [];
+      const n = list.filter(p => p && p.commute && p.kind === 'office' && !p.dead).length;
+      const bts = G.world.bts;
+      const dest = { x: bts ? bts.x : 0, z: (bts && bts.z) || 0 };
+      let toward = 0;
+      for (const p of list) {
+        if (!p || !p.mesh) continue;
+        const dx = dest.x - p.mesh.position.x, dz = dest.z - p.mesh.position.z;
+        const want = Math.atan2(dx, dz);
+        let d = Math.abs(p.heading - want);
+        while (d > Math.PI) d = Math.abs(d - Math.PI * 2);
+        if (d < 0.6 || Math.hypot(dx, dz) < 10) toward++;
+      }
+      const shirt = list[0] && list[0].mesh && list[0].mesh.userData.parts && list[0].mesh.userData.parts.torso;
+      const pale = shirt && shirt.material && shirt.material.color.getHex() > 0xc0c0c0;
+      G.time.dayT = 12 / 24;
+      main.updateOfficeCommute(0.05);
+      const gone = !(G._officeCommute && G._officeCommute.length);
+      return { flag: !!(G.gameplay && G.gameplay.officeCommute), n, toward, pale, gone, bts: !!(bts) };
+    });
+    assert(commute.flag && commute.bts, 'officeCommute flag on and BTS exists');
+    assert(commute.n >= 5 && commute.toward >= 4 && commute.pale, `evening office crowd walks toward the BTS (${commute.n})`);
+    assert(commute.gone, 'office commute disperses after evening');
+
+    console.log('\n[37] afternoon thunderstorm');
+    const storm = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      G.time.dayT = 15.2 / 24;
+      G.time.weather = 'clear';
+      G.time.rainStrength = 0;
+      G._rainTarget = 0;
+      G._stormToday = false;
+      G._weatherT = 0;
+      G._weatherUntil = 1e9;
+      main.updateDayNight(0.05);
+      const tag = document.getElementById('weather-tag') && document.getElementById('weather-tag').textContent;
+      const fired = G.time.weather === 'rain' && (G._rainTarget || 0) > 0.7 && G._stormToday;
+      G.time.dayT = 5.2 / 24;
+      main.updateDayNight(0.05);
+      const reset = G._stormToday === false;
+      return {
+        flag: !!(G.gameplay && G.gameplay.afternoonStorm),
+        fired, tag, reset, weather: G.time.weather,
+      };
+    });
+    assert(storm.flag, 'afternoonStorm flag on');
+    assert(storm.fired && /STORM/.test(storm.tag || ''), `heat breaks into an afternoon storm ("${storm.tag}")`);
+    assert(storm.reset, 'storm flag clears before dawn so the next day can fire');
+
+    console.log('\n[38] morning crossing guards');
+    const guard = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      G.time.dayT = 7.4 / 24;
+      main.updateCrossingGuards(0.05);
+      const list = G._crossingGuards || [];
+      const n = list.filter(p => p && p.crossingGuard && !p.dead).length;
+      const g0 = list[0];
+      const vest = !!(g0 && g0.mesh && g0.mesh.getObjectByName('guard-vest'));
+      const paddle = !!(g0 && g0.mesh && g0.mesh.getObjectByName('stop-paddle'));
+      const bts = G.world && G.world.bts;
+      const nearBts = !!(g0 && g0.mesh && bts && Math.hypot(g0.mesh.position.x - bts.x, g0.mesh.position.z - (bts.z || 0)) < 18);
+      G.time.dayT = 12 / 24;
+      main.updateCrossingGuards(0.05);
+      const goneNoon = !(G._crossingGuards && G._crossingGuards.length);
+      G.time.dayT = 15.4 / 24;
+      main.updateCrossingGuards(0.05);
+      const pm = (G._crossingGuards || []).filter(p => p && p.crossingGuard).length;
+      G.time.dayT = 18 / 24;
+      main.updateCrossingGuards(0.05);
+      const goneEve = !(G._crossingGuards && G._crossingGuards.length);
+      return { flag: !!(G.gameplay && G.gameplay.crossingGuard), n, vest, paddle, nearBts, goneNoon, pm, goneEve };
+    });
+    assert(guard.flag && guard.n >= 2 && guard.nearBts, `crossing guards stand at Asok (${guard.n})`);
+    assert(guard.vest && guard.paddle, 'yellow vest and stop paddle');
+    assert(guard.goneNoon, 'crossing guards leave after morning');
+    assert(guard.pm >= 2 && guard.goneEve, 'crossing guards return for the afternoon pickup');
+
+    console.log('\n[39] BTS motosai rank');
+    const rank = await page.evaluate(() => {
+      const G = window.GAME;
+      const bts = G.world && G.world.bts;
+      const list = (G.world && G.world.motosaiStands) || [];
+      const atBts = list.filter(s => s && (s.bts || (bts && Math.hypot(s.x - bts.x, s.z - (bts.z || 0)) < 28)));
+      const s0 = atBts[0] || list.find(s => s && s.bts);
+      const vest = !!(s0 && s0.rider && (s0.rider.motosaiVest || (s0.rider.mesh && s0.rider.mesh.getObjectByName('motosai-vest'))));
+      const helm = !!(s0 && s0.rider && (s0.rider.bikeHelmet || (s0.rider.mesh && s0.rider.mesh.getObjectByName('bike-helmet'))));
+      const bike = s0 && s0.bike;
+      return {
+        flag: !!(G.gameplay && G.gameplay.btsMotosai),
+        n: atBts.length,
+        vest, helm,
+        stand: !!(bike && bike.motosaiStand && bike.driver !== 'player'),
+        waiter: !!(s0 && s0.waiter),
+      };
+    });
+    assert(rank.flag && rank.n >= 1, `a motosai rank waits at the BTS (${rank.n})`);
+    assert(rank.vest && rank.helm && rank.stand && rank.waiter, 'BTS rank has a helmeted vest rider, bike, and waiter');
+
+    console.log('\n[40] rain packs the food stalls');
+    const pack = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      G.time.weather = 'rain';
+      G.time.rainStrength = 0.8;
+      G._rainTarget = 0.8;
+      G._clusterT = 0;
+      main.updateRainPack(0.05);
+      main.updateClusters(2);
+      const fs = G.world.foodStalls || [];
+      const packed = fs.filter(f => f.packed).length;
+      const stools = fs[0] && fs[0].mesh && fs[0].mesh.getObjectByName('stool');
+      const parasol = fs[0] && fs[0].mesh && fs[0].mesh.getObjectByName('parasol');
+      const stoolHidden = !!(stools && stools.visible === false);
+      const parasolTilt = !!(parasol && parasol.rotation.x > 0.5);
+      const foodQ = (G.clusterAnchors || []).filter(a => a.kind === 'food').reduce((n, a) => n + a.peds.length, 0);
+      G.time.weather = 'clear';
+      G.time.rainStrength = 0;
+      G._rainTarget = 0;
+      main.updateRainPack(0.05);
+      const open = fs.filter(f => f.packed).length;
+      const stoolBack = fs[0] && fs[0].mesh && fs[0].mesh.getObjectByName('stool') && fs[0].mesh.getObjectByName('stool').visible;
+      return {
+        flag: !!(G.gameplay && G.gameplay.rainPack),
+        packed, foodQ, stoolHidden, parasolTilt, open, stoolBack,
+      };
+    });
+    assert(pack.flag && pack.packed >= 8 && pack.stoolHidden && pack.parasolTilt, `stalls pack in the rain (${pack.packed})`);
+    assert(pack.foodQ === 0, 'food queues empty when packed');
+    assert(pack.open === 0 && pack.stoolBack, 'stalls unpack when it dries');
+
+    console.log('\n[41] BTS songthaew rank');
+    const song = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      main.updateVehicles(0.016);
+      const rec = G.world && G.world.btsSongthaew;
+      const bts = G.world && G.world.bts;
+      const v = rec && rec.vehicle || (G.vehicles || []).find(x => x && x.btsSongthaew);
+      const px = v && v.pos && v.pos.x;
+      const pz = v && v.pos && v.pos.z;
+      const dist = (v && bts && px != null) ? Math.hypot(px - bts.x, pz - (bts.z || 0)) : null;
+      const waiter = rec && rec.waiter;
+      return {
+        flag: !!(G.gameplay && G.gameplay.btsSongthaew),
+        rec: !!rec, hasV: !!v,
+        kind: v && (v.kind || (v.spec && v.spec.kind)),
+        stand: !!(v && v.btsSongthaew && v.driver !== 'player'),
+        near: dist != null && dist < 40,
+        dist, px, pz, btsX: bts && bts.x, btsZ: bts && (bts.z || 0),
+        home: rec && rec.x != null ? { x: rec.x, z: rec.z } : null,
+        npc: !!(v && v.npc), driver: v && v.driver,
+        waiter: !!(waiter && waiter.btsSongthaew && waiter.anchor),
+      };
+    });
+    assert(song.flag && song.kind === 'songthaew' && song.near, `a songthaew waits at the BTS (${song.dist && song.dist.toFixed(1)}m)`);
+    assert(song.stand && song.waiter, 'BTS songthaew is enterable and has a hawker');
+
+    console.log('\n[42] soi ice carts');
+    const ice = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = G.iceCarts || [];
+      const n = list.filter(c => c && c.mesh && c.mesh.name === 'ice-cart').length;
+      const vendor = list.filter(c => c && c.vendor && c.vendor.iceCart).length;
+      const c0 = list[0];
+      const start = c0 && c0.mesh ? { x: c0.mesh.position.x, z: c0.mesh.position.z } : null;
+      if (c0) { c0.t = 0.15; c0.dir = 1; }
+      for (let i = 0; i < 40; i++) main.updateIceCarts(0.25);
+      const moved = !!(c0 && start && Math.hypot(c0.mesh.position.x - start.x, c0.mesh.position.z - start.z) > 0.4);
+      const onSoi = !!(c0 && c0.soi);
+      G.player.inVehicle = null;
+      G.player.group.visible = true;
+      G._eating = null;
+      G.cash = 80;
+      G.player.stam = 10;
+      if (c0 && c0.mesh) G.player.group.position.copy(c0.mesh.position);
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+      main.updateIceCarts(0.016);
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      return {
+        flag: !!(G.gameplay && G.gameplay.iceCart), n, vendor, moved, onSoi,
+        paid: G.cash === 60, stam: G.player.stam === G.player.stamMax,
+      };
+    });
+    assert(ice.flag && ice.n >= 2 && ice.vendor >= 2, `ice carts roll the sois (${ice.n})`);
+    assert(ice.moved && ice.onSoi, 'ice carts move along a soi');
+    assert(ice.paid && ice.stam, 'E buys ice cream for ฿20 and fills stamina');
+
+    console.log('\n[43] BTS tuk-tuk rank');
+    const tuk = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      main.updateVehicles(0.016);
+      const rec = G.world && G.world.btsTuktuk;
+      const bts = G.world && G.world.bts;
+      const v = rec && rec.vehicle;
+      const dist = (v && bts) ? Math.hypot(v.pos.x - bts.x, v.pos.z - (bts.z || 0)) : null;
+      return {
+        flag: !!(G.gameplay && G.gameplay.btsTuktuk),
+        kind: v && v.kind,
+        stand: !!(v && v.btsTuktuk && v.driver !== 'player' && v._standHome),
+        near: dist != null && dist < 40,
+        waiter: !!(rec && rec.waiter && rec.waiter.btsTuktuk),
+      };
+    });
+    assert(tuk.flag && tuk.kind === 'tuktuk' && tuk.near, 'a tuk-tuk waits at the BTS');
+    assert(tuk.stand && tuk.waiter, 'BTS tuk-tuk is pinned and has a driver waiting');
+
+    console.log('\n[46] for-hire roof signs');
+    const hire = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const song = G.world && G.world.btsSongthaew && G.world.btsSongthaew.vehicle;
+      const tukV = G.world && G.world.btsTuktuk && G.world.btsTuktuk.vehicle;
+      const songSign = !!(song && (song.hireSign || (song.mesh && song.mesh.getObjectByName('hire-sign'))));
+      const tukSign = !!(tukV && (tukV.hireSign || (tukV.mesh && tukV.mesh.getObjectByName('hire-sign'))));
+      if (song) { song.driver = 'player'; main.updateVehicles(0.016); }
+      const hidden = !!(song && song.hireSign && song.hireSign.visible === false);
+      if (song) { song.driver = null; main.updateVehicles(0.016); }
+      const back = !!(song && song.hireSign && song.hireSign.visible);
+      return { songSign, tukSign, hidden, back };
+    });
+    assert(hire.songSign && hire.tukSign, 'BTS songthaew and tuk-tuk wear for-hire signs');
+    assert(hire.hidden && hire.back, 'hire sign hides when you take the ride and returns on the rank');
+
+    console.log('\n[44] khlong water monitors');
+    const mon = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = G.monitors || [];
+      const n = list.filter(m => m && m.mesh).length;
+      const m0 = list[0];
+      if (!m0) return { flag: !!(G.gameplay && G.gameplay.khlongMonitor), n };
+      G.player.inVehicle = null;
+      G.player.group.position.set(m0.mesh.position.x + 1.2, 0, m0.mesh.position.z);
+      const start = { x: m0.mesh.position.x, z: m0.mesh.position.z };
+      for (let i = 0; i < 20; i++) main.updateMonitors(0.1);
+      const moved = Math.hypot(m0.mesh.position.x - start.x, m0.mesh.position.z - start.z);
+      const bank = m0.mesh.position.x < -200;
+      return {
+        flag: !!(G.gameplay && G.gameplay.khlongMonitor),
+        n, bolted: m0.state === 'bolt' || m0.state === 'return', moved, bank,
+      };
+    });
+    assert(mon.flag && mon.n >= 2, `water monitors loaf on the khlong (${mon.n})`);
+    assert(mon.bolted && mon.moved > 0.8 && mon.bank, `monitors bolt along the bank (${mon.moved.toFixed(1)}m)`);
+
+    console.log('\n[45] stall geckos after dark');
+    const gecko = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = G.geckos || [];
+      G.nightK = 0.1;
+      main.updateGeckos(0.05);
+      const dayHide = list.filter(g => g && g.mesh && g.mesh.visible).length;
+      G.nightK = 0.8;
+      main.updateGeckos(0.05);
+      const nightShow = list.filter(g => g && g.mesh && g.mesh.visible).length;
+      const onStall = list[0] && list[0].mesh && list[0].mesh.position.y > 1.4;
+      return { flag: !!(G.gameplay && G.gameplay.stallGecko), n: list.length, dayHide, nightShow, onStall };
+    });
+    assert(gecko.flag && gecko.n >= 3, `geckos exist on stalls (${gecko.n})`);
+    assert(gecko.dayHide === 0 && gecko.nightShow >= 3 && gecko.onStall, 'geckos hide by day and sit on parasols at night');
+
+    console.log('\n[47] soi football after school');
+    const kick = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      G.time.dayT = 17.4 / 24;
+      main.updateSoiFootball(0.05);
+      const g = G._soiFootball;
+      const n = g && g.kids ? g.kids.filter(p => p && p.football).length : 0;
+      const ball0 = g && g.ball && { x: g.ball.position.x, y: g.ball.position.y, z: g.ball.position.z };
+      for (let i = 0; i < 12; i++) main.updateSoiFootball(0.08);
+      const moved = !!(g && g.ball && ball0 && Math.hypot(g.ball.position.x - ball0.x, g.ball.position.z - ball0.z) > 0.3);
+      const loft = !!(g && g.ball && g.ball.position.y > 0.2);
+      G.time.dayT = 12 / 24;
+      main.updateSoiFootball(0.05);
+      const gone = !G._soiFootball;
+      return { flag: !!(G.gameplay && G.gameplay.soiFootball), n, moved, loft, gone, soi: !!(g && g.soi) };
+    });
+    assert(kick.flag && kick.n >= 3 && kick.soi, `kids kick about in a soi (${kick.n})`);
+    assert(kick.moved && kick.loft, 'the ball travels between kids');
+    assert(kick.gone, 'the kickabout packs up after evening');
+
+    console.log('\n[48] mall shoppers to the BTS');
+    const bags = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      G.time.dayT = 18.2 / 24;
+      main.updateMallShoppers(0.05);
+      const list = G._mallShoppers || [];
+      const n = list.filter(p => p && p.mallShop && !p.dead).length;
+      const bts = G.world.bts;
+      const dest = { x: bts ? bts.x : 0, z: (bts && bts.z) || 0 };
+      let toward = 0;
+      for (const p of list) {
+        if (!p || !p.mesh) continue;
+        const dx = dest.x - p.mesh.position.x, dz = dest.z - p.mesh.position.z;
+        const want = Math.atan2(dx, dz);
+        let d = Math.abs(p.heading - want);
+        while (d > Math.PI) d = Math.abs(d - Math.PI * 2);
+        if (d < 0.6 || Math.hypot(dx, dz) < 10) toward++;
+      }
+      const mall = G.world.poi && G.world.poi.terminal21;
+      G.time.dayT = 12 / 24;
+      main.updateMallShoppers(0.05);
+      const gone = !(G._mallShoppers && G._mallShoppers.length);
+      return { flag: !!(G.gameplay && G.gameplay.mallShoppers), n, toward, gone, mall: !!mall };
+    });
+    assert(bags.flag && bags.mall && bags.n >= 3, `mall shoppers walk from Terminal 21 (${bags.n})`);
+    assert(bags.toward >= 2 && bags.gone, 'they head to the BTS and clear after evening');
+
+    console.log('\n[49] lottery seller at 7-Eleven');
+    const lotto = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const L = G.lottery;
+      const seven = G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0]));
+      const near = !!(L && L.pos && seven && Math.hypot(L.pos.x - seven.pos.x, L.pos.z - seven.pos.z) < 12);
+      const board = !!(L && L.board && L.board.name === 'lottery-board');
+      const seller = !!(L && L.ped && L.ped.lottery);
+      G.player.inVehicle = null;
+      G._eating = null;
+      G._btsRide = null;
+      G.player.group.visible = true;
+      G.cash = 200;
+      G._lotteryForce = 1200;
+      G._lotteryLast = null;
+      if (L && L.pos) G.player.group.position.copy(L.pos);
+      if (L) L.readyAt = 0;
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+      main.updateLottery(0.016);
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      return {
+        flag: !!(G.gameplay && G.gameplay.lottery),
+        near, board, seller,
+        last: G._lotteryLast,
+        cash: G.cash,
+      };
+    });
+    assert(lotto.flag && lotto.seller && lotto.board && lotto.near, 'a lottery board waits outside 7-Eleven');
+    assert(lotto.last && lotto.last.spent === 80 && lotto.last.win === 1200 && lotto.cash === 1320, 'E buys a ticket (฿80) and can pay out');
+
+    console.log('\n[50] wat chant at dawn and dusk');
+    const chant = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const temple = G.world && G.world.poi && G.world.poi.temple;
+      if (temple) G.player.group.position.set(temple.x, 0, temple.z);
+      G._watChantSlot = null;
+      G._watChant = null;
+      G.time.dayT = 6.1 / 24;
+      G._weatherUntil = 1e9;
+      main.updateDayNight(0.05);
+      const dawn = G._watChant && G._watChant.slot === 'dawn' && G._watChant.near;
+      G.time.dayT = 12 / 24;
+      main.updateDayNight(0.05);
+      const midday = G._watChantSlot == null;
+      G._watChantSlot = null;
+      G.time.dayT = 18.3 / 24;
+      main.updateDayNight(0.05);
+      const dusk = G._watChant && G._watChant.slot === 'dusk' && G._watChant.near;
+      return { flag: !!(G.gameplay && G.gameplay.watChant), temple: !!temple, dawn, midday, dusk };
+    });
+    assert(chant.flag && chant.temple, 'watChant flag on and the wat exists');
+    assert(chant.dawn && chant.midday && chant.dusk, 'chant fires at dawn and dusk, not midday');
+
+    console.log('\n[51] coconut cart on a soi');
+    const coco = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = G.coconutCarts || [];
+      const n = list.filter(c => c && c.mesh && c.mesh.name === 'coconut-cart').length;
+      const c0 = list[0];
+      const start = c0 && c0.mesh ? { x: c0.mesh.position.x, z: c0.mesh.position.z } : null;
+      if (c0) { c0.t = 0.12; c0.dir = 1; }
+      for (let i = 0; i < 50; i++) main.updateCoconutCarts(0.3);
+      const moved = !!(c0 && start && Math.hypot(c0.mesh.position.x - start.x, c0.mesh.position.z - start.z) > 0.4);
+      G.player.inVehicle = null;
+      G._eating = null;
+      G.player.group.visible = true;
+      G.cash = 90;
+      G.player.hp = 40;
+      G.player.stam = 10;
+      if (c0 && c0.mesh) G.player.group.position.copy(c0.mesh.position);
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+      main.updateCoconutCarts(0.016);
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      return {
+        flag: !!(G.gameplay && G.gameplay.coconutCart),
+        n, moved, onSoi: !!(c0 && c0.soi),
+        paid: G.cash === 60, healed: G.player.hp > 40, stam: G.player.stam === G.player.stamMax,
+      };
+    });
+    assert(coco.flag && coco.n >= 1 && coco.onSoi, `a coconut cart rolls a soi (${coco.n})`);
+    assert(coco.moved, 'coconut cart moves along the soi');
+    assert(coco.paid && coco.healed && coco.stam, 'E buys coconut water for ฿30');
+
+    console.log('\n[52] soi laundry lines');
+    const wash = await page.evaluate(() => {
+      const G = window.GAME;
+      const list = G.laundry || [];
+      const n = list.filter(l => l && l.mesh && l.mesh.name === 'laundry-line').length;
+      const high = list.filter(l => l && l.mesh && l.mesh.position.y === 0 && l.mesh.children.some(c => c.position.y > 1.8)).length;
+      const onSoi = list.filter(l => l && l.soi).length;
+      return { flag: !!(G.gameplay && G.gameplay.soiLaundry), n, high, onSoi };
+    });
+    assert(wash.flag && wash.n >= 2 && wash.onSoi >= 2, `laundry lines span the sois (${wash.n})`);
+    assert(wash.high >= 2, 'shirts hang above head height');
+
+    console.log('\n[53] night checkpoint');
+    const stop = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const cp = G.checkpoint;
+      const cones = cp && cp.cones ? cp.cones.filter(c => c && c.name === 'checkpoint-cone').length : 0;
+      const torch = !!(cp && cp.cop && cp.cop.mesh && cp.cop.mesh.getObjectByName('flashlight'));
+      G.time.dayT = 12 / 24;
+      main.updateCheckpoint(0.05);
+      const dayOff = !cp.active && cp.cop && cp.cop.mesh && cp.cop.mesh.visible === false && (cp.light ? cp.light.intensity === 0 : true);
+      G.time.dayT = 22.4 / 24;
+      G.policeOff = false;
+      G.wanted.stars = 0;
+      G.wanted.crime = 0;
+      cp.flagged = false;
+      main.updateCheckpoint(0.05);
+      const nightOn = !!(cp.active && cp.cop && cp.cop.mesh && cp.cop.mesh.visible && cp.light && cp.light.intensity > 0.5);
+      G.player.inVehicle = null;
+      G.player.group.position.set(cp.x + 8, 0, cp.z);
+      G.player.group.visible = true;
+      const car = G.vehicles.find(v => v && v.npc && v.spec && v.spec.kind !== 'boat' && v.spec.kind !== 'airliner' && v.driver !== 'player') || main.makeVehicle('camry', G.scene);
+      if (!car.npc) car.npc = { kind: 'traffic', cruiseSpeed: 12, followMul: 1, dir: 0 };
+      car.pos.set(cp.x - 2.5, 0, cp.z);
+      if (car.mesh) { car.mesh.position.copy(car.pos); car.mesh.rotation.y = 0; }
+      car.heading = 0;
+      car.vel = 12;
+      car.npc.dir = 0;
+      car.npc.cruiseSpeed = 12;
+      car.npc.turnCD = 99;
+      for (let i = 0; i < 16; i++) main.updateTrafficCar(car, 0.1);
+      const slowed = car.vel < 6;
+      const ride = G.vehicles.find(v => v && v.spec && v.spec.kind !== 'boat' && v.spec.kind !== 'airliner' && v !== car) || car;
+      G.player.inVehicle = ride;
+      ride.driver = 'player';
+      ride.pos.set(cp.x, 0, cp.z);
+      ride.vel = 14;
+      cp.flagged = false;
+      G.wanted.stars = 0;
+      G.wanted.crime = 0;
+      main.updateCheckpoint(0.016);
+      const stars = G.wanted.stars;
+      G.wanted.stars = 0;
+      G.wanted.crime = 0;
+      G.player.inVehicle = null;
+      ride.driver = ride.npc ? 'npc' : null;
+      ride.vel = 0;
+      G.time.dayT = 12 / 24;
+      main.updateCheckpoint(0.05);
+      return {
+        flag: !!(G.gameplay && G.gameplay.nightCheckpoint),
+        cones, torch, dayOff, nightOn, slowed, stars, cop: !!(cp && cp.cop),
+      };
+    });
+    assert(stop.flag && stop.cones >= 4 && stop.cop && stop.torch, `checkpoint cones and cop (${stop.cones})`);
+    assert(stop.dayOff && stop.nightOn, 'flashlight cop only works the night shift');
+    assert(stop.slowed, 'traffic crawls through the checkpoint');
+    assert(stop.stars >= 1, 'blowing the checkpoint at speed is a star');
+
+    console.log('\n[54] 7-Eleven parked bikes');
+    const rack = await page.evaluate(() => {
+      const G = window.GAME;
+      const seven = G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0]));
+      const list = G.sevenBikes || [];
+      const n = list.filter(v => v && v.spec && v.spec.kind === 'bike' && v.sevenParked).length;
+      const pinned = list.filter(v => v && v._standHome && v.driver !== 'player').length;
+      let near = 0;
+      if (seven && seven.pos) {
+        for (const v of list) {
+          if (!v || !v.pos) continue;
+          if (Math.hypot(v.pos.x - seven.pos.x, v.pos.z - seven.pos.z) < 12) near++;
+        }
+      }
+      const open = list.filter(v => v && v.driver == null).length;
+      return { flag: !!(G.gameplay && G.gameplay.sevenBikes), n, pinned, near, open, seven: !!(seven && seven.pos) };
+    });
+    assert(rack.flag && rack.seven && rack.n >= 4 && rack.near >= 4, `bikes cluster outside 7-Eleven (${rack.n})`);
+    assert(rack.pinned >= 4 && rack.open >= 4, 'the rack is pinned and enterable');
+
+    console.log('\n[55] khlong water hyacinth');
+    const weed = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = G.hyacinth || [];
+      const n = list.filter(h => h && h.mesh && h.mesh.name === 'hyacinth').length;
+      const onRiver = list.filter(h => h && h.mesh && h.mesh.position.x < -210 && h.mesh.position.x > -248).length;
+      const wet = list.filter(h => h && h.mesh && h.mesh.position.y < 0.4).length;
+      const h0 = list[0];
+      const start = h0 && h0.mesh ? h0.mesh.position.z : 0;
+      for (let i = 0; i < 40; i++) main.updateHyacinth(0.25);
+      const moved = !!(h0 && h0.mesh && Math.abs(h0.mesh.position.z - start) > 0.4);
+      return { flag: !!(G.gameplay && G.gameplay.hyacinth), n, onRiver, wet, moved };
+    });
+    assert(weed.flag && weed.n >= 4 && weed.onRiver >= 4, `hyacinth mats on the khlong (${weed.n})`);
+    assert(weed.wet >= 4 && weed.moved, 'mats sit on the water and drift with the current');
+
+    console.log('\n[56] BTS escalator sitters');
+    const sit = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      main.updatePeds(0.05);
+      const list = G.btsSitters || [];
+      const n = list.filter(p => p && p.btsSit && p.mesh).length;
+      const bts = G.world && G.world.bts;
+      const sx = bts ? bts.x : -50;
+      const atAsok = list.filter(p => p && p.mesh && Math.abs(p.mesh.position.x - sx) < 8).length;
+      const onStairs = list.filter(p => p && p.mesh && p.mesh.position.y > 2).length;
+      const folded = list.filter(p => {
+        const parts = p && p.mesh && p.mesh.userData && p.mesh.userData.parts;
+        return !!(parts && parts.legL && parts.legL.rotation.x > 0.8);
+      }).length;
+      const still = list.filter(p => p && p.speed === 0).length;
+      return { flag: !!(G.gameplay && G.gameplay.btsSitters), n, atAsok, onStairs, folded, still };
+    });
+    assert(sit.flag && sit.n >= 2 && sit.atAsok >= 2, `people sit the Asok escalator (${sit.n})`);
+    assert(sit.onStairs >= 1 && sit.folded >= 2 && sit.still >= 2, 'at least one is up the stairs, legs folded');
+
+    console.log('\n[57] moo ping cart');
+    const grill = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = G.mooPing || [];
+      const n = list.filter(c => c && c.mesh && c.mesh.name === 'mooping-cart').length;
+      const c0 = list[0];
+      const start = c0 && c0.mesh ? { x: c0.mesh.position.x, z: c0.mesh.position.z } : null;
+      if (c0) { c0.t = 0.12; c0.dir = 1; }
+      for (let i = 0; i < 50; i++) main.updateMooPing(0.3);
+      const moved = !!(c0 && start && Math.hypot(c0.mesh.position.x - start.x, c0.mesh.position.z - start.z) > 0.4);
+      const coals = !!(c0 && c0.mesh && c0.mesh.getObjectByName('mooping-coals'));
+      G.time.dayT = 18.5 / 24;
+      main.updateMooPing(0.05);
+      const duskGlow = !!(c0 && c0.coalMat && c0.coalMat.emissiveIntensity > 0.9);
+      G.player.inVehicle = null;
+      G._eating = null;
+      G.player.group.visible = true;
+      G.cash = 90;
+      G.player.hp = 40;
+      if (c0 && c0.mesh) G.player.group.position.copy(c0.mesh.position);
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+      main.updateMooPing(0.016);
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      return {
+        flag: !!(G.gameplay && G.gameplay.mooPing),
+        n, moved, onSoi: !!(c0 && c0.soi), coals, duskGlow,
+        paid: G.cash === 55, healed: G.player.hp > 40,
+      };
+    });
+    assert(grill.flag && grill.n >= 1 && grill.onSoi && grill.coals, `a moo ping cart works a soi (${grill.n})`);
+    assert(grill.moved, 'moo ping cart moves along the soi');
+    assert(grill.duskGlow && grill.paid && grill.healed, 'coals glow at dusk and E buys a skewer for ฿35');
+
+    console.log('\n[58] wat turtles');
+    const shell = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = G.watTurtles || [];
+      const n = list.filter(t => t && t.mesh && t.mesh.name === 'wat-turtle').length;
+      const temple = G.world && G.world.poi && G.world.poi.temple;
+      const near = list.filter(t => t && t.mesh && temple && Math.hypot(t.mesh.position.x - temple.x, t.mesh.position.z - temple.z) < 18).length;
+      const pond = G.watPond && G.watPond.name === 'wat-pond';
+      const t0 = list[0];
+      const start = t0 && t0.mesh ? { x: t0.mesh.position.x, z: t0.mesh.position.z } : null;
+      for (let i = 0; i < 20; i++) main.updateWatTurtles(0.2);
+      const moved = !!(t0 && start && Math.hypot(t0.mesh.position.x - start.x, t0.mesh.position.z - start.z) > 0.15);
+      return { flag: !!(G.gameplay && G.gameplay.watTurtles), n, near, pond, moved };
+    });
+    assert(shell.flag && shell.n >= 3 && shell.pond && shell.near >= 3, `turtles in the wat pond (${shell.n})`);
+    assert(shell.moved, 'turtles paddle around the pond');
+
+    console.log('\n[59] 7-Eleven security guard');
+    const booth = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const g = G.sevenGuard;
+      const seven = G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0]));
+      main.updatePeds(0.05);
+      main.updateSevenGuard(0.05);
+      const ped = g && g.ped;
+      const seated = !!(ped && ped.sevenGuard && ped.mesh && ped.mesh.position.y >= 0.3);
+      const chair = !!(g && g.chair && g.chair.name === 'seven-chair');
+      const near = !!(seven && seven.pos && ped && ped.mesh && Math.hypot(ped.mesh.position.x - seven.pos.x, ped.mesh.position.z - seven.pos.z) < 10);
+      const torch = !!(ped && ped.mesh && ped.mesh.getObjectByName('flashlight'));
+      G.time.dayT = 12 / 24;
+      main.updateSevenGuard(0.05);
+      const dayOff = !!(g && g.beam && g.beam.visible === false && g.light && g.light.intensity === 0);
+      G.time.dayT = 21.5 / 24;
+      main.updateSevenGuard(0.05);
+      const nightOn = !!(g && g.beam && g.beam.visible && g.light && g.light.intensity > 0.4);
+      return { flag: !!(G.gameplay && G.gameplay.sevenGuard), seated, chair, near, torch, dayOff, nightOn };
+    });
+    assert(booth.flag && booth.seated && booth.chair && booth.near, 'a guard sits outside 7-Eleven');
+    assert(booth.torch && booth.dayOff && booth.nightOn, 'the guard torch only comes on at night');
+
+    console.log('\n[60] soi PA speakers');
+    const pa = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = G.soiPa || [];
+      const n = list.filter(s => s && s.mesh && s.mesh.name === 'soi-pa').length;
+      const horns = list.filter(s => s && s.mesh && s.mesh.getObjectByName('pa-horn')).length;
+      const onSoi = list.filter(s => s && s.soi).length;
+      const s0 = list[0];
+      if (s0) G.player.group.position.set(s0.x, 0, s0.z);
+      G._soiPaSlot = null;
+      G._soiPa = null;
+      G.time.dayT = 7.2 / 24;
+      G._weatherUntil = 1e9;
+      main.updateDayNight(0.05);
+      const morning = G._soiPa && G._soiPa.slot === 'morning' && G._soiPa.near;
+      G.time.dayT = 12 / 24;
+      main.updateDayNight(0.05);
+      const midday = G._soiPaSlot == null;
+      G._soiPaSlot = null;
+      G.time.dayT = 16.8 / 24;
+      main.updateDayNight(0.05);
+      const afternoon = G._soiPa && G._soiPa.slot === 'afternoon' && G._soiPa.near;
+      return { flag: !!(G.gameplay && G.gameplay.soiPa), n, horns, onSoi, morning, midday, afternoon };
+    });
+    assert(pa.flag && pa.n >= 2 && pa.horns >= 2 && pa.onSoi >= 2, `soi PA horns on the alleys (${pa.n})`);
+    assert(pa.morning && pa.midday && pa.afternoon, 'PA crackles at morning and afternoon, not midday');
+
+    console.log('\n[61] soi chairs and beer crates');
+    const drink = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const set = G.soiChairs;
+      const chairs = set && set.seats ? set.seats.filter(s => s && s.mesh && s.mesh.name === 'plastic-chair').length : 0;
+      const crates = set && set.crates ? set.crates.filter(c => c && c.name === 'beer-crate').length : 0;
+      G.time.dayT = 20.2 / 24;
+      main.updateSoiChairs(0.05);
+      main.updatePeds(0.05);
+      const night = (G._soiDrinkers || []).filter(p => p && p.soiDrink && p.mesh && p.mesh.position.y >= 0.3).length;
+      G.time.dayT = 12 / 24;
+      main.updateSoiChairs(0.05);
+      const dayGone = !(G._soiDrinkers && G._soiDrinkers.length);
+      return { flag: !!(G.gameplay && G.gameplay.soiChairs), chairs, crates, night, dayGone, onSoi: !!(set && set.soi) };
+    });
+    assert(drink.flag && drink.onSoi && drink.chairs >= 2 && drink.crates >= 2, `chairs and crates on a soi (${drink.chairs})`);
+    assert(drink.night >= 2 && drink.dayGone, 'drinkers sit after dark and clear by day');
+
+    console.log('\n[62] soi mechanic');
+    const wrench = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const shop = G.soiMechanic;
+      const ped = shop && shop.ped;
+      const bike = shop && shop.bike;
+      const stand = shop && shop.stand && shop.stand.name === 'paddock-stand';
+      const tool = !!(ped && ped.mesh && ped.mesh.getObjectByName('wrench'));
+      const pinned = !!(bike && bike._standHome && bike.driver !== 'player');
+      const car = G.vehicles.find(v => v && v.spec && v.spec.kind !== 'boat' && v.spec.kind !== 'airliner' && v !== bike) || main.makeVehicle('camry', G.scene);
+      G.player.inVehicle = car;
+      car.driver = 'player';
+      car.hp = 40;
+      car.tiresBlown = true;
+      car.pos.set(shop.x, 0, shop.z);
+      G.cash = 200;
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+      main.updateSoiMechanic(0.016);
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      const fixed = car.hp === 100 && car.tiresBlown === false && G.cash === 120;
+      G.player.inVehicle = null;
+      car.driver = car.npc ? 'npc' : null;
+      return {
+        flag: !!(G.gameplay && G.gameplay.soiMechanic),
+        ped: !!(ped && ped.soiMechanic), stand, tool, pinned, onSoi: !!(shop && shop.soi), fixed,
+      };
+    });
+    assert(wrench.flag && wrench.ped && wrench.stand && wrench.tool && wrench.onSoi, 'a mechanic waits with a bike on a stand');
+    assert(wrench.pinned && wrench.fixed, 'the shop bike stays put and E patches a wreck for ฿80');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

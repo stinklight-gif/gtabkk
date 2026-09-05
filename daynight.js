@@ -98,16 +98,29 @@ export function updateDayNight(dt) {
   G.scene.background.copy(sky);
   G.scene.fog.color.copy(sky);
   G.scene.fog.density = lerp(0.0012, 0.0035, 1 - dayK) + G.time.rainStrength * 0.004;
+  G.sun.color.setHex(0xffe0a0);
+  G._hazeK = 0;
+  G.time.pm25 = 0;
   if (G.time.weather === 'overcast') {
     G.sun.intensity *= 0.55;
     G.hemi.intensity *= 0.82;
     G.scene.fog.density += 0.0014;
     G.renderer.toneMappingExposure *= 0.92;
-  } else if (G.time.weather === 'haze') {
-    G.sun.intensity *= 0.7;
-    G.scene.fog.color.setHex(0x9a8060);
-    G.scene.fog.density += 0.0026;
-    G.scene.background.lerp(new THREE.Color(0xc4a070), 0.35);
+  } else if (GAMEPLAY.burningHaze && G.time.weather === 'haze') {
+    // Burning season: noon is the dirty hour. Distance dies, the sun goes ochre,
+    // headlights read in the brown air (see vehicles.js). Not a landmark.
+    const noonDirty = clamp(dayK, 0, 1);
+    G._hazeK = noonDirty;
+    G.sun.intensity *= 0.38 + (1 - noonDirty) * 0.28;
+    G.sun.color.setHex(0xffb060);
+    G.hemi.intensity *= 0.62;
+    G.amb.intensity = Math.min(0.42, G.amb.intensity + 0.10);
+    G.renderer.toneMappingExposure *= 0.72;
+    G.scene.fog.color.setHex(0xb8945a);
+    G.scene.fog.density = 0.0048 + noonDirty * 0.0062 + G.time.rainStrength * 0.002;
+    G.scene.background.lerp(new THREE.Color(0xc4a070), 0.58 + noonDirty * 0.22);
+    G.time.pm25 = Math.round(145 + noonDirty * 95);
+    if (G.hud && G.hud.setWeather) G.hud.setWeather(`HAZE · PM2.5 ${G.time.pm25} · 34°C`);
   }
 
   // neon/lamp/window emissive + accent lights: brighter at night.
@@ -141,18 +154,18 @@ export function updateDayNight(dt) {
         G.hud.showNotif(G._rainTarget > 0.7 ? 'The sky opens up.' : 'It starts to rain.');
         G.audio.thunder();
         G._weatherUntil = G._weatherT + rand(40, 90);
-      } else if (roll < 0.75) {
+      } else if (GAMEPLAY.burningHaze && roll < 0.78) {
+        G.time.weather = 'haze';
+        G._rainTarget = 0;
+        G.hud.setWeather('HAZE · PM2.5 180 · 34°C');
+        G.hud.showNotif('Burning-season haze rolls in — PM2.5 spikes.');
+        G._weatherUntil = G._weatherT + rand(50, 110);
+      } else {
         G.time.weather = 'overcast';
         G._rainTarget = 0;
         G.hud.setWeather('OVERCAST · 30°C');
         G.hud.showNotif('Clouds pile up over the Gulf.');
         G._weatherUntil = G._weatherT + rand(50, 100);
-      } else {
-        G.time.weather = 'haze';
-        G._rainTarget = 0;
-        G.hud.setWeather('HAZE · 34°C');
-        G.hud.showNotif('Burning-season haze rolls in.');
-        G._weatherUntil = G._weatherT + rand(50, 110);
       }
     } else {
       G.time.weather = 'clear';
@@ -160,6 +173,17 @@ export function updateDayNight(dt) {
       G.hud.setWeather('CLEAR · 33°C');
       G._weatherUntil = G._weatherT + rand(70, 150);
     }
+  }
+  const hour = t * 24;
+  if (hour < 6) G._stormToday = false;
+  if (GAMEPLAY.afternoonStorm && !G._stormToday && hour >= 14.5 && hour < 17.2 && G.time.weather !== 'rain') {
+    G.time.weather = 'rain';
+    G._rainTarget = 0.88;
+    G._stormToday = true;
+    G._weatherUntil = (G._weatherT || 0) + rand(45, 85);
+    if (G.hud && G.hud.setWeather) G.hud.setWeather('STORM · 28°C');
+    if (G.hud && G.hud.showNotif) G.hud.showNotif('The heat breaks — afternoon storm.');
+    if (G.audio && G.audio.thunder) G.audio.thunder();
   }
   // dt-correct: 0.012/frame at 60 fps is a ~5.7 s half-life, now expressed as one
   G.time.rainStrength = lerp(G.time.rainStrength, G._rainTarget, 1 - Math.pow(0.5, dt / 5.7));
@@ -184,6 +208,50 @@ export function updateDayNight(dt) {
     G.audio.bell();
   }
   if (hourSlot < 5) G._bellSeen.clear();
+
+  if (GAMEPLAY.watChant) {
+    const hour = t * 24;
+    const slot = (hour >= 5.5 && hour < 6.8) ? 'dawn' : (hour >= 18 && hour < 19) ? 'dusk' : null;
+    if (slot && G._watChantSlot !== slot) {
+      const temple = G.world && G.world.poi && G.world.poi.temple;
+      const pp = G.player && G.player.group && G.player.group.position;
+      const near = !!(temple && pp && Math.hypot(pp.x - temple.x, pp.z - temple.z) < 95);
+      G._watChantSlot = slot;
+      G._watChant = { slot, near };
+      if (near && G.hud && G.hud.showSubtitle) {
+        G.hud.showSubtitle(
+          slot === 'dawn' ? 'The wat begins morning chant.' : 'Evening chant from the wat.',
+          slot === 'dawn' ? 'วัดสวดมนต์เช้า' : 'วัดสวดมนต์เย็น'
+        );
+        if (G.audio && G.audio.bell) G.audio.bell();
+      }
+    }
+    if (!slot) G._watChantSlot = null;
+  }
+
+  if (GAMEPLAY.soiPa && G.soiPa && G.soiPa.length) {
+    const hour = t * 24;
+    const slot = (hour >= 6.9 && hour < 7.9) ? 'morning' : (hour >= 16.2 && hour < 17.5) ? 'afternoon' : null;
+    if (slot && G._soiPaSlot !== slot) {
+      const pp = G.player && G.player.group && G.player.group.position;
+      let near = false;
+      if (pp) {
+        for (const s of G.soiPa) {
+          if (s && Math.hypot(pp.x - s.x, pp.z - s.z) < 70) { near = true; break; }
+        }
+      }
+      G._soiPaSlot = slot;
+      G._soiPa = { slot, near };
+      if (near && G.hud && G.hud.showSubtitle) {
+        G.hud.showSubtitle(
+          slot === 'morning' ? 'The soi PA crackles — community news.' : 'The soi PA reminds everyone about the meeting.',
+          slot === 'morning' ? 'เสียงตามสาย' : 'ประกาศซอย'
+        );
+        if (G.audio && G.audio.blip) G.audio.blip({ freq: 780, dur: 0.18, type: 'square', gain: 0.07, freqEnd: 420 });
+      }
+    }
+    if (!slot) G._soiPaSlot = null;
+  }
 }
 
 // =============================================================================

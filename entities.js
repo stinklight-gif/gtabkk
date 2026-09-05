@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.yaowaratNight;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.yaowaratNight || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -702,6 +702,12 @@ function pickPedKind(pos) {
     return r < 0.38 ? 'vendor' : r < 0.7 ? 'local' : 'laborer';
   }
   const roll = Math.random();
+  if (GAMEPLAY.schoolKids && h >= 6.2 && h < 8.6) {
+    if (roll < 0.42) return 'school';
+    if (roll < 0.55) return 'office';
+    if (roll < 0.68) return 'local';
+    return roll < 0.82 ? 'vendor' : 'laborer';
+  }
   if (h >= 5 && h < 7) {
     if (roll < 0.22) return 'monk';
     if (roll < 0.38) return 'vendor';
@@ -740,6 +746,8 @@ export function makePedMesh(forcedKind = null, pos = null) {
                     pantsColor = pick([0x33384a, 0x222222, 0x5a4030]); break;
     case 'laborer': shirtColor = pick([0x6a8fb0, 0x9a8a60, 0xb0b0b0, 0x7a6a5a]);
                     pantsColor = pick([0x3a4658, 0x4a3a2a, 0x222222]); break;
+    case 'school':  shirtColor = 0xf3f4f8; pantsColor = 0x1c355e; bareArms = false;
+                    if (Math.random() < 0.42) skirt = true; break;
     default:        shirtColor = pick([0xffffff, 0xeeeeee, 0xdeb887, 0x223344, 0x556677, 0xb04040, 0xddcc88, 0x3a6a8a]);
                     pantsColor = pick([0x222222, 0x111111, 0x445566, 0x804020, 0x33384a]);
   }
@@ -836,6 +844,11 @@ export function makePedMesh(forcedKind = null, pos = null) {
   } else if (kind === 'monk') {
     const bowl = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6, 0, TAU, 0, PI/2), new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.7 }));
     bowl.rotation.x = PI; bowl.position.set(0, 1.0, 0.2); g.add(bowl);
+  } else if (kind === 'school') {
+    const pack = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.34, 0.16), new THREE.MeshStandardMaterial({ color: pick([0x1c355e, 0xc44a3a, 0x2a5a3a]), roughness: 0.82 }));
+    pack.position.set(0, 1.12, -0.2); g.add(pack);
+    const tie = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.2, 0.02), new THREE.MeshStandardMaterial({ color: 0xc9a227, roughness: 0.7 }));
+    tie.position.set(0, 1.22, 0.12); g.add(tie);
   }
 
   const props = {};
@@ -960,6 +973,138 @@ export function makeDogMesh() {
   return g;
 }
 
+export function makeCatMesh() {
+  const g = new THREE.Group();
+  const fur = new THREE.MeshStandardMaterial({ color: pick([0xc8b090, 0x3a3a3a, 0xe8dcc8, 0xb06030, 0xf0f0f0]), roughness: 0.85 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.16, 0.38), fur);
+  body.position.y = 0.2; g.add(body);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.14, 0.16), fur);
+  head.position.set(0, 0.28, 0.22); g.add(head);
+  for (const x of [-0.05, 0.05]) {
+    const ear = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.08, 4), fur);
+    ear.position.set(x, 0.38, 0.2); g.add(ear);
+  }
+  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.28), fur);
+  tail.position.set(0.06, 0.26, -0.24); tail.rotation.y = 0.4; g.add(tail);
+  for (const z of [-0.1, 0.1]) for (const x of [-0.06, 0.06]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.12, 0.045), fur);
+    leg.position.set(x, 0.06, z); g.add(leg);
+  }
+  return g;
+}
+
+export function makeMonitorMesh() {
+  const g = new THREE.Group();
+  g.name = 'khlong-monitor';
+  const hide = new THREE.MeshStandardMaterial({ color: pick([0x4a5a38, 0x3a4a30, 0x5a4a28]), roughness: 0.9 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.12, 0.85), hide);
+  body.position.y = 0.14; g.add(body);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.1, 0.22), hide);
+  head.position.set(0, 0.16, 0.48); g.add(head);
+  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.07, 0.7), hide);
+  tail.position.set(0, 0.12, -0.7); tail.rotation.y = 0.15; g.add(tail);
+  for (const z of [-0.28, 0.22]) for (const x of [-0.1, 0.1]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.1, 0.12), hide);
+    leg.position.set(x, 0.05, z); g.add(leg);
+  }
+  return g;
+}
+
+export function makeGeckoMesh() {
+  const g = new THREE.Group();
+  g.name = 'stall-gecko';
+  const hide = new THREE.MeshStandardMaterial({ color: pick([0xc8c070, 0xb0a060, 0xd0c898]), roughness: 0.85 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.03, 0.14), hide);
+  g.add(body);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.03, 0.05), hide);
+  head.position.z = 0.09; g.add(head);
+  const tail = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.02, 0.1), hide);
+  tail.position.z = -0.11; tail.rotation.y = 0.3; g.add(tail);
+  return g;
+}
+
+export function spawnGeckos(scene) {
+  if (!GAMEPLAY.stallGecko) return;
+  G.geckos = [];
+  const stalls = (G.world && G.world.foodStalls) || [];
+  const n = Math.min(4, stalls.length);
+  for (let i = 0; i < n; i++) {
+    const f = stalls[i];
+    const mesh = makeGeckoMesh();
+    const ox = rand(-0.4, 0.4), oz = rand(-0.3, 0.3);
+    mesh.position.set(f.pos.x + ox, 1.72, f.pos.z + oz);
+    mesh.rotation.x = -0.2;
+    mesh.visible = false;
+    scene.add(mesh);
+    G.geckos.push({ mesh, home: { x: f.pos.x + ox, y: 1.72, z: f.pos.z + oz }, heading: rand(0, TAU), timer: rand(0.8, 2.4), chirp: rand(2, 6) });
+  }
+}
+
+export function spawnMonitors(scene) {
+  if (!GAMEPLAY.khlongMonitor) return;
+  G.monitors = [];
+  for (const z of [-90, 40, 130]) {
+    const home = new THREE.Vector3(-214, 0, z);
+    const mesh = makeMonitorMesh();
+    mesh.position.copy(home);
+    scene.add(mesh);
+    G.monitors.push({ mesh, home: home.clone(), heading: rand(0, TAU), state: 'loaf', timer: rand(1, 3) });
+  }
+}
+
+function makeHyacinthMesh() {
+  const g = new THREE.Group();
+  g.name = 'hyacinth';
+  const leafMat = new THREE.MeshStandardMaterial({ color: pick([0x2f7a3a, 0x3a8a40, 0x256838]), roughness: 0.85, side: THREE.DoubleSide });
+  const n = 6;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * TAU + rand(-0.2, 0.2);
+    const r = 0.22 + (i % 3) * 0.12;
+    const leaf = new THREE.Mesh(new THREE.CircleGeometry(0.18 + (i % 2) * 0.06, 7), leafMat);
+    leaf.rotation.x = -PI / 2 + rand(-0.12, 0.12);
+    leaf.position.set(Math.sin(a) * r, 0.02, Math.cos(a) * r);
+    g.add(leaf);
+  }
+  const bloom = new THREE.Mesh(
+    new THREE.ConeGeometry(0.05, 0.16, 5),
+    new THREE.MeshStandardMaterial({ color: 0x7a4aaa, roughness: 0.55, emissive: 0x4a2060, emissiveIntensity: 0.12 })
+  );
+  bloom.position.y = 0.12;
+  g.add(bloom);
+  return g;
+}
+
+export function spawnHyacinth(scene) {
+  if (!GAMEPLAY.hyacinth) return;
+  const cx = -229;
+  G.hyacinth = [];
+  const zs = [-170, -110, -40, 20, 90, 155];
+  for (let i = 0; i < zs.length; i++) {
+    const mesh = makeHyacinthMesh();
+    const x = cx + (i % 2 === 0 ? 8.5 : -7.2);
+    const z = zs[i];
+    mesh.position.set(x, 0.1, z);
+    mesh.rotation.y = rand(0, TAU);
+    scene.add(mesh);
+    G.hyacinth.push({ mesh, phase: rand(0, TAU), drift: 0.32 + i * 0.03, x, z });
+  }
+}
+
+export function spawnCats(scene) {
+  if (!GAMEPLAY.soiCats) return;
+  G.cats = [];
+  const stalls = (G.world && G.world.foodStalls) || [];
+  const n = Math.min(5, stalls.length);
+  for (let i = 0; i < n; i++) {
+    const f = stalls[i];
+    const pos = new THREE.Vector3(f.pos.x + rand(-1.4, 1.4), 0, f.pos.z + rand(-1.4, 1.4));
+    const mesh = makeCatMesh();
+    mesh.position.copy(pos);
+    scene.add(mesh);
+    G.cats.push({ mesh, home: f.pos.clone(), heading: rand(0, TAU), state: 'loaf', timer: rand(1, 3) });
+  }
+}
+
 // A point on a sidewalk near (cx,cz): sample within `radius`, then snap onto the
 // band just outside the nearer road centerline so peds populate the pavements
 // (and read as a crowd down whatever street the camera faces) rather than a
@@ -974,8 +1119,8 @@ export function sidewalkPos(cx, cz, radius) {
   return new THREE.Vector3(clamp(x, -HALF + 5, HALF - 5), 0, clamp(z, -HALF + 5, HALF - 5));
 }
 
-export function spawnPed(scene, pos) {
-  const m = makePedMesh(null, pos);
+export function spawnPed(scene, pos, kind = null) {
+  const m = makePedMesh(kind, pos);
   m.position.copy(pos);
   m.userData.heading = rand(0, TAU);
   scene.add(m);
@@ -1102,7 +1247,911 @@ export function spawnTraffic(scene) {
     };
     v.npc.cruiseSpeed *= v.npc.cruiseMul;
     v.vel = v.npc.cruiseSpeed;
+    if (kind === 'bike' && GAMEPLAY.motosaiStands && (Math.random() < 0.4 || !G._motosaiPillionSeeded)) {
+      attachTrafficPillion(v);
+      G._motosaiPillionSeeded = true;
+    }
   }
+}
+
+export function dressMotosaiVest(ped) {
+  if (!ped || !ped.mesh) return;
+  recolorTorso(ped.mesh.userData.parts, 0xff6a18, 0.7);
+  const vest = new THREE.Mesh(
+    new THREE.BoxGeometry(0.4, 0.36, 0.26),
+    new THREE.MeshStandardMaterial({ color: 0xff7a1a, roughness: 0.65, emissive: 0xff6a18, emissiveIntensity: 0.18 }),
+  );
+  vest.name = 'motosai-vest';
+  vest.position.set(0, 1.18, 0.04);
+  ped.mesh.add(vest);
+  ped.motosaiVest = true;
+}
+
+export function makeBikeHelmet(color = 0x1a1a1e) {
+  const g = new THREE.Group();
+  g.name = 'bike-helmet';
+  const shell = new THREE.Mesh(
+    new THREE.SphereGeometry(0.155, 9, 7, 0, TAU, 0, PI / 1.35),
+    new THREE.MeshStandardMaterial({ color, roughness: 0.42, metalness: 0.28 })
+  );
+  g.add(shell);
+  const visor = new THREE.Mesh(
+    new THREE.BoxGeometry(0.16, 0.07, 0.1),
+    new THREE.MeshStandardMaterial({ color: 0x1a3040, roughness: 0.15, metalness: 0.7 })
+  );
+  visor.position.set(0, -0.02, 0.1);
+  g.add(visor);
+  return g;
+}
+
+export function wearBikeHelmet(ped, color = 0x1a1a1e) {
+  if (!GAMEPLAY.bikeHelmets || !ped || !ped.mesh || ped.bikeHelmet) return ped;
+  const head = ped.mesh.userData.parts && ped.mesh.userData.parts.head;
+  if (!head) return ped;
+  const h = makeBikeHelmet(color);
+  h.position.set(0, 0.12, 0.02);
+  head.add(h);
+  ped.bikeHelmet = h;
+  return ped;
+}
+
+function playerShirtHex() {
+  if (typeof G._shirtColor === 'number') return G._shirtColor;
+  const t = G.player && G.player.torso && G.player.torso.material && G.player.torso.material.color;
+  return t ? t.getHex() : 0xd44b3b;
+}
+
+export function makeSeatedBikeRider(opts = {}) {
+  const g = new THREE.Group();
+  g.name = 'bike-rider';
+  g.userData.keep = true;
+  const shirt = opts.shirt || 0xd44b3b;
+  const skin = opts.skin || 0xc69472;
+  const helm = opts.helmet != null ? opts.helmet : 0x1a1a1e;
+  const shirtMat = new THREE.MeshStandardMaterial({ color: shirt, roughness: 0.75 });
+  const skinMat = new THREE.MeshStandardMaterial({ color: skin, roughness: 0.8 });
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.32, 3, 6), shirtMat);
+  torso.position.set(0, 1.05, 0.02); torso.rotation.x = 0.22; torso.castShadow = true; g.add(torso);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), skinMat);
+  head.position.set(0, 1.42, 0.08); head.castShadow = true; g.add(head);
+  const helmet = makeBikeHelmet(helm);
+  helmet.position.set(0, 1.50, 0.08);
+  g.add(helmet);
+  for (const sx of [-1, 1]) {
+    const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.32, 3, 5), shirtMat);
+    arm.position.set(sx * 0.18, 1.12, 0.16);
+    arm.rotation.x = -1.05;
+    arm.rotation.z = sx * 0.35;
+    g.add(arm);
+  }
+  g.position.set(0, 0.02, 0.12);
+  return g;
+}
+
+export function syncBikeRider(v) {
+  if (!v || !v.mesh || !v.spec || v.spec.kind !== 'bike') return;
+  if (!GAMEPLAY.bikeHelmets) {
+    if (v.bikeRider) v.bikeRider.visible = false;
+    return;
+  }
+  const playerOn = v.driver === 'player';
+  const npcOn = !!v.npc && v.driver !== 'player' && !v.motosaiStand;
+  const want = playerOn || npcOn;
+  if (!want) {
+    if (v.bikeRider) v.bikeRider.visible = false;
+    return;
+  }
+  const shirt = playerOn ? playerShirtHex() : (v._riderShirt || (v._riderShirt = pick([0xffffff, 0x223344, 0x556677, 0xff6a18, 0x2a5aad])));
+  const helm = playerOn ? 0x222226 : (v._riderHelm || (v._riderHelm = pick([0x1a1a1e, 0xb03030, 0x2a5a8a, 0xffcf2a, 0x2a2a2a])));
+  const look = shirt + ',' + helm;
+  if (!v.bikeRider || v._riderLook !== look) {
+    if (v.bikeRider) {
+      if (v.bikeRider.parent) v.bikeRider.parent.remove(v.bikeRider);
+      disposeObject(v.bikeRider);
+      const lod = v.mesh.userData.lod;
+      if (lod && lod.high) {
+        const i = lod.high.indexOf(v.bikeRider);
+        if (i >= 0) lod.high.splice(i, 1);
+      }
+    }
+    v.bikeRider = makeSeatedBikeRider({ shirt, helmet: helm });
+    v._riderLook = look;
+    v.mesh.add(v.bikeRider);
+    const lod = v.mesh.userData.lod;
+    if (lod && lod.high && !lod.high.includes(v.bikeRider)) lod.high.push(v.bikeRider);
+  }
+  v.bikeRider.visible = true;
+}
+
+export function attachTrafficPillion(bike) {
+  if (!bike) return null;
+  if (bike.pillionPed && bike.pillionPed.mesh && bike.pillionPed.mesh.parent) return bike.pillionPed;
+  bike.pillionPed = null;
+  const ped = spawnPed(G.scene, bike.pos.clone());
+  ped.pillion = true;
+  ped.speed = 0;
+  ped.state = 'idle';
+  G.scene.remove(ped.mesh);
+  bike.mesh.add(ped.mesh);
+  ped.mesh.position.set(0, 0.02, -0.42);
+  ped.mesh.rotation.set(0.16, 0, 0);
+  wearBikeHelmet(ped, pick([0x1a1a1e, 0xb03030, 0xffcf2a, 0x2a5a8a]));
+  bike.pillionPed = ped;
+  return ped;
+}
+
+export function spawnMotosaiStands(scene) {
+  if (!GAMEPLAY.motosaiStands) return;
+  const sois = (G.world && G.world.sois) || [];
+  G.world.motosaiStands = [];
+  const n = Math.min(4, sois.length);
+  for (let i = 0; i < n; i++) {
+    const s = sois[i];
+    const alongZ = s.axis === 'z';
+    const x = alongZ ? (s.x0 + s.x1) / 2 : s.x0 + 2.8;
+    const z = alongZ ? s.z0 + 2.8 : (s.z0 + s.z1) / 2;
+    const heading = alongZ ? 0 : PI / 2;
+    const bike = makeVehicle('bike', scene);
+    bike.pos.set(x, 0, z);
+    bike.heading = heading;
+    bike.mesh.position.copy(bike.pos);
+    bike.mesh.rotation.y = heading;
+    bike.driver = null;
+    bike.vel = 0;
+    bike.motosaiStand = true;
+    bike._standHome = { x, z, heading };
+    const rider = spawnPed(scene, new THREE.Vector3(x + (alongZ ? 1.15 : 0), 0, z + (alongZ ? 0 : 1.15)));
+    dressMotosaiVest(rider);
+    wearBikeHelmet(rider, 0xffcf2a);
+    rider.anchor = { slot: rider.mesh.position.clone(), facing: heading + PI };
+    rider.motosaiRider = true;
+    rider.speed = 0;
+    const waiter = spawnPed(scene, new THREE.Vector3(x + (alongZ ? 1.7 : 0.4), 0, z + (alongZ ? 0.4 : 1.7)));
+    waiter.anchor = { slot: waiter.mesh.position.clone(), facing: heading + PI };
+    waiter.motosaiWait = true;
+    waiter.speed = 0;
+    bike.standRider = rider;
+    G.world.motosaiStands.push({ bike, rider, waiter, soi: s, x, z });
+  }
+  if (GAMEPLAY.btsMotosai && G.world.bts) {
+    const x = G.world.bts.x + 7.6, z = -22, heading = 0;
+    const bike = makeVehicle('bike', scene);
+    bike.pos.set(x, 0, z);
+    bike.heading = heading;
+    bike.mesh.position.copy(bike.pos);
+    bike.mesh.rotation.y = heading;
+    bike.driver = null;
+    bike.vel = 0;
+    bike.motosaiStand = true;
+    bike._standHome = { x, z, heading };
+    const rider = spawnPed(scene, new THREE.Vector3(x + 1.15, 0, z));
+    dressMotosaiVest(rider);
+    wearBikeHelmet(rider, 0xffcf2a);
+    rider.anchor = { slot: rider.mesh.position.clone(), facing: heading + PI };
+    rider.motosaiRider = true;
+    rider.speed = 0;
+    const waiter = spawnPed(scene, new THREE.Vector3(x + 1.7, 0, z + 0.4));
+    waiter.anchor = { slot: waiter.mesh.position.clone(), facing: heading + PI };
+    waiter.motosaiWait = true;
+    waiter.speed = 0;
+    bike.standRider = rider;
+    G.world.motosaiStands.push({ bike, rider, waiter, soi: null, x, z, bts: true });
+  }
+}
+
+export function makeIceCartMesh() {
+  const g = new THREE.Group();
+  g.name = 'ice-cart';
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 1.15), new THREE.MeshStandardMaterial({ color: 0xf0f4f8, roughness: 0.55 }));
+  box.position.y = 0.55; g.add(box);
+  const lid = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.08, 1.18), new THREE.MeshStandardMaterial({ color: 0x2a7d8e, roughness: 0.5 }));
+  lid.position.y = 0.94; g.add(lid);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.9, 5), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+  pole.position.y = 1.35; g.add(pole);
+  const umb = new THREE.Mesh(new THREE.ConeGeometry(0.7, 0.28, 8), new THREE.MeshStandardMaterial({ color: 0xff6a9a, roughness: 0.7 }));
+  umb.position.y = 1.85; umb.rotation.x = PI; g.add(umb);
+  const tire = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+  for (const z of [-0.38, 0.38]) for (const x of [-0.28, 0.28]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 8), tire);
+    w.rotation.z = PI / 2; w.position.set(x, 0.12, z); g.add(w);
+  }
+  return g;
+}
+
+export function spawnLottery(scene) {
+  if (!GAMEPLAY.lottery) return;
+  const seven = G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0]));
+  if (!seven || !seven.pos) return;
+  const hz = seven.hz || 4;
+  const x = seven.pos.x + 2.4;
+  const z = seven.pos.z + hz + 1.6;
+  const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'vendor');
+  ped.lottery = true;
+  ped.anchor = { slot: ped.mesh.position.clone(), facing: PI };
+  ped.speed = 0;
+  ped.state = 'idle';
+  const board = new THREE.Group();
+  board.name = 'lottery-board';
+  const pole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.04, 0.05, 1.45, 6),
+    new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.6 })
+  );
+  pole.position.y = 0.72; board.add(pole);
+  const sheet = new THREE.Mesh(
+    new THREE.BoxGeometry(0.72, 0.95, 0.04),
+    new THREE.MeshStandardMaterial({ color: 0xf5e6a3, roughness: 0.7 })
+  );
+  sheet.position.set(0, 1.38, 0.05); board.add(sheet);
+  for (let r = 0; r < 4; r++) {
+    const strip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.56, 0.12, 0.02),
+      new THREE.MeshStandardMaterial({ color: pick([0xc03030, 0x2a7d3a, 0x2a4a8a, 0xd9a020]), roughness: 0.55 })
+    );
+    strip.position.set(0, 1.62 - r * 0.18, 0.08); board.add(strip);
+  }
+  board.position.set(x - 0.5, 0, z + 0.2);
+  scene.add(board);
+  G.lottery = { ped, board, pos: new THREE.Vector3(x, 0, z), readyAt: 0 };
+}
+
+export function makeCoconutCartMesh() {
+  const g = new THREE.Group();
+  g.name = 'coconut-cart';
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.55, 1.2), new THREE.MeshStandardMaterial({ color: 0x6a4a28, roughness: 0.8 }));
+  box.position.y = 0.5; g.add(box);
+  const green = new THREE.MeshStandardMaterial({ color: 0x3a8a3a, roughness: 0.7 });
+  for (let i = 0; i < 5; i++) {
+    const nut = new THREE.Mesh(new THREE.SphereGeometry(0.14, 7, 6), green);
+    nut.position.set((i % 3 - 1) * 0.22, 0.88, (i < 3 ? -0.2 : 0.22));
+    g.add(nut);
+  }
+  const machete = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.02, 0.42), new THREE.MeshStandardMaterial({ color: 0x888890, metalness: 0.5, roughness: 0.35 }));
+  machete.position.set(0.32, 0.82, 0); g.add(machete);
+  const tire = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+  for (const z of [-0.4, 0.4]) for (const x of [-0.32, 0.32]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 8), tire);
+    w.rotation.z = PI / 2; w.position.set(x, 0.12, z); g.add(w);
+  }
+  return g;
+}
+
+export function makeMooPingMesh() {
+  const g = new THREE.Group();
+  g.name = 'mooping-cart';
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.5, 1.35), new THREE.MeshStandardMaterial({ color: 0x5a3a22, roughness: 0.82 }));
+  box.position.y = 0.48; g.add(box);
+  const coalMat = new THREE.MeshStandardMaterial({ color: 0x1a1210, roughness: 0.7, emissive: 0xff5510, emissiveIntensity: 0.55 });
+  const coals = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.08, 0.9), coalMat);
+  coals.name = 'mooping-coals';
+  coals.position.y = 0.78; g.add(coals);
+  const grate = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.02, 0.92), new THREE.MeshStandardMaterial({ color: 0x3a3a40, metalness: 0.45, roughness: 0.4 }));
+  grate.position.y = 0.84; g.add(grate);
+  const stickMat = new THREE.MeshStandardMaterial({ color: 0xc8a070, roughness: 0.7 });
+  const meatMat = new THREE.MeshStandardMaterial({ color: 0xa03a22, roughness: 0.65 });
+  for (let i = 0; i < 6; i++) {
+    const sk = new THREE.Group();
+    const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.7, 4), stickMat);
+    stick.rotation.x = PI / 2;
+    sk.add(stick);
+    for (let k = 0; k < 3; k++) {
+      const meat = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.04, 0.08), meatMat);
+      meat.position.z = -0.18 + k * 0.14;
+      sk.add(meat);
+    }
+    sk.position.set((i % 3 - 1) * 0.18, 0.9, i < 3 ? -0.12 : 0.18);
+    g.add(sk);
+  }
+  const umb = new THREE.Mesh(new THREE.ConeGeometry(0.7, 0.28, 8), new THREE.MeshStandardMaterial({ color: 0xc03030, roughness: 0.7, side: THREE.DoubleSide }));
+  umb.position.y = 1.95; umb.rotation.x = PI; g.add(umb);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.1, 5), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+  pole.position.y = 1.4; g.add(pole);
+  const puff = new THREE.Mesh(
+    new THREE.SphereGeometry(0.22, 6, 5),
+    new THREE.MeshBasicMaterial({ color: 0x887766, transparent: true, opacity: 0.22, depthWrite: false })
+  );
+  puff.name = 'mooping-smoke';
+  puff.position.set(0, 1.15, 0);
+  g.add(puff);
+  const tire = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+  for (const z of [-0.42, 0.42]) for (const x of [-0.34, 0.34]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 8), tire);
+    w.rotation.z = PI / 2; w.position.set(x, 0.12, z); g.add(w);
+  }
+  g.userData.coalMat = coalMat;
+  return g;
+}
+
+export function spawnLaundry(scene) {
+  if (!GAMEPLAY.soiLaundry) return;
+  const sois = (G.world && G.world.sois) || [];
+  G.laundry = [];
+  const n = Math.min(3, sois.length);
+  const shirtColors = [0xf0f0f0, 0xd44b3b, 0x2a5aad, 0x1e9a5e, 0xffcf4a];
+  for (let i = 0; i < n; i++) {
+    const s = sois[i];
+    const alongZ = s.axis === 'z';
+    const g = new THREE.Group();
+    g.name = 'laundry-line';
+    const midX = (s.x0 + s.x1) * 0.5, midZ = (s.z0 + s.z1) * 0.5;
+    const t = 0.35 + i * 0.12;
+    const cx = alongZ ? midX : s.x0 + (s.x1 - s.x0) * t;
+    const cz = alongZ ? s.z0 + (s.z1 - s.z0) * t : midZ;
+    const span = alongZ ? (s.x1 - s.x0) + 2.4 : (s.z1 - s.z0) + 2.4;
+    const rope = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.015, 0.015, span, 4),
+      new THREE.MeshStandardMaterial({ color: 0xc8b090, roughness: 0.7 })
+    );
+    rope.position.y = 2.35;
+    if (alongZ) rope.rotation.z = PI / 2;
+    else rope.rotation.x = PI / 2;
+    g.add(rope);
+    const count = 5;
+    for (let k = 0; k < count; k++) {
+      const u = (k + 0.5) / count - 0.5;
+      const shirt = new THREE.Mesh(
+        new THREE.BoxGeometry(0.28, 0.38, 0.04),
+        new THREE.MeshStandardMaterial({ color: shirtColors[(i + k) % shirtColors.length], roughness: 0.85 })
+      );
+      shirt.position.set(
+        alongZ ? u * span * 0.7 : 0,
+        2.1,
+        alongZ ? 0 : u * span * 0.7
+      );
+      g.add(shirt);
+    }
+    g.position.set(cx, 0, cz);
+    scene.add(g);
+    G.laundry.push({ mesh: g, soi: s, x: cx, z: cz });
+  }
+}
+
+export function spawnSoiPa(scene) {
+  if (!GAMEPLAY.soiPa) return;
+  const sois = (G.world && G.world.sois) || [];
+  G.soiPa = [];
+  const n = Math.min(3, sois.length);
+  for (let i = 0; i < n; i++) {
+    const s = sois[sois.length - 1 - i];
+    const alongZ = s.axis === 'z';
+    const t = 0.28 + i * 0.18;
+    const x = alongZ ? (s.x0 + s.x1) * 0.5 + (alongZ ? 1.6 : 0) : s.x0 + (s.x1 - s.x0) * t;
+    const z = alongZ ? s.z0 + (s.z1 - s.z0) * t : (s.z0 + s.z1) * 0.5 + 1.6;
+    const g = new THREE.Group();
+    g.name = 'soi-pa';
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.07, 0.09, 4.4, 6),
+      new THREE.MeshStandardMaterial({ color: 0x8a8a82, roughness: 0.7, metalness: 0.2 })
+    );
+    pole.position.y = 2.2;
+    g.add(pole);
+    const horn = new THREE.Mesh(
+      new THREE.ConeGeometry(0.28, 0.55, 8),
+      new THREE.MeshStandardMaterial({ color: 0x3a3a40, roughness: 0.45, metalness: 0.35 })
+    );
+    horn.name = 'pa-horn';
+    horn.position.set(alongZ ? 0.22 : 0, 3.85, alongZ ? 0 : 0.22);
+    if (alongZ) horn.rotation.z = -PI / 2;
+    else horn.rotation.x = PI / 2;
+    g.add(horn);
+    const box = new THREE.Mesh(
+      new THREE.BoxGeometry(0.22, 0.28, 0.16),
+      new THREE.MeshStandardMaterial({ color: 0x2a2a28, roughness: 0.6 })
+    );
+    box.position.y = 3.5;
+    g.add(box);
+    g.position.set(x, 0, z);
+    scene.add(g);
+    G.soiPa.push({ mesh: g, soi: s, x, z });
+  }
+}
+
+function makePlasticChair() {
+  const g = new THREE.Group();
+  g.name = 'plastic-chair';
+  const mat = new THREE.MeshStandardMaterial({ color: 0xd8d0c0, roughness: 0.7 });
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.04, 0.42), mat);
+  seat.position.y = 0.42; g.add(seat);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.46, 0.04), mat);
+  back.position.set(0, 0.65, -0.2); g.add(back);
+  const steel = new THREE.MeshStandardMaterial({ color: 0x888890, roughness: 0.5, metalness: 0.3 });
+  for (const [sx, sz] of [[-0.16, -0.16], [0.16, -0.16], [-0.16, 0.16], [0.16, 0.16]]) {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.42, 5), steel);
+    leg.position.set(sx, 0.21, sz); g.add(leg);
+  }
+  return g;
+}
+
+export function spawnSoiChairs(scene) {
+  if (!GAMEPLAY.soiChairs) return;
+  const sois = (G.world && G.world.sois) || [];
+  if (sois.length < 3) return;
+  const s = sois[2];
+  const alongZ = s.axis === 'z';
+  const t = 0.72;
+  const midX = alongZ ? (s.x0 + s.x1) * 0.5 : s.x0 + (s.x1 - s.x0) * t;
+  const midZ = alongZ ? s.z0 + (s.z1 - s.z0) * t : (s.z0 + s.z1) * 0.5;
+  const ox = alongZ ? 1.7 : 0, oz = alongZ ? 0 : 1.7;
+  const facing = alongZ ? -PI / 2 : 0;
+  G.soiChairs = { soi: s, seats: [], crates: [], x: midX + ox, z: midZ + oz };
+  const crateMat = new THREE.MeshStandardMaterial({ color: 0xc45a1a, roughness: 0.75 });
+  for (let i = 0; i < 2; i++) {
+    const chair = makePlasticChair();
+    const x = midX + ox + (alongZ ? 0 : (i - 0.5) * 0.85);
+    const z = midZ + oz + (alongZ ? (i - 0.5) * 0.85 : 0);
+    chair.position.set(x, 0, z);
+    chair.rotation.y = facing;
+    scene.add(chair);
+    G.soiChairs.seats.push({ mesh: chair, x, z, facing });
+  }
+  for (let i = 0; i < 2; i++) {
+    const crate = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.28, 0.38), crateMat);
+    crate.name = 'beer-crate';
+    const x = midX + ox + (alongZ ? 0.55 : (i - 0.5) * 0.5);
+    const z = midZ + oz + (alongZ ? (i - 0.5) * 0.5 : 0.55);
+    crate.position.set(x, 0.14, z);
+    scene.add(crate);
+    G.soiChairs.crates.push(crate);
+  }
+}
+
+export function spawnSoiMechanic(scene) {
+  if (!GAMEPLAY.soiMechanic) return;
+  const sois = (G.world && G.world.sois) || [];
+  if (sois.length < 4) return;
+  const s = sois[3];
+  const alongZ = s.axis === 'z';
+  const t = 0.22;
+  const x = alongZ ? (s.x0 + s.x1) * 0.5 + 1.8 : s.x0 + (s.x1 - s.x0) * t;
+  const z = alongZ ? s.z0 + (s.z1 - s.z0) * t : (s.z0 + s.z1) * 0.5 + 1.8;
+  const heading = alongZ ? PI / 2 : 0;
+  const stand = new THREE.Group();
+  stand.name = 'paddock-stand';
+  const steel = new THREE.MeshStandardMaterial({ color: 0x4a4a50, roughness: 0.45, metalness: 0.4 });
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.55, 0.08), steel);
+  bar.position.y = 0.28; stand.add(bar);
+  const base = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.06, 0.28), steel);
+  base.position.y = 0.03; stand.add(base);
+  stand.position.set(x, 0, z);
+  scene.add(stand);
+  const bike = makeVehicle('bike', scene);
+  bike.pos.set(x, 0, z);
+  bike.heading = heading;
+  bike.mesh.position.set(x, 0.28, z);
+  bike.mesh.rotation.y = heading;
+  bike.driver = null;
+  bike.vel = 0;
+  bike.soiMechanic = true;
+  bike._standHome = { x, y: 0.28, z, heading };
+  const ped = spawnPed(scene, new THREE.Vector3(x + (alongZ ? 0 : 1.1), 0, z + (alongZ ? 1.1 : 0)), 'laborer');
+  ped.soiMechanic = true;
+  ped.anchor = { slot: ped.mesh.position.clone(), facing: heading + PI };
+  ped.speed = 0;
+  ped.state = 'idle';
+  ped.heading = heading + PI;
+  ped.mesh.rotation.y = ped.heading;
+  const wrench = new THREE.Mesh(
+    new THREE.BoxGeometry(0.04, 0.04, 0.28),
+    new THREE.MeshStandardMaterial({ color: 0x888890, metalness: 0.5, roughness: 0.35 })
+  );
+  wrench.name = 'wrench';
+  const pp = ped.mesh.userData.parts;
+  if (pp && pp.foreR) { wrench.position.set(0.02, -0.22, 0.08); pp.foreR.add(wrench); }
+  else { wrench.position.set(0.22, 1.05, 0.12); ped.mesh.add(wrench); }
+  G.soiMechanic = { ped, bike, stand, soi: s, x, z };
+}
+
+function makeCheckpointCone() {
+  const g = new THREE.Group();
+  g.name = 'checkpoint-cone';
+  const body = new THREE.Mesh(
+    new THREE.ConeGeometry(0.18, 0.56, 7),
+    new THREE.MeshStandardMaterial({ color: 0xff6a1a, roughness: 0.55, emissive: 0xff3a00, emissiveIntensity: 0.14 })
+  );
+  body.position.y = 0.28;
+  g.add(body);
+  const stripe = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.11, 0.14, 0.055, 7),
+    new THREE.MeshStandardMaterial({ color: 0xf4f4f4, roughness: 0.45 })
+  );
+  stripe.position.y = 0.2;
+  g.add(stripe);
+  return g;
+}
+
+function dressCheckpointCop(ped, slot) {
+  const pp = ped.mesh.userData.parts;
+  recolorTorso(pp, 0x8a7f4a, 0.7);
+  const pants = new THREE.MeshStandardMaterial({ color: 0x4a4030, roughness: 0.8 });
+  for (const part of (pp.pantsParts || [pp.legL, pp.legR])) if (part) part.material = pants;
+  const vest = new THREE.Mesh(
+    new THREE.BoxGeometry(0.42, 0.38, 0.28),
+    new THREE.MeshStandardMaterial({ color: 0xc8e04a, roughness: 0.6, emissive: 0x88aa20, emissiveIntensity: 0.16 })
+  );
+  vest.name = 'checkpoint-vest';
+  vest.position.set(0, 1.18, 0.04);
+  ped.mesh.add(vest);
+  if (pp.head) {
+    const cap = new THREE.Group();
+    cap.name = 'cop-cap';
+    const crown = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.1, 0.12, 0.08, 8),
+      new THREE.MeshStandardMaterial({ color: 0x3a3424, roughness: 0.7 })
+    );
+    crown.position.y = 0.14;
+    cap.add(crown);
+    const brim = new THREE.Mesh(
+      new THREE.BoxGeometry(0.22, 0.02, 0.28),
+      new THREE.MeshStandardMaterial({ color: 0x2a261c, roughness: 0.65 })
+    );
+    brim.position.set(0, 0.1, 0.04);
+    cap.add(brim);
+    pp.head.add(cap);
+  }
+  const torch = new THREE.Group();
+  torch.name = 'flashlight';
+  const handle = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.022, 0.022, 0.18, 6),
+    new THREE.MeshStandardMaterial({ color: 0x1a1a1e, roughness: 0.45, metalness: 0.35 })
+  );
+  handle.rotation.x = PI / 2;
+  torch.add(handle);
+  const head = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.038, 0.03, 0.07, 6),
+    new THREE.MeshStandardMaterial({ color: 0x2a2a30, roughness: 0.4, metalness: 0.4 })
+  );
+  head.rotation.x = PI / 2;
+  head.position.z = 0.12;
+  torch.add(head);
+  const lens = new THREE.Mesh(
+    new THREE.CircleGeometry(0.032, 8),
+    new THREE.MeshStandardMaterial({ color: 0xfff2c0, emissive: 0xffe080, emissiveIntensity: 1.4, roughness: 0.2 })
+  );
+  lens.position.z = 0.16;
+  torch.add(lens);
+  const beam = new THREE.Mesh(
+    new THREE.ConeGeometry(0.42, 2.1, 8, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xffe6a0, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide })
+  );
+  beam.name = 'flashlight-beam';
+  beam.rotation.x = PI / 2;
+  beam.position.z = 1.22;
+  torch.add(beam);
+  const light = new THREE.PointLight(0xffe0a0, 0, 16, 2);
+  light.position.z = 0.2;
+  torch.add(light);
+  if (pp.foreR) {
+    torch.position.set(0.02, -0.22, 0.1);
+    torch.rotation.set(-0.4, 0, 0.15);
+    pp.foreR.add(torch);
+  } else {
+    torch.position.set(0.22, 1.1, 0.18);
+    ped.mesh.add(torch);
+  }
+  ped.checkpoint = true;
+  ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
+  ped.speed = 0;
+  ped.state = 'idle';
+  ped.heading = slot.facing;
+  ped.mesh.rotation.y = slot.facing;
+  ped.mesh.position.set(slot.x, 0, slot.z);
+  return { torch, light, beam };
+}
+
+export function spawnCheckpoint(scene) {
+  if (!GAMEPLAY.nightCheckpoint) return;
+  const x = 50, z = 100;
+  const g = new THREE.Group();
+  g.name = 'checkpoint';
+  const cones = [];
+  for (let i = 0; i < 5; i++) {
+    const cone = makeCheckpointCone();
+    cone.position.set(x - 2.5, 0, z - 8 + i * 4);
+    g.add(cone);
+    cones.push(cone);
+  }
+  const bar = new THREE.Mesh(
+    new THREE.BoxGeometry(1.6, 0.12, 0.08),
+    new THREE.MeshStandardMaterial({ color: 0xc03030, roughness: 0.5 })
+  );
+  bar.position.set(x - 2.5, 0.95, z + 10);
+  g.add(bar);
+  const post = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.03, 0.03, 0.95, 5),
+    new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.6 })
+  );
+  post.position.set(x - 2.5, 0.48, z + 10);
+  g.add(post);
+  scene.add(g);
+  const slot = { x: x + ROAD_WIDTH / 2 + 1.35, z, facing: -PI / 2 };
+  const cop = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), 'office');
+  const kit = dressCheckpointCop(cop, slot);
+  cop.mesh.visible = false;
+  if (kit.beam) kit.beam.visible = false;
+  if (G.nightLights) G.nightLights.push({ light: kit.light, base: 1.6 });
+  G.checkpoint = {
+    x, z, mesh: g, cones, cop, light: kit.light, beam: kit.beam,
+    active: false, flagged: false,
+  };
+}
+
+export function spawnSevenBikes(scene) {
+  if (!GAMEPLAY.sevenBikes) return;
+  const seven = G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0]));
+  if (!seven || !seven.pos) return;
+  const hx = seven.hx || 5;
+  const px = seven.pos.x - hx - 1.55;
+  const heading = PI / 2;
+  G.sevenBikes = [];
+  const n = 5;
+  for (let i = 0; i < n; i++) {
+    const z = seven.pos.z - 2.2 + i * 1.15;
+    const x = px + (i % 2) * 0.18;
+    const bike = makeVehicle('bike', scene);
+    bike.pos.set(x, 0, z);
+    bike.heading = heading;
+    bike.mesh.position.copy(bike.pos);
+    bike.mesh.rotation.y = heading;
+    bike.driver = null;
+    bike.vel = 0;
+    bike.sevenParked = true;
+    bike._standHome = { x, z, heading };
+    G.sevenBikes.push(bike);
+  }
+}
+
+export function spawnSevenGuard(scene) {
+  if (!GAMEPLAY.sevenGuard) return;
+  const seven = G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0]));
+  if (!seven || !seven.pos) return;
+  const hz = seven.hz || 4;
+  const x = seven.pos.x - 3.1, z = seven.pos.z + hz + 1.15;
+  const chair = new THREE.Group();
+  chair.name = 'seven-chair';
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.04, 0.42), new THREE.MeshStandardMaterial({ color: 0xd8d0c0, roughness: 0.7 }));
+  seat.position.y = 0.42; chair.add(seat);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.46, 0.04), seat.material);
+  back.position.set(0, 0.65, -0.2); chair.add(back);
+  for (const [sx, sz] of [[-0.16, -0.16], [0.16, -0.16], [-0.16, 0.16], [0.16, 0.16]]) {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.42, 5), new THREE.MeshStandardMaterial({ color: 0x888890, roughness: 0.5, metalness: 0.3 }));
+    leg.position.set(sx, 0.21, sz); chair.add(leg);
+  }
+  chair.position.set(x, 0, z);
+  scene.add(chair);
+  const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'laborer');
+  recolorTorso(ped.mesh.userData.parts, 0x1a3a6a, 0.7);
+  ped.sevenGuard = true;
+  ped.anchor = { slot: new THREE.Vector3(x, 0.42, z), facing: PI };
+  ped.speed = 0;
+  ped.state = 'idle';
+  ped.heading = PI;
+  ped.mesh.position.set(x, 0.42, z);
+  ped.mesh.rotation.y = PI;
+  const torch = new THREE.Group();
+  torch.name = 'flashlight';
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.16, 6), new THREE.MeshStandardMaterial({ color: 0x1a1a1e, roughness: 0.45 }));
+  handle.rotation.x = PI / 2; torch.add(handle);
+  const beam = new THREE.Mesh(
+    new THREE.ConeGeometry(0.35, 1.6, 8, 1, true),
+    new THREE.MeshBasicMaterial({ color: 0xffe6a0, transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide })
+  );
+  beam.name = 'flashlight-beam';
+  beam.rotation.x = PI / 2; beam.position.z = 0.95; torch.add(beam);
+  const light = new THREE.PointLight(0xffe0a0, 0, 10, 2);
+  light.position.z = 0.2; torch.add(light);
+  const pp = ped.mesh.userData.parts;
+  if (pp && pp.foreR) { torch.position.set(0.02, -0.2, 0.08); pp.foreR.add(torch); }
+  else { torch.position.set(0.2, 0.9, 0.15); ped.mesh.add(torch); }
+  beam.visible = false;
+  G.sevenGuard = { ped, chair, light, beam, x, z };
+}
+
+export function spawnBtsSitters(scene) {
+  if (!GAMEPLAY.btsSitters) return;
+  const bts = G.world && G.world.bts;
+  const sx = bts ? bts.x : -50;
+  const PY = (bts && bts.platformY) || 13.9;
+  const yAt = (z) => ((z + 25) / 20) * PY;
+  const slots = [
+    { x: sx - 3.2, z: -24.4, y: 0.42, facing: PI / 2, kind: 'office' },
+    { x: sx - 2.15, z: -17.2, y: yAt(-17.2) + 0.42, facing: PI / 2, kind: 'tourist' },
+    { x: sx + 2.15, z: -11.4, y: yAt(-11.4) + 0.42, facing: -PI / 2, kind: 'office' },
+  ];
+  G.btsSitters = [];
+  for (const slot of slots) {
+    const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
+    ped.btsSit = true;
+    ped.anchor = { slot: new THREE.Vector3(slot.x, slot.y, slot.z), facing: slot.facing };
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = slot.facing;
+    ped.mesh.position.set(slot.x, slot.y, slot.z);
+    ped.mesh.rotation.y = slot.facing;
+    G.btsSitters.push(ped);
+  }
+}
+
+function makeTurtleMesh() {
+  const g = new THREE.Group();
+  g.name = 'wat-turtle';
+  const shell = new THREE.Mesh(
+    new THREE.SphereGeometry(0.16, 8, 6, 0, TAU, 0, PI / 2),
+    new THREE.MeshStandardMaterial({ color: pick([0x4a5a30, 0x3a4a28, 0x5a4a28]), roughness: 0.9 })
+  );
+  shell.position.y = 0.04;
+  shell.scale.set(1.15, 0.55, 1.35);
+  g.add(shell);
+  const head = new THREE.Mesh(
+    new THREE.BoxGeometry(0.07, 0.05, 0.12),
+    new THREE.MeshStandardMaterial({ color: 0x6a5a38, roughness: 0.85 })
+  );
+  head.position.set(0, 0.06, 0.2);
+  g.add(head);
+  return g;
+}
+
+export function spawnWatTurtles(scene) {
+  if (!GAMEPLAY.watTurtles) return;
+  const temple = G.world && G.world.poi && G.world.poi.temple;
+  if (!temple) return;
+  const cx = temple.x + 6.2, cz = temple.z - 7.4;
+  const pond = new THREE.Group();
+  pond.name = 'wat-pond';
+  const water = new THREE.Mesh(
+    new THREE.CircleGeometry(2.15, 14),
+    new THREE.MeshStandardMaterial({ color: 0x3a6a58, roughness: 0.25, metalness: 0.15, transparent: true, opacity: 0.88 })
+  );
+  water.rotation.x = -PI / 2;
+  water.position.y = 0.08;
+  pond.add(water);
+  const rim = new THREE.Mesh(
+    new THREE.TorusGeometry(2.15, 0.12, 6, 16),
+    new THREE.MeshStandardMaterial({ color: 0xc8b090, roughness: 0.85 })
+  );
+  rim.rotation.x = PI / 2;
+  rim.position.y = 0.12;
+  pond.add(rim);
+  pond.position.set(cx, 0, cz);
+  scene.add(pond);
+  G.watTurtles = [];
+  for (let i = 0; i < 4; i++) {
+    const mesh = makeTurtleMesh();
+    const ang = (i / 4) * TAU;
+    const r = 0.7 + i * 0.22;
+    mesh.position.set(cx + Math.sin(ang) * r, 0.12, cz + Math.cos(ang) * r);
+    scene.add(mesh);
+    G.watTurtles.push({ mesh, cx, cz, ang, r, spin: 0.35 + i * 0.08 });
+  }
+  G.watPond = pond;
+}
+
+export function spawnCoconutCarts(scene) {
+  if (!GAMEPLAY.coconutCart) return;
+  const sois = (G.world && G.world.sois) || [];
+  G.coconutCarts = [];
+  if (!sois.length) return;
+  let s = sois[0], best = 0;
+  for (const cand of sois) {
+    const len = cand.axis === 'z' ? (cand.z1 - cand.z0) : (cand.x1 - cand.x0);
+    if (len > best) { best = len; s = cand; }
+  }
+  const alongZ = s.axis === 'z';
+  const t0 = 0.4;
+  const x = alongZ ? (s.x0 + s.x1) * 0.5 : s.x0 + (s.x1 - s.x0) * t0;
+  const z = alongZ ? s.z0 + (s.z1 - s.z0) * t0 : (s.z0 + s.z1) * 0.5;
+  const mesh = makeCoconutCartMesh();
+  mesh.position.set(x, 0, z);
+  scene.add(mesh);
+  const vendor = spawnPed(scene, new THREE.Vector3(x, 0, z), 'vendor');
+  vendor.coconutCart = true;
+  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: alongZ ? 0 : PI / 2 };
+  vendor.speed = 0;
+  G.coconutCarts.push({ mesh, vendor, soi: s, alongZ, t: t0, dir: 1 });
+}
+
+export function spawnMooPing(scene) {
+  if (!GAMEPLAY.mooPing) return;
+  const sois = (G.world && G.world.sois) || [];
+  G.mooPing = [];
+  if (!sois.length) return;
+  const ranked = sois.slice().sort((a, b) => {
+    const la = a.axis === 'z' ? (a.z1 - a.z0) : (a.x1 - a.x0);
+    const lb = b.axis === 'z' ? (b.z1 - b.z0) : (b.x1 - b.x0);
+    return lb - la;
+  });
+  const s = ranked[1] || ranked[0];
+  const alongZ = s.axis === 'z';
+  const t0 = 0.55;
+  const x = alongZ ? (s.x0 + s.x1) * 0.5 : s.x0 + (s.x1 - s.x0) * t0;
+  const z = alongZ ? s.z0 + (s.z1 - s.z0) * t0 : (s.z0 + s.z1) * 0.5;
+  const mesh = makeMooPingMesh();
+  mesh.position.set(x, 0, z);
+  scene.add(mesh);
+  const vendor = spawnPed(scene, new THREE.Vector3(x, 0, z), 'vendor');
+  vendor.mooPing = true;
+  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: alongZ ? 0 : PI / 2 };
+  vendor.speed = 0;
+  G.mooPing.push({ mesh, vendor, soi: s, alongZ, t: t0, dir: 1, coalMat: mesh.userData.coalMat });
+}
+
+export function spawnIceCarts(scene) {
+  if (!GAMEPLAY.iceCart) return;
+  const sois = (G.world && G.world.sois) || [];
+  G.iceCarts = [];
+  const n = Math.min(2, sois.length);
+  for (let i = 0; i < n; i++) {
+    const s = sois[i];
+    const alongZ = s.axis === 'z';
+    const t0 = 0.28 + i * 0.22;
+    const x = alongZ ? (s.x0 + s.x1) * 0.5 : s.x0 + (s.x1 - s.x0) * t0;
+    const z = alongZ ? s.z0 + (s.z1 - s.z0) * t0 : (s.z0 + s.z1) * 0.5;
+    const mesh = makeIceCartMesh();
+    mesh.position.set(x, 0, z);
+    scene.add(mesh);
+    const vendor = spawnPed(scene, new THREE.Vector3(x, 0, z), 'vendor');
+    vendor.iceCart = true;
+    vendor.anchor = { slot: vendor.mesh.position.clone(), facing: alongZ ? 0 : PI / 2 };
+    vendor.speed = 0;
+    G.iceCarts.push({ mesh, vendor, soi: s, alongZ, t: t0, dir: 1, ding: rand(2, 6) });
+  }
+}
+
+export function addHireSign(v, color = 0xffcf4a) {
+  if (!v || !v.mesh || v.hireSign) return;
+  const sign = new THREE.Mesh(
+    new THREE.BoxGeometry(0.58, 0.22, 0.14),
+    new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.4, roughness: 0.45 })
+  );
+  sign.name = 'hire-sign';
+  const y = (v.spec && v.spec.kind === 'tuktuk') ? 1.72 : 2.05;
+  sign.position.set(0, y, 0.15);
+  v.mesh.add(sign);
+  v.hireSign = sign;
+}
+
+export function spawnBtsSongthaew(scene) {
+  if (!GAMEPLAY.btsSongthaew) return;
+  const bts = G.world && G.world.bts;
+  if (!bts) return;
+  const x = bts.x + 11.5, z = -22, heading = PI / 2;
+  const v = makeVehicle('songthaew', scene);
+  v.pos.set(x, 0, z);
+  v.heading = heading;
+  v.mesh.position.copy(v.pos);
+  v.mesh.rotation.y = heading;
+  v.driver = null;
+  v.vel = 0;
+  v.btsSongthaew = true;
+  v._standHome = { x, z, heading };
+  addHireSign(v, 0xffcf4a);
+  const waiter = spawnPed(scene, new THREE.Vector3(x + 2.4, 0, z + 0.4), 'laborer');
+  waiter.anchor = { slot: waiter.mesh.position.clone(), facing: heading + PI };
+  waiter.btsSongthaew = true;
+  waiter.speed = 0;
+  waiter.state = 'idle';
+  G.world.btsSongthaew = { vehicle: v, waiter, x, z };
+}
+
+export function spawnBtsTuktuk(scene) {
+  if (!GAMEPLAY.btsTuktuk) return;
+  const bts = G.world && G.world.bts;
+  if (!bts) return;
+  const x = bts.x + 11.5, z = -14.2, heading = PI / 2;
+  const v = makeVehicle('tuktuk', scene);
+  v.pos.set(x, 0, z);
+  v.heading = heading;
+  v.mesh.position.copy(v.pos);
+  v.mesh.rotation.y = heading;
+  v.driver = null;
+  v.vel = 0;
+  v.btsTuktuk = true;
+  v._standHome = { x, z, heading };
+  addHireSign(v, 0x21f0ff);
+  const waiter = spawnPed(scene, new THREE.Vector3(x + 1.8, 0, z + 0.5), 'vendor');
+  waiter.anchor = { slot: waiter.mesh.position.clone(), facing: heading + PI };
+  waiter.btsTuktuk = true;
+  waiter.speed = 0;
+  waiter.state = 'idle';
+  G.world.btsTuktuk = { vehicle: v, waiter, x, z };
 }
 
 // A handful of parked, enterable cars at the curb so there's always a ride (and a

@@ -59,8 +59,8 @@ of sight, wanted-heat accumulation, fall damage, and frame-rate independence.
 | B | Bribe a nearby cop (฿1,000) at 1–2★ |
 | H | Honk (in vehicle) |
 | M | Car radio — cycle stations (Luk Thung / Bangkok Bars / Talk Radio / off) |
-| J | Start a taxi fare (in a songthaew) |
-| Y / J | Start Moto Drop (on a motorbike or tuk-tuk) |
+| J | Start a taxi fare (in a songthaew) · start a motosai (on a bike) |
+| Y / J | Start Moto Drop (Y on a bike, Y/J on a tuk-tuk) |
 | T | Phone — pauses pointer lock and shows menu |
 | +/- / 0 | Zoom / reset the full map while TAB map is open |
 | P | Photo mode — free-fly camera + hidden HUD (WASD/Space/Ctrl to fly, Shift faster) |
@@ -189,7 +189,7 @@ The original numbered sections (now spread across those modules):
 | 16 | Particles / FX | Smoke emitter (vehicles below 30% HP), explosion (light flash + smoke + camera shake + thunder SFX), tire-skid decals (`spawnSkid`, laid while drifting and faded over 5 s), impact dust puffs (`spawnDust`), and a global **hit-stop** (`triggerHitStop` slows the loop ~0.05 s on a solid melee/gun connect). |
 | 17 | Interaction | Vehicle proximity check + E to enter. |
 | 18 | Camera update | Follow rig with smoothed distance, shake decay, in-vehicle chase view auto-aligns to vehicle heading, **occlusion** (ray-casts target→camera against building AABBs and pulls in so it never clips into a wall), speed-squared FOV kick, acceleration follow stretch/compression, and sprint-only on-foot bob. |
-| 19 | Day/Night + Weather + Festivals | 8-min day cycle drives sun position (tilted so noon actually sunlights the facades), sky/fog colours, neon and street-lamp intensity; the sun + shadow camera track the player. A whole-day counter (`G.time.day`) ticks at midnight and `scheduledFestival()` drives **Loy Krathong** nights, filling the Chao Phraya with drifting candle-lit floats + rising sky lanterns and a riverside crowd — press **E** at the bank to float your own krathong (+฿50). Monsoon weather (clear ⇄ drizzle/downpour) with lightning, wet material response, puddles, lower road grip, and dawn temple bell at 5–6 AM. |
+| 19 | Day/Night + Weather + Festivals | 8-min day cycle drives sun position (tilted so noon actually sunlights the facades), sky/fog colours, neon and street-lamp intensity; the sun + shadow camera track the player. A whole-day counter (`G.time.day`) ticks at midnight and `scheduledFestival()` drives **Loy Krathong** nights, filling the Chao Phraya with drifting candle-lit floats + rising sky lanterns and a riverside crowd — press **E** at the bank to float your own krathong (+฿50). Weather is clear ⇄ monsoon rain ⇄ burning-season haze (noon goes ochre, headlights come on, far streets die in the fog), with lightning, wet material response, puddles, lower road grip, and dawn temple bell at 5–6 AM. |
 | 20 | Main loop | Single `loop()` calls every system in order. |
 
 The mutable global is `window.GAME`. Useful while developing:
