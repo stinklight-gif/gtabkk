@@ -1456,6 +1456,51 @@ export function spawnLottery(scene) {
   G.lottery = { ped, board, pos: new THREE.Vector3(x, 0, z), readyAt: 0 };
 }
 
+export function makeCoconutCartMesh() {
+  const g = new THREE.Group();
+  g.name = 'coconut-cart';
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.55, 1.2), new THREE.MeshStandardMaterial({ color: 0x6a4a28, roughness: 0.8 }));
+  box.position.y = 0.5; g.add(box);
+  const green = new THREE.MeshStandardMaterial({ color: 0x3a8a3a, roughness: 0.7 });
+  for (let i = 0; i < 5; i++) {
+    const nut = new THREE.Mesh(new THREE.SphereGeometry(0.14, 7, 6), green);
+    nut.position.set((i % 3 - 1) * 0.22, 0.88, (i < 3 ? -0.2 : 0.22));
+    g.add(nut);
+  }
+  const machete = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.02, 0.42), new THREE.MeshStandardMaterial({ color: 0x888890, metalness: 0.5, roughness: 0.35 }));
+  machete.position.set(0.32, 0.82, 0); g.add(machete);
+  const tire = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+  for (const z of [-0.4, 0.4]) for (const x of [-0.32, 0.32]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 8), tire);
+    w.rotation.z = PI / 2; w.position.set(x, 0.12, z); g.add(w);
+  }
+  return g;
+}
+
+export function spawnCoconutCarts(scene) {
+  if (!GAMEPLAY.coconutCart) return;
+  const sois = (G.world && G.world.sois) || [];
+  G.coconutCarts = [];
+  if (!sois.length) return;
+  let s = sois[0], best = 0;
+  for (const cand of sois) {
+    const len = cand.axis === 'z' ? (cand.z1 - cand.z0) : (cand.x1 - cand.x0);
+    if (len > best) { best = len; s = cand; }
+  }
+  const alongZ = s.axis === 'z';
+  const t0 = 0.4;
+  const x = alongZ ? (s.x0 + s.x1) * 0.5 : s.x0 + (s.x1 - s.x0) * t0;
+  const z = alongZ ? s.z0 + (s.z1 - s.z0) * t0 : (s.z0 + s.z1) * 0.5;
+  const mesh = makeCoconutCartMesh();
+  mesh.position.set(x, 0, z);
+  scene.add(mesh);
+  const vendor = spawnPed(scene, new THREE.Vector3(x, 0, z), 'vendor');
+  vendor.coconutCart = true;
+  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: alongZ ? 0 : PI / 2 };
+  vendor.speed = 0;
+  G.coconutCarts.push({ mesh, vendor, soi: s, alongZ, t: t0, dir: 1 });
+}
+
 export function spawnIceCarts(scene) {
   if (!GAMEPLAY.iceCart) return;
   const sois = (G.world && G.world.sois) || [];
