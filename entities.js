@@ -1789,6 +1789,60 @@ export function spawnBtsSitters(scene) {
   }
 }
 
+function makeTurtleMesh() {
+  const g = new THREE.Group();
+  g.name = 'wat-turtle';
+  const shell = new THREE.Mesh(
+    new THREE.SphereGeometry(0.16, 8, 6, 0, TAU, 0, PI / 2),
+    new THREE.MeshStandardMaterial({ color: pick([0x4a5a30, 0x3a4a28, 0x5a4a28]), roughness: 0.9 })
+  );
+  shell.position.y = 0.04;
+  shell.scale.set(1.15, 0.55, 1.35);
+  g.add(shell);
+  const head = new THREE.Mesh(
+    new THREE.BoxGeometry(0.07, 0.05, 0.12),
+    new THREE.MeshStandardMaterial({ color: 0x6a5a38, roughness: 0.85 })
+  );
+  head.position.set(0, 0.06, 0.2);
+  g.add(head);
+  return g;
+}
+
+export function spawnWatTurtles(scene) {
+  if (!GAMEPLAY.watTurtles) return;
+  const temple = G.world && G.world.poi && G.world.poi.temple;
+  if (!temple) return;
+  const cx = temple.x + 6.2, cz = temple.z - 7.4;
+  const pond = new THREE.Group();
+  pond.name = 'wat-pond';
+  const water = new THREE.Mesh(
+    new THREE.CircleGeometry(2.15, 14),
+    new THREE.MeshStandardMaterial({ color: 0x3a6a58, roughness: 0.25, metalness: 0.15, transparent: true, opacity: 0.88 })
+  );
+  water.rotation.x = -PI / 2;
+  water.position.y = 0.08;
+  pond.add(water);
+  const rim = new THREE.Mesh(
+    new THREE.TorusGeometry(2.15, 0.12, 6, 16),
+    new THREE.MeshStandardMaterial({ color: 0xc8b090, roughness: 0.85 })
+  );
+  rim.rotation.x = PI / 2;
+  rim.position.y = 0.12;
+  pond.add(rim);
+  pond.position.set(cx, 0, cz);
+  scene.add(pond);
+  G.watTurtles = [];
+  for (let i = 0; i < 4; i++) {
+    const mesh = makeTurtleMesh();
+    const ang = (i / 4) * TAU;
+    const r = 0.7 + i * 0.22;
+    mesh.position.set(cx + Math.sin(ang) * r, 0.12, cz + Math.cos(ang) * r);
+    scene.add(mesh);
+    G.watTurtles.push({ mesh, cx, cz, ang, r, spin: 0.35 + i * 0.08 });
+  }
+  G.watPond = pond;
+}
+
 export function spawnCoconutCarts(scene) {
   if (!GAMEPLAY.coconutCart) return;
   const sois = (G.world && G.world.sois) || [];

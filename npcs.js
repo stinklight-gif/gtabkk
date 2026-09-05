@@ -1572,6 +1572,18 @@ export function updateMonitors(dt) {
   }
 }
 
+export function updateWatTurtles(dt) {
+  if (!GAMEPLAY.watTurtles || !G.watTurtles) return;
+  for (const t of G.watTurtles) {
+    if (!t.mesh) continue;
+    t.ang += t.spin * dt;
+    t.mesh.position.x = t.cx + Math.sin(t.ang) * t.r;
+    t.mesh.position.z = t.cz + Math.cos(t.ang) * t.r;
+    t.mesh.position.y = 0.12 + Math.sin(t.ang * 3) * 0.02;
+    t.mesh.rotation.y = t.ang + PI / 2;
+  }
+}
+
 export function updateHyacinth(dt) {
   if (!GAMEPLAY.hyacinth || !G.hyacinth) return;
   const t = (G.time && G.time.dayT ? G.time.dayT : 0) * TAU * 6;

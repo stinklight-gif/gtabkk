@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -1775,6 +1775,23 @@ async function main() {
     assert(grill.flag && grill.n >= 1 && grill.onSoi && grill.coals, `a moo ping cart works a soi (${grill.n})`);
     assert(grill.moved, 'moo ping cart moves along the soi');
     assert(grill.duskGlow && grill.paid && grill.healed, 'coals glow at dusk and E buys a skewer for ฿35');
+
+    console.log('\n[58] wat turtles');
+    const shell = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = G.watTurtles || [];
+      const n = list.filter(t => t && t.mesh && t.mesh.name === 'wat-turtle').length;
+      const temple = G.world && G.world.poi && G.world.poi.temple;
+      const near = list.filter(t => t && t.mesh && temple && Math.hypot(t.mesh.position.x - temple.x, t.mesh.position.z - temple.z) < 18).length;
+      const pond = G.watPond && G.watPond.name === 'wat-pond';
+      const t0 = list[0];
+      const start = t0 && t0.mesh ? { x: t0.mesh.position.x, z: t0.mesh.position.z } : null;
+      for (let i = 0; i < 20; i++) main.updateWatTurtles(0.2);
+      const moved = !!(t0 && start && Math.hypot(t0.mesh.position.x - start.x, t0.mesh.position.z - start.z) > 0.15);
+      return { flag: !!(G.gameplay && G.gameplay.watTurtles), n, near, pond, moved };
+    });
+    assert(shell.flag && shell.n >= 3 && shell.pond && shell.near >= 3, `turtles in the wat pond (${shell.n})`);
+    assert(shell.moved, 'turtles paddle around the pond');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

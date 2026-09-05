@@ -284,6 +284,7 @@ export const GAMEPLAY = {
   hyacinth: true,         // water hyacinth mats drift on the khlong
   btsSitters: true,       // people sit on the Asok BTS escalator with their phones
   mooPing: true,          // grilled-pork cart on a soi; E for a skewer
+  watTurtles: true,       // turtles paddle the pond at the wat
 };
 G.gameplay = GAMEPLAY;
 
