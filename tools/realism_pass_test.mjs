@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -2098,6 +2098,58 @@ async function main() {
     assert(book.soiRun != null && book.night != null, `Soi Run and 2 AM race have places (${book.soiRun}m, ${book.night}m)`);
     assert(book.taxi != null && book.drop != null && book.props != null, `taxi, moto drop and properties have places (${book.taxi}m)`);
     assert(book.cowboy != null, 'Soi Cowboy still lists a distance');
+
+    console.log('\n[68] longtail river chase');
+    const river = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      let boat = G.vehicles.find(v => v && v.spec && v.spec.kind === 'boat' && !v.dead && !v.isCop);
+      if (!boat) boat = main.makeVehicle('boat', G.scene);
+      boat.dead = false;
+      boat.pos.set(-224, 0.3, 20);
+      boat.heading = 0;
+      boat.vel = 8;
+      if (boat.mesh) { boat.mesh.position.copy(boat.pos); boat.mesh.rotation.y = 0; }
+      G.player.inVehicle = boat;
+      boat.driver = 'player';
+      G.player.group.position.set(-224, 0.5, 20);
+      G.wanted.stars = 2;
+      G.wanted.crime = 5;
+      G.policeOff = false;
+      G._btsRide = null;
+      for (let i = 0; i < 80; i++) main.updateWanted(0.25);
+      let cops = G.vehicles.filter(v => v && v.isCop && v.spec && v.spec.kind === 'boat' && !v.dead && v.driver === 'cop');
+      if (!cops.length && main.spawnCopBoat) {
+        const spawned = main.spawnCopBoat(G.scene, boat.pos);
+        spawned.pos.set(-224, 0.3, -30);
+        spawned.heading = 0;
+        spawned.vel = 10;
+        if (spawned.mesh) { spawned.mesh.position.copy(spawned.pos); spawned.mesh.rotation.y = 0; }
+        cops = [spawned];
+      }
+      const cop = cops[0];
+      let moved = 0, inRiver = false, lamps = false;
+      if (cop) {
+        cop.pos.set(-224, 0.3, -30);
+        cop.heading = 0;
+        cop.vel = 12;
+        if (cop.mesh) { cop.mesh.position.copy(cop.pos); cop.mesh.rotation.y = 0; }
+        const z0 = cop.pos.z;
+        for (let i = 0; i < 24; i++) main.updateCopBoat(cop, 0.12);
+        moved = cop.pos.z - z0;
+        inRiver = cop.pos.x >= -248 && cop.pos.x <= -210;
+        lamps = !!(cop.mesh && cop.mesh.userData && cop.mesh.userData.copLamps && cop.mesh.userData.copLamps.length >= 2);
+      }
+      G.player.inVehicle = null;
+      boat.driver = boat.npc ? 'boatman' : null;
+      G.wanted.stars = 0;
+      G.wanted.crime = 0;
+      return {
+        flag: !!(G.gameplay && G.gameplay.longtailChase),
+        n: cops.length, moved, inRiver, lamps,
+      };
+    });
+    assert(river.flag && river.n >= 1 && river.lamps, `a river cop longtail joins the chase (${river.n})`);
+    assert(river.inRiver && river.moved > 2, `the cop boat stays in the channel and closes (${river.moved.toFixed(1)}m)`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

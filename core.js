@@ -294,6 +294,7 @@ export const GAMEPLAY = {
   dawnAlms: true,         // 5–7h tak bat: monks walk a soi; E offers ฿20 and cools heat
   soiCowboy: true,        // neon bar strip at the Soi Cowboy kiosk; touts after 20:00
   phonePlaces: true,      // phone directory rows that were "somewhere" now point at a place
+  longtailChase: true,    // steal a longtail with stars and river cops chase in the channel
 };
 G.gameplay = GAMEPLAY;
 
