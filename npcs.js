@@ -197,14 +197,14 @@ export function resyncCrowd() {
   // pull stray wanderers onto nearby sidewalks so the count near the camera
   // reflects the hour immediately (harness-only; gameplay distributes gradually)
   for (const ped of G.peds) {
-    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic) continue;
+    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy) continue;
     if (dist2(ped.mesh.position, pp) > 95 * 95) ped.mesh.position.copy(sidewalkPos(pp.x, pp.z, 88));
   }
   for (let guard = 0; G.peds.length > target && guard < 500; guard++) {
     let fi = -1, fd = -1;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy) continue;
       const d = dist2(ped.mesh.position, pp);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -250,6 +250,17 @@ export function updatePeds(dt) {
       ped.mesh.rotation.y = ped.heading;
       updatePedRainProp(ped);
       animateWalk(ped.mesh, ped.speed, dt, ped.speed > 0.05);
+      continue;
+    }
+    if (ped.cowboy) {
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        ped.mesh.position.set(slot.x, 0, slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
       continue;
     }
     if (ped.btsWait) {
@@ -496,7 +507,7 @@ export function updatePeds(dt) {
     let fi = -1, fd = 60 * 60;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy) continue;
       const d = dist2(ped.mesh.position, playerPos);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -1191,6 +1202,49 @@ export function updateSoiChairs(dt) {
   }
 }
 
+export function updateSoiCowboy(dt) {
+  if (!GAMEPLAY.soiCowboy || !G.soiCowboy) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const night = h >= 20 || h < 4;
+  G._cowboyTouts = (G._cowboyTouts || []).filter(p => p && !p.dead);
+  const signs = G.soiCowboy.signs || [];
+  if (night) {
+    while (G._cowboyTouts.length < 3) {
+      const s = signs[G._cowboyTouts.length] || signs[0];
+      const ox = (s && s.x != null) ? s.x : (G.soiCowboy.origin && G.soiCowboy.origin.x) || 44;
+      const oz = (s && s.z != null) ? s.z : (G.soiCowboy.origin && G.soiCowboy.origin.z) || 90;
+      const pos = new THREE.Vector3(ox + 1.35, 0, oz);
+      const ped = spawnPed(G.scene, pos, 'tourist');
+      ped.cowboy = true;
+      ped.anchor = { slot: pos.clone(), facing: PI / 2 };
+      ped.speed = 0;
+      ped.state = 'idle';
+      ped.heading = PI / 2;
+      if (ped.mesh) ped.mesh.rotation.y = ped.heading;
+      G._cowboyTouts.push(ped);
+    }
+    for (const ped of G._cowboyTouts) {
+      if (!ped || !ped.mesh) continue;
+      ped.cowboy = true;
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        ped.mesh.position.set(slot.x, 0, slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+        ped.speed = 0;
+        ped.state = 'idle';
+      }
+    }
+  } else if (G._cowboyTouts.length) {
+    for (const ped of G._cowboyTouts) {
+      if (!ped || ped.dead) continue;
+      ped.cowboy = false;
+      ped.anchor = null;
+    }
+    G._cowboyTouts = [];
+  }
+}
+
 export function updateSoiMechanic(dt) {
   if (!GAMEPLAY.soiMechanic || !G.soiMechanic) return;
   const shop = G.soiMechanic;
@@ -1438,7 +1492,7 @@ export function updateSeekShade(dt) {
   let n = 0;
   for (const ped of G.peds) {
     if (n >= 22) break;
-    if (!ped || ped.dead || ped.anchor || ped.gang || ped.pillion || ped.alms || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.checkpoint || ped.btsSit || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.panicT > 0) continue;
+    if (!ped || ped.dead || ped.anchor || ped.gang || ped.pillion || ped.alms || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.checkpoint || ped.btsSit || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.panicT > 0) continue;
     if (ped.social || ped.isMugger || ped.isTarget || ped.motosaiRider || ped.motosaiWait) continue;
     const w = nearestWalkway(ped.mesh.position.x, ped.mesh.position.z);
     if (!w) continue;

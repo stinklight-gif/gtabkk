@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, TRAFFIC_TARGET, trafficTarget, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, ROAD_WIDTH, PED_TARGET, GAMEPLAY, TRAFFIC_TARGET, trafficTarget, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { attachHeroBike } from './gltf.js';
 
@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.yaowaratNight || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.yaowaratNight || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -1739,6 +1739,49 @@ export function spawnSoiMechanic(scene) {
   if (pp && pp.foreR) { wrench.position.set(0.02, -0.22, 0.08); pp.foreR.add(wrench); }
   else { wrench.position.set(0.22, 1.05, 0.12); ped.mesh.add(wrench); }
   G.soiMechanic = { ped, bike, stand, soi: s, x, z };
+}
+
+export function spawnSoiCowboy(scene) {
+  if (!GAMEPLAY.soiCowboy) return;
+  const bar = (BUSINESSES || []).find(b => b.id === 'bar');
+  const origin = (bar && bar.pos) || new THREE.Vector3(44, 0, 90);
+  const x = origin.x - 2.6;
+  const colors = [0xff2a86, 0x21f0ff, 0xffcf4a, 0xff3344];
+  G.soiCowboy = { signs: [], origin: { x: origin.x, z: origin.z } };
+  if (G.world && G.world.poi) G.world.poi.cowboy = new THREE.Vector3(origin.x, 0, origin.z);
+  for (let i = 0; i < 4; i++) {
+    const z = origin.z - 14 + i * 4;
+    const col = colors[i];
+    const g = new THREE.Group();
+    g.name = 'cowboy-neon';
+    const face = new THREE.Mesh(
+      new THREE.BoxGeometry(0.16, 3.1, 3.2),
+      new THREE.MeshStandardMaterial({ color: 0x161018, roughness: 0.72 })
+    );
+    face.position.y = 1.55;
+    g.add(face);
+    const signMat = new THREE.MeshStandardMaterial({
+      color: col, emissive: col, emissiveIntensity: 0.25, roughness: 0.42,
+    });
+    if (G.nightEmissive) G.nightEmissive.push({ mat: signMat, dayIntensity: 0.22, nightIntensity: 1.75 });
+    const sign = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.62, 2.4), signMat);
+    sign.name = 'cowboy-sign';
+    sign.position.set(0.14, 3.2, 0);
+    g.add(sign);
+    const awning = new THREE.Mesh(
+      new THREE.BoxGeometry(1.15, 0.07, 3.2),
+      new THREE.MeshStandardMaterial({ color: col, roughness: 0.78 })
+    );
+    awning.position.set(0.55, 2.48, 0);
+    g.add(awning);
+    const light = new THREE.PointLight(col, 0, 9, 2);
+    light.position.set(0.55, 2.7, 0);
+    g.add(light);
+    if (G.nightLights) G.nightLights.push({ light, base: 1.05 });
+    g.position.set(x, 0, z);
+    scene.add(g);
+    G.soiCowboy.signs.push({ mesh: g, mat: signMat, light, x, z });
+  }
 }
 
 function makeCheckpointCone() {

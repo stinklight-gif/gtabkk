@@ -456,7 +456,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -2040,6 +2040,37 @@ async function main() {
     assert(takbat.moved, 'alms round moves along the soi');
     assert(takbat.paid && takbat.cooled && takbat.offered >= 1, 'E offers ฿20 and cools heat');
     assert(takbat.gone, 'monks end the round after morning');
+
+    console.log('\n[66] Soi Cowboy neon block');
+    const cowboy = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const strip = G.soiCowboy;
+      const signs = (strip && strip.signs) || [];
+      const n = signs.filter(s => s && s.mesh && s.mesh.name === 'cowboy-neon').length;
+      const neons = signs.filter(s => s && s.mesh && s.mesh.getObjectByName('cowboy-sign')).length;
+      const bar = strip && strip.origin;
+      const nearBar = signs.filter(s => s && bar && Math.hypot(s.x - bar.x, s.z - bar.z) < 22).length;
+      G.time.dayT = 12 / 24;
+      G._weatherUntil = 1e9;
+      main.updateDayNight(0.05);
+      main.updateSoiCowboy(0.05);
+      const dayGlow = signs[0] && signs[0].mat ? signs[0].mat.emissiveIntensity : 9;
+      const dayTouts = (G._cowboyTouts || []).filter(p => p && p.cowboy).length;
+      G.time.dayT = 21.4 / 24;
+      main.updateDayNight(0.05);
+      main.updateSoiCowboy(0.05);
+      const nightGlow = signs[0] && signs[0].mat ? signs[0].mat.emissiveIntensity : 0;
+      const nightTouts = (G._cowboyTouts || []).filter(p => p && p.cowboy && p.mesh).length;
+      const lit = signs.filter(s => s && s.light && s.light.intensity > 0.4).length;
+      const poi = !!(G.world && G.world.poi && G.world.poi.cowboy);
+      return {
+        flag: !!(G.gameplay && G.gameplay.soiCowboy),
+        n, neons, nearBar, dayGlow, nightGlow, dayTouts, nightTouts, lit, poi,
+      };
+    });
+    assert(cowboy.flag && cowboy.n >= 4 && cowboy.neons >= 4 && cowboy.poi, `Soi Cowboy neon strip (${cowboy.n})`);
+    assert(cowboy.nearBar >= 4 && cowboy.dayGlow < 0.7 && cowboy.nightGlow > 1.0, 'neon wakes up after 20:00');
+    assert(cowboy.dayTouts === 0 && cowboy.nightTouts >= 3 && cowboy.lit >= 3, 'touts and lights only after dark');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

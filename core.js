@@ -292,6 +292,7 @@ export const GAMEPLAY = {
   copSoiBlock: true,      // cop cars (not bikes) refuse authored sois; they stall at the mouth
   floodSois: true,        // after a downpour the sois sheet with water; cars crawl, bikes don't
   dawnAlms: true,         // 5–7h tak bat: monks walk a soi; E offers ฿20 and cools heat
+  soiCowboy: true,        // neon bar strip at the Soi Cowboy kiosk; touts after 20:00
 };
 G.gameplay = GAMEPLAY;
 

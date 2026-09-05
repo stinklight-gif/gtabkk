@@ -197,6 +197,12 @@ export function bindHud() {
     if (poi.suvarnabhumi) out.push({ name: 'Suvarnabhumi', status: 'taxi an airliner', dist: d(poi.suvarnabhumi) });
     if (G.world && G.world.bts) out.push({ name: 'BTS Asok', status: 'ride the skytrain', dist: d({ x: G.world.bts.x, z: G.world.bts.z || 0 }) });
     if (poi.yaowarat) out.push({ name: 'Yaowarat', status: 'night market', dist: d(poi.yaowarat) });
+    if (poi.cowboy || (G.soiCowboy && G.soiCowboy.origin)) {
+      const loc = poi.cowboy || G.soiCowboy.origin;
+      const hh = ((G.time.dayT % 1) + 1) % 1 * 24;
+      const open = hh >= 20 || hh < 4;
+      out.push({ name: 'Soi Cowboy', status: open ? 'neon · open' : 'closed till 20:00', dist: d(loc) });
+    }
     if (G.world && G.world.bank) {
       const h = G.heist;
       const st = (h && h.active) ? 'in progress' : (h && performance.now() < h.cooldownUntil) ? `cooldown ${Math.ceil((h.cooldownUntil - performance.now()) / 1000)}s` : 'ready';
