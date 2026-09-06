@@ -3123,54 +3123,60 @@ export function spawnStationPorter(scene) {
     { x: spawn.x - 5.2, z: spawn.z + 2.8, facing: PI, kind: 'laborer' },
     { x: spawn.x + 5.6, z: spawn.z + 2.6, facing: PI, kind: 'laborer' },
   ]);
-  const sitters = [];
-  const sitSlots = [
+  const packSit = (sitSlots, chairName) => {
+    const sitters = [];
+    for (let i = 0; i < sitSlots.length; i++) {
+      const slot = sitSlots[i];
+      const chair = new THREE.Group();
+      chair.name = chairName;
+      const seat = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.04, 0.42), new THREE.MeshStandardMaterial({ color: 0xd8d0c0, roughness: 0.7 }));
+      seat.position.y = 0.42; chair.add(seat);
+      const back = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.46, 0.04), seat.material);
+      back.position.set(0, 0.65, -0.2); chair.add(back);
+      for (const [sx, sz] of [[-0.16, -0.16], [0.16, -0.16], [-0.16, 0.16], [0.16, 0.16]]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.42, 5), new THREE.MeshStandardMaterial({ color: 0x888890, roughness: 0.5, metalness: 0.3 }));
+        leg.position.set(sx, 0.21, sz); chair.add(leg);
+      }
+      chair.position.set(slot.x, 0, slot.z);
+      scene.add(chair);
+      const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
+      ped.stationPorter = true;
+      ped.stationSit = true;
+      ped.speed = 0;
+      ped.state = 'idle';
+      ped.heading = slot.facing;
+      ped.anchor = { slot: new THREE.Vector3(slot.x, 0.42, slot.z), facing: slot.facing };
+      if (ped.mesh) {
+        ped.mesh.position.set(slot.x, 0.42, slot.z);
+        ped.mesh.rotation.y = slot.facing;
+        ped.mesh.visible = false;
+      }
+      const phone = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05, 0.09, 0.01),
+        new THREE.MeshStandardMaterial({ color: 0x1a1a22, roughness: 0.4, emissive: 0x4a8aff, emissiveIntensity: 0.2 })
+      );
+      phone.name = 'station-phone';
+      const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+      if (parts && parts.foreR) {
+        phone.position.set(0.02, -0.26, 0.06);
+        parts.foreR.add(phone);
+      } else if (ped.mesh) {
+        phone.position.set(0.2, 0.95, 0.12);
+        ped.mesh.add(phone);
+      }
+      ped._phone = phone;
+      sitters.push(ped);
+    }
+    return { sitters, x: spawn.x, z: spawn.z, t: 0 };
+  };
+  G.stationSit = packSit([
     { x: spawn.x - 2.4, z: spawn.z + 2.6, facing: PI, kind: 'office' },
     { x: spawn.x + 2.2, z: spawn.z + 2.8, facing: PI, kind: 'local' },
-  ];
-  for (let i = 0; i < sitSlots.length; i++) {
-    const slot = sitSlots[i];
-    const chair = new THREE.Group();
-    chair.name = 'station-chair';
-    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.04, 0.42), new THREE.MeshStandardMaterial({ color: 0xd8d0c0, roughness: 0.7 }));
-    seat.position.y = 0.42; chair.add(seat);
-    const back = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.46, 0.04), seat.material);
-    back.position.set(0, 0.65, -0.2); chair.add(back);
-    for (const [sx, sz] of [[-0.16, -0.16], [0.16, -0.16], [-0.16, 0.16], [0.16, 0.16]]) {
-      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.42, 5), new THREE.MeshStandardMaterial({ color: 0x888890, roughness: 0.5, metalness: 0.3 }));
-      leg.position.set(sx, 0.21, sz); chair.add(leg);
-    }
-    chair.position.set(slot.x, 0, slot.z);
-    scene.add(chair);
-    const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
-    ped.stationPorter = true;
-    ped.stationSit = true;
-    ped.speed = 0;
-    ped.state = 'idle';
-    ped.heading = slot.facing;
-    ped.anchor = { slot: new THREE.Vector3(slot.x, 0.42, slot.z), facing: slot.facing };
-    if (ped.mesh) {
-      ped.mesh.position.set(slot.x, 0.42, slot.z);
-      ped.mesh.rotation.y = slot.facing;
-      ped.mesh.visible = false;
-    }
-    const phone = new THREE.Mesh(
-      new THREE.BoxGeometry(0.05, 0.09, 0.01),
-      new THREE.MeshStandardMaterial({ color: 0x1a1a22, roughness: 0.4, emissive: 0x4a8aff, emissiveIntensity: 0.2 })
-    );
-    phone.name = 'station-phone';
-    const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
-    if (parts && parts.foreR) {
-      phone.position.set(0.02, -0.26, 0.06);
-      parts.foreR.add(phone);
-    } else if (ped.mesh) {
-      phone.position.set(0.2, 0.95, 0.12);
-      ped.mesh.add(phone);
-    }
-    ped._phone = phone;
-    sitters.push(ped);
-  }
-  G.stationSit = { sitters, x: spawn.x, z: spawn.z, t: 0 };
+  ], 'station-chair');
+  G.southStationSit = packSit([
+    { x: spawn.x - 2.4, z: spawn.z - 2.6, facing: 0, kind: 'office' },
+    { x: spawn.x + 2.2, z: spawn.z - 2.8, facing: 0, kind: 'local' },
+  ], 'south-station-chair');
 }
 
 export function spawnGarageMech(scene) {

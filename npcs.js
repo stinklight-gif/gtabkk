@@ -2154,8 +2154,8 @@ export function updateStationPorter(dt) {
       if (bag) bag.rotation.z = Math.sin(c.t * 3.2 + i) * 0.22;
     }
   }
-  const sit = G.stationSit;
-  if (sit) {
+  for (const sit of [G.stationSit, G.southStationSit]) {
+    if (!sit) continue;
     sit.t = (sit.t || 0) + dt;
     for (const ped of sit.sitters || []) {
       if (!ped || ped.dead || !ped.mesh) continue;

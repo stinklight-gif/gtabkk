@@ -7615,6 +7615,44 @@ async function main() {
     });
     assert(auntieB.flag && auntieB.rec && auntieB.paper && auntieB.chair && auntieB.near && auntieB.other, 'a second neighbor sits beside the safehouse');
     assert(auntieB.night && auntieB.day && auntieB.folded && auntieB.flipped, 'they hide after 22:00 and turn pages on the plastic chair');
+
+    console.log('\n[214] south Hua Lamphong platform sitters');
+    const southSit = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.southStationSit;
+      const list = (c && c.sitters) || [];
+      const n = list.filter(p => p && p.stationSit && p.stationPorter && p.mesh).length;
+      const phones = list.filter(p => p && p.mesh && p.mesh.getObjectByName('station-phone')).length;
+      const first = G.stationSit;
+      const spawn = G.world && G.world.spawns && G.world.spawns.player;
+      const near = !!(c && spawn && Math.hypot(c.x - spawn.x, c.z - spawn.z) < 8);
+      const s0 = list[0] && list[0].anchor && list[0].anchor.slot;
+      const f0 = first && first.sitters && first.sitters[0] && first.sitters[0].anchor && first.sitters[0].anchor.slot;
+      const other = !!(s0 && f0 && Math.hypot(s0.x - f0.x, s0.z - f0.z) > 2);
+      G.time.dayT = 3 / 24;
+      main.updateStationPorter(0.05);
+      const late = list.filter(p => p && p.mesh && p.mesh.visible === false).length;
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updatePeds(0.05);
+      main.updateStationPorter(0.05);
+      const day = list.filter(p => p && p.stationSit && p.mesh && p.mesh.visible).length;
+      const seated = list.filter(p => p && p.mesh && p.mesh.position.y >= 0.3).length;
+      const p0 = list[0];
+      const parts = p0 && p0.mesh && p0.mesh.userData && p0.mesh.userData.parts;
+      const folded = !!(parts && parts.legL && parts.legL.rotation.x > 0.8);
+      const phone = p0 && p0.mesh && p0.mesh.getObjectByName('station-phone');
+      const e0 = phone && phone.material ? phone.material.emissiveIntensity : 0;
+      if (c) c.t = 0.2 + Math.PI / 3.4;
+      main.updateStationPorter(0.05);
+      const glowed = !!(phone && phone.material && Math.abs(phone.material.emissiveIntensity - e0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.stationPorter),
+        n, phones, near, other, late, day, seated, folded, glowed,
+      };
+    });
+    assert(southSit.flag && southSit.n >= 2 && southSit.phones >= 2 && southSit.near && southSit.other, `passengers sit south of the Hua Lamphong platform (${southSit.n})`);
+    assert(southSit.late >= 2 && southSit.day >= 2 && southSit.seated >= 2 && southSit.folded && southSit.glowed, 'they hide late, sit with phones, and the screens glow');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
