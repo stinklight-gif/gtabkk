@@ -243,6 +243,9 @@ export function bindHud() {
     if (G.btsMalai && G.btsMalai.mesh) {
       out.push({ name: 'Malai at Asok', status: G._malai ? 'garland in hand' : 'พวงมาลัย · ฿20', dist: d(G.btsMalai.mesh.position) });
     }
+    if (G.phromMalai && G.phromMalai.mesh) {
+      out.push({ name: 'Malai at Phrom Phong', status: G._malai ? 'garland in hand' : 'พวงมาลัย · ฿20', dist: d(G.phromMalai.mesh.position) });
+    }
     if (G.mangoSticky && G.mangoSticky.mesh) {
       const hh = ((G.time.dayT % 1) + 1) % 1 * 24;
       const open = hh >= 16 && hh < 22.5;

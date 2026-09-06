@@ -3387,32 +3387,40 @@ export function updatePhromFruit(dt) {
 }
 
 export function updateBtsMalai(dt) {
-  if (!GAMEPLAY.btsMalai || !G.btsMalai) return;
-  const stand = G.btsMalai;
-  const ped = stand.vendor;
-  if (ped && ped.mesh && ped.anchor && ped.anchor.slot) {
-    ped.btsMalai = true;
-    ped.mesh.position.set(ped.anchor.slot.x, 0, ped.anchor.slot.z);
-    ped.heading = ped.anchor.facing;
-    ped.mesh.rotation.y = ped.heading;
-    ped.speed = 0;
-    ped.state = 'idle';
+  if (!GAMEPLAY.btsMalai) return;
+  const stands = [G.btsMalai, G.phromMalai];
+  const pp = G.player && G.player.group && G.player.group.position;
+  for (const stand of stands) {
+    if (!stand) continue;
+    stand.t = (stand.t || 0) + dt;
+    const strands = stand.mesh ? stand.mesh.children.filter(ch => ch && ch.name === 'malai-strand') : [];
+    for (let i = 0; i < strands.length; i++) {
+      strands[i].rotation.z = Math.sin(stand.t * 2.8 + i) * 0.12;
+    }
+    const ped = stand.vendor;
+    if (ped && ped.mesh && ped.anchor && ped.anchor.slot) {
+      ped.btsMalai = true;
+      ped.mesh.position.set(ped.anchor.slot.x, 0, ped.anchor.slot.z);
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+      ped.speed = 0;
+      ped.state = 'idle';
+    }
+    if (G.player.inVehicle || G._eating || !pp) continue;
+    if (!stand.mesh || dist2(stand.mesh.position, pp) > 2.4 * 2.4) continue;
+    if (G._malai) {
+      G.hud.showPrompt('You already have a malai', 0.35);
+      continue;
+    }
+    G.hud.showPrompt('Press <b>E</b> for a malai · ฿20', 0.4);
+    if (!G.input.pressed('KeyE')) continue;
+    if (G.cash < 20) { G.hud.showNotif('Need ฿20 for a malai'); continue; }
+    G.cash -= 20;
+    G._malai = true;
+    if (G.hud.setCash) G.hud.setCash(G.cash);
+    G.hud.showNotif('Phuang malai — พวงมาลัย');
+    if (G.audio && G.audio.chime) G.audio.chime();
   }
-  if (G.player.inVehicle || G._eating) return;
-  const pp = G.player.group.position;
-  if (!stand.mesh || dist2(stand.mesh.position, pp) > 2.4 * 2.4) return;
-  if (G._malai) {
-    G.hud.showPrompt('You already have a malai', 0.35);
-    return;
-  }
-  G.hud.showPrompt('Press <b>E</b> for a malai · ฿20', 0.4);
-  if (!G.input.pressed('KeyE')) return;
-  if (G.cash < 20) { G.hud.showNotif('Need ฿20 for a malai'); return; }
-  G.cash -= 20;
-  G._malai = true;
-  if (G.hud.setCash) G.hud.setCash(G.cash);
-  G.hud.showNotif('Phuang malai — พวงมาลัย');
-  if (G.audio && G.audio.chime) G.audio.chime();
 }
 
 export function updateSomTam(dt) {

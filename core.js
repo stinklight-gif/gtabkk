@@ -298,7 +298,7 @@ export const GAMEPLAY = {
   boatNoodle: true,       // kuay teow reua: a noodle boat works the pier; E for a bowl
   twoAmCheckpoint: true,  // 1:30–3:40 ด่าน: spike strip across the lane; blow through is 2★
   somTam: true,           // som tam cart on a soi; pestle, E for a plate
-  btsMalai: true,         // phuang malai vendor at Asok BTS; E buys a garland
+  btsMalai: true,         // phuang malai vendor at Asok and Phrom Phong BTS; E buys a garland
   cowboyClose: true,      // 4–5:30h drunks walk from Soi Cowboy toward the BTS
   plaKat: true,           // fighting-fish bags hanging on a soi; E buys a bag
   chaYen: true,           // Thai iced-tea cart on a soi; E for a cup

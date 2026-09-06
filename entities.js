@@ -4680,46 +4680,50 @@ export function spawnBtsMalai(scene) {
   if (!GAMEPLAY.btsMalai) return;
   const bts = G.world && G.world.bts;
   if (!bts) return;
-  const x = bts.x - 6.4, z = -16.2;
-  const g = new THREE.Group();
-  g.name = 'malai-stand';
-  const crate = new THREE.Mesh(
-    new THREE.BoxGeometry(0.7, 0.38, 0.55),
-    new THREE.MeshStandardMaterial({ color: 0x8a6a3a, roughness: 0.8 })
-  );
-  crate.position.y = 0.22;
-  g.add(crate);
-  const jasmine = new THREE.MeshStandardMaterial({ color: 0xf4f0e0, roughness: 0.55 });
-  const marigold = new THREE.MeshStandardMaterial({ color: 0xff8a1a, roughness: 0.55 });
-  for (let i = 0; i < 5; i++) {
-    const strand = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.55, 5), i % 2 ? marigold : jasmine);
-    strand.name = 'malai-strand';
-    strand.position.set(-0.22 + i * 0.11, 0.72, 0.02);
-    g.add(strand);
-  }
-  const pole = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.02, 0.02, 1.15, 5),
-    new THREE.MeshStandardMaterial({ color: 0x333333 })
-  );
-  pole.position.set(0.28, 0.7, -0.12);
-  g.add(pole);
-  const sign = new THREE.Mesh(
-    new THREE.BoxGeometry(0.42, 0.18, 0.04),
-    new THREE.MeshStandardMaterial({ color: 0xc44a3a, roughness: 0.6, emissive: 0x802020, emissiveIntensity: 0.15 })
-  );
-  sign.name = 'malai-sign';
-  sign.position.set(0.28, 1.32, -0.12);
-  g.add(sign);
-  g.position.set(x, 0, z);
-  scene.add(g);
-  const vendor = spawnPed(scene, new THREE.Vector3(x + 0.55, 0, z + 0.35), 'vendor');
-  vendor.btsMalai = true;
-  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI / 2 };
-  vendor.speed = 0;
-  vendor.state = 'idle';
-  vendor.heading = PI / 2;
-  if (vendor.mesh) vendor.mesh.rotation.y = PI / 2;
-  G.btsMalai = { mesh: g, vendor, x, z };
+  const stand = (x, z, stop) => {
+    const g = new THREE.Group();
+    g.name = 'malai-stand';
+    const crate = new THREE.Mesh(
+      new THREE.BoxGeometry(0.7, 0.38, 0.55),
+      new THREE.MeshStandardMaterial({ color: 0x8a6a3a, roughness: 0.8 })
+    );
+    crate.position.y = 0.22;
+    g.add(crate);
+    const jasmine = new THREE.MeshStandardMaterial({ color: 0xf4f0e0, roughness: 0.55 });
+    const marigold = new THREE.MeshStandardMaterial({ color: 0xff8a1a, roughness: 0.55 });
+    for (let i = 0; i < 5; i++) {
+      const strand = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.55, 5), i % 2 ? marigold : jasmine);
+      strand.name = 'malai-strand';
+      strand.position.set(-0.22 + i * 0.11, 0.72, 0.02);
+      g.add(strand);
+    }
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.02, 0.02, 1.15, 5),
+      new THREE.MeshStandardMaterial({ color: 0x333333 })
+    );
+    pole.position.set(0.28, 0.7, -0.12);
+    g.add(pole);
+    const sign = new THREE.Mesh(
+      new THREE.BoxGeometry(0.42, 0.18, 0.04),
+      new THREE.MeshStandardMaterial({ color: 0xc44a3a, roughness: 0.6, emissive: 0x802020, emissiveIntensity: 0.15 })
+    );
+    sign.name = 'malai-sign';
+    sign.position.set(0.28, 1.32, -0.12);
+    g.add(sign);
+    g.position.set(x, 0, z);
+    scene.add(g);
+    const vendor = spawnPed(scene, new THREE.Vector3(x + 0.55, 0, z + 0.35), 'vendor');
+    vendor.btsMalai = true;
+    vendor.stop = stop;
+    vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI / 2 };
+    vendor.speed = 0;
+    vendor.state = 'idle';
+    vendor.heading = PI / 2;
+    if (vendor.mesh) vendor.mesh.rotation.y = PI / 2;
+    return { mesh: g, vendor, x, z, t: 0, stop };
+  };
+  G.btsMalai = stand(bts.x - 6.4, -16.2, 'asok');
+  G.phromMalai = stand(100 - 6.4, -16.2, 'phrom');
 }
 
 export function makeMangoStickyMesh() {

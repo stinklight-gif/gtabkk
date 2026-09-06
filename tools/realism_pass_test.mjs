@@ -4901,6 +4901,67 @@ async function main() {
     });
     assert(gym.flag && gym.fighter && gym.trainer && gym.bag && gym.near, 'a pad man waits at the Muay Thai gym');
     assert(gym.night >= 2 && gym.day >= 2 && gym.shifted && gym.swung, 'they hide after 21:00 and the bag swings');
+
+    console.log('\n[140] phuang malai at Phrom Phong');
+    const phromMalai = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const stand = G.phromMalai;
+      const strands = stand && stand.mesh ? stand.mesh.children.filter(c => c && c.name === 'malai-strand').length : 0;
+      const dist = (stand && stand.x != null) ? Math.hypot(stand.x - 100, stand.z) : null;
+      if (stand) stand.t = 0.2;
+      main.updateBtsMalai(0.05);
+      const s0 = stand && stand.mesh && stand.mesh.children.find(c => c && c.name === 'malai-strand');
+      const r0 = s0 ? s0.rotation.z : 0;
+      if (stand) stand.t = 0.2 + Math.PI / 2.8;
+      main.updateBtsMalai(0.05);
+      const swayed = !!(s0 && Math.abs(s0.rotation.z - r0) > 0.02);
+      G.player.inVehicle = null;
+      G._btsRide = null;
+      G._eating = null;
+      G.player.group.visible = true;
+      G._malai = false;
+      G._malaiOffered = 0;
+      if (stand) G.player.group.position.set(stand.x, 0, stand.z);
+      G.cash = 80;
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let paid = false;
+      for (let i = 0; i < 4 && !paid; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateBtsMalai(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        paid = G.cash === 60 && G._malai === true;
+      }
+      const s = (G.world.shrines || [])[0];
+      let offered = false, cooled = false;
+      if (s && s.pos) {
+        G.player.group.position.set(s.pos.x, 0, s.pos.z);
+        G.wanted.stars = 2;
+        G.wanted.lastSeenAt = performance.now() + 30000;
+        s.readyAt = 1;
+        const seen0 = G.wanted.lastSeenAt;
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        for (let i = 0; i < 4 && !offered; i++) {
+          window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+          main.updateShrines(0.016);
+          window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+          if (G.input && G.input.endFrame) G.input.endFrame();
+          offered = (G._malaiOffered || 0) >= 1 && G._malai === false;
+        }
+        cooled = G.wanted.lastSeenAt < seen0 - 18000;
+      }
+      return {
+        flag: !!(G.gameplay && G.gameplay.btsMalai),
+        named: !!(stand && stand.mesh && stand.mesh.name === 'malai-stand'),
+        stop: stand && stand.stop,
+        strands, near: dist != null && dist < 28, paid, offered, cooled, swayed,
+        vendor: !!(stand && stand.vendor && stand.vendor.btsMalai && stand.vendor.stop === 'phrom'),
+      };
+    });
+    assert(phromMalai.flag && phromMalai.named && phromMalai.stop === 'phrom' && phromMalai.strands >= 4 && phromMalai.near && phromMalai.vendor, `a malai stand waits at Phrom Phong (${phromMalai.strands} strands)`);
+    assert(phromMalai.swayed && phromMalai.paid && phromMalai.offered && phromMalai.cooled, 'E buys a malai at Phrom Phong and the shrine takes it for extra heat cool');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
