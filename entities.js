@@ -3328,32 +3328,35 @@ export function spawnSengClerk(scene) {
     ped.mesh.add(tray);
   }
   G.sengClerk = { ped, x, z, t: 0 };
-  const cx = x + 1.55, cz = z + 0.85;
-  const shopper = spawnPed(scene, new THREE.Vector3(cx, 0, cz), 'office');
-  shopper.sengClerk = true;
-  shopper.sengShop = true;
-  shopper.speed = 0;
-  shopper.state = 'idle';
-  shopper.heading = PI;
-  shopper.anchor = { slot: new THREE.Vector3(cx, 0, cz), facing: PI };
-  if (shopper.mesh) {
-    shopper.mesh.rotation.y = PI;
-    shopper.mesh.visible = false;
-  }
-  const chain = new THREE.Mesh(
-    new THREE.TorusGeometry(0.04, 0.008, 6, 10),
-    new THREE.MeshStandardMaterial({ color: 0xffcf4a, metalness: 0.7, roughness: 0.28 })
-  );
-  chain.name = 'seng-chain';
-  const sp = shopper.mesh && shopper.mesh.userData && shopper.mesh.userData.parts;
-  if (sp && sp.foreL) {
-    chain.position.set(0.02, -0.24, 0.06);
-    sp.foreL.add(chain);
-  } else if (shopper.mesh) {
-    chain.position.set(-0.18, 1.0, 0.1);
-    shopper.mesh.add(chain);
-  }
-  G.sengShopper = { ped: shopper, x: cx, z: cz, t: 0 };
+  const packShop = (cx, cz, facing) => {
+    const shopper = spawnPed(scene, new THREE.Vector3(cx, 0, cz), 'office');
+    shopper.sengClerk = true;
+    shopper.sengShop = true;
+    shopper.speed = 0;
+    shopper.state = 'idle';
+    shopper.heading = facing;
+    shopper.anchor = { slot: new THREE.Vector3(cx, 0, cz), facing };
+    if (shopper.mesh) {
+      shopper.mesh.rotation.y = facing;
+      shopper.mesh.visible = false;
+    }
+    const chain = new THREE.Mesh(
+      new THREE.TorusGeometry(0.04, 0.008, 6, 10),
+      new THREE.MeshStandardMaterial({ color: 0xffcf4a, metalness: 0.7, roughness: 0.28 })
+    );
+    chain.name = 'seng-chain';
+    const sp = shopper.mesh && shopper.mesh.userData && shopper.mesh.userData.parts;
+    if (sp && sp.foreL) {
+      chain.position.set(0.02, -0.24, 0.06);
+      sp.foreL.add(chain);
+    } else if (shopper.mesh) {
+      chain.position.set(-0.18, 1.0, 0.1);
+      shopper.mesh.add(chain);
+    }
+    return { ped: shopper, x: cx, z: cz, t: 0 };
+  };
+  G.sengShopper = packShop(x + 1.55, z + 0.85, PI);
+  G.sengShopperB = packShop(x - 1.55, z + 0.85, PI);
 }
 
 export function spawnAirportCrew(scene) {

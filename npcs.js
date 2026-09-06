@@ -2314,8 +2314,8 @@ export function updateSengClerk(dt) {
       if (tray) tray.rotation.z = Math.sin(c.t * 4.2) * 0.35;
     }
   }
-  const shop = G.sengShopper;
-  if (shop) {
+  for (const shop of [G.sengShopper, G.sengShopperB]) {
+    if (!shop) continue;
     shop.t = (shop.t || 0) + dt;
     const sp = shop.ped;
     if (sp && sp.mesh) {

@@ -7349,6 +7349,43 @@ async function main() {
     });
     assert(klongCheckB.flag && klongCheckB.rec && klongCheckB.clip && klongCheckB.near && klongCheckB.other, 'a second checker waits at the Klong Toey yard');
     assert(klongCheckB.night && klongCheckB.day && klongCheckB.shifted && klongCheckB.swung, 'they hide after 19:00 and the clipboard turns');
+
+    console.log('\n[207] second Uncle Seng gold-shop window shopper');
+    const sengShopB = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.sengShopperB;
+      const ped = c && c.ped;
+      const chain = !!(ped && ped.mesh && ped.mesh.getObjectByName('seng-chain'));
+      const clerk = G.sengClerk;
+      const first = G.sengShopper;
+      const near = !!(c && clerk && Math.hypot(c.x - clerk.x, c.z - clerk.z) < 4);
+      const other = !!(c && first && Math.hypot(c.x - first.x, c.z - first.z) > 2);
+      G.time.dayT = 21 / 24;
+      main.updateSengClerk(0.05);
+      const night = !!(ped && ped.mesh && ped.mesh.visible === false);
+      G.time.dayT = 12.5 / 24;
+      if (c) c.t = 0.2;
+      main.updateSengClerk(0.05);
+      const day = !!(ped && ped.sengClerk && ped.sengShop && ped.mesh && ped.mesh.visible);
+      const z0 = ped && ped.mesh ? ped.mesh.position.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateSengClerk(0.05);
+      const shifted = !!(ped && ped.mesh && Math.abs(ped.mesh.position.z - z0) > 0.02);
+      const tool = ped && ped.mesh && ped.mesh.getObjectByName('seng-chain');
+      if (c) c.t = 0.2;
+      main.updateSengClerk(0.05);
+      const r0 = tool ? tool.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 4.2;
+      main.updateSengClerk(0.05);
+      const swung = !!(tool && Math.abs(tool.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.sengClerk),
+        rec: !!(ped && ped.sengClerk && ped.sengShop),
+        chain, near, other, night, day, shifted, swung,
+      };
+    });
+    assert(sengShopB.flag && sengShopB.rec && sengShopB.chain && sengShopB.near && sengShopB.other, "a second window shopper waits at Uncle Seng's gold-shop door");
+    assert(sengShopB.night && sengShopB.day && sengShopB.shifted && sengShopB.swung, 'they hide after 20:00 and the gold chain turns');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
