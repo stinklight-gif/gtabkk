@@ -197,14 +197,14 @@ export function resyncCrowd() {
   // pull stray wanderers onto nearby sidewalks so the count near the camera
   // reflects the hour immediately (harness-only; gameplay distributes gradually)
   for (const ped of G.peds) {
-    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle) continue;
+    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.somTam) continue;
     if (dist2(ped.mesh.position, pp) > 95 * 95) ped.mesh.position.copy(sidewalkPos(pp.x, pp.z, 88));
   }
   for (let guard = 0; G.peds.length > target && guard < 500; guard++) {
     let fi = -1, fd = -1;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.somTam) continue;
       const d = dist2(ped.mesh.position, pp);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -518,7 +518,7 @@ export function updatePeds(dt) {
     let fi = -1, fd = 60 * 60;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.somTam) continue;
       const d = dist2(ped.mesh.position, playerPos);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -1515,7 +1515,7 @@ export function updateSeekShade(dt) {
   let n = 0;
   for (const ped of G.peds) {
     if (n >= 22) break;
-    if (!ped || ped.dead || ped.anchor || ped.gang || ped.pillion || ped.alms || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.checkpoint || ped.btsSit || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.panicT > 0) continue;
+    if (!ped || ped.dead || ped.anchor || ped.gang || ped.pillion || ped.alms || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.checkpoint || ped.btsSit || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.somTam || ped.panicT > 0) continue;
     if (ped.social || ped.isMugger || ped.isTarget || ped.motosaiRider || ped.motosaiWait) continue;
     const w = nearestWalkway(ped.mesh.position.x, ped.mesh.position.z);
     if (!w) continue;
@@ -1619,6 +1619,51 @@ export function updateCoconutCarts(dt) {
       G.player.stam = G.player.stamMax;
       if (G.hud.setCash) G.hud.setCash(G.cash);
       G.hud.showNotif('Coconut water — มะพร้าว');
+      if (G.audio && G.audio.chime) G.audio.chime();
+    }
+    return;
+  }
+}
+
+export function updateSomTam(dt) {
+  if (!GAMEPLAY.somTam || !G.somTam) return;
+  for (const c of G.somTam) {
+    if (!c.mesh || !c.soi) continue;
+    c.t += c.dir * dt * 0.032;
+    if (c.t > 0.9) { c.t = 0.9; c.dir = -1; }
+    if (c.t < 0.1) { c.t = 0.1; c.dir = 1; }
+    const s = c.soi;
+    const x = c.alongZ ? (s.x0 + s.x1) * 0.5 : s.x0 + (s.x1 - s.x0) * c.t;
+    const z = c.alongZ ? s.z0 + (s.z1 - s.z0) * c.t : (s.z0 + s.z1) * 0.5;
+    const yaw = c.alongZ ? (c.dir > 0 ? 0 : PI) : (c.dir > 0 ? PI / 2 : -PI / 2);
+    c.mesh.position.set(x, 0, z);
+    c.mesh.rotation.y = yaw;
+    const pestle = c.mesh.getObjectByName('somtam-pestle');
+    if (pestle) {
+      const pound = Math.sin(c.t * 42);
+      pestle.position.y = 1.18 + Math.max(0, pound) * 0.12;
+      pestle.rotation.z = 0.25 + pound * 0.2;
+    }
+    if (c.vendor && c.vendor.mesh && !c.vendor.dead) {
+      c.vendor.somTam = true;
+      c.vendor.mesh.position.set(x, 0, z);
+      c.vendor.heading = yaw;
+      c.vendor.mesh.rotation.y = yaw;
+      if (c.vendor.anchor && c.vendor.anchor.slot) c.vendor.anchor.slot.set(x, 0, z);
+      c.vendor.speed = 0.5;
+    }
+  }
+  if (G.player.inVehicle || G._eating) return;
+  const pp = G.player.group.position;
+  for (const c of G.somTam) {
+    if (!c.mesh || dist2(c.mesh.position, pp) > 2.2 * 2.2) continue;
+    G.hud.showPrompt('Press <b>E</b> for som tam · ฿45', 0.4);
+    if (G.input.pressed('KeyE')) {
+      if (G.cash < 45) { G.hud.showNotif('Need ฿45 for som tam'); return; }
+      G.cash -= 45;
+      G.player.hp = Math.min(G.player.hpMax, G.player.hp + 24);
+      if (G.hud.setCash) G.hud.setCash(G.cash);
+      G.hud.showNotif('Som tam — ส้มตำ');
       if (G.audio && G.audio.chime) G.audio.chime();
     }
     return;

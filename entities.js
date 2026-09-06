@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.yaowaratNight || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.yaowaratNight || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -2107,6 +2107,78 @@ export function spawnCoconutCarts(scene) {
   vendor.anchor = { slot: vendor.mesh.position.clone(), facing: alongZ ? 0 : PI / 2 };
   vendor.speed = 0;
   G.coconutCarts.push({ mesh, vendor, soi: s, alongZ, t: t0, dir: 1 });
+}
+
+export function makeSomTamMesh() {
+  const g = new THREE.Group();
+  g.name = 'somtam-cart';
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.5, 1.25), new THREE.MeshStandardMaterial({ color: 0x4a6a2a, roughness: 0.82 }));
+  box.position.y = 0.48; g.add(box);
+  const board = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.04, 0.7), new THREE.MeshStandardMaterial({ color: 0xc8b080, roughness: 0.7 }));
+  board.position.y = 0.76; g.add(board);
+  const mortar = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.16, 0.2, 0.28, 8),
+    new THREE.MeshStandardMaterial({ color: 0x6a5a48, roughness: 0.75 })
+  );
+  mortar.name = 'somtam-mortar';
+  mortar.position.set(-0.12, 0.94, 0.08);
+  g.add(mortar);
+  const pestle = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.035, 0.05, 0.42, 6),
+    new THREE.MeshStandardMaterial({ color: 0x8a6a40, roughness: 0.7 })
+  );
+  pestle.name = 'somtam-pestle';
+  pestle.position.set(-0.12, 1.18, 0.08);
+  pestle.rotation.z = 0.25;
+  g.add(pestle);
+  const papaya = new THREE.MeshStandardMaterial({ color: 0x7a9a2a, roughness: 0.65 });
+  for (let i = 0; i < 3; i++) {
+    const fruit = new THREE.Mesh(new THREE.SphereGeometry(0.09, 6, 5), papaya);
+    fruit.scale.set(0.7, 1.15, 0.7);
+    fruit.position.set(0.22, 0.88, -0.18 + i * 0.16);
+    g.add(fruit);
+  }
+  const chili = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.04, 0.08), new THREE.MeshStandardMaterial({ color: 0xc03020, roughness: 0.6 }));
+  chili.position.set(0.28, 0.8, 0.22);
+  g.add(chili);
+  const umb = new THREE.Mesh(
+    new THREE.ConeGeometry(0.7, 0.26, 8),
+    new THREE.MeshStandardMaterial({ color: 0xff8a2a, roughness: 0.7, side: THREE.DoubleSide })
+  );
+  umb.position.y = 1.92; umb.rotation.x = PI; g.add(umb);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.05, 5), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+  pole.position.y = 1.38; g.add(pole);
+  const tire = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+  for (const z of [-0.4, 0.4]) for (const x of [-0.32, 0.32]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 8), tire);
+    w.rotation.z = PI / 2; w.position.set(x, 0.12, z); g.add(w);
+  }
+  return g;
+}
+
+export function spawnSomTam(scene) {
+  if (!GAMEPLAY.somTam) return;
+  const sois = (G.world && G.world.sois) || [];
+  G.somTam = [];
+  if (!sois.length) return;
+  const ranked = sois.slice().sort((a, b) => {
+    const la = a.axis === 'z' ? (a.z1 - a.z0) : (a.x1 - a.x0);
+    const lb = b.axis === 'z' ? (b.z1 - b.z0) : (b.x1 - b.x0);
+    return lb - la;
+  });
+  const s = ranked[2] || ranked[0];
+  const alongZ = s.axis === 'z';
+  const t0 = 0.62;
+  const x = alongZ ? (s.x0 + s.x1) * 0.5 : s.x0 + (s.x1 - s.x0) * t0;
+  const z = alongZ ? s.z0 + (s.z1 - s.z0) * t0 : (s.z0 + s.z1) * 0.5;
+  const mesh = makeSomTamMesh();
+  mesh.position.set(x, 0, z);
+  scene.add(mesh);
+  const vendor = spawnPed(scene, new THREE.Vector3(x, 0, z), 'vendor');
+  vendor.somTam = true;
+  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: alongZ ? 0 : PI / 2 };
+  vendor.speed = 0;
+  G.somTam.push({ mesh, vendor, soi: s, alongZ, t: t0, dir: 1 });
 }
 
 export function spawnMooPing(scene) {

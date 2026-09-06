@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -2236,6 +2236,47 @@ async function main() {
     });
     assert(two.flag && two.spikes && two.day && two.evening, '2 AM strip hides until the late window');
     assert(two.lateOn && two.cap === 2.2 && two.stars >= 2 && two.blown, 'blowing the 2 AM ด่าน is two stars and a spike strip');
+
+    console.log('\n[71] som tam cart');
+    const papaya = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = G.somTam || [];
+      const n = list.filter(c => c && c.mesh && c.mesh.name === 'somtam-cart').length;
+      const c0 = list[0];
+      const mortar = !!(c0 && c0.mesh && c0.mesh.getObjectByName('somtam-mortar'));
+      const pestle = c0 && c0.mesh && c0.mesh.getObjectByName('somtam-pestle');
+      if (c0) { c0.t = 0.12; c0.dir = 1; }
+      G.player.inVehicle = null;
+      G._eating = null;
+      if (c0 && c0.mesh) G.player.group.position.set(c0.mesh.position.x + 40, 0, c0.mesh.position.z + 40);
+      main.updateSomTam(0.05);
+      const y0 = pestle ? pestle.position.y : 0;
+      const start = c0 && c0.mesh ? { x: c0.mesh.position.x, z: c0.mesh.position.z } : null;
+      for (let i = 0; i < 50; i++) main.updateSomTam(0.3);
+      const moved = !!(c0 && start && Math.hypot(c0.mesh.position.x - start.x, c0.mesh.position.z - start.z) > 0.4);
+      const pounded = !!(pestle && Math.abs(pestle.position.y - y0) > 0.01);
+      if (c0 && c0.mesh) G.player.group.position.copy(c0.mesh.position);
+      G.cash = 90;
+      G.player.hp = 40;
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let paid = false;
+      for (let i = 0; i < 4 && !paid; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateSomTam(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        paid = G.cash === 45;
+      }
+      return {
+        flag: !!(G.gameplay && G.gameplay.somTam),
+        n, mortar, pestle: !!pestle, moved, pounded, paid, healed: G.player.hp > 40,
+        onSoi: !!(c0 && c0.soi), vendor: !!(c0 && c0.vendor && c0.vendor.somTam),
+      };
+    });
+    assert(papaya.flag && papaya.n >= 1 && papaya.onSoi && papaya.mortar && papaya.pestle && papaya.vendor, `a som tam cart works a soi (${papaya.n})`);
+    assert(papaya.moved && papaya.pounded, 'the cart rolls the soi and the pestle pounds');
+    assert(papaya.paid && papaya.healed, 'E buys som tam for ฿45');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

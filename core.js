@@ -297,6 +297,7 @@ export const GAMEPLAY = {
   longtailChase: true,    // steal a longtail with stars and river cops chase in the channel
   boatNoodle: true,       // kuay teow reua: a noodle boat works the pier; E for a bowl
   twoAmCheckpoint: true,  // 1:30–3:40 ด่าน: spike strip across the lane; blow through is 2★
+  somTam: true,           // som tam cart on a soi; pestle, E for a plate
 };
 G.gameplay = GAMEPLAY;
 
