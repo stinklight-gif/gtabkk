@@ -7653,6 +7653,43 @@ async function main() {
     });
     assert(southSit.flag && southSit.n >= 2 && southSit.phones >= 2 && southSit.near && southSit.other, `passengers sit south of the Hua Lamphong platform (${southSit.n})`);
     assert(southSit.late >= 2 && southSit.day >= 2 && southSit.seated >= 2 && southSit.folded && southSit.glowed, 'they hide late, sit with phones, and the screens glow');
+
+    console.log('\n[215] second Sukhumvit gun shop customer');
+    const gunShopperB = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.gunShopperB;
+      const ped = c && c.ped;
+      const cse = !!(ped && ped.mesh && ped.mesh.getObjectByName('gun-case'));
+      const clerk = G.gunClerk;
+      const first = G.gunShopper;
+      const near = !!(c && clerk && Math.hypot(c.x - clerk.x, c.z - clerk.z) < 4);
+      const other = !!(c && first && Math.hypot(c.x - first.x, c.z - first.z) > 2);
+      G.time.dayT = 22.4 / 24;
+      main.updateGunClerk(0.05);
+      const night = !!(ped && ped.mesh && ped.mesh.visible === false);
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updateGunClerk(0.05);
+      const day = !!(ped && ped.gunClerk && ped.gunShop && ped.mesh && ped.mesh.visible);
+      const z0 = ped && ped.mesh ? ped.mesh.position.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateGunClerk(0.05);
+      const shifted = !!(ped && ped.mesh && Math.abs(ped.mesh.position.z - z0) > 0.02);
+      const tool = ped && ped.mesh && ped.mesh.getObjectByName('gun-case');
+      if (c) c.t = 0.2;
+      main.updateGunClerk(0.05);
+      const r0 = tool ? tool.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 4.2;
+      main.updateGunClerk(0.05);
+      const swung = !!(tool && Math.abs(tool.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.gunClerk),
+        rec: !!(ped && ped.gunClerk && ped.gunShop),
+        cse, near, other, night, day, shifted, swung,
+      };
+    });
+    assert(gunShopperB.flag && gunShopperB.rec && gunShopperB.cse && gunShopperB.near && gunShopperB.other, 'a second customer waits at the Sukhumvit Gun Shop counter');
+    assert(gunShopperB.night && gunShopperB.day && gunShopperB.shifted && gunShopperB.swung, 'they hide after hours and the gun case turns');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
