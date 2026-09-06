@@ -333,10 +333,26 @@ async function main() {
       G.time.weather = 'clear';
       G.time.rainStrength = 0;
       G._rainTarget = 0;
-      let car = G.player.inVehicle;
-      if (!car || !car.spec || car.spec.kind === 'bike' || car.spec.kind === 'boat' || car.spec.kind === 'airliner') {
-        car = main.makeVehicle('camry', G.scene);
-      }
+      // Occupied slice: wanderers and traffic can stand on the pin strip at
+      // (0,-150) and steal engine pull / terminal speed. Shove them aside.
+      const clearPin = () => {
+        for (const ped of G.peds || []) {
+          if (!ped || !ped.mesh) continue;
+          if (Math.hypot(ped.mesh.position.x, ped.mesh.position.z + 150) < 14) {
+            ped.mesh.position.set(90, 0, 90);
+            if (ped.anchor && ped.anchor.slot) ped.anchor.slot.set(90, 0, 90);
+          }
+        }
+        for (const v of G.vehicles || []) {
+          if (!v || v === G.player.inVehicle || !v.pos) continue;
+          if (Math.hypot(v.pos.x, v.pos.z + 150) < 14) {
+            v.pos.set(80, 0, 80);
+            if (v.mesh) v.mesh.position.copy(v.pos);
+          }
+        }
+      };
+      clearPin();
+      let car = main.makeVehicle('camry', G.scene);
       G.player.inVehicle = car;
       car.driver = 'player';
       car.npc = null;
@@ -360,6 +376,7 @@ async function main() {
           car.pos.set(0, 0, -150); car.heading = 0;
           car.mesh.position.copy(car.pos); car.mesh.rotation.y = 0;
           G.player.group.position.copy(car.pos);
+          car._impactVX = 0; car._impactVZ = 0; car._impactSpin = 0;
         }
       };
 
