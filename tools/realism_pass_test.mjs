@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -462,7 +462,7 @@ async function main() {
     const peds = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
       const ways = (G.world.walkways || []).length;
-      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart && !p.songthaewRide && !p.watSweep);
+      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart && !p.songthaewRide && !p.watSweep && !p.yaoGold);
       const b = G.world.buildings.find(x => x.size.y > 8 && x.size.x > 4 && x.size.z > 4) || G.world.buildings[0];
       const insideBefore = wanderer && b && Math.abs(wanderer.mesh.position.x - b.pos.x) < b.size.x / 2 && Math.abs(wanderer.mesh.position.z - b.pos.z) < b.size.z / 2;
       if (wanderer && b) {
@@ -3107,6 +3107,37 @@ async function main() {
     });
     assert(sweep.flag && sweep.n >= 2 && sweep.brooms >= 2 && sweep.nearWat >= 2, `monks sweep the wat courtyard (${sweep.n})`);
     assert(sweep.day >= 2 && sweep.morning >= 2 && sweep.walked && sweep.swung, 'they hide by day and sweep at dawn');
+
+    console.log('\n[93] Yaowarat gold shop window');
+    const gold = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.yaoGold;
+      const named = !!(c && c.mesh && c.mesh.name === 'yao-gold');
+      const trays = c && c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'yao-gold-tray').length : 0;
+      const sign = !!(c && c.mesh && c.mesh.getObjectByName('yao-gold-sign'));
+      const poi = G.world && G.world.poi && G.world.poi.yaowarat;
+      const nearYao = !!(c && poi && Math.hypot(c.x - poi.x, c.z - poi.z) < 40);
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updateYaoGold(0.05);
+      const dayGlow = c && c.goldMat ? c.goldMat.emissiveIntensity : 9;
+      const dayShop = (c && c.shoppers || []).filter(p => p && p.yaoGold && p.mesh && p.mesh.visible === false).length;
+      G.time.dayT = 21.2 / 24;
+      if (c) c.t = Math.PI / 6;
+      main.updateYaoGold(0.05);
+      const nightGlow = c && c.goldMat ? c.goldMat.emissiveIntensity : 0;
+      const nightShop = (c && c.shoppers || []).filter(p => p && p.yaoGold && p.mesh && p.mesh.visible).length;
+      const e0 = c && c.goldMat ? c.goldMat.emissiveIntensity : 0;
+      if (c) c.t = 0.2;
+      main.updateYaoGold(0.05);
+      const pulsed = !!(c && c.goldMat && Math.abs(c.goldMat.emissiveIntensity - e0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.yaoGold),
+        named, trays, sign, nearYao, dayGlow, nightGlow, dayShop, nightShop, pulsed,
+      };
+    });
+    assert(gold.flag && gold.named && gold.trays >= 5 && gold.sign && gold.nearYao, 'a gold-shop window waits on Yaowarat');
+    assert(gold.dayShop >= 3 && gold.nightShop >= 3 && gold.dayGlow < gold.nightGlow && gold.pulsed, 'the gold wakes up after dark and shoppers look in');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

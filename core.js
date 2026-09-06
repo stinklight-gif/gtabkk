@@ -319,6 +319,7 @@ export const GAMEPLAY = {
   squidGrill: true,       // grilled-squid cart on Yaowarat after dark; E for a stick
   songthaewRiders: true,  // passengers sit the BTS songthaew bench; hop off when you take it
   watSweep: true,         // monks sweep the wat courtyard at dawn
+  yaoGold: true,          // gold-shop window on Yaowarat; shoppers after dark
 };
 G.gameplay = GAMEPLAY;
 

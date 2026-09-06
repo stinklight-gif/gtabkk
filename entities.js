@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -1692,6 +1692,69 @@ export function spawnSquidGrill(scene) {
   vendor.heading = PI;
   if (vendor.mesh) vendor.mesh.rotation.y = PI;
   G.squidGrill = { mesh, vendor, x, z, t: 0, coalMat: mesh.userData.coalMat };
+}
+
+function makeYaoGoldMesh() {
+  const g = new THREE.Group();
+  g.name = 'yao-gold';
+  const frame = new THREE.Mesh(
+    new THREE.BoxGeometry(2.4, 2.2, 0.18),
+    new THREE.MeshStandardMaterial({ color: 0x3a1a12, roughness: 0.7 })
+  );
+  frame.position.y = 1.2;
+  g.add(frame);
+  const glass = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.05, 1.7),
+    new THREE.MeshStandardMaterial({ color: 0x8899aa, transparent: true, opacity: 0.28, metalness: 0.4, roughness: 0.2 })
+  );
+  glass.position.set(0, 1.2, 0.1);
+  g.add(glass);
+  const goldMat = new THREE.MeshStandardMaterial({
+    color: 0xe8c04a, roughness: 0.35, metalness: 0.75, emissive: 0xd4a020, emissiveIntensity: 0.15,
+  });
+  g.userData.goldMat = goldMat;
+  for (let i = 0; i < 5; i++) {
+    const tray = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.04, 0.18), goldMat);
+    tray.name = 'yao-gold-tray';
+    tray.position.set(-0.7 + i * 0.35, 0.85 + (i % 2) * 0.45, 0.02);
+    g.add(tray);
+  }
+  const sign = new THREE.Mesh(
+    new THREE.BoxGeometry(1.6, 0.28, 0.08),
+    new THREE.MeshStandardMaterial({ color: 0xa8261f, roughness: 0.6, emissive: 0xff2233, emissiveIntensity: 0.2 })
+  );
+  sign.name = 'yao-gold-sign';
+  sign.position.set(0, 2.42, 0.06);
+  g.add(sign);
+  g.userData.signMat = sign.material;
+  return g;
+}
+
+export function spawnYaoGold(scene) {
+  if (!GAMEPLAY.yaoGold) return;
+  const poi = G.world && G.world.poi && G.world.poi.yaowarat;
+  if (!poi) return;
+  const x = poi.x - 8.2, z = poi.z - 22;
+  const mesh = makeYaoGoldMesh();
+  mesh.position.set(x, 0, z);
+  mesh.rotation.y = PI / 2;
+  scene.add(mesh);
+  const shoppers = [];
+  for (let i = 0; i < 3; i++) {
+    const px = x + 1.15, pz = z + (i - 1) * 0.75;
+    const ped = spawnPed(scene, new THREE.Vector3(px, 0, pz), i === 1 ? 'tourist' : 'local');
+    ped.yaoGold = true;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = -PI / 2;
+    ped.anchor = { slot: new THREE.Vector3(px, 0, pz), facing: -PI / 2 };
+    if (ped.mesh) {
+      ped.mesh.rotation.y = -PI / 2;
+      ped.mesh.visible = false;
+    }
+    shoppers.push(ped);
+  }
+  G.yaoGold = { mesh, shoppers, x, z, t: 0, goldMat: mesh.userData.goldMat, signMat: mesh.userData.signMat };
 }
 
 export function makeCoconutCartMesh() {
