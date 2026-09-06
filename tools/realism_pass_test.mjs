@@ -7498,6 +7498,46 @@ async function main() {
     });
     assert(eastCrew.flag && eastCrew.n >= 2 && eastCrew.paddles >= 2 && eastCrew.near && eastCrew.other, `marshallers wait on the east Suvarnabhumi apron (${eastCrew.n})`);
     assert(eastCrew.night >= 2 && eastCrew.day >= 2 && eastCrew.shifted && eastCrew.swung, 'they hide after 21:00 and the paddles wave');
+
+    console.log('\n[211] north Hua Lamphong station porters');
+    const northPorters = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.northStationPorter;
+      const list = (c && c.porters) || [];
+      const n = list.filter(p => p && p.stationPorter && p.mesh).length;
+      const bags = list.filter(p => p && p.mesh && p.mesh.getObjectByName('station-bag')).length;
+      const first = G.stationPorter;
+      const spawn = G.world && G.world.spawns && G.world.spawns.player;
+      const near = !!(c && spawn && Math.hypot(c.x - spawn.x, c.z - spawn.z) < 8);
+      const s0 = list[0] && list[0].anchor && list[0].anchor.slot;
+      const f0 = first && first.porters && first.porters[0] && first.porters[0].anchor && first.porters[0].anchor.slot;
+      const other = !!(s0 && f0 && Math.hypot(s0.x - f0.x, s0.z - f0.z) > 2);
+      G.time.dayT = 23 / 24;
+      main.updateStationPorter(0.05);
+      const night = list.filter(p => p && p.mesh && p.mesh.visible === false).length;
+      G.time.dayT = 12.5 / 24;
+      if (c) c.t = 0.2;
+      main.updateStationPorter(0.05);
+      const day = list.filter(p => p && p.stationPorter && p.mesh && p.mesh.visible).length;
+      const p0 = list[0];
+      const x0 = p0 && p0.mesh ? p0.mesh.position.x : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateStationPorter(0.05);
+      const shifted = !!(p0 && p0.mesh && Math.abs(p0.mesh.position.x - x0) > 0.02);
+      const bag = p0 && p0.mesh && p0.mesh.getObjectByName('station-bag');
+      if (c) c.t = 0.2;
+      main.updateStationPorter(0.05);
+      const r0 = bag ? bag.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 3.2;
+      main.updateStationPorter(0.05);
+      const swung = !!(bag && Math.abs(bag.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.stationPorter),
+        n, bags, near, other, night, day, shifted, swung,
+      };
+    });
+    assert(northPorters.flag && northPorters.n >= 2 && northPorters.bags >= 2 && northPorters.near && northPorters.other, `porters wait north of the Hua Lamphong canopy (${northPorters.n})`);
+    assert(northPorters.night >= 2 && northPorters.day >= 2 && northPorters.shifted && northPorters.swung, 'they hide after 22:00 and the bags swing');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

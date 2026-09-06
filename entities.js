@@ -3071,49 +3071,55 @@ export function spawnStationPorter(scene) {
   if (!GAMEPLAY.stationPorter) return;
   const spawn = G.world && G.world.spawns && G.world.spawns.player;
   if (!spawn) return;
-  const porters = [];
-  const slots = [
+  const packPorters = (slots) => {
+    const porters = [];
+    for (let i = 0; i < slots.length; i++) {
+      const slot = slots[i];
+      const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
+      recolorTorso(ped.mesh.userData.parts, 0xc03030, 0.7);
+      ped.stationPorter = true;
+      ped.speed = 0;
+      ped.state = 'idle';
+      ped.heading = slot.facing;
+      ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
+      if (ped.mesh) {
+        ped.mesh.rotation.y = slot.facing;
+        ped.mesh.visible = false;
+      }
+      const bag = new THREE.Group();
+      bag.name = 'station-bag';
+      const body = new THREE.Mesh(
+        new THREE.BoxGeometry(0.18, 0.22, 0.12),
+        new THREE.MeshStandardMaterial({ color: i === 0 ? 0x2a4a8a : 0xffcf4a, roughness: 0.65 })
+      );
+      bag.add(body);
+      const handle = new THREE.Mesh(
+        new THREE.BoxGeometry(0.1, 0.04, 0.02),
+        new THREE.MeshStandardMaterial({ color: 0x2a2a32, roughness: 0.5 })
+      );
+      handle.position.y = 0.14;
+      bag.add(handle);
+      const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+      if (parts && parts.foreR) {
+        bag.position.set(0.02, -0.22, 0.08);
+        parts.foreR.add(bag);
+      } else if (ped.mesh) {
+        bag.position.set(0.22, 1.05, 0.12);
+        ped.mesh.add(bag);
+      }
+      ped._bag = bag;
+      porters.push(ped);
+    }
+    return { porters, x: spawn.x, z: spawn.z, t: 0 };
+  };
+  G.stationPorter = packPorters([
     { x: spawn.x - 5.2, z: spawn.z - 2.8, facing: 0, kind: 'laborer' },
     { x: spawn.x + 5.6, z: spawn.z - 2.6, facing: 0, kind: 'laborer' },
-  ];
-  for (let i = 0; i < slots.length; i++) {
-    const slot = slots[i];
-    const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
-    recolorTorso(ped.mesh.userData.parts, 0xc03030, 0.7);
-    ped.stationPorter = true;
-    ped.speed = 0;
-    ped.state = 'idle';
-    ped.heading = slot.facing;
-    ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
-    if (ped.mesh) {
-      ped.mesh.rotation.y = slot.facing;
-      ped.mesh.visible = false;
-    }
-    const bag = new THREE.Group();
-    bag.name = 'station-bag';
-    const body = new THREE.Mesh(
-      new THREE.BoxGeometry(0.18, 0.22, 0.12),
-      new THREE.MeshStandardMaterial({ color: i === 0 ? 0x2a4a8a : 0xffcf4a, roughness: 0.65 })
-    );
-    bag.add(body);
-    const handle = new THREE.Mesh(
-      new THREE.BoxGeometry(0.1, 0.04, 0.02),
-      new THREE.MeshStandardMaterial({ color: 0x2a2a32, roughness: 0.5 })
-    );
-    handle.position.y = 0.14;
-    bag.add(handle);
-    const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
-    if (parts && parts.foreR) {
-      bag.position.set(0.02, -0.22, 0.08);
-      parts.foreR.add(bag);
-    } else if (ped.mesh) {
-      bag.position.set(0.22, 1.05, 0.12);
-      ped.mesh.add(bag);
-    }
-    ped._bag = bag;
-    porters.push(ped);
-  }
-  G.stationPorter = { porters, x: spawn.x, z: spawn.z, t: 0 };
+  ]);
+  G.northStationPorter = packPorters([
+    { x: spawn.x - 5.2, z: spawn.z + 2.8, facing: PI, kind: 'laborer' },
+    { x: spawn.x + 5.6, z: spawn.z + 2.6, facing: PI, kind: 'laborer' },
+  ]);
   const sitters = [];
   const sitSlots = [
     { x: spawn.x - 2.4, z: spawn.z + 2.6, facing: PI, kind: 'office' },
