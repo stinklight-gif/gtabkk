@@ -310,7 +310,7 @@ export const GAMEPLAY = {
   rotiCart: true,         // banana roti cart on a soi; E for a fold
   rainPoncho: true,       // plastic rain capes on motorbike riders when it pours
   bikeSeatCover: true,    // plastic seat covers on parked 7-Eleven bikes in the rain
-  watBell: true,          // temple bell at the wat; E rings it and cools last-seen
+  watBell: true,          // temple bell at the wat; E rings it and cools last-seen; a monk tends it at dawn and dusk
   stallIncense: true,     // mosquito coils hang under stall parasols; glow after dusk
   mangoSticky: true,      // khao niao mamuang carts at Asok and Phrom Phong BTS; evening, E for a plate
   watBats: true,          // flying foxes circle the wat after dusk

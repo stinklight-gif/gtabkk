@@ -253,14 +253,14 @@ export function resyncCrowd() {
   // pull stray wanderers onto nearby sidewalks so the count near the camera
   // reflects the hour immediately (harness-only; gameplay distributes gradually)
   for (const ped of G.peds) {
-    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.yaoPhoto || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.homeAuntie || ped.stationPorter || ped.garageMech || ped.klongDock || ped.sengClerk || ped.airportCrew || ped.airportCargo || ped.airportTower || ped.airportTaxi || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.soiBarber) continue;
+    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.yaoPhoto || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.homeAuntie || ped.stationPorter || ped.garageMech || ped.klongDock || ped.sengClerk || ped.airportCrew || ped.airportCargo || ped.airportTower || ped.airportTaxi || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.watBell || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.soiBarber) continue;
     if (dist2(ped.mesh.position, pp) > 95 * 95) ped.mesh.position.copy(sidewalkPos(pp.x, pp.z, 88));
   }
   for (let guard = 0; G.peds.length > target && guard < 500; guard++) {
     let fi = -1, fd = -1;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.yaoPhoto || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.homeAuntie || ped.stationPorter || ped.garageMech || ped.klongDock || ped.sengClerk || ped.airportCrew || ped.airportCargo || ped.airportTower || ped.airportTaxi || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.soiBarber) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.yaoPhoto || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.homeAuntie || ped.stationPorter || ped.garageMech || ped.klongDock || ped.sengClerk || ped.airportCrew || ped.airportCargo || ped.airportTower || ped.airportTaxi || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.watBell || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.soiBarber) continue;
       const d = dist2(ped.mesh.position, pp);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -374,6 +374,9 @@ export function updatePeds(dt) {
       continue;
     }
     if (ped.watDrum) {
+      continue;
+    }
+    if (ped.watBell) {
       continue;
     }
     if (ped.sevenShop) {
@@ -777,7 +780,7 @@ export function updatePeds(dt) {
     let fi = -1, fd = 60 * 60;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.yaoPhoto || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.homeAuntie || ped.stationPorter || ped.garageMech || ped.klongDock || ped.sengClerk || ped.airportCrew || ped.airportCargo || ped.airportTower || ped.airportTaxi || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.soiBarber) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.yaoPhoto || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.homeAuntie || ped.stationPorter || ped.garageMech || ped.klongDock || ped.sengClerk || ped.airportCrew || ped.airportCargo || ped.airportTower || ped.airportTaxi || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.watBell || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.soiBarber) continue;
       const d = dist2(ped.mesh.position, playerPos);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -3134,7 +3137,7 @@ export function updateSeekShade(dt) {
   let n = 0;
   for (const ped of G.peds) {
     if (n >= 22) break;
-    if (!ped || ped.dead || ped.anchor || ped.gang || ped.pillion || ped.alms || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.checkpoint || ped.btsSit || ped.sevenGuard || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.homeAuntie || ped.stationPorter || ped.garageMech || ped.klongDock || ped.sengClerk || ped.airportCrew || ped.airportCargo || ped.airportTower || ped.airportTaxi || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.soiBarber || ped.yaoPhoto || ped.panicT > 0) continue;
+    if (!ped || ped.dead || ped.anchor || ped.gang || ped.pillion || ped.alms || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.checkpoint || ped.btsSit || ped.sevenGuard || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.homeAuntie || ped.stationPorter || ped.garageMech || ped.klongDock || ped.sengClerk || ped.airportCrew || ped.airportCargo || ped.airportTower || ped.airportTaxi || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.watBell || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.soiBarber || ped.yaoPhoto || ped.panicT > 0) continue;
     if (ped.social || ped.isMugger || ped.isTarget || ped.motosaiRider || ped.motosaiWait) continue;
     const w = nearestWalkway(ped.mesh.position.x, ped.mesh.position.z);
     if (!w) continue;
@@ -3154,6 +3157,30 @@ export function updateWatBell(dt) {
   } else {
     if (b.bell) b.bell.rotation.z = 0;
     if (b.striker) b.striker.rotation.z = 0.35;
+  }
+  const keep = G.watBellMonk;
+  if (keep) {
+    keep.t = (keep.t || 0) + dt;
+    const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+    const shift = (h >= 6 && h < 8.5) || (h >= 17 && h < 19.5);
+    const ped = keep.ped;
+    if (ped && ped.mesh) {
+      ped.watBell = true;
+      ped.mesh.visible = shift;
+      if (shift) {
+        const slot = ped.anchor && ped.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(keep.t * 2.2) * 0.05;
+          ped.mesh.position.set(slot.x, 0, slot.z + bob);
+          ped.heading = ped.anchor.facing;
+          ped.mesh.rotation.y = ped.heading;
+        }
+        const mallet = ped.mesh.getObjectByName('wat-bell-mallet');
+        if (mallet) mallet.rotation.z = 0.55 + Math.sin(keep.t * 4.2) * 0.35;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+    }
   }
   if (G.player.inVehicle || G._eating || G._barberCut) return;
   const pp = G.player.group.position;

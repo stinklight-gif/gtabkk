@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.homeAuntie || ped.stationPorter || ped.garageMech || ped.klongDock || ped.sengClerk || ped.airportCrew || ped.airportCargo || ped.airportTower || ped.airportTaxi || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.watBell || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.homeAuntie || ped.stationPorter || ped.garageMech || ped.klongDock || ped.sengClerk || ped.airportCrew || ped.airportCargo || ped.airportTower || ped.airportTaxi || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -4798,6 +4798,35 @@ export function spawnWatBell(scene) {
   g.position.set(x, 0, z);
   scene.add(g);
   G.watBell = { mesh: g, bell, striker, x, z, ringT: 0 };
+  const mx = x - 0.85, mz = z + 0.1;
+  const monk = spawnPed(scene, new THREE.Vector3(mx, 0, mz), 'monk');
+  monk.watBell = true;
+  monk.anchor = { slot: new THREE.Vector3(mx, 0, mz), facing: PI / 2 };
+  monk.speed = 0;
+  monk.state = 'idle';
+  monk.heading = PI / 2;
+  if (monk.mesh) {
+    monk.mesh.rotation.y = PI / 2;
+    monk.mesh.visible = false;
+    const bowl = monk.mesh.getObjectByName('alms-bowl');
+    if (bowl) bowl.visible = false;
+  }
+  const mallet = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.018, 0.028, 0.42, 5),
+    new THREE.MeshStandardMaterial({ color: 0x4a3a22, roughness: 0.75 })
+  );
+  mallet.name = 'wat-bell-mallet';
+  const parts = monk.mesh && monk.mesh.userData && monk.mesh.userData.parts;
+  if (parts && parts.foreR) {
+    mallet.position.set(0.02, -0.28, 0.06);
+    mallet.rotation.z = 0.55;
+    parts.foreR.add(mallet);
+  } else if (monk.mesh) {
+    mallet.position.set(0.22, 1.05, 0.12);
+    mallet.rotation.z = 0.55;
+    monk.mesh.add(mallet);
+  }
+  G.watBellMonk = { ped: monk, x: mx, z: mz, t: 0 };
 }
 
 export function spawnWatDrum(scene) {

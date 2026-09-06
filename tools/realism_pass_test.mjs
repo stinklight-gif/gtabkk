@@ -6863,6 +6863,43 @@ async function main() {
     });
     assert(bankTeller.flag && bankTeller.rec && bankTeller.stamp && bankTeller.near && bankTeller.other, 'a teller works behind the Krung Thep Bank counter');
     assert(bankTeller.night && bankTeller.day && bankTeller.shifted && bankTeller.swung, 'they hide after hours and the stamp turns');
+
+    console.log('\n[194] wat bell monk');
+    const bellMonk = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.watBellMonk;
+      const ped = c && c.ped;
+      const mallet = !!(ped && ped.mesh && ped.mesh.getObjectByName('wat-bell-mallet'));
+      const bell = G.watBell;
+      const near = !!(c && bell && Math.hypot(c.x - bell.x, c.z - bell.z) < 4);
+      const drum = G.watDrum && G.watDrum.monk;
+      const other = !!(c && drum && drum.mesh && Math.hypot(c.x - drum.mesh.position.x, c.z - drum.mesh.position.z) > 2);
+      G.time.dayT = 12 / 24;
+      main.updateWatBell(0.05);
+      const noon = !!(ped && ped.mesh && ped.mesh.visible === false);
+      G.time.dayT = 7.2 / 24;
+      if (c) c.t = 0.2;
+      main.updateWatBell(0.05);
+      const dawn = !!(ped && ped.watBell && ped.mesh && ped.mesh.visible);
+      const z0 = ped && ped.mesh ? ped.mesh.position.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateWatBell(0.05);
+      const shifted = !!(ped && ped.mesh && Math.abs(ped.mesh.position.z - z0) > 0.02);
+      const tool = ped && ped.mesh && ped.mesh.getObjectByName('wat-bell-mallet');
+      if (c) c.t = 0.2;
+      main.updateWatBell(0.05);
+      const r0 = tool ? tool.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 4.2;
+      main.updateWatBell(0.05);
+      const swung = !!(tool && Math.abs(tool.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.watBell),
+        rec: !!(ped && ped.watBell),
+        mallet, near, other, noon, dawn, shifted, swung,
+      };
+    });
+    assert(bellMonk.flag && bellMonk.rec && bellMonk.mallet && bellMonk.near && bellMonk.other, 'a monk tends the wat bell');
+    assert(bellMonk.noon && bellMonk.dawn && bellMonk.shifted && bellMonk.swung, 'they hide at noon and the mallet turns');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
