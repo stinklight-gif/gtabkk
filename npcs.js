@@ -3356,7 +3356,7 @@ export function updateSevenShoppers(dt) {
   if (!GAMEPLAY.sevenShoppers) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const open = h >= 7 && h < 22;
-  for (const rec of [G.sevenShoppers, G.southSevenShoppers]) {
+  for (const rec of [G.sevenShoppers, G.southSevenShoppers, G.westSevenShoppers]) {
     if (!rec) continue;
     for (const ped of rec.shoppers || []) {
       if (!ped || ped.dead || !ped.mesh) continue;
