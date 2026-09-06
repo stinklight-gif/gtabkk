@@ -3353,32 +3353,34 @@ export function updateBtsBusker(dt) {
 }
 
 export function updateSevenShoppers(dt) {
-  if (!GAMEPLAY.sevenShoppers || !G.sevenShoppers) return;
-  const rec = G.sevenShoppers;
+  if (!GAMEPLAY.sevenShoppers) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const open = h >= 7 && h < 22;
-  for (const ped of rec.shoppers || []) {
-    if (!ped || ped.dead || !ped.mesh) continue;
-    ped.sevenShop = true;
-    ped.mesh.visible = open;
-    if (!open) {
-      ped.speed = 0;
-      ped.state = 'idle';
-      continue;
+  for (const rec of [G.sevenShoppers, G.southSevenShoppers]) {
+    if (!rec) continue;
+    for (const ped of rec.shoppers || []) {
+      if (!ped || ped.dead || !ped.mesh) continue;
+      ped.sevenShop = true;
+      ped.mesh.visible = open;
+      if (!open) {
+        ped.speed = 0;
+        ped.state = 'idle';
+        continue;
+      }
+      ped._shopT = (ped._shopT || 0) + dt * 0.16 * (ped._shopDir || 1);
+      if (ped._shopT > 1) { ped._shopT = 1; ped._shopDir = -1; }
+      if (ped._shopT < 0) { ped._shopT = 0; ped._shopDir = 1; }
+      const t = ped._shopT;
+      const z = rec.curbZ + (rec.doorZ - rec.curbZ) * t;
+      ped.mesh.position.set(ped._shopX != null ? ped._shopX : rec.x, 0, z);
+      ped.heading = (ped._shopDir || 1) > 0 ? PI : 0;
+      ped.mesh.rotation.y = ped.heading;
+      ped.speed = 1.15;
+      ped.state = 'walking';
+      animateWalk(ped.mesh, ped.speed, dt, true);
+      const bag = ped._sevenBag || ped.mesh.getObjectByName('seven-bag');
+      if (bag) bag.visible = (ped._shopDir || 1) < 0;
     }
-    ped._shopT = (ped._shopT || 0) + dt * 0.16 * (ped._shopDir || 1);
-    if (ped._shopT > 1) { ped._shopT = 1; ped._shopDir = -1; }
-    if (ped._shopT < 0) { ped._shopT = 0; ped._shopDir = 1; }
-    const t = ped._shopT;
-    const z = rec.curbZ + (rec.doorZ - rec.curbZ) * t;
-    ped.mesh.position.set(ped._shopX != null ? ped._shopX : rec.x, 0, z);
-    ped.heading = (ped._shopDir || 1) > 0 ? PI : 0;
-    ped.mesh.rotation.y = ped.heading;
-    ped.speed = 1.15;
-    ped.state = 'walking';
-    animateWalk(ped.mesh, ped.speed, dt, true);
-    const bag = ped._sevenBag || ped.mesh.getObjectByName('seven-bag');
-    if (bag) bag.visible = (ped._shopDir || 1) < 0;
   }
 }
 
