@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -3061,6 +3061,64 @@ export function spawnMallRoma(scene) {
   }
   customer._bag = bag;
   G.mallRoma = { clerk, customer, x, z, t: 0 };
+}
+
+export function spawnMallWatch(scene) {
+  if (!GAMEPLAY.mallWatch) return;
+  const mall = G.world && G.world.mall;
+  const shop = mall && (mall.shops || []).find(s => s && s.name === 'Watch Boutique');
+  if (!shop || !shop.pos) return;
+  const x = shop.pos.x, z = shop.pos.z, y = shop.pos.y || 10;
+  const clerk = spawnPed(scene, new THREE.Vector3(x + 1.55, 0, z), 'office');
+  recolorTorso(clerk.mesh.userData.parts, 0x2a4a3a, 0.7);
+  clerk.mallWatch = true;
+  clerk.watchRole = 'clerk';
+  clerk.speed = 0;
+  clerk.state = 'idle';
+  clerk.heading = -PI / 2;
+  clerk.anchor = { slot: new THREE.Vector3(x + 1.55, y, z), facing: -PI / 2 };
+  if (clerk.mesh) {
+    clerk.mesh.position.y = y;
+    clerk.mesh.rotation.y = -PI / 2;
+    clerk.mesh.visible = false;
+  }
+  const customer = spawnPed(scene, new THREE.Vector3(x - 0.15, 0, z + 0.12), 'tourist');
+  customer.mallWatch = true;
+  customer.watchRole = 'customer';
+  customer.speed = 0;
+  customer.state = 'idle';
+  customer.heading = PI / 2;
+  customer.anchor = { slot: new THREE.Vector3(x - 0.15, y, z + 0.12), facing: PI / 2 };
+  if (customer.mesh) {
+    customer.mesh.position.y = y;
+    customer.mesh.rotation.y = PI / 2;
+    customer.mesh.visible = false;
+  }
+  const tray = new THREE.Group();
+  tray.name = 'mall-watch-tray';
+  const pad = new THREE.Mesh(
+    new THREE.BoxGeometry(0.16, 0.02, 0.1),
+    new THREE.MeshStandardMaterial({ color: 0x1a3a28, roughness: 0.7 })
+  );
+  tray.add(pad);
+  const face = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.03, 0.03, 0.012, 10),
+    new THREE.MeshStandardMaterial({ color: 0xd9a134, metalness: 0.55, roughness: 0.35, emissive: 0x886622, emissiveIntensity: 0.2 })
+  );
+  face.name = 'mall-watch-face';
+  face.rotation.x = PI / 2;
+  face.position.y = 0.02;
+  tray.add(face);
+  const parts = clerk.mesh && clerk.mesh.userData && clerk.mesh.userData.parts;
+  if (parts && parts.foreR) {
+    tray.position.set(0.02, -0.22, 0.08);
+    parts.foreR.add(tray);
+  } else if (clerk.mesh) {
+    tray.position.set(0.22, 1.05, 0.12);
+    clerk.mesh.add(tray);
+  }
+  clerk._tray = tray;
+  G.mallWatch = { clerk, customer, x, z, y, t: 0 };
 }
 
 export function spawnSevenAtm(scene) {
