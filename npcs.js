@@ -1868,42 +1868,44 @@ export function updateBankGuard(dt) {
 }
 
 export function updateMallDirectory(dt) {
-  if (!GAMEPLAY.mallDir || !G.mallDir) return;
-  const c = G.mallDir;
-  c.t = (c.t || 0) + dt;
+  if (!GAMEPLAY.mallDir) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const open = h >= 10 && h < 22;
-  if (c.screen && c.screen.material) {
-    c.screen.material.emissiveIntensity = open ? 0.35 + 0.28 * Math.max(0, Math.sin(c.t * 3.2)) : 0.05;
-  }
-  const ped = c.clerk;
-  if (ped && ped.mesh) {
-    ped.mallDir = true;
-    ped.mesh.visible = open;
-    const slot = ped.anchor && ped.anchor.slot;
-    if (slot) {
-      ped.mesh.position.set(slot.x, 0, slot.z);
-      ped.heading = ped.anchor.facing;
-      ped.mesh.rotation.y = ped.heading;
-    }
-    ped.speed = 0;
-    ped.state = 'idle';
-  }
-  if (!open || G.player.inVehicle || G._eating) return;
   const pp = G.player.group.position;
-  if (!c.mesh || dist2(c.mesh.position, pp) > 2.8 * 2.8) return;
-  if (Math.abs((pp.y || 0) - (c.mesh.position.y || 0)) > 2.2) return;
-  G.hud.showPrompt('Press <b>E</b> to ask the directory', 0.4);
-  if (!G.input.pressed('KeyE')) return;
-  const shops = (G.world.mall && G.world.mall.shops) || [];
-  if (!shops.length) return;
-  c.idx = ((c.idx || 0) + 1) % shops.length;
-  const s = shops[c.idx];
-  const floor = !s || s.pos.y < 1 ? 'G' : s.pos.y < 8 ? '1' : '2';
-  G._mallDir = (G._mallDir || 0) + 1;
-  G._mallDirShop = s && s.name;
-  if (G.hud.showNotif) G.hud.showNotif(`${s.name} — floor ${floor}`);
-  if (G.audio && G.audio.chime) G.audio.chime();
+  for (const c of [G.mallDir, G.mallDirB]) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    if (c.screen && c.screen.material) {
+      c.screen.material.emissiveIntensity = open ? 0.35 + 0.28 * Math.max(0, Math.sin(c.t * 3.2)) : 0.05;
+    }
+    const ped = c.clerk;
+    if (ped && ped.mesh) {
+      ped.mallDir = true;
+      ped.mesh.visible = open;
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        ped.mesh.position.set(slot.x, 0, slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+    }
+    if (!open || G.player.inVehicle || G._eating) continue;
+    if (!c.mesh || dist2(c.mesh.position, pp) > 2.8 * 2.8) continue;
+    if (Math.abs((pp.y || 0) - (c.mesh.position.y || 0)) > 2.2) continue;
+    G.hud.showPrompt('Press <b>E</b> to ask the directory', 0.4);
+    if (!G.input.pressed('KeyE')) continue;
+    const shops = (G.world.mall && G.world.mall.shops) || [];
+    if (!shops.length) continue;
+    c.idx = ((c.idx || 0) + 1) % shops.length;
+    const s = shops[c.idx];
+    const floor = !s || s.pos.y < 1 ? 'G' : s.pos.y < 8 ? '1' : '2';
+    G._mallDir = (G._mallDir || 0) + 1;
+    G._mallDirShop = s && s.name;
+    if (G.hud.showNotif) G.hud.showNotif(`${s.name} — floor ${floor}`);
+    if (G.audio && G.audio.chime) G.audio.chime();
+  }
 }
 
 export function updateOfficeSmoke(dt) {

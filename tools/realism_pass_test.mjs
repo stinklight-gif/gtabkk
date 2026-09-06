@@ -7727,6 +7727,50 @@ async function main() {
     });
     assert(starterShopperB.flag && starterShopperB.rec && starterShopperB.cse && starterShopperB.near && starterShopperB.other, 'a second customer waits at the Hua Lamphong starter gun counter');
     assert(starterShopperB.night && starterShopperB.day && starterShopperB.shifted && starterShopperB.swung, 'they hide after hours and the gun case turns');
+
+    console.log('\n[217] north Terminal 21 directory');
+    const northDir = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.mallDirB;
+      const first = G.mallDir;
+      const named = !!(c && c.mesh && c.mesh.name === 'north-mall-directory');
+      const screen = !!(c && c.screen && c.screen.name === 'north-mall-dir-screen');
+      const mall = G.world && G.world.mall && G.world.mall.center;
+      const near = !!(c && mall && Math.hypot(c.x - mall.x, c.z - mall.z) < 8);
+      const other = !!(c && first && Math.hypot(c.x - first.x, c.z - first.z) > 6);
+      G.time.dayT = 23 / 24;
+      main.updateMallDirectory(0.05);
+      const night = !!(c && c.clerk && c.clerk.mesh && c.clerk.mesh.visible === false);
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updateMallDirectory(0.05);
+      const day = !!(c && c.clerk && c.clerk.mallDir && c.clerk.mesh && c.clerk.mesh.visible);
+      const glow0 = c && c.screen && c.screen.material ? c.screen.material.emissiveIntensity : 0;
+      if (c) c.t = 0.2 + Math.PI / 3.2;
+      main.updateMallDirectory(0.05);
+      const glowed = !!(c && c.screen && Math.abs(c.screen.material.emissiveIntensity - glow0) > 0.02);
+      G.player.inVehicle = null;
+      G._eating = null;
+      if (c && c.mesh) G.player.group.position.set(c.x, 0, c.z + 1.6);
+      G._mallDir = 0;
+      G._mallDirShop = null;
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let asked = false;
+      for (let i = 0; i < 4 && !asked; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateMallDirectory(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        asked = (G._mallDir || 0) >= 1 && !!G._mallDirShop;
+      }
+      return {
+        flag: !!(G.gameplay && G.gameplay.mallDir),
+        named, screen, near, other, night, day, glowed, asked, shop: G._mallDirShop,
+      };
+    });
+    assert(northDir.flag && northDir.named && northDir.screen && northDir.near && northDir.other, 'a second directory board waits north in Terminal 21');
+    assert(northDir.night && northDir.day && northDir.glowed && northDir.asked, 'the north clerk works the desk and E names a shop');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

@@ -457,7 +457,11 @@ export function updateInteraction(dt) {
       if (c && c.mesh && dist2(c.mesh.position, pp0) < 2.4 * 2.4) return;
     }
   }
-  if (GAMEPLAY.mallDir && G.mallDir && G.mallDir.mesh && dist2(G.mallDir.mesh.position, pp0) < 2.8 * 2.8) return;
+  if (GAMEPLAY.mallDir) {
+    for (const c of [G.mallDir, G.mallDirB]) {
+      if (c && c.mesh && dist2(c.mesh.position, pp0) < 2.8 * 2.8) return;
+    }
+  }
 
   const crate = G.world.yaowaratCrate;
   if (crate && !crate.taken && dist2(p.group.position, crate.pos) < 2.6 * 2.6) {
