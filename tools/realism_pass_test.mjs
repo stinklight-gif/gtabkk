@@ -6983,6 +6983,43 @@ async function main() {
     });
     assert(bankTellerB.flag && bankTellerB.rec && bankTellerB.stamp && bankTellerB.near && bankTellerB.other, 'a second teller works behind the Krung Thep Bank counter');
     assert(bankTellerB.night && bankTellerB.day && bankTellerB.shifted && bankTellerB.swung, 'they hide after hours and the stamp turns');
+
+    console.log('\n[197] second U-Spray garage mechanic');
+    const mechB = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.garageMechB;
+      const ped = c && c.ped;
+      const wrench = !!(ped && ped.mesh && ped.mesh.getObjectByName('garage-wrench'));
+      const g = G.world && G.world.garages && G.world.garages[0];
+      const first = G.garageMech;
+      const near = !!(c && g && g.pos && Math.hypot(c.x - g.pos.x, c.z - g.pos.z) < 8);
+      const other = !!(c && first && Math.hypot(c.x - first.x, c.z - first.z) > 2);
+      G.time.dayT = 21 / 24;
+      main.updateGarageMech(0.05);
+      const night = !!(ped && ped.mesh && ped.mesh.visible === false);
+      G.time.dayT = 12.5 / 24;
+      if (c) c.t = 0.2;
+      main.updateGarageMech(0.05);
+      const day = !!(ped && ped.garageMech && ped.mesh && ped.mesh.visible);
+      const z0 = ped && ped.mesh ? ped.mesh.position.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateGarageMech(0.05);
+      const shifted = !!(ped && ped.mesh && Math.abs(ped.mesh.position.z - z0) > 0.02);
+      const tool = ped && ped.mesh && ped.mesh.getObjectByName('garage-wrench');
+      if (c) c.t = 0.2;
+      main.updateGarageMech(0.05);
+      const r0 = tool ? tool.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 4.2;
+      main.updateGarageMech(0.05);
+      const swung = !!(tool && Math.abs(tool.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.garageMech),
+        rec: !!(ped && ped.garageMech),
+        wrench, near, other, night, day, shifted, swung,
+      };
+    });
+    assert(mechB.flag && mechB.rec && mechB.wrench && mechB.near && mechB.other, 'a second mechanic waits at the U-Spray bay');
+    assert(mechB.night && mechB.day && mechB.shifted && mechB.swung, 'they hide after 19:00 and the wrench turns');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

@@ -3162,32 +3162,35 @@ export function spawnGarageMech(scene) {
   if (!GAMEPLAY.garageMech) return;
   const g = G.world && G.world.garages && G.world.garages[0];
   if (!g || !g.pos) return;
-  const x = g.pos.x + 5.4, z = g.pos.z - 4.8;
-  const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'laborer');
-  recolorTorso(ped.mesh.userData.parts, 0xc45a18, 0.7);
-  ped.garageMech = true;
-  ped.speed = 0;
-  ped.state = 'idle';
-  ped.heading = -PI / 2;
-  ped.anchor = { slot: new THREE.Vector3(x, 0, z), facing: -PI / 2 };
-  if (ped.mesh) {
-    ped.mesh.rotation.y = -PI / 2;
-    ped.mesh.visible = false;
-  }
-  const wrench = new THREE.Mesh(
-    new THREE.BoxGeometry(0.04, 0.04, 0.28),
-    new THREE.MeshStandardMaterial({ color: 0x888890, metalness: 0.5, roughness: 0.35 })
-  );
-  wrench.name = 'garage-wrench';
-  const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
-  if (parts && parts.foreR) {
-    wrench.position.set(0.02, -0.22, 0.08);
-    parts.foreR.add(wrench);
-  } else if (ped.mesh) {
-    wrench.position.set(0.22, 1.05, 0.12);
-    ped.mesh.add(wrench);
-  }
-  G.garageMech = { ped, x, z, t: 0 };
+  const packMech = (x, z, facing) => {
+    const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'laborer');
+    recolorTorso(ped.mesh.userData.parts, 0xc45a18, 0.7);
+    ped.garageMech = true;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = facing;
+    ped.anchor = { slot: new THREE.Vector3(x, 0, z), facing };
+    if (ped.mesh) {
+      ped.mesh.rotation.y = facing;
+      ped.mesh.visible = false;
+    }
+    const wrench = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04, 0.04, 0.28),
+      new THREE.MeshStandardMaterial({ color: 0x888890, metalness: 0.5, roughness: 0.35 })
+    );
+    wrench.name = 'garage-wrench';
+    const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+    if (parts && parts.foreR) {
+      wrench.position.set(0.02, -0.22, 0.08);
+      parts.foreR.add(wrench);
+    } else if (ped.mesh) {
+      wrench.position.set(0.22, 1.05, 0.12);
+      ped.mesh.add(wrench);
+    }
+    return { ped, x, z, t: 0 };
+  };
+  G.garageMech = packMech(g.pos.x + 5.4, g.pos.z - 4.8, -PI / 2);
+  G.garageMechB = packMech(g.pos.x - 5.4, g.pos.z - 4.8, PI / 2);
   const cx = g.pos.x + 2.8, cz = g.pos.z - 6.6;
   const wait = spawnPed(scene, new THREE.Vector3(cx, 0, cz), 'office');
   wait.garageMech = true;

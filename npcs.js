@@ -2171,30 +2171,32 @@ export function updateStationPorter(dt) {
 }
 
 export function updateGarageMech(dt) {
-  if (!GAMEPLAY.garageMech || !G.garageMech) return;
-  const c = G.garageMech;
-  c.t = (c.t || 0) + dt;
+  if (!GAMEPLAY.garageMech) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const open = h >= 8 && h < 19;
-  const ped = c.ped;
-  if (ped && ped.mesh) {
-    ped.garageMech = true;
-    ped.mesh.visible = open;
-    if (!open) {
-      ped.speed = 0;
-      ped.state = 'idle';
-    } else {
-      const slot = ped.anchor && ped.anchor.slot;
-      if (slot) {
-        const bob = Math.sin(c.t * 2.2) * 0.05;
-        ped.mesh.position.set(slot.x, 0, slot.z + bob);
-        ped.heading = ped.anchor.facing;
-        ped.mesh.rotation.y = ped.heading;
+  for (const c of [G.garageMech, G.garageMechB]) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    const ped = c.ped;
+    if (ped && ped.mesh) {
+      ped.garageMech = true;
+      ped.mesh.visible = open;
+      if (!open) {
+        ped.speed = 0;
+        ped.state = 'idle';
+      } else {
+        const slot = ped.anchor && ped.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(c.t * 2.2) * 0.05;
+          ped.mesh.position.set(slot.x, 0, slot.z + bob);
+          ped.heading = ped.anchor.facing;
+          ped.mesh.rotation.y = ped.heading;
+        }
+        ped.speed = 0;
+        ped.state = 'idle';
+        const wrench = ped.mesh.getObjectByName('garage-wrench');
+        if (wrench) wrench.rotation.z = Math.sin(c.t * 4.2) * 0.35;
       }
-      ped.speed = 0;
-      ped.state = 'idle';
-      const wrench = ped.mesh.getObjectByName('garage-wrench');
-      if (wrench) wrench.rotation.z = Math.sin(c.t * 4.2) * 0.35;
     }
   }
   const wait = G.garageWait;
