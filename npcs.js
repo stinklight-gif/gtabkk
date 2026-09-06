@@ -3469,7 +3469,7 @@ export function updateSevenAtm(dt) {
   if (!GAMEPLAY.sevenAtm) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const open = h >= 6 && h < 22;
-  for (const c of [G.sevenAtm, G.southSevenAtm]) {
+  for (const c of [G.sevenAtm, G.southSevenAtm, G.westSevenAtm]) {
     if (!c) continue;
     c.t = (c.t || 0) + dt;
     for (let i = 0; i < (c.queue || []).length; i++) {

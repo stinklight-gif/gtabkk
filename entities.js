@@ -4024,6 +4024,11 @@ export function spawnSevenAtm(scene) {
     const hz = south.hz || 4;
     G.southSevenAtm = pack(south.pos.x + 4.2, south.pos.z + hz + 1.4, 'south-seven-atm');
   }
+  const west = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x < -50 && s.pos.z > 0 && s.pos.z < 60);
+  if (west && west.pos) {
+    const hz = west.hz || 4;
+    G.westSevenAtm = pack(west.pos.x + 4.2, west.pos.z + hz + 1.4, 'west-seven-atm');
+  }
 }
 
 export function spawnSevenShoppers(scene) {
