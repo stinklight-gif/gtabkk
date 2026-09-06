@@ -3224,6 +3224,33 @@ export function spawnKlongDock(scene) {
     hands.push(ped);
   }
   G.klongDock = { hands, x: poi.x, z: poi.z, t: 0 };
+  const cx = poi.x + 1.6, cz = poi.z + 5.8;
+  const check = spawnPed(scene, new THREE.Vector3(cx, 0, cz), 'office');
+  recolorTorso(check.mesh.userData.parts, 0x2a4a6a, 0.7);
+  check.klongDock = true;
+  check.klongCheck = true;
+  check.speed = 0;
+  check.state = 'idle';
+  check.heading = PI;
+  check.anchor = { slot: new THREE.Vector3(cx, 0, cz), facing: PI };
+  if (check.mesh) {
+    check.mesh.rotation.y = PI;
+    check.mesh.visible = false;
+  }
+  const clip = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 0.16, 0.02),
+    new THREE.MeshStandardMaterial({ color: 0xf0ead8, roughness: 0.7 })
+  );
+  clip.name = 'klong-clip';
+  const cp = check.mesh && check.mesh.userData && check.mesh.userData.parts;
+  if (cp && cp.foreL) {
+    clip.position.set(0.02, -0.22, 0.06);
+    cp.foreL.add(clip);
+  } else if (check.mesh) {
+    clip.position.set(-0.18, 1.0, 0.1);
+    check.mesh.add(clip);
+  }
+  G.klongCheck = { ped: check, x: cx, z: cz, t: 0 };
 }
 
 export function spawnSengClerk(scene) {

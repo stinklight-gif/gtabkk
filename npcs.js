@@ -2195,6 +2195,32 @@ export function updateKlongDock(dt) {
     const crate = ped.mesh.getObjectByName('dock-crate');
     if (crate) crate.rotation.z = Math.sin(c.t * 3.4 + i) * 0.22;
   }
+  const check = G.klongCheck;
+  if (check) {
+    check.t = (check.t || 0) + dt;
+    const ped = check.ped;
+    if (ped && ped.mesh) {
+      ped.klongDock = true;
+      ped.klongCheck = true;
+      ped.mesh.visible = open;
+      if (!open) {
+        ped.speed = 0;
+        ped.state = 'idle';
+      } else {
+        const slot = ped.anchor && ped.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(check.t * 2.2) * 0.05;
+          ped.mesh.position.set(slot.x, 0, slot.z + bob);
+          ped.heading = ped.anchor.facing;
+          ped.mesh.rotation.y = ped.heading;
+        }
+        ped.speed = 0;
+        ped.state = 'idle';
+        const clip = ped.mesh.getObjectByName('klong-clip');
+        if (clip) clip.rotation.z = Math.sin(check.t * 4.2) * 0.35;
+      }
+    }
+  }
 }
 
 export function updateSengClerk(dt) {

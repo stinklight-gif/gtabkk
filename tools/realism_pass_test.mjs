@@ -6429,6 +6429,41 @@ async function main() {
     });
     assert(starterShopper.flag && starterShopper.rec && starterShopper.cse && starterShopper.near, 'a customer waits at the Hua Lamphong starter gun counter');
     assert(starterShopper.night && starterShopper.day && starterShopper.shifted && starterShopper.swung, 'they hide after hours and the gun case turns');
+
+    console.log('\n[182] Klong Toey yard checker');
+    const klongCheck = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.klongCheck;
+      const ped = c && c.ped;
+      const clip = !!(ped && ped.mesh && ped.mesh.getObjectByName('klong-clip'));
+      const dock = G.klongDock;
+      const near = !!(c && dock && Math.hypot(c.x - dock.x, c.z - dock.z) < 8);
+      G.time.dayT = 21 / 24;
+      main.updateKlongDock(0.05);
+      const night = !!(ped && ped.mesh && ped.mesh.visible === false);
+      G.time.dayT = 12.5 / 24;
+      if (c) c.t = 0.2;
+      main.updateKlongDock(0.05);
+      const day = !!(ped && ped.klongDock && ped.klongCheck && ped.mesh && ped.mesh.visible);
+      const z0 = ped && ped.mesh ? ped.mesh.position.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateKlongDock(0.05);
+      const shifted = !!(ped && ped.mesh && Math.abs(ped.mesh.position.z - z0) > 0.02);
+      const tool = ped && ped.mesh && ped.mesh.getObjectByName('klong-clip');
+      if (c) c.t = 0.2;
+      main.updateKlongDock(0.05);
+      const r0 = tool ? tool.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 4.2;
+      main.updateKlongDock(0.05);
+      const swung = !!(tool && Math.abs(tool.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.klongDock),
+        rec: !!(ped && ped.klongDock && ped.klongCheck),
+        clip, near, night, day, shifted, swung,
+      };
+    });
+    assert(klongCheck.flag && klongCheck.rec && klongCheck.clip && klongCheck.near, 'a checker waits at the Klong Toey yard');
+    assert(klongCheck.night && klongCheck.day && klongCheck.shifted && klongCheck.swung, 'they hide after 19:00 and the clipboard turns');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
