@@ -3403,40 +3403,44 @@ export function spawnAirportCargo(scene) {
   if (!GAMEPLAY.airportCargo) return;
   if (!G.world || !G.world.airport) return;
   const sx = 209, sz = -118;
-  const hands = [];
-  const slots = [
-    { x: sx + 7.4, z: sz - 3.2, facing: -PI / 2, kind: 'laborer' },
-    { x: sx + 7.4, z: sz + 4.1, facing: -PI / 2, kind: 'laborer' },
-  ];
-  for (let i = 0; i < slots.length; i++) {
-    const slot = slots[i];
-    const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
-    recolorTorso(ped.mesh.userData.parts, 0x3a6a8a, 0.7);
-    ped.airportCargo = true;
-    ped.speed = 0;
-    ped.state = 'idle';
-    ped.heading = slot.facing;
-    ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
-    if (ped.mesh) {
-      ped.mesh.rotation.y = slot.facing;
-      ped.mesh.visible = false;
+  const packCargo = (hx, facing) => {
+    const hands = [];
+    const slots = [
+      { x: hx, z: sz - 3.2, facing, kind: 'laborer' },
+      { x: hx, z: sz + 4.1, facing, kind: 'laborer' },
+    ];
+    for (let i = 0; i < slots.length; i++) {
+      const slot = slots[i];
+      const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
+      recolorTorso(ped.mesh.userData.parts, 0x3a6a8a, 0.7);
+      ped.airportCargo = true;
+      ped.speed = 0;
+      ped.state = 'idle';
+      ped.heading = slot.facing;
+      ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
+      if (ped.mesh) {
+        ped.mesh.rotation.y = slot.facing;
+        ped.mesh.visible = false;
+      }
+      const crate = new THREE.Mesh(
+        new THREE.BoxGeometry(0.24, 0.18, 0.2),
+        new THREE.MeshStandardMaterial({ color: i === 0 ? 0xc8a22a : 0xb45a2a, roughness: 0.7, metalness: 0.15 })
+      );
+      crate.name = 'cargo-crate';
+      const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+      if (parts && parts.foreR) {
+        crate.position.set(0.02, -0.24, 0.1);
+        parts.foreR.add(crate);
+      } else if (ped.mesh) {
+        crate.position.set(0.22, 1.05, 0.12);
+        ped.mesh.add(crate);
+      }
+      hands.push(ped);
     }
-    const crate = new THREE.Mesh(
-      new THREE.BoxGeometry(0.24, 0.18, 0.2),
-      new THREE.MeshStandardMaterial({ color: i === 0 ? 0xc8a22a : 0xb45a2a, roughness: 0.7, metalness: 0.15 })
-    );
-    crate.name = 'cargo-crate';
-    const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
-    if (parts && parts.foreR) {
-      crate.position.set(0.02, -0.24, 0.1);
-      parts.foreR.add(crate);
-    } else if (ped.mesh) {
-      crate.position.set(0.22, 1.05, 0.12);
-      ped.mesh.add(crate);
-    }
-    hands.push(ped);
-  }
-  G.airportCargo = { hands, x: sx, z: sz, t: 0 };
+    return { hands, x: sx, z: sz, hx, t: 0 };
+  };
+  G.airportCargo = packCargo(sx + 7.4, -PI / 2);
+  G.westAirportCargo = packCargo(sx - 7.4, PI / 2);
 }
 
 export function spawnAirportTower(scene) {

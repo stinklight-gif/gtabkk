@@ -7423,6 +7423,43 @@ async function main() {
     });
     assert(pierClerkB.flag && pierClerkB.rec && pierClerkB.ticket && pierClerkB.near && pierClerkB.other, 'a second ticket clerk waits at the pier');
     assert(pierClerkB.night && pierClerkB.day && pierClerkB.shifted && pierClerkB.swung, 'they hide after 21:00 and the ticket pad turns');
+
+    console.log('\n[209] west Suvarnabhumi cargo shed');
+    const westCargo = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.westAirportCargo;
+      const list = (c && c.hands) || [];
+      const n = list.filter(p => p && p.airportCargo && p.mesh).length;
+      const crates = list.filter(p => p && p.mesh && p.mesh.getObjectByName('cargo-crate')).length;
+      const first = G.airportCargo;
+      const near = !!(c && Math.hypot(c.x - 209, c.z + 118) < 8);
+      const other = !!(c && first && Math.abs((c.hx || 0) - (first.hx || 0)) > 2);
+      G.time.dayT = 21 / 24;
+      main.updateAirportCargo(0.05);
+      const night = list.filter(p => p && p.mesh && p.mesh.visible === false).length;
+      G.time.dayT = 12.5 / 24;
+      if (c) c.t = 0.2;
+      main.updateAirportCargo(0.05);
+      const day = list.filter(p => p && p.airportCargo && p.mesh && p.mesh.visible).length;
+      const p0 = list[0];
+      const x0 = p0 && p0.mesh ? p0.mesh.position.x : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateAirportCargo(0.05);
+      const shifted = !!(p0 && p0.mesh && Math.abs(p0.mesh.position.x - x0) > 0.02);
+      const crate = p0 && p0.mesh && p0.mesh.getObjectByName('cargo-crate');
+      if (c) c.t = 0.2;
+      main.updateAirportCargo(0.05);
+      const r0 = crate ? crate.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 3.4;
+      main.updateAirportCargo(0.05);
+      const swung = !!(crate && Math.abs(crate.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.airportCargo),
+        n, crates, near, other, night, day, shifted, swung,
+      };
+    });
+    assert(westCargo.flag && westCargo.n >= 2 && westCargo.crates >= 2 && westCargo.near && westCargo.other, `cargo hands wait at the west Suvarnabhumi shed (${westCargo.n})`);
+    assert(westCargo.night >= 2 && westCargo.day >= 2 && westCargo.shifted && westCargo.swung, 'they hide after 19:00 and the crates tilt');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

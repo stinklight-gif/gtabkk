@@ -362,7 +362,7 @@ export const GAMEPLAY = {
   klongDock: true,        // dockhands and checkers at the Klong Toey container yard; they hide after 19:00
   sengClerk: true,        // clerk and window shoppers at Uncle Seng's gold-shop door; they hide after 20:00
   airportCrew: true,      // marshallers on the Suvarnabhumi apron; they hide after 21:00
-  airportCargo: true,     // cargo hands at the south Suvarnabhumi shed; they hide after 19:00
+  airportCargo: true,     // cargo hands on both sides of the south Suvarnabhumi shed; they hide after 19:00
   airportTower: true,     // controllers on both sides of the Suvarnabhumi tower base; they hide after 22:00
   airportTaxi: true,      // taxi touts at the north and south Suvarnabhumi curbs, plus baggage at the main, north, and south terminals; they hide after 22:00
 };
