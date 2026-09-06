@@ -259,7 +259,7 @@ export const GAMEPLAY = {
   schoolKids: true,       // morning uniforms walking the sois toward the BTS
   seekShade: true,        // midday / haze: wanderers pull onto walkways and stop
   stallSit: true,         // E to sit at a food stall, pay, eat, heal
-  spiritWai: true,        // E at a spirit house: incense, heat cools
+  spiritWai: true,        // E at a spirit house: incense, heat cools; a keeper tends the first house by day
   soiCats: true,          // cats loaf at food stalls and bolt when you get close
   btsPlatform: true,      // commuters wait on Asok / Phrom Phong; PA when the train pulls in
   bikeHelmets: true,      // helmeted riders on bikes; stand/pillion heads get lids too

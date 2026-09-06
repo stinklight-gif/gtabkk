@@ -6605,6 +6605,41 @@ async function main() {
     });
     assert(pierFish.flag && pierFish.rec && pierFish.rod && pierFish.near, 'a fisherman waits on the pier bank');
     assert(pierFish.night && pierFish.day && pierFish.shifted && pierFish.swung, 'they hide after 21:00 and the rod dips');
+
+    console.log('\n[187] spirit-house keeper');
+    const shrineKeep = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.spiritKeep;
+      const ped = c && c.ped;
+      const malai = !!(ped && ped.mesh && ped.mesh.getObjectByName('shrine-malai'));
+      const s = (G.world.shrines || [])[0];
+      const near = !!(c && s && s.pos && Math.hypot(c.x - s.pos.x, c.z - s.pos.z) < 4);
+      G.time.dayT = 21 / 24;
+      main.updateShrines(0.05);
+      const night = !!(ped && ped.mesh && ped.mesh.visible === false);
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updateShrines(0.05);
+      const day = !!(ped && ped.spiritKeep && ped.mesh && ped.mesh.visible);
+      const z0 = ped && ped.mesh ? ped.mesh.position.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateShrines(0.05);
+      const shifted = !!(ped && ped.mesh && Math.abs(ped.mesh.position.z - z0) > 0.02);
+      const tool = ped && ped.mesh && ped.mesh.getObjectByName('shrine-malai');
+      if (c) c.t = 0.2;
+      main.updateShrines(0.05);
+      const r0 = tool ? tool.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 4.2;
+      main.updateShrines(0.05);
+      const swung = !!(tool && Math.abs(tool.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.spiritWai),
+        rec: !!(ped && ped.spiritKeep),
+        malai, near, night, day, shifted, swung,
+      };
+    });
+    assert(shrineKeep.flag && shrineKeep.rec && shrineKeep.malai && shrineKeep.near, 'a keeper tends a spirit house');
+    assert(shrineKeep.night && shrineKeep.day && shrineKeep.shifted && shrineKeep.swung, 'they hide after 20:00 and the malai turns');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

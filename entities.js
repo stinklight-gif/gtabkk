@@ -5103,6 +5103,38 @@ export function spawnWatCats(scene) {
   }
 }
 
+export function spawnShrineKeep(scene) {
+  if (!GAMEPLAY.spiritWai) return;
+  const s = G.world && G.world.shrines && G.world.shrines[0];
+  if (!s || !s.pos) return;
+  const x = s.pos.x + 1.35, z = s.pos.z + 0.2;
+  const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'local');
+  recolorTorso(ped.mesh.userData.parts, 0xe8c040, 0.7);
+  ped.spiritKeep = true;
+  ped.speed = 0;
+  ped.state = 'idle';
+  ped.heading = -PI / 2;
+  ped.anchor = { slot: new THREE.Vector3(x, 0, z), facing: -PI / 2 };
+  if (ped.mesh) {
+    ped.mesh.rotation.y = -PI / 2;
+    ped.mesh.visible = false;
+  }
+  const malai = new THREE.Mesh(
+    new THREE.TorusGeometry(0.05, 0.012, 6, 10),
+    new THREE.MeshStandardMaterial({ color: 0xe878a0, roughness: 0.55 })
+  );
+  malai.name = 'shrine-malai';
+  const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+  if (parts && parts.foreL) {
+    malai.position.set(0.02, -0.24, 0.06);
+    parts.foreL.add(malai);
+  } else if (ped.mesh) {
+    malai.position.set(-0.18, 1.0, 0.1);
+    ped.mesh.add(malai);
+  }
+  G.spiritKeep = { ped, x, z, t: 0 };
+}
+
 export function makeChaYenMesh() {
   const g = new THREE.Group();
   g.name = 'chayen-cart';

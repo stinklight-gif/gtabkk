@@ -491,6 +491,9 @@ export function updatePeds(dt) {
       ped.state = 'idle';
       continue;
     }
+    if (ped.spiritKeep) {
+      continue;
+    }
     if (ped.plaKat) {
       const slot = ped.anchor && ped.anchor.slot;
       if (slot) {
@@ -934,6 +937,30 @@ export function updateFoodStalls(dt) {
 }
 
 export function updateShrines(dt) {
+  const keep = G.spiritKeep;
+  if (GAMEPLAY.spiritWai && keep) {
+    keep.t = (keep.t || 0) + dt;
+    const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+    const open = h >= 6 && h < 20;
+    const ped = keep.ped;
+    if (ped && ped.mesh) {
+      ped.spiritKeep = true;
+      ped.mesh.visible = open;
+      if (open) {
+        const slot = ped.anchor && ped.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(keep.t * 2.2) * 0.05;
+          ped.mesh.position.set(slot.x, 0, slot.z + bob);
+          ped.heading = ped.anchor.facing;
+          ped.mesh.rotation.y = ped.heading;
+        }
+        const malai = ped.mesh.getObjectByName('shrine-malai');
+        if (malai) malai.rotation.z = Math.sin(keep.t * 4.2) * 0.35;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+    }
+  }
   const list = G.world && G.world.shrines;
   if (!list || !list.length) return;
   for (const s of list) {
