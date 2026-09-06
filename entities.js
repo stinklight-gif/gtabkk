@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.sevenShop || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -2533,6 +2533,39 @@ export function spawnSevenAtm(scene) {
     queue.push(ped);
   }
   G.sevenAtm = { queue, ax, az, t: 0 };
+}
+
+export function spawnSevenShoppers(scene) {
+  if (!GAMEPLAY.sevenShoppers) return;
+  const seven = G.world && G.world.sevenWalkIn;
+  if (!seven || !seven.pos) return;
+  const hz = seven.hz || 4;
+  const doorZ = seven.pos.z + hz + 0.35;
+  const curbZ = doorZ + 4.2;
+  const shoppers = [];
+  for (let i = 0; i < 3; i++) {
+    const x = seven.pos.x + (i - 1) * 0.55;
+    const ped = spawnPed(scene, new THREE.Vector3(x, 0, curbZ), i === 1 ? 'office' : 'local');
+    ped.sevenShop = true;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped._shopT = i * 0.32;
+    ped._shopDir = 1;
+    ped._shopX = x;
+    if (ped.mesh) ped.mesh.visible = false;
+    const bag = new THREE.Mesh(
+      new THREE.BoxGeometry(0.14, 0.2, 0.1),
+      new THREE.MeshStandardMaterial({ color: pick([0xff5a23, 0x2a2a2a, 0xf5f5f0]), roughness: 0.7 })
+    );
+    bag.name = 'seven-bag';
+    bag.visible = false;
+    const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+    if (parts && parts.foreL) { bag.position.set(0.02, -0.3, 0.04); parts.foreL.add(bag); }
+    else if (ped.mesh) { bag.position.set(-0.18, 0.95, 0.08); ped.mesh.add(bag); }
+    ped._sevenBag = bag;
+    shoppers.push(ped);
+  }
+  G.sevenShoppers = { shoppers, doorZ, curbZ, x: seven.pos.x, z: seven.pos.z };
 }
 
 export function spawnBtsBusker(scene) {

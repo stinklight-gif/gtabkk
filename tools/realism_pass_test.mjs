@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes','btsPigeons','watLotus','watCats']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes','btsPigeons','watLotus','watCats','sevenShoppers']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -462,7 +462,7 @@ async function main() {
     const peds = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
       const ways = (G.world.walkways || []).length;
-      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart && !p.songthaewRide && !p.watSweep && !p.yaoGold && !p.sevenAtm && !p.btsBusker && !p.watLotus);
+      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart && !p.songthaewRide && !p.watSweep && !p.yaoGold && !p.sevenAtm && !p.btsBusker && !p.watLotus && !p.sevenShop);
       const b = G.world.buildings.find(x => x.size.y > 8 && x.size.x > 4 && x.size.z > 4) || G.world.buildings[0];
       const insideBefore = wanderer && b && Math.abs(wanderer.mesh.position.x - b.pos.x) < b.size.x / 2 && Math.abs(wanderer.mesh.position.z - b.pos.z) < b.size.z / 2;
       if (wanderer && b) {
@@ -3365,6 +3365,40 @@ async function main() {
     });
     assert(templeCats.flag && templeCats.n >= 4 && templeCats.nearWat >= 4, `temple cats loaf the wat (${templeCats.n})`);
     assert(templeCats.bolted && templeCats.moved > 0.8, `they bolt when you get close (${templeCats.moved && templeCats.moved.toFixed(1)}m)`);
+
+    console.log('\n[100] 7-Eleven shoppers');
+    const shop = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const rec = G.sevenShoppers;
+      const list = (rec && rec.shoppers) || [];
+      const n = list.filter(p => p && p.sevenShop && p.mesh).length;
+      const bags = list.filter(p => p && p.mesh && p.mesh.getObjectByName('seven-bag')).length;
+      const seven = G.world && G.world.sevenWalkIn;
+      const near = !!(rec && seven && seven.pos && Math.hypot(rec.x - seven.pos.x, rec.z - seven.pos.z) < 8);
+      G.time.dayT = 3 / 24;
+      main.updateSevenShoppers(0.05);
+      const late = list.filter(p => p && p.mesh && p.mesh.visible === false).length;
+      G.time.dayT = 12 / 24;
+      const p0 = list[0];
+      if (p0) { p0._shopT = 0.15; p0._shopDir = 1; }
+      main.updateSevenShoppers(0.05);
+      const day = list.filter(p => p && p.sevenShop && p.mesh && p.mesh.visible).length;
+      const z0 = p0 && p0.mesh ? p0.mesh.position.z : 0;
+      if (p0) { p0._shopT = 0.15; p0._shopDir = 1; }
+      main.updateSevenShoppers(0.05);
+      const sz = p0 && p0.mesh ? p0.mesh.position.z : 0;
+      for (let i = 0; i < 20; i++) main.updateSevenShoppers(0.1);
+      const walked = !!(p0 && p0.mesh && Math.abs(p0.mesh.position.z - sz) > 0.4);
+      if (p0) { p0._shopT = 0.8; p0._shopDir = -1; }
+      main.updateSevenShoppers(0.05);
+      const bagOut = !!(p0 && p0._sevenBag && p0._sevenBag.visible);
+      return {
+        flag: !!(G.gameplay && G.gameplay.sevenShoppers),
+        n, bags, near, late, day, walked, bagOut,
+      };
+    });
+    assert(shop.flag && shop.n >= 3 && shop.bags >= 3 && shop.near, `shoppers work the 7-Eleven door (${shop.n})`);
+    assert(shop.late >= 3 && shop.day >= 3 && shop.walked && shop.bagOut, 'they hide late, walk the door, and leave with a bag');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

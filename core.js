@@ -326,6 +326,7 @@ export const GAMEPLAY = {
   btsPigeons: true,       // pigeons loaf the Asok platform by day and scatter
   watLotus: true,         // lotus stall at the wat; E buys a bloom, shrine offering cools extra
   watCats: true,          // temple cats loaf the wat courtyard and bolt when you get close
+  sevenShoppers: true,    // people walk in and out of the walk-in 7-Eleven
 };
 G.gameplay = GAMEPLAY;
 
