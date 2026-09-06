@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -2187,6 +2187,55 @@ async function main() {
     assert(bowl.flag && bowl.named && bowl.pot && bowl.steam && bowl.vendor, 'a noodle boat works the pier');
     assert(bowl.nearPier && bowl.onRiver && bowl.moved, 'the boat sits on the khlong and drifts');
     assert(bowl.paid && bowl.healed, 'E buys boat noodles for ฿50');
+
+    console.log('\n[70] 2 AM checkpoint');
+    const two = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const cp = G.checkpoint;
+      const spikes = !!(cp && cp.spikes && cp.spikes.name === 'checkpoint-spikes');
+      G.time.dayT = 12 / 24;
+      main.updateCheckpoint(0.05);
+      const day = !!(cp && !cp.late && cp.spikes && cp.spikes.visible === false);
+      G.time.dayT = 22.4 / 24;
+      main.updateCheckpoint(0.05);
+      const evening = !!(cp && cp.active && !cp.late && cp.spikes && cp.spikes.visible === false);
+      G.time.dayT = 2.2 / 24;
+      G.policeOff = false;
+      G.wanted.stars = 0;
+      G.wanted.crime = 0;
+      if (cp) cp.flagged = false;
+      main.updateCheckpoint(0.05);
+      const lateOn = !!(cp && cp.late && cp.active && cp.spikes && cp.spikes.visible);
+      const cap = (G.gameplay && G.gameplay.twoAmCheckpoint && cp && cp.late) ? 2.2 : 3.2;
+      const ride = G.vehicles.find(v => v && v.spec && v.spec.kind !== 'boat' && v.spec.kind !== 'airliner') || main.makeVehicle('camry', G.scene);
+      G.player.inVehicle = ride;
+      ride.driver = 'player';
+      ride.dead = false;
+      ride.tiresBlown = false;
+      ride.pos.set(cp.x, 0, cp.z);
+      if (ride.mesh) ride.mesh.position.copy(ride.pos);
+      ride.vel = 14;
+      cp.flagged = false;
+      G.wanted.stars = 0;
+      G.wanted.crime = 0;
+      main.updateCheckpoint(0.016);
+      const stars = G.wanted.stars;
+      const blown = !!ride.tiresBlown;
+      G.wanted.stars = 0;
+      G.wanted.crime = 0;
+      G.player.inVehicle = null;
+      ride.driver = ride.npc ? 'npc' : null;
+      ride.vel = 0;
+      ride.tiresBlown = false;
+      G.time.dayT = 12 / 24;
+      main.updateCheckpoint(0.05);
+      return {
+        flag: !!(G.gameplay && G.gameplay.twoAmCheckpoint),
+        spikes, day, evening, lateOn, stars, blown, cap,
+      };
+    });
+    assert(two.flag && two.spikes && two.day && two.evening, '2 AM strip hides until the late window');
+    assert(two.lateOn && two.cap === 2.2 && two.stars >= 2 && two.blown, 'blowing the 2 AM ด่าน is two stars and a spike strip');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

@@ -1905,6 +1905,23 @@ export function spawnCheckpoint(scene) {
   );
   post.position.set(x - 2.5, 0.48, z + 10);
   g.add(post);
+  const spikes = new THREE.Group();
+  spikes.name = 'checkpoint-spikes';
+  const strip = new THREE.Mesh(
+    new THREE.BoxGeometry(7.2, 0.08, 0.42),
+    new THREE.MeshStandardMaterial({ color: 0x1a1a1e, roughness: 0.88 })
+  );
+  strip.position.y = 0.05;
+  spikes.add(strip);
+  const spikeMat = new THREE.MeshStandardMaterial({ color: 0x9a9aa0, metalness: 0.55, roughness: 0.35 });
+  for (let i = -4; i <= 4; i++) {
+    const tooth = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.26, 4), spikeMat);
+    tooth.position.set(i * 0.78, 0.18, 0);
+    spikes.add(tooth);
+  }
+  spikes.position.set(x, 0, z);
+  spikes.visible = false;
+  g.add(spikes);
   scene.add(g);
   const slot = { x: x + ROAD_WIDTH / 2 + 1.35, z, facing: -PI / 2 };
   const cop = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), 'office');
@@ -1913,8 +1930,8 @@ export function spawnCheckpoint(scene) {
   if (kit.beam) kit.beam.visible = false;
   if (G.nightLights) G.nightLights.push({ light: kit.light, base: 1.6 });
   G.checkpoint = {
-    x, z, mesh: g, cones, cop, light: kit.light, beam: kit.beam,
-    active: false, flagged: false,
+    x, z, mesh: g, cones, cop, light: kit.light, beam: kit.beam, spikes,
+    active: false, flagged: false, late: false,
   };
 }
 

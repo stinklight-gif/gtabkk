@@ -1311,8 +1311,10 @@ export function updateCheckpoint(dt) {
   if (!GAMEPLAY.nightCheckpoint || !G.checkpoint) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const night = h >= 21 || h < 5.2;
+  const late = !!(GAMEPLAY.twoAmCheckpoint && night && h >= 1.5 && h < 3.8);
   const cp = G.checkpoint;
   cp.active = night;
+  cp.late = late;
   const cop = cp.cop;
   if (cop && cop.mesh) {
     cop.mesh.visible = night;
@@ -1325,19 +1327,29 @@ export function updateCheckpoint(dt) {
       cop.state = 'idle';
     }
   }
-  if (cp.light) cp.light.intensity = night ? 1.6 : 0;
+  if (cp.spikes) cp.spikes.visible = late;
+  if (cp.light) cp.light.intensity = night ? (late ? 2.2 : 1.6) : 0;
   if (cp.beam) cp.beam.visible = night;
   if (!night) { cp.flagged = false; return; }
   const p = G.player;
   const v = p && p.inVehicle;
   if (v && v.driver === 'player' && !cp.flagged) {
-    if (dist2(v.pos, cp) < 9 * 9 && Math.abs(v.vel || 0) > 8) {
+    const speed = Math.abs(v.vel || 0);
+    const near = dist2(v.pos, cp) < 9 * 9;
+    const hitStrip = late && near && speed > 6;
+    const blow = near && speed > 8;
+    if (hitStrip || blow) {
       cp.flagged = true;
-      raiseWanted(1, 2);
-      if (G.hud && G.hud.showNotif) G.hud.showNotif('Ran the checkpoint');
+      if (hitStrip) v.tiresBlown = true;
+      raiseWanted(late ? 2 : 1, late ? 4 : 2);
+      if (G.hud && G.hud.showNotif) {
+        G.hud.showNotif(late
+          ? (hitStrip ? 'Spike strip — ด่านตีสอง' : 'Ran the 2 AM checkpoint')
+          : 'Ran the checkpoint');
+      }
     }
   } else if (!v && p && p.group && dist2(p.group.position, cp) < 7 * 7) {
-    if (G.hud && G.hud.showPrompt) G.hud.showPrompt('Checkpoint — slow down', 0.35);
+    if (G.hud && G.hud.showPrompt) G.hud.showPrompt(late ? '2 AM checkpoint — crawl' : 'Checkpoint — slow down', 0.35);
   }
 }
 

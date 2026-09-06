@@ -212,6 +212,16 @@ export function bindHud() {
     if (G._boutDone) out.push({ name: 'Monsoon', status: G._monsoonDone ? 'done · replay' : 'available', job: 'monsoon', dist: d(poi.pier) });
     if (G._monsoonDone) out.push({ name: 'Customs Issue', status: G._customsDone ? 'done · replay' : 'available', job: 'customs', dist: d(poi.klongToey) });
     out.push({ name: '2 AM Soi Race', status: G._nightSoiDone ? 'done · replay' : 'bikes · night', job: 'nightSoi', dist: GAMEPLAY.phonePlaces ? d(soiMid) : null });
+    if (G.checkpoint) {
+      const hh = ((G.time.dayT % 1) + 1) % 1 * 24;
+      const nightCp = hh >= 21 || hh < 5.2;
+      const lateCp = GAMEPLAY.twoAmCheckpoint && hh >= 1.5 && hh < 3.8;
+      out.push({
+        name: '2 AM checkpoint',
+        status: lateCp ? 'spike strip · slow' : nightCp ? 'cones out' : 'day shift',
+        dist: d(G.checkpoint),
+      });
+    }
     if (poi.gym) out.push({ name: 'Muay Thai gym', status: `melee ${((G.econ.upgrades && G.econ.upgrades.melee) || 0)}/3`, dist: d(poi.gym) });
     if (poi.suvarnabhumi) out.push({ name: 'Suvarnabhumi', status: 'taxi an airliner', dist: d(poi.suvarnabhumi) });
     if (G.world && G.world.bts) out.push({ name: 'BTS Asok', status: 'ride the skytrain', dist: d({ x: G.world.bts.x, z: G.world.bts.z || 0 }) });

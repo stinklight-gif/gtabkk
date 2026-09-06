@@ -617,8 +617,9 @@ export function updateTrafficCar(v, dt) {
   if (GAMEPLAY.nightCheckpoint && G.checkpoint && G.checkpoint.active) {
     const dx = v.pos.x - G.checkpoint.x, dz = v.pos.z - G.checkpoint.z;
     if (dx * dx + dz * dz < 18 * 18) {
-      obstacleTarget = Math.min(obstacleTarget, 3.2);
-      signalTarget = Math.min(signalTarget, 3.2);
+      const cap = (GAMEPLAY.twoAmCheckpoint && G.checkpoint.late) ? 2.2 : 3.2;
+      obstacleTarget = Math.min(obstacleTarget, cap);
+      signalTarget = Math.min(signalTarget, cap);
     }
   }
   const target = Math.min(obstacleTarget, signalTarget);
