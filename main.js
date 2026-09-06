@@ -22,7 +22,7 @@ export * from './traffic.js';
 import { buildTrafficLights, updateTrafficLights } from './traffic.js';
 export * from './entities.js';
 import {
-  animateWalk, makeCamera, makeCatMesh, makeDogMesh, makePedMesh, makePlayer, makeRain, makeVehicle, makeVehicleMesh, sidewalkPos, spawnBoat, spawnBoatNoodle, spawnCats, spawnDog, spawnDogs, spawnMotosaiStands, spawnBtsSongthaew, spawnBtsTuktuk, spawnBtsMalai, spawnIceCarts, spawnCoconutCarts, spawnMooPing, spawnSomTam, spawnLaundry, spawnSoiPa, spawnSoiChairs, spawnSoiMechanic, spawnSoiCowboy, spawnCheckpoint, spawnSevenBikes, spawnSevenGuard, spawnBtsSitters, spawnWatTurtles, spawnMonitors, spawnHyacinth, spawnGeckos, spawnLottery, spawnParkedCars, spawnPed, spawnPeds, spawnTraffic, updateEntityLod, wearBikeHelmet
+  animateWalk, makeCamera, makeCatMesh, makeDogMesh, makePedMesh, makePlayer, makeRain, makeVehicle, makeVehicleMesh, sidewalkPos, spawnBoat, spawnBoatNoodle, spawnCats, spawnDog, spawnDogs, spawnMotosaiStands, spawnBtsSongthaew, spawnBtsTuktuk, spawnBtsMalai, spawnIceCarts, spawnCoconutCarts, spawnMooPing, spawnSomTam, spawnPlaKat, spawnLaundry, spawnSoiPa, spawnSoiChairs, spawnSoiMechanic, spawnSoiCowboy, spawnCheckpoint, spawnSevenBikes, spawnSevenGuard, spawnBtsSitters, spawnWatTurtles, spawnMonitors, spawnHyacinth, spawnGeckos, spawnLottery, spawnParkedCars, spawnPed, spawnPeds, spawnTraffic, updateEntityLod, wearBikeHelmet
 } from './entities.js';
 import { spawnAirportPlanes } from './airport.js';
 export * from './wanted.js';
@@ -35,7 +35,7 @@ import {
 } from './physics.js';
 export * from './npcs.js';
 import {
-  CROWD_CURVE, buildClusterAnchors, crowdFactor, crowdTarget, makeBarkSprite, resyncCrowd, spawnAnchoredPed, spawnBark, spawnSpikeStrip, updateAlms, updateArmorPickups, updateBarks, updateCats, updateClusters, updateDogs, updateFoodStalls, updateMuggings, updatePeds, updateSchoolKids, updateSeekShade, updateShrines, updateSpikes, updateTurf, updateVigilante, updateYaowaratNight, updateBtsPlatform, updateOfficeCommute, updateCrossingGuards, updateCheckpoint, updateSevenGuard, updateSoiChairs, updateSoiCowboy, updateCowboyClose, updateSoiMechanic, updateRainPack, updateIceCarts, updateCoconutCarts, updateMooPing, updateSomTam, updateBtsMalai, updateBoatNoodle, updateMonitors, updateHyacinth, updateWatTurtles, updateGeckos, updateSoiFootball, updateMallShoppers, updateLottery, vigilanteEnd, vigilanteSpawnTarget
+  CROWD_CURVE, buildClusterAnchors, crowdFactor, crowdTarget, makeBarkSprite, resyncCrowd, spawnAnchoredPed, spawnBark, spawnSpikeStrip, updateAlms, updateArmorPickups, updateBarks, updateCats, updateClusters, updateDogs, updateFoodStalls, updateMuggings, updatePeds, updateSchoolKids, updateSeekShade, updateShrines, updateSpikes, updateTurf, updateVigilante, updateYaowaratNight, updateBtsPlatform, updateOfficeCommute, updateCrossingGuards, updateCheckpoint, updateSevenGuard, updateSoiChairs, updateSoiCowboy, updateCowboyClose, updateSoiMechanic, updateRainPack, updateIceCarts, updateCoconutCarts, updateMooPing, updateSomTam, updateBtsMalai, updatePlaKat, updateBoatNoodle, updateMonitors, updateHyacinth, updateWatTurtles, updateGeckos, updateSoiFootball, updateMallShoppers, updateLottery, vigilanteEnd, vigilanteSpawnTarget
 } from './npcs.js';
 export * from './combat.js';
 import {
@@ -517,6 +517,7 @@ async function init() {
   spawnCoconutCarts(scene);
   spawnMooPing(scene);
   spawnSomTam(scene);
+  spawnPlaKat(scene);
   spawnLaundry(scene);
   spawnSoiPa(scene);
   spawnSoiChairs(scene);
@@ -1744,6 +1745,7 @@ export function loop() {
     updateMooPing(dt);
     updateSomTam(dt);
     updateBtsMalai(dt);
+    updatePlaKat(dt);
     updateBoatNoodle(dt);
     updateAlms(dt);
     updateSchoolKids(dt);

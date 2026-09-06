@@ -386,6 +386,7 @@ export function updateInteraction(dt) {
     for (const c of G.somTam) if (c.mesh && dist2(c.mesh.position, pp0) < 2.2 * 2.2) return;
   }
   if (GAMEPLAY.btsMalai && G.btsMalai && G.btsMalai.mesh && dist2(G.btsMalai.mesh.position, pp0) < 2.4 * 2.4) return;
+  if (GAMEPLAY.plaKat && G.plaKat && G.plaKat.mesh && dist2(G.plaKat.mesh.position, pp0) < 2.4 * 2.4) return;
   if (GAMEPLAY.dawnAlms && G._alms) {
     for (const ped of G._alms) {
       if (ped && ped.mesh && !ped.dead && dist2(ped.mesh.position, pp0) < 2.2 * 2.2) return;

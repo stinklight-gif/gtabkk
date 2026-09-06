@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -2368,6 +2368,43 @@ async function main() {
     assert(kickout.flag && kickout.nightTouts >= 3, 'touts work Cowboy before close');
     assert(kickout.n >= 3 && kickout.nearBar >= 2 && kickout.moved && kickout.toward, 'after 4 AM the crowd walks it off toward the BTS');
     assert(kickout.gone, 'the stagger clears by morning');
+
+    console.log('\n[74] pla kat bags on a soi');
+    const betta = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const stand = G.plaKat;
+      const bags = stand && stand.bags ? stand.bags.filter(b => b && b.name === 'plakat-bag').length : 0;
+      const fish = stand && stand.bags ? stand.bags.filter(b => b && b.getObjectByName('plakat-fish')).length : 0;
+      const f0 = stand && stand.bags && stand.bags[0] && stand.bags[0].getObjectByName('plakat-fish');
+      const x0 = f0 ? f0.position.x : 0;
+      stand.t = 0;
+      for (let i = 0; i < 20; i++) main.updatePlaKat(0.2);
+      const swam = !!(f0 && Math.abs(f0.position.x - x0) > 0.005);
+      G.player.inVehicle = null;
+      G._eating = null;
+      G.player.group.visible = true;
+      if (stand) G.player.group.position.set(stand.x, 0, stand.z);
+      G.cash = 100;
+      G._plaKat = 0;
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let paid = false;
+      for (let i = 0; i < 4 && !paid; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updatePlaKat(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        paid = G.cash === 60 && G._plaKat >= 1;
+      }
+      return {
+        flag: !!(G.gameplay && G.gameplay.plaKat),
+        named: !!(stand && stand.mesh && stand.mesh.name === 'plakat-rack'),
+        bags, fish, swam, paid, onSoi: !!(stand && stand.soi),
+        vendor: !!(stand && stand.vendor && stand.vendor.plaKat),
+      };
+    });
+    assert(betta.flag && betta.named && betta.bags >= 5 && betta.fish >= 5 && betta.onSoi && betta.vendor, `fighting-fish bags hang on a soi (${betta.bags})`);
+    assert(betta.swam && betta.paid, 'the fish swim in the bags and E buys one for ฿40');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

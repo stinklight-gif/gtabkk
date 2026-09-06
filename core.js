@@ -300,6 +300,7 @@ export const GAMEPLAY = {
   somTam: true,           // som tam cart on a soi; pestle, E for a plate
   btsMalai: true,         // phuang malai vendor at Asok BTS; E buys a garland
   cowboyClose: true,      // 4–5:30h drunks walk from Soi Cowboy toward the BTS
+  plaKat: true,           // fighting-fish bags hanging on a soi; E buys a bag
 };
 G.gameplay = GAMEPLAY;
 

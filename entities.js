@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.yaowaratNight || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.yaowaratNight || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -2154,6 +2154,66 @@ export function makeSomTamMesh() {
     w.rotation.z = PI / 2; w.position.set(x, 0.12, z); g.add(w);
   }
   return g;
+}
+
+export function spawnPlaKat(scene) {
+  if (!GAMEPLAY.plaKat) return;
+  const sois = (G.world && G.world.sois) || [];
+  if (sois.length < 2) return;
+  const ranked = sois.slice().sort((a, b) => {
+    const la = a.axis === 'z' ? (a.z1 - a.z0) : (a.x1 - a.x0);
+    const lb = b.axis === 'z' ? (b.z1 - b.z0) : (b.x1 - b.x0);
+    return lb - la;
+  });
+  const s = ranked[3] || ranked[0];
+  const alongZ = s.axis === 'z';
+  const t = 0.38;
+  const x = alongZ ? (s.x0 + s.x1) * 0.5 + 1.55 : s.x0 + (s.x1 - s.x0) * t;
+  const z = alongZ ? s.z0 + (s.z1 - s.z0) * t : (s.z0 + s.z1) * 0.5 + 1.55;
+  const g = new THREE.Group();
+  g.name = 'plakat-rack';
+  const pole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.04, 0.05, 2.2, 5),
+    new THREE.MeshStandardMaterial({ color: 0x6a5a3a, roughness: 0.75 })
+  );
+  pole.position.y = 1.1;
+  g.add(pole);
+  const bar = new THREE.Mesh(
+    new THREE.BoxGeometry(1.15, 0.04, 0.04),
+    new THREE.MeshStandardMaterial({ color: 0x4a4a48, roughness: 0.55, metalness: 0.25 })
+  );
+  bar.position.y = 2.05;
+  g.add(bar);
+  const bagMat = new THREE.MeshStandardMaterial({
+    color: 0x8ec8e8, roughness: 0.2, metalness: 0.05, transparent: true, opacity: 0.35,
+  });
+  const fishColors = [0xc44a3a, 0x2a6aad, 0xc8a227, 0x6a2a8a, 0x1e9a5e, 0xd44b3b];
+  const bags = [];
+  for (let i = 0; i < 6; i++) {
+    const bag = new THREE.Group();
+    bag.name = 'plakat-bag';
+    const water = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), bagMat.clone());
+    water.scale.set(0.85, 1.15, 0.85);
+    bag.add(water);
+    const fish = new THREE.Mesh(
+      new THREE.SphereGeometry(0.035, 5, 4),
+      new THREE.MeshStandardMaterial({ color: fishColors[i], roughness: 0.45, emissive: fishColors[i], emissiveIntensity: 0.12 })
+    );
+    fish.name = 'plakat-fish';
+    fish.position.y = -0.02;
+    bag.add(fish);
+    bag.position.set(-0.45 + i * 0.18, 1.72, 0);
+    g.add(bag);
+    bags.push(bag);
+  }
+  g.position.set(x, 0, z);
+  scene.add(g);
+  const vendor = spawnPed(scene, new THREE.Vector3(x + (alongZ ? 0.7 : 0), 0, z + (alongZ ? 0 : 0.7)), 'vendor');
+  vendor.plaKat = true;
+  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: alongZ ? PI / 2 : 0 };
+  vendor.speed = 0;
+  vendor.state = 'idle';
+  G.plaKat = { mesh: g, vendor, bags, soi: s, x, z };
 }
 
 export function spawnSomTam(scene) {
