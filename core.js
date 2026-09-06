@@ -354,7 +354,7 @@ export const GAMEPLAY = {
   mallThreads: true,      // clerk and a customer at London Threads on Terminal 21 floor 2; they hide after 21:00
   mallSeven: true,        // clerk and a customer at the Terminal 21 7-Eleven; they hide after 21:00
   mallArcade: true,       // two players at Akihabara Arcade cabinets on Terminal 21 floor 1; they hide after 21:00
-  gymBag: true,           // a pad man hits the heavy bag at the Muay Thai gym; they hide after 21:00
+  gymBag: true,           // a pad man hits the heavy bag at the Muay Thai gym, plus a waiting fighter; they hide after 21:00
   starterClerk: true,     // clerk and a customer at the Hua Lamphong starter gun counter; they hide after 21:00
   homeAuntie: true,       // neighbor sits a plastic chair beside the safehouse door; they hide after 22:00
   stationPorter: true,    // red-vest porters and seated passengers under the Hua Lamphong canopy; they hide after 22:00

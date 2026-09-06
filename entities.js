@@ -4226,6 +4226,33 @@ export function spawnGymBag(scene) {
     trainer.mesh.visible = false;
   }
   G.gymBag = { bag, fighter, trainer, x, z, t: 0 };
+  const cx = x + 1.6, cz = z - 1.4;
+  const wait = spawnPed(scene, new THREE.Vector3(cx, 0, cz), 'laborer');
+  recolorTorso(wait.mesh.userData.parts, 0x3a1a1a, 0.75);
+  wait.gymBag = true;
+  wait.gymWait = true;
+  wait.speed = 0;
+  wait.state = 'idle';
+  wait.heading = -PI / 2;
+  wait.anchor = { slot: new THREE.Vector3(cx, 0, cz), facing: -PI / 2 };
+  if (wait.mesh) {
+    wait.mesh.rotation.y = -PI / 2;
+    wait.mesh.visible = false;
+  }
+  const wrap = new THREE.Mesh(
+    new THREE.BoxGeometry(0.06, 0.04, 0.1),
+    new THREE.MeshStandardMaterial({ color: 0xe8e0d0, roughness: 0.7 })
+  );
+  wrap.name = 'gym-wrap';
+  const wp = wait.mesh && wait.mesh.userData && wait.mesh.userData.parts;
+  if (wp && wp.foreL) {
+    wrap.position.set(0.02, -0.22, 0.04);
+    wp.foreL.add(wrap);
+  } else if (wait.mesh) {
+    wrap.position.set(-0.18, 1.0, 0.1);
+    wait.mesh.add(wrap);
+  }
+  G.gymWait = { ped: wait, x: cx, z: cz, t: 0 };
 }
 
 export function spawnSevenAtm(scene) {

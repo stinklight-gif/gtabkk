@@ -2839,6 +2839,32 @@ export function updateGymBag(dt) {
     c.bag.visible = true;
     c.bag.rotation.z = Math.sin(c.t * 3.4) * 0.22;
   }
+  const wait = G.gymWait;
+  if (wait) {
+    wait.t = (wait.t || 0) + dt;
+    const ped = wait.ped;
+    if (ped && ped.mesh) {
+      ped.gymBag = true;
+      ped.gymWait = true;
+      ped.mesh.visible = open;
+      if (!open) {
+        ped.speed = 0;
+        ped.state = 'idle';
+      } else {
+        const slot = ped.anchor && ped.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(wait.t * 2.2) * 0.05;
+          ped.mesh.position.set(slot.x, 0, slot.z + bob);
+          ped.heading = ped.anchor.facing;
+          ped.mesh.rotation.y = ped.heading;
+        }
+        ped.speed = 0;
+        ped.state = 'idle';
+        const wrap = ped.mesh.getObjectByName('gym-wrap');
+        if (wrap) wrap.rotation.z = Math.sin(wait.t * 4.2) * 0.35;
+      }
+    }
+  }
 }
 
 export function updateCheckpoint(dt) {

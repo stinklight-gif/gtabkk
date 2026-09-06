@@ -6499,6 +6499,41 @@ async function main() {
     });
     assert(pierClerk.flag && pierClerk.rec && pierClerk.ticket && pierClerk.near, 'a ticket clerk waits at the pier');
     assert(pierClerk.night && pierClerk.day && pierClerk.shifted && pierClerk.swung, 'they hide after 21:00 and the ticket pad turns');
+
+    console.log('\n[184] Muay Thai gym waiting fighter');
+    const gymWait = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.gymWait;
+      const ped = c && c.ped;
+      const wrap = !!(ped && ped.mesh && ped.mesh.getObjectByName('gym-wrap'));
+      const gym = G.gymBag;
+      const near = !!(c && gym && Math.hypot(c.x - gym.x, c.z - gym.z) < 4);
+      G.time.dayT = 22 / 24;
+      main.updateGymBag(0.05);
+      const night = !!(ped && ped.mesh && ped.mesh.visible === false);
+      G.time.dayT = 12.5 / 24;
+      if (c) c.t = 0.2;
+      main.updateGymBag(0.05);
+      const day = !!(ped && ped.gymBag && ped.gymWait && ped.mesh && ped.mesh.visible);
+      const z0 = ped && ped.mesh ? ped.mesh.position.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateGymBag(0.05);
+      const shifted = !!(ped && ped.mesh && Math.abs(ped.mesh.position.z - z0) > 0.02);
+      const tool = ped && ped.mesh && ped.mesh.getObjectByName('gym-wrap');
+      if (c) c.t = 0.2;
+      main.updateGymBag(0.05);
+      const r0 = tool ? tool.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 4.2;
+      main.updateGymBag(0.05);
+      const swung = !!(tool && Math.abs(tool.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.gymBag),
+        rec: !!(ped && ped.gymBag && ped.gymWait),
+        wrap, near, night, day, shifted, swung,
+      };
+    });
+    assert(gymWait.flag && gymWait.rec && gymWait.wrap && gymWait.near, 'a fighter waits at the Muay Thai gym');
+    assert(gymWait.night && gymWait.day && gymWait.shifted && gymWait.swung, 'they hide after 21:00 and the hand wrap turns');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
