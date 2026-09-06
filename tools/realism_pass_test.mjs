@@ -7690,6 +7690,43 @@ async function main() {
     });
     assert(gunShopperB.flag && gunShopperB.rec && gunShopperB.cse && gunShopperB.near && gunShopperB.other, 'a second customer waits at the Sukhumvit Gun Shop counter');
     assert(gunShopperB.night && gunShopperB.day && gunShopperB.shifted && gunShopperB.swung, 'they hide after hours and the gun case turns');
+
+    console.log('\n[216] second Hua Lamphong starter gun customer');
+    const starterShopperB = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.starterShopperB;
+      const ped = c && c.ped;
+      const cse = !!(ped && ped.mesh && ped.mesh.getObjectByName('starter-case'));
+      const clerk = G.starterClerk;
+      const first = G.starterShopper;
+      const near = !!(c && clerk && Math.hypot(c.x - clerk.x, c.z - clerk.z) < 4);
+      const other = !!(c && first && Math.hypot(c.x - first.x, c.z - first.z) > 2);
+      G.time.dayT = 22 / 24;
+      main.updateStarterClerk(0.05);
+      const night = !!(ped && ped.mesh && ped.mesh.visible === false);
+      G.time.dayT = 12.5 / 24;
+      if (c) c.t = 0.2;
+      main.updateStarterClerk(0.05);
+      const day = !!(ped && ped.starterClerk && ped.starterShop && ped.mesh && ped.mesh.visible);
+      const z0 = ped && ped.mesh ? ped.mesh.position.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateStarterClerk(0.05);
+      const shifted = !!(ped && ped.mesh && Math.abs(ped.mesh.position.z - z0) > 0.02);
+      const tool = ped && ped.mesh && ped.mesh.getObjectByName('starter-case');
+      if (c) c.t = 0.2;
+      main.updateStarterClerk(0.05);
+      const r0 = tool ? tool.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 4.2;
+      main.updateStarterClerk(0.05);
+      const swung = !!(tool && Math.abs(tool.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.starterClerk),
+        rec: !!(ped && ped.starterClerk && ped.starterShop),
+        cse, near, other, night, day, shifted, swung,
+      };
+    });
+    assert(starterShopperB.flag && starterShopperB.rec && starterShopperB.cse && starterShopperB.near && starterShopperB.other, 'a second customer waits at the Hua Lamphong starter gun counter');
+    assert(starterShopperB.night && starterShopperB.day && starterShopperB.shifted && starterShopperB.swung, 'they hide after hours and the gun case turns');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

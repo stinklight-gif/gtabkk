@@ -2987,32 +2987,35 @@ export function spawnStarterClerk(scene) {
     ped.mesh.add(cloth);
   }
   G.starterClerk = { ped, cloth, x, z, t: 0 };
-  const cx = x + 1.4, cz = z - 1.6;
-  const shopper = spawnPed(scene, new THREE.Vector3(cx, 0, cz), 'office');
-  shopper.starterClerk = true;
-  shopper.starterShop = true;
-  shopper.speed = 0;
-  shopper.state = 'idle';
-  shopper.heading = 0;
-  shopper.anchor = { slot: new THREE.Vector3(cx, 0, cz), facing: 0 };
-  if (shopper.mesh) {
-    shopper.mesh.rotation.y = 0;
-    shopper.mesh.visible = false;
-  }
-  const cse = new THREE.Mesh(
-    new THREE.BoxGeometry(0.16, 0.08, 0.28),
-    new THREE.MeshStandardMaterial({ color: 0x4a3a28, roughness: 0.7, metalness: 0.15 })
-  );
-  cse.name = 'starter-case';
-  const sp = shopper.mesh && shopper.mesh.userData && shopper.mesh.userData.parts;
-  if (sp && sp.foreL) {
-    cse.position.set(0.02, -0.24, 0.08);
-    sp.foreL.add(cse);
-  } else if (shopper.mesh) {
-    cse.position.set(-0.18, 1.0, 0.1);
-    shopper.mesh.add(cse);
-  }
-  G.starterShopper = { ped: shopper, x: cx, z: cz, t: 0 };
+  const packShop = (cx, cz, facing) => {
+    const shopper = spawnPed(scene, new THREE.Vector3(cx, 0, cz), 'office');
+    shopper.starterClerk = true;
+    shopper.starterShop = true;
+    shopper.speed = 0;
+    shopper.state = 'idle';
+    shopper.heading = facing;
+    shopper.anchor = { slot: new THREE.Vector3(cx, 0, cz), facing };
+    if (shopper.mesh) {
+      shopper.mesh.rotation.y = facing;
+      shopper.mesh.visible = false;
+    }
+    const cse = new THREE.Mesh(
+      new THREE.BoxGeometry(0.16, 0.08, 0.28),
+      new THREE.MeshStandardMaterial({ color: 0x4a3a28, roughness: 0.7, metalness: 0.15 })
+    );
+    cse.name = 'starter-case';
+    const sp = shopper.mesh && shopper.mesh.userData && shopper.mesh.userData.parts;
+    if (sp && sp.foreL) {
+      cse.position.set(0.02, -0.24, 0.08);
+      sp.foreL.add(cse);
+    } else if (shopper.mesh) {
+      cse.position.set(-0.18, 1.0, 0.1);
+      shopper.mesh.add(cse);
+    }
+    return { ped: shopper, x: cx, z: cz, t: 0 };
+  };
+  G.starterShopper = packShop(x + 1.4, z - 1.6, 0);
+  G.starterShopperB = packShop(x - 1.4, z - 1.6, 0);
 }
 
 export function spawnHomeAuntie(scene) {

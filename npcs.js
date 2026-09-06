@@ -2071,8 +2071,8 @@ export function updateStarterClerk(dt) {
     if (open && parts && parts.armR) parts.armR.rotation.x = -0.7 + Math.sin(c.t * 4.2) * 0.22;
     if (c.cloth) c.cloth.rotation.z = open ? Math.sin(c.t * 4.2) * 0.35 : 0;
   }
-  const shop = G.starterShopper;
-  if (shop) {
+  for (const shop of [G.starterShopper, G.starterShopperB]) {
+    if (!shop) continue;
     shop.t = (shop.t || 0) + dt;
     const sp = shop.ped;
     if (sp && sp.mesh) {
