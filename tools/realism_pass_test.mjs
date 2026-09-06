@@ -326,12 +326,26 @@ async function main() {
       const G = window.GAME, main = window.__REALISM_MAIN;
       const down = code => window.dispatchEvent(new KeyboardEvent('keydown', { code }));
       const up = code => window.dispatchEvent(new KeyboardEvent('keyup', { code }));
-      const car = G.player.inVehicle;
+      // Probe [4] leaves whatever sedan/camry/hilux `find` hit, plus collision
+      // impulses and whatever weather the boot rolled. A leftover _impactVX
+      // shoves the pinned car off x=0 onto the kerb, and kerbScrub then
+      // settles well short of spec.topSpeed * 0.9 (CI: 20.9 of 24).
+      G.time.weather = 'clear';
+      G.time.rainStrength = 0;
+      G._rainTarget = 0;
+      let car = G.player.inVehicle;
+      if (!car || !car.spec || car.spec.kind === 'bike' || car.spec.kind === 'boat' || car.spec.kind === 'airliner') {
+        car = main.makeVehicle('camry', G.scene);
+      }
+      G.player.inVehicle = car;
+      car.driver = 'player';
+      car.npc = null;
       const spec = car.spec;
       const reset = v => {
-        car.pos.set(0, 0, -140); car.heading = 0; car.vel = v;
+        car.pos.set(0, 0, -150); car.heading = 0; car.vel = v;
         car.yawRate = 0; car.steerAngle = 0; car.steerInput = 0;
         car.throttle = 0; car.brakeInput = 0; car.latVel = 0; car._aLong = 0;
+        car._impactVX = 0; car._impactVZ = 0; car._impactSpin = 0;
         car.hp = 100; car._burning = false; car.dead = false; car.tiresBlown = false;
         car.mesh.position.copy(car.pos); car.mesh.rotation.y = car.heading;
         G.player.group.position.copy(car.pos);
@@ -343,7 +357,7 @@ async function main() {
       const stepPinned = (n, dt) => {
         for (let i = 0; i < n; i++) {
           main.updatePlayerInVehicle(dt);
-          car.pos.set(0, 0, -140); car.heading = 0;
+          car.pos.set(0, 0, -150); car.heading = 0;
           car.mesh.position.copy(car.pos); car.mesh.rotation.y = 0;
           G.player.group.position.copy(car.pos);
         }
