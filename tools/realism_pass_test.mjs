@@ -8157,6 +8157,39 @@ async function main() {
     });
     assert(eastAtmB.flag && eastAtmB.n >= 1 && eastAtmB.phone && eastAtmB.near && eastAtmB.other, `a third customer waits at the east 7-Eleven ATM (${eastAtmB.n})`);
     assert(eastAtmB.late >= 1 && eastAtmB.day >= 1 && eastAtmB.shifted && eastAtmB.glowed, 'they hide late and the phone glows');
+
+    console.log('\n[228] third customer at the walk-in 7-Eleven ATM');
+    const walkAtmB = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.sevenAtmB;
+      const first = G.sevenAtm;
+      const walk = G.world && G.world.sevenWalkIn;
+      const n = (c && c.queue || []).filter(p => p && p.sevenAtm && p.mesh).length;
+      const phone = (c && c.queue || []).some(p => p && p.mesh && p.mesh.getObjectByName('seven-atm-phone'));
+      const near = !!(c && walk && walk.atm && Math.hypot(c.ax - walk.atm.x, c.az - walk.atm.z) < 8);
+      const other = !!(c && first && Math.hypot(c.ax - first.ax, c.az - first.az) > 1.2);
+      G.time.dayT = 3 / 24;
+      main.updateSevenAtm(0.05);
+      const late = (c && c.queue || []).filter(p => p && p.mesh && p.mesh.visible === false).length;
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updateSevenAtm(0.05);
+      const day = (c && c.queue || []).filter(p => p && p.sevenAtm && p.mesh && p.mesh.visible).length;
+      const p0 = c && c.queue && c.queue[0];
+      const z0 = p0 && p0.mesh ? p0.mesh.position.z : 0;
+      const tool = p0 && p0.mesh && p0.mesh.getObjectByName('seven-atm-phone');
+      const e0 = tool && tool.material ? tool.material.emissiveIntensity : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.4;
+      main.updateSevenAtm(0.05);
+      const shifted = !!(p0 && p0.mesh && Math.abs(p0.mesh.position.z - z0) > 0.04);
+      const glowed = !!(tool && tool.material && Math.abs(tool.material.emissiveIntensity - e0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.sevenAtm),
+        n, phone, near, other, late, day, shifted, glowed,
+      };
+    });
+    assert(walkAtmB.flag && walkAtmB.n >= 1 && walkAtmB.phone && walkAtmB.near && walkAtmB.other, `a third customer waits at the walk-in 7-Eleven ATM (${walkAtmB.n})`);
+    assert(walkAtmB.late >= 1 && walkAtmB.day >= 1 && walkAtmB.shifted && walkAtmB.glowed, 'they hide late and the phone glows');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

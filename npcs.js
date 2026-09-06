@@ -3855,7 +3855,7 @@ export function updateSevenAtm(dt) {
   if (!GAMEPLAY.sevenAtm) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const open = h >= 6 && h < 22;
-  for (const c of [G.sevenAtm, G.southSevenAtm, G.westSevenAtm, G.eastSevenAtm, G.southSevenAtmB, G.westSevenAtmB, G.eastSevenAtmB]) {
+  for (const c of [G.sevenAtm, G.southSevenAtm, G.westSevenAtm, G.eastSevenAtm, G.southSevenAtmB, G.westSevenAtmB, G.eastSevenAtmB, G.sevenAtmB]) {
     if (!c) continue;
     c.t = (c.t || 0) + dt;
     for (let i = 0; i < (c.queue || []).length; i++) {
@@ -3879,7 +3879,7 @@ export function updateSevenAtm(dt) {
       ped.state = 'idle';
       const parts = ped.mesh.userData && ped.mesh.userData.parts;
       if (i === 0 && parts && parts.armR) parts.armR.rotation.x = -0.85 + Math.sin(c.t * 3.1) * 0.12;
-      const phone = ped.mesh.getObjectByName('south-seven-atm-phone') || ped.mesh.getObjectByName('west-seven-atm-phone') || ped.mesh.getObjectByName('east-seven-atm-phone');
+      const phone = ped.mesh.getObjectByName('south-seven-atm-phone') || ped.mesh.getObjectByName('west-seven-atm-phone') || ped.mesh.getObjectByName('east-seven-atm-phone') || ped.mesh.getObjectByName('seven-atm-phone');
       if (phone && phone.material) phone.material.emissiveIntensity = 0.28 + Math.sin(c.t * 3.4) * 0.18;
     }
   }

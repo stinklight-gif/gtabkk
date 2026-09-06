@@ -4480,6 +4480,34 @@ export function spawnSevenAtm(scene) {
   };
   const walk = G.world && G.world.sevenWalkIn;
   G.sevenAtm = walk && walk.atm ? pack(walk.atm.x, walk.atm.z, null) : null;
+  if (G.sevenAtm) {
+    const ax = G.sevenAtm.ax + 2.65, az = G.sevenAtm.az + 0.36;
+    const extra = spawnPed(scene, new THREE.Vector3(ax, 0, az), 'office');
+    extra.sevenAtm = true;
+    extra.speed = 0;
+    extra.state = 'idle';
+    extra.heading = -PI / 2;
+    extra.anchor = { slot: new THREE.Vector3(ax, 0, az), facing: -PI / 2 };
+    if (extra.mesh) {
+      extra.mesh.rotation.y = -PI / 2;
+      extra.mesh.visible = false;
+    }
+    const phone = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.09, 0.012),
+      new THREE.MeshStandardMaterial({ color: 0x1a1a22, emissive: 0x226688, emissiveIntensity: 0.35, roughness: 0.35 })
+    );
+    phone.name = 'seven-atm-phone';
+    const ep = extra.mesh && extra.mesh.userData && extra.mesh.userData.parts;
+    if (ep && ep.foreR) {
+      phone.position.set(0.02, -0.28, 0.06);
+      ep.foreR.add(phone);
+    } else if (extra.mesh) {
+      phone.position.set(0.22, 1.05, 0.12);
+      extra.mesh.add(phone);
+    }
+    extra._phone = phone;
+    G.sevenAtmB = { queue: [extra], ax, az, t: 0 };
+  }
   const south = (G.world.sevenElevens || []).find(s => s && s.pos && Math.abs(s.pos.x) < 8 && s.pos.z < -80);
   if (south && south.pos) {
     const hz = south.hz || 4;
