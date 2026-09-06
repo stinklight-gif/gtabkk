@@ -2087,6 +2087,32 @@ export function updateGarageMech(dt) {
       if (wrench) wrench.rotation.z = Math.sin(c.t * 4.2) * 0.35;
     }
   }
+  const wait = G.garageWait;
+  if (wait) {
+    wait.t = (wait.t || 0) + dt;
+    const wp = wait.ped;
+    if (wp && wp.mesh) {
+      wp.garageMech = true;
+      wp.garageWait = true;
+      wp.mesh.visible = open;
+      if (!open) {
+        wp.speed = 0;
+        wp.state = 'idle';
+      } else {
+        const slot = wp.anchor && wp.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(wait.t * 2.2) * 0.05;
+          wp.mesh.position.set(slot.x, 0, slot.z + bob);
+          wp.heading = wp.anchor.facing;
+          wp.mesh.rotation.y = wp.heading;
+        }
+        wp.speed = 0;
+        wp.state = 'idle';
+        const helm = wp.mesh.getObjectByName('garage-helmet');
+        if (helm) helm.rotation.z = Math.sin(wait.t * 4.2) * 0.35;
+      }
+    }
+  }
 }
 
 export function updateKlongDock(dt) {
