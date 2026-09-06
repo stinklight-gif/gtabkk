@@ -6324,6 +6324,41 @@ async function main() {
     });
     assert(garageWait.flag && garageWait.rec && garageWait.helm && garageWait.near, 'a customer waits at the U-Spray bay');
     assert(garageWait.night && garageWait.day && garageWait.shifted && garageWait.swung, 'they hide after 19:00 and the helmet turns');
+
+    console.log('\n[179] Suvarnabhumi baggage handlers');
+    const airportBags = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.airportBags;
+      const list = (c && c.hands) || [];
+      const n = list.filter(p => p && p.airportBags && p.airportTaxi && p.mesh).length;
+      const cases = list.filter(p => p && p.mesh && p.mesh.getObjectByName('bag-case')).length;
+      const near = !!(c && Math.hypot(c.x - 209, c.z) < 8);
+      G.time.dayT = 23 / 24;
+      main.updateAirportTaxi(0.05);
+      const night = list.filter(p => p && p.mesh && p.mesh.visible === false).length;
+      G.time.dayT = 12.5 / 24;
+      if (c) c.t = 0.2;
+      main.updateAirportTaxi(0.05);
+      const day = list.filter(p => p && p.airportBags && p.mesh && p.mesh.visible).length;
+      const p0 = list[0];
+      const x0 = p0 && p0.mesh ? p0.mesh.position.x : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateAirportTaxi(0.05);
+      const shifted = !!(p0 && p0.mesh && Math.abs(p0.mesh.position.x - x0) > 0.02);
+      const cse = p0 && p0.mesh && p0.mesh.getObjectByName('bag-case');
+      if (c) c.t = 0.2;
+      main.updateAirportTaxi(0.05);
+      const r0 = cse ? cse.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 3.4;
+      main.updateAirportTaxi(0.05);
+      const swung = !!(cse && Math.abs(cse.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.airportTaxi),
+        n, cases, near, night, day, shifted, swung,
+      };
+    });
+    assert(airportBags.flag && airportBags.n >= 2 && airportBags.cases >= 2 && airportBags.near, `baggage handlers wait at the Suvarnabhumi terminal (${airportBags.n})`);
+    assert(airportBags.night >= 2 && airportBags.day >= 2 && airportBags.shifted && airportBags.swung, 'they hide after 22:00 and the cases tilt');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
