@@ -3512,42 +3512,46 @@ export function spawnAirportTaxi(scene) {
   };
   G.airportTaxi = pack(209, 50);
   G.southAirportTaxi = pack(209, -50);
-  const bx = 209 - 6.4, bz = 0;
-  const hands = [];
-  const bagSlots = [
-    { x: bx, z: bz - 2.2, facing: PI / 2 },
-    { x: bx, z: bz + 2.4, facing: PI / 2 },
-  ];
-  for (let i = 0; i < bagSlots.length; i++) {
-    const slot = bagSlots[i];
-    const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), 'laborer');
-    recolorTorso(ped.mesh.userData.parts, 0x2a5a8a, 0.7);
-    ped.airportTaxi = true;
-    ped.airportBags = true;
-    ped.speed = 0;
-    ped.state = 'idle';
-    ped.heading = slot.facing;
-    ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
-    if (ped.mesh) {
-      ped.mesh.rotation.y = slot.facing;
-      ped.mesh.visible = false;
+  const packBags = (cx, cz) => {
+    const bx = cx - 6.4;
+    const hands = [];
+    const bagSlots = [
+      { x: bx, z: cz - 2.2, facing: PI / 2 },
+      { x: bx, z: cz + 2.4, facing: PI / 2 },
+    ];
+    for (let i = 0; i < bagSlots.length; i++) {
+      const slot = bagSlots[i];
+      const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), 'laborer');
+      recolorTorso(ped.mesh.userData.parts, 0x2a5a8a, 0.7);
+      ped.airportTaxi = true;
+      ped.airportBags = true;
+      ped.speed = 0;
+      ped.state = 'idle';
+      ped.heading = slot.facing;
+      ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
+      if (ped.mesh) {
+        ped.mesh.rotation.y = slot.facing;
+        ped.mesh.visible = false;
+      }
+      const cse = new THREE.Mesh(
+        new THREE.BoxGeometry(0.18, 0.14, 0.28),
+        new THREE.MeshStandardMaterial({ color: i === 0 ? 0xc8a22a : 0x3a3a44, roughness: 0.65, metalness: 0.15 })
+      );
+      cse.name = 'bag-case';
+      const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+      if (parts && parts.foreR) {
+        cse.position.set(0.02, -0.24, 0.1);
+        parts.foreR.add(cse);
+      } else if (ped.mesh) {
+        cse.position.set(0.22, 1.05, 0.12);
+        ped.mesh.add(cse);
+      }
+      hands.push(ped);
     }
-    const cse = new THREE.Mesh(
-      new THREE.BoxGeometry(0.18, 0.14, 0.28),
-      new THREE.MeshStandardMaterial({ color: i === 0 ? 0xc8a22a : 0x3a3a44, roughness: 0.65, metalness: 0.15 })
-    );
-    cse.name = 'bag-case';
-    const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
-    if (parts && parts.foreR) {
-      cse.position.set(0.02, -0.24, 0.1);
-      parts.foreR.add(cse);
-    } else if (ped.mesh) {
-      cse.position.set(0.22, 1.05, 0.12);
-      ped.mesh.add(cse);
-    }
-    hands.push(ped);
-  }
-  G.airportBags = { hands, x: 209, z: 0, t: 0 };
+    return { hands, x: cx, z: cz, t: 0 };
+  };
+  G.airportBags = packBags(209, 0);
+  G.southAirportBags = packBags(209, -50);
 }
 
 export function spawnMallDirectory(scene) {

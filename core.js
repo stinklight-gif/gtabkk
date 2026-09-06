@@ -364,7 +364,7 @@ export const GAMEPLAY = {
   airportCrew: true,      // marshallers on the Suvarnabhumi apron; they hide after 21:00
   airportCargo: true,     // cargo hands at the south Suvarnabhumi shed; they hide after 19:00
   airportTower: true,     // controllers on both sides of the Suvarnabhumi tower base; they hide after 22:00
-  airportTaxi: true,      // taxi touts at the north and south Suvarnabhumi curbs, plus baggage at the main terminal; they hide after 22:00
+  airportTaxi: true,      // taxi touts at the north and south Suvarnabhumi curbs, plus baggage at the main and south terminals; they hide after 22:00
 };
 G.gameplay = GAMEPLAY;
 
