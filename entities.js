@@ -3552,6 +3552,7 @@ export function spawnAirportTaxi(scene) {
   };
   G.airportBags = packBags(209, 0);
   G.southAirportBags = packBags(209, -50);
+  G.northAirportBags = packBags(209, 50);
 }
 
 export function spawnMallDirectory(scene) {

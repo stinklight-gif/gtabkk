@@ -2463,7 +2463,7 @@ export function updateAirportTaxi(dt) {
       if (slate) slate.rotation.z = Math.sin(c.t * 3.4 + i) * 0.22;
     }
   }
-  for (const bags of [G.airportBags, G.southAirportBags]) {
+  for (const bags of [G.airportBags, G.southAirportBags, G.northAirportBags]) {
     if (!bags) continue;
     bags.t = (bags.t || 0) + dt;
     for (let i = 0; i < (bags.hands || []).length; i++) {
