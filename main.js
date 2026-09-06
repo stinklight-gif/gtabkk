@@ -22,7 +22,7 @@ export * from './traffic.js';
 import { buildTrafficLights, updateTrafficLights } from './traffic.js';
 export * from './entities.js';
 import {
-  animateWalk, makeCamera, makeCatMesh, makeDogMesh, makePedMesh, makePlayer, makeRain, makeVehicle, makeVehicleMesh, sidewalkPos, spawnBoat, spawnBoatNoodle, spawnPierWait, spawnCats, spawnDog, spawnDogs, spawnMotosaiStands, spawnBtsSongthaew, spawnBtsTuktuk, spawnBtsMalai, spawnMangoSticky, spawnPhromFruit, spawnBtsGates, spawnIceCarts, spawnCoconutCarts, spawnChaYen, spawnRotiCart, spawnMooPing, spawnSomTam, spawnPlaKat, spawnLaundry, spawnSoiPa, spawnSoiCctv, spawnSoiWires, spawnRainFrogs, spawnSoiChairs, spawnSoiMechanic, spawnSoiBarber, spawnSoiCowboy, spawnCheckpoint, spawnSevenBikes, spawnSevenGuard, spawnMallGuard, spawnBankGuard, spawnBankQueue, spawnGunClerk, spawnMallDirectory, spawnMallFood, spawnMallTech, spawnSevenAtm, spawnSevenShoppers, spawnSevenSlush, spawnBtsBusker, spawnBtsPaper, spawnBtsShine, spawnOfficeSmoke, spawnBtsSitters, spawnWatTurtles, spawnWatFeed, spawnWatBell, spawnWatDrum, spawnWatBats, spawnWatSweep, spawnWatRobes, spawnBtsPigeons, spawnWatLotus, spawnWatAmulet, spawnWatCats, spawnMonitors, spawnHyacinth, spawnGeckos, spawnStallIncense, spawnLottery, spawnKanomKrok, spawnSquidGrill, spawnYaoGold, spawnYaoDuck, spawnYaoFortune, spawnParkedCars, spawnPed, spawnPeds, spawnTraffic, updateEntityLod, wearBikeHelmet
+  animateWalk, makeCamera, makeCatMesh, makeDogMesh, makePedMesh, makePlayer, makeRain, makeVehicle, makeVehicleMesh, sidewalkPos, spawnBoat, spawnBoatNoodle, spawnPierWait, spawnCats, spawnDog, spawnDogs, spawnMotosaiStands, spawnBtsSongthaew, spawnBtsTuktuk, spawnBtsMalai, spawnMangoSticky, spawnPhromFruit, spawnBtsGates, spawnIceCarts, spawnCoconutCarts, spawnChaYen, spawnRotiCart, spawnMooPing, spawnSomTam, spawnPlaKat, spawnLaundry, spawnSoiPa, spawnSoiCctv, spawnSoiWires, spawnRainFrogs, spawnSoiChairs, spawnSoiMechanic, spawnSoiBarber, spawnSoiCowboy, spawnCheckpoint, spawnSevenBikes, spawnSevenGuard, spawnMallGuard, spawnBankGuard, spawnBankQueue, spawnGunClerk, spawnMallDirectory, spawnMallFood, spawnMallTech, spawnMallPharm, spawnSevenAtm, spawnSevenShoppers, spawnSevenSlush, spawnBtsBusker, spawnBtsPaper, spawnBtsShine, spawnOfficeSmoke, spawnBtsSitters, spawnWatTurtles, spawnWatFeed, spawnWatBell, spawnWatDrum, spawnWatBats, spawnWatSweep, spawnWatRobes, spawnBtsPigeons, spawnWatLotus, spawnWatAmulet, spawnWatCats, spawnMonitors, spawnHyacinth, spawnGeckos, spawnStallIncense, spawnLottery, spawnKanomKrok, spawnSquidGrill, spawnYaoGold, spawnYaoDuck, spawnYaoFortune, spawnParkedCars, spawnPed, spawnPeds, spawnTraffic, updateEntityLod, wearBikeHelmet
 } from './entities.js';
 import { spawnAirportPlanes } from './airport.js';
 export * from './wanted.js';
@@ -35,7 +35,7 @@ import {
 } from './physics.js';
 export * from './npcs.js';
 import {
-  CROWD_CURVE, buildClusterAnchors, crowdFactor, crowdTarget, makeBarkSprite, resyncCrowd, spawnAnchoredPed, spawnBark, spawnSpikeStrip, updateAlms, updateArmorPickups, updateBarks, updateCats, updateClusters, updateDogs, updateFoodStalls, updateMuggings, updatePeds, updateSchoolKids, updateSeekShade, updateShrines, updateSpikes, updateTurf, updateVigilante, updateYaowaratNight, updateYaoPhotos, updateBtsPlatform, updateBtsGates, updateOfficeCommute, updateCrossingGuards, updateCheckpoint, updateSevenGuard, updateMallGuard, updateBankGuard, updateBankQueue, updateGunClerk, updateMallDirectory, updateMallFood, updateMallTech, updateSevenAtm, updateSevenShoppers, updateSevenSlush, updateBtsBusker, updateBtsPaper, updateBtsShine, updateOfficeSmoke, updateSoiChairs, updateSoiCowboy, updateCowboyClose, updateSoiMechanic, updateSoiBarber, updateRainPack, updateRainPoncho, updateBikeSeatCover, updateIceCarts, updateCoconutCarts, updateChaYen, updateRotiCart, updateMooPing, updateSomTam, updateBtsMalai, updateMangoSticky, updatePhromFruit, updateKanomKrok, updateSquidGrill, updateYaoGold, updateYaoDuck, updateYaoFortune, updateSongthaewRiders, updatePlaKat, updateBoatNoodle, updatePierWait, updateMonitors, updateHyacinth, updateWatTurtles, updateWatFeed, updateWatBell, updateWatDrum, updateWatBats, updateWatSweep, updateWatRobes, updateBtsPigeons, updateWatLotus, updateWatAmulet, updateWatCats, updateGeckos, updateStallIncense, updateSoiFootball, updateMallShoppers, updateLottery, updateSoiWires, updateRainFrogs, updateSoiCctv, vigilanteEnd, vigilanteSpawnTarget
+  CROWD_CURVE, buildClusterAnchors, crowdFactor, crowdTarget, makeBarkSprite, resyncCrowd, spawnAnchoredPed, spawnBark, spawnSpikeStrip, updateAlms, updateArmorPickups, updateBarks, updateCats, updateClusters, updateDogs, updateFoodStalls, updateMuggings, updatePeds, updateSchoolKids, updateSeekShade, updateShrines, updateSpikes, updateTurf, updateVigilante, updateYaowaratNight, updateYaoPhotos, updateBtsPlatform, updateBtsGates, updateOfficeCommute, updateCrossingGuards, updateCheckpoint, updateSevenGuard, updateMallGuard, updateBankGuard, updateBankQueue, updateGunClerk, updateMallDirectory, updateMallFood, updateMallTech, updateMallPharm, updateSevenAtm, updateSevenShoppers, updateSevenSlush, updateBtsBusker, updateBtsPaper, updateBtsShine, updateOfficeSmoke, updateSoiChairs, updateSoiCowboy, updateCowboyClose, updateSoiMechanic, updateSoiBarber, updateRainPack, updateRainPoncho, updateBikeSeatCover, updateIceCarts, updateCoconutCarts, updateChaYen, updateRotiCart, updateMooPing, updateSomTam, updateBtsMalai, updateMangoSticky, updatePhromFruit, updateKanomKrok, updateSquidGrill, updateYaoGold, updateYaoDuck, updateYaoFortune, updateSongthaewRiders, updatePlaKat, updateBoatNoodle, updatePierWait, updateMonitors, updateHyacinth, updateWatTurtles, updateWatFeed, updateWatBell, updateWatDrum, updateWatBats, updateWatSweep, updateWatRobes, updateBtsPigeons, updateWatLotus, updateWatAmulet, updateWatCats, updateGeckos, updateStallIncense, updateSoiFootball, updateMallShoppers, updateLottery, updateSoiWires, updateRainFrogs, updateSoiCctv, vigilanteEnd, vigilanteSpawnTarget
 } from './npcs.js';
 export * from './combat.js';
 import {
@@ -544,6 +544,7 @@ async function init() {
   spawnMallDirectory(scene);
   spawnMallFood(scene);
   spawnMallTech(scene);
+  spawnMallPharm(scene);
   spawnSevenAtm(scene);
   spawnSevenShoppers(scene);
   spawnSevenSlush(scene);
@@ -1823,6 +1824,7 @@ export function loop() {
     updateMallDirectory(dt);
     updateMallFood(dt);
     updateMallTech(dt);
+    updateMallPharm(dt);
     updateSevenAtm(dt);
     updateSevenShoppers(dt);
     updateSevenSlush(dt);

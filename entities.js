@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -2953,6 +2953,60 @@ export function spawnMallTech(scene) {
     lookers.push(ped);
   }
   G.mallTech = { lookers, x, z, t: 0 };
+}
+
+export function spawnMallPharm(scene) {
+  if (!GAMEPLAY.mallPharm) return;
+  const mall = G.world && G.world.mall;
+  const shop = mall && (mall.shops || []).find(s => s && s.name === 'Paris Pharmacy');
+  if (!shop || !shop.pos) return;
+  const x = shop.pos.x, z = shop.pos.z;
+  const clerk = spawnPed(scene, new THREE.Vector3(x + 1.55, 0, z), 'office');
+  recolorTorso(clerk.mesh.userData.parts, 0xe8f0ea, 0.75);
+  clerk.mallPharm = true;
+  clerk.pharmRole = 'clerk';
+  clerk.speed = 0;
+  clerk.state = 'idle';
+  clerk.heading = -PI / 2;
+  clerk.anchor = { slot: new THREE.Vector3(x + 1.55, 0, z), facing: -PI / 2 };
+  if (clerk.mesh) {
+    clerk.mesh.rotation.y = -PI / 2;
+    clerk.mesh.visible = false;
+  }
+  const customer = spawnPed(scene, new THREE.Vector3(x - 0.15, 0, z + 0.12), 'local');
+  customer.mallPharm = true;
+  customer.pharmRole = 'customer';
+  customer.speed = 0;
+  customer.state = 'idle';
+  customer.heading = PI / 2;
+  customer.anchor = { slot: new THREE.Vector3(x - 0.15, 0, z + 0.12), facing: PI / 2 };
+  if (customer.mesh) {
+    customer.mesh.rotation.y = PI / 2;
+    customer.mesh.visible = false;
+  }
+  const bag = new THREE.Group();
+  bag.name = 'mall-pharm-bag';
+  const paper = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 0.16, 0.06),
+    new THREE.MeshStandardMaterial({ color: 0xf4f0e8, roughness: 0.8 })
+  );
+  bag.add(paper);
+  const cross = new THREE.Mesh(
+    new THREE.BoxGeometry(0.08, 0.03, 0.01),
+    new THREE.MeshStandardMaterial({ color: 0xc03030, roughness: 0.55 })
+  );
+  cross.position.set(0, 0.02, 0.035);
+  bag.add(cross);
+  const parts = customer.mesh && customer.mesh.userData && customer.mesh.userData.parts;
+  if (parts && parts.foreL) {
+    bag.position.set(0.02, -0.22, 0.08);
+    parts.foreL.add(bag);
+  } else if (customer.mesh) {
+    bag.position.set(-0.16, 0.95, 0.12);
+    customer.mesh.add(bag);
+  }
+  customer._bag = bag;
+  G.mallPharm = { clerk, customer, x, z, t: 0 };
 }
 
 export function spawnSevenAtm(scene) {
