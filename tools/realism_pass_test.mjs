@@ -7161,6 +7161,43 @@ async function main() {
     });
     assert(southBags.flag && southBags.n >= 2 && southBags.cases >= 2 && southBags.near && southBags.other, `baggage handlers wait at the south Suvarnabhumi terminal (${southBags.n})`);
     assert(southBags.night >= 2 && southBags.day >= 2 && southBags.shifted && southBags.swung, 'they hide after 22:00 and the cases tilt');
+
+    console.log('\n[202] second Muay Thai gym waiting fighter');
+    const gymWaitB = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.gymWaitB;
+      const ped = c && c.ped;
+      const wrap = !!(ped && ped.mesh && ped.mesh.getObjectByName('gym-wrap'));
+      const gym = G.gymBag;
+      const first = G.gymWait;
+      const near = !!(c && gym && Math.hypot(c.x - gym.x, c.z - gym.z) < 4);
+      const other = !!(c && first && Math.hypot(c.x - first.x, c.z - first.z) > 2);
+      G.time.dayT = 22 / 24;
+      main.updateGymBag(0.05);
+      const night = !!(ped && ped.mesh && ped.mesh.visible === false);
+      G.time.dayT = 12.5 / 24;
+      if (c) c.t = 0.2;
+      main.updateGymBag(0.05);
+      const day = !!(ped && ped.gymBag && ped.gymWait && ped.mesh && ped.mesh.visible);
+      const z0 = ped && ped.mesh ? ped.mesh.position.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateGymBag(0.05);
+      const shifted = !!(ped && ped.mesh && Math.abs(ped.mesh.position.z - z0) > 0.02);
+      const tool = ped && ped.mesh && ped.mesh.getObjectByName('gym-wrap');
+      if (c) c.t = 0.2;
+      main.updateGymBag(0.05);
+      const r0 = tool ? tool.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 4.2;
+      main.updateGymBag(0.05);
+      const swung = !!(tool && Math.abs(tool.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.gymBag),
+        rec: !!(ped && ped.gymBag && ped.gymWait),
+        wrap, near, other, night, day, shifted, swung,
+      };
+    });
+    assert(gymWaitB.flag && gymWaitB.rec && gymWaitB.wrap && gymWaitB.near && gymWaitB.other, 'a second fighter waits at the Muay Thai gym');
+    assert(gymWaitB.night && gymWaitB.day && gymWaitB.shifted && gymWaitB.swung, 'they hide after 21:00 and the hand wrap turns');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

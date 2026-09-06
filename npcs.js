@@ -2905,8 +2905,8 @@ export function updateGymBag(dt) {
     c.bag.visible = true;
     c.bag.rotation.z = Math.sin(c.t * 3.4) * 0.22;
   }
-  const wait = G.gymWait;
-  if (wait) {
+  for (const wait of [G.gymWait, G.gymWaitB]) {
+    if (!wait) continue;
     wait.t = (wait.t || 0) + dt;
     const ped = wait.ped;
     if (ped && ped.mesh) {
