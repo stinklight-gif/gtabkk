@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -3361,6 +3361,76 @@ export function spawnMallThreads(scene) {
     customer.mesh.visible = false;
   }
   G.mallThreads = { clerk, customer, x, z, y, t: 0 };
+}
+
+export function spawnMallSeven(scene) {
+  if (!GAMEPLAY.mallSeven) return;
+  const mall = G.world && G.world.mall;
+  const shop = mall && (mall.shops || []).find(s => s && s.name === '7-Eleven');
+  if (!shop || !shop.pos) return;
+  const x = shop.pos.x, z = shop.pos.z, y = shop.pos.y || 0;
+  const clerk = spawnPed(scene, new THREE.Vector3(x + 1.55, 0, z), 'office');
+  recolorTorso(clerk.mesh.userData.parts, 0x2a6a3a, 0.7);
+  clerk.mallSeven = true;
+  clerk.sevenRole = 'clerk';
+  clerk.speed = 0;
+  clerk.state = 'idle';
+  clerk.heading = -PI / 2;
+  clerk.anchor = { slot: new THREE.Vector3(x + 1.55, y, z), facing: -PI / 2 };
+  if (clerk.mesh) {
+    clerk.mesh.position.y = y;
+    clerk.mesh.rotation.y = -PI / 2;
+    clerk.mesh.visible = false;
+  }
+  const scan = new THREE.Mesh(
+    new THREE.BoxGeometry(0.04, 0.08, 0.03),
+    new THREE.MeshStandardMaterial({ color: 0x1a1a22, emissive: 0x39ff7a, emissiveIntensity: 0.25, roughness: 0.4 })
+  );
+  scan.name = 'mall-seven-scan';
+  const parts = clerk.mesh && clerk.mesh.userData && clerk.mesh.userData.parts;
+  if (parts && parts.foreR) {
+    scan.position.set(0.02, -0.22, 0.08);
+    parts.foreR.add(scan);
+  } else if (clerk.mesh) {
+    scan.position.set(0.22, 1.05, 0.12);
+    clerk.mesh.add(scan);
+  }
+  clerk._scan = scan;
+  const customer = spawnPed(scene, new THREE.Vector3(x - 0.15, 0, z + 0.12), 'local');
+  customer.mallSeven = true;
+  customer.sevenRole = 'customer';
+  customer.speed = 0;
+  customer.state = 'idle';
+  customer.heading = PI / 2;
+  customer.anchor = { slot: new THREE.Vector3(x - 0.15, y, z + 0.12), facing: PI / 2 };
+  if (customer.mesh) {
+    customer.mesh.position.y = y;
+    customer.mesh.rotation.y = PI / 2;
+    customer.mesh.visible = false;
+  }
+  const bag = new THREE.Group();
+  bag.name = 'mall-seven-bag';
+  const paper = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 0.16, 0.05),
+    new THREE.MeshStandardMaterial({ color: 0xff7a2a, roughness: 0.7 })
+  );
+  bag.add(paper);
+  const stripe = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 0.03, 0.012),
+    new THREE.MeshStandardMaterial({ color: 0x39ff7a, roughness: 0.55 })
+  );
+  stripe.position.set(0, 0.02, 0.032);
+  bag.add(stripe);
+  const cparts = customer.mesh && customer.mesh.userData && customer.mesh.userData.parts;
+  if (cparts && cparts.foreL) {
+    bag.position.set(0.02, -0.22, 0.08);
+    cparts.foreL.add(bag);
+  } else if (customer.mesh) {
+    bag.position.set(-0.16, 0.95, 0.12);
+    customer.mesh.add(bag);
+  }
+  customer._bag = bag;
+  G.mallSeven = { clerk, customer, x, z, y, t: 0 };
 }
 
 export function spawnSevenAtm(scene) {

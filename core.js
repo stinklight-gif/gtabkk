@@ -352,6 +352,7 @@ export const GAMEPLAY = {
   mallSushi: true,        // chef and a customer at Sushi Bar on Terminal 21 floor 1; they hide after 21:00
   mallCafe: true,         // barista and a customer at Le Café on Terminal 21 floor 2; they hide after 21:00
   mallThreads: true,      // clerk and a customer at London Threads on Terminal 21 floor 2; they hide after 21:00
+  mallSeven: true,        // clerk and a customer at the Terminal 21 7-Eleven; they hide after 21:00
 };
 G.gameplay = GAMEPLAY;
 
