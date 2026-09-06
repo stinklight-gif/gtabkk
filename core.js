@@ -304,6 +304,7 @@ export const GAMEPLAY = {
   chaYen: true,           // Thai iced-tea cart on a soi; E for a cup
   soiBarber: true,        // plastic-chair barber on a soi; E for a cut
   btsGates: true,         // Asok ticket gates + Rabbit machine; hop is 1★
+  soiWires: true,         // tangled cables between soi PA poles; sparks in the rain
 };
 G.gameplay = GAMEPLAY;
 

@@ -1646,6 +1646,72 @@ export function spawnSoiPa(scene) {
   }
 }
 
+function addSagWire(scene, ax, ay, az, bx, by, bz, sag, mat) {
+  const g = new THREE.Group();
+  g.name = 'soi-wire';
+  const segs = 6;
+  const up = new THREE.Vector3(0, 1, 0);
+  const dir = new THREE.Vector3();
+  for (let i = 0; i < segs; i++) {
+    const t0 = i / segs, t1 = (i + 1) / segs;
+    const drop = (t) => 4 * t * (1 - t) * sag;
+    const x0 = ax + (bx - ax) * t0, y0 = ay + (by - ay) * t0 - drop(t0), z0 = az + (bz - az) * t0;
+    const x1 = ax + (bx - ax) * t1, y1 = ay + (by - ay) * t1 - drop(t1), z1 = az + (bz - az) * t1;
+    dir.set(x1 - x0, y1 - y0, z1 - z0);
+    const len = dir.length() || 0.01;
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 1, 4), mat);
+    m.position.set((x0 + x1) * 0.5, (y0 + y1) * 0.5, (z0 + z1) * 0.5);
+    m.scale.set(1, len, 1);
+    m.quaternion.setFromUnitVectors(up, dir.normalize());
+    g.add(m);
+  }
+  scene.add(g);
+  return g;
+}
+
+export function spawnSoiWires(scene) {
+  if (!GAMEPLAY.soiWires) return;
+  const poles = G.soiPa || [];
+  G.soiWires = { cables: [], sparks: [], t: 0 };
+  if (poles.length < 2) return;
+  const mat = new THREE.MeshStandardMaterial({ color: 0x1c1c18, roughness: 0.9 });
+  const y = 3.7;
+  for (let i = 0; i < poles.length - 1; i++) {
+    const a = poles[i], b = poles[i + 1];
+    const sag = 0.85 + i * 0.12;
+    G.soiWires.cables.push(addSagWire(scene, a.x, y, a.z, b.x, y, b.z, sag, mat));
+  }
+  for (let i = 0; i < poles.length; i++) {
+    const p = poles[i];
+    const soi = p.soi;
+    const alongZ = soi && soi.axis === 'z';
+    const ox = alongZ ? -3.2 : 0, oz = alongZ ? 0 : -3.2;
+    G.soiWires.cables.push(addSagWire(scene, p.x, y, p.z, p.x + ox, y - 0.4, p.z + oz, 0.55, mat));
+  }
+  const a0 = poles[0];
+  const xfmr = new THREE.Mesh(
+    new THREE.BoxGeometry(0.42, 0.34, 0.3),
+    new THREE.MeshStandardMaterial({ color: 0x6a6a38, roughness: 0.7, metalness: 0.15 })
+  );
+  xfmr.name = 'soi-transformer';
+  xfmr.position.set(a0.x + 0.22, 3.15, a0.z);
+  scene.add(xfmr);
+  G.soiWires.transformer = xfmr;
+  for (let i = 0; i < Math.min(2, G.soiWires.cables.length); i++) {
+    const c = G.soiWires.cables[i];
+    const spark = new THREE.Mesh(
+      new THREE.SphereGeometry(0.055, 6, 5),
+      new THREE.MeshStandardMaterial({ color: 0xc8fff8, emissive: 0x88eeff, emissiveIntensity: 0, roughness: 0.25 })
+    );
+    spark.name = 'soi-spark';
+    const mid = c.children[Math.floor(c.children.length / 2)];
+    if (mid) spark.position.copy(mid.position);
+    else spark.position.set(a0.x, y - 0.8, a0.z);
+    scene.add(spark);
+    G.soiWires.sparks.push(spark);
+  }
+}
+
 function makePlasticChair() {
   const g = new THREE.Group();
   g.name = 'plastic-chair';

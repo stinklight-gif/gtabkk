@@ -1396,6 +1396,19 @@ export function updateSoiBarber(dt) {
   if (G.audio && G.audio.blip) G.audio.blip({ freq: 180, dur: 0.08, type: 'square', gain: 0.08 });
 }
 
+export function updateSoiWires(dt) {
+  if (!GAMEPLAY.soiWires || !G.soiWires) return;
+  const st = G.soiWires;
+  st.t = (st.t || 0) + dt;
+  const rain = (G.time && G.time.rainStrength) || 0;
+  const wet = rain > 0.45;
+  for (const spark of st.sparks || []) {
+    if (!spark || !spark.material) continue;
+    spark.material.emissiveIntensity = wet ? 0.35 + 0.85 * Math.max(0, Math.sin(st.t * 22)) : 0;
+    spark.visible = wet ? spark.material.emissiveIntensity > 0.2 : false;
+  }
+}
+
 export function updateBtsGates(dt) {
   if (!GAMEPLAY.btsGates || !G.btsGates) return;
   const st = G.btsGates;

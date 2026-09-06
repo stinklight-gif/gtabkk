@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -2376,12 +2376,16 @@ async function main() {
       const bags = stand && stand.bags ? stand.bags.filter(b => b && b.name === 'plakat-bag').length : 0;
       const fish = stand && stand.bags ? stand.bags.filter(b => b && b.getObjectByName('plakat-fish')).length : 0;
       const f0 = stand && stand.bags && stand.bags[0] && stand.bags[0].getObjectByName('plakat-fish');
-      const x0 = f0 ? f0.position.x : 0;
       stand.t = 0;
-      for (let i = 0; i < 20; i++) main.updatePlaKat(0.2);
+      main.updatePlaKat(0.05);
+      const x0 = f0 ? f0.position.x : 0;
+      stand.t = 0.8;
+      main.updatePlaKat(0.05);
       const swam = !!(f0 && Math.abs(f0.position.x - x0) > 0.005);
       G.player.inVehicle = null;
       G._eating = null;
+      G._barberCut = null;
+      G._btsRide = null;
       G.player.group.visible = true;
       if (stand) G.player.group.position.set(stand.x, 0, stand.z);
       G.cash = 100;
@@ -2389,7 +2393,7 @@ async function main() {
       window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
       if (G.input && G.input.endFrame) G.input.endFrame();
       let paid = false;
-      for (let i = 0; i < 4 && !paid; i++) {
+      for (let i = 0; i < 8 && !paid; i++) {
         window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
         main.updatePlaKat(0.016);
         window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
@@ -2556,6 +2560,31 @@ async function main() {
     assert(tap.flag && tap.n >= 3 && tap.flaps >= 3 && tap.machine && tap.screen, `Asok ticket gates (${tap.n})`);
     assert(tap.paid, 'E buys a Rabbit card for ฿50');
     assert(tap.hopped && tap.opened && tap.tapped, 'hopping is a star; a tap opens the flaps');
+
+    console.log('\n[78] tangled soi wires');
+    const tangle = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const st = G.soiWires;
+      const n = st && st.cables ? st.cables.filter(c => c && c.name === 'soi-wire').length : 0;
+      const xfmr = !!(st && st.transformer && st.transformer.name === 'soi-transformer');
+      const sparks = st && st.sparks ? st.sparks.filter(s => s && s.name === 'soi-spark') : [];
+      const spark0 = sparks[0];
+      G.time.rainStrength = 0;
+      st.t = 0;
+      main.updateSoiWires(0.05);
+      const dry = !!(spark0 && spark0.material.emissiveIntensity < 0.05 && spark0.visible === false);
+      G.time.rainStrength = 0.9;
+      st.t = Math.PI / (2 * 22);
+      main.updateSoiWires(0.016);
+      const wet = !!(spark0 && spark0.material.emissiveIntensity > 0.8 && spark0.visible);
+      return {
+        flag: !!(G.gameplay && G.gameplay.soiWires),
+        n, xfmr, sparks: sparks.length, dry, wet,
+        poles: (G.soiPa || []).length,
+      };
+    });
+    assert(tangle.flag && tangle.n >= 4 && tangle.xfmr && tangle.sparks >= 1 && tangle.poles >= 2, `tangled cables on the soi poles (${tangle.n})`);
+    assert(tangle.dry && tangle.wet, 'the wires only spark in the rain');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
