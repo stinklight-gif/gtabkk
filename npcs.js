@@ -940,7 +940,7 @@ export function updateShrines(dt) {
   if (GAMEPLAY.spiritWai) {
     const h = ((G.time.dayT % 1) + 1) % 1 * 24;
     const open = h >= 6 && h < 20;
-    for (const keep of [G.spiritKeep, G.spiritKeepB, G.spiritKeepC, G.spiritKeepD, G.spiritKeepE]) {
+    for (const keep of [G.spiritKeep, G.spiritKeepB, G.spiritKeepC, G.spiritKeepD, G.spiritKeepE, G.spiritKeepF]) {
       if (!keep) continue;
       keep.t = (keep.t || 0) + dt;
       const ped = keep.ped;

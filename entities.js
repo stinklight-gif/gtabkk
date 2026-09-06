@@ -5140,6 +5140,7 @@ export function spawnShrineKeep(scene) {
   G.spiritKeepC = pack(list[2], 1.35, -PI / 2);
   G.spiritKeepD = pack(list[3], -1.35, PI / 2);
   G.spiritKeepE = pack(list[4], 1.35, -PI / 2);
+  G.spiritKeepF = pack(list[5], -1.35, PI / 2);
 }
 
 export function makeChaYenMesh() {
