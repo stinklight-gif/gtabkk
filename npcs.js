@@ -2257,6 +2257,19 @@ export function updateWindsock(dt) {
   sock.rotation.x = Math.sin(c.t * 3.6) * amp * 0.35;
 }
 
+export function updateRunwayLights(dt) {
+  if (!GAMEPLAY.airport || !G.runwayLights) return;
+  const c = G.runwayLights;
+  c.t = (c.t || 0) + dt;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const night = h >= 18.5 || h < 6.2;
+  const pulse = night ? 0.85 + Math.sin(c.t * 6.2) * 0.25 : 0.12;
+  if (c.mat) c.mat.emissiveIntensity = pulse;
+  for (const m of c.lights || []) {
+    if (m) m.visible = true;
+  }
+}
+
 export function updateMallFood(dt) {
   if (!GAMEPLAY.mallFood || !G.mallFood) return;
   const c = G.mallFood;

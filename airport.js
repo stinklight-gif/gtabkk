@@ -14,7 +14,6 @@ export function buildAirport(scene, world) {
   const runwayMat = new THREE.MeshStandardMaterial({ color: 0x2b2e33, roughness: 0.88 });
   const taxiMat = new THREE.MeshStandardMaterial({ color: 0x35383e, roughness: 0.9 });
   const markMat = new THREE.MeshBasicMaterial({ color: 0xe8e4d8 });
-  const yellowMat = new THREE.MeshBasicMaterial({ color: 0xc9a020 });
   const concrete = new THREE.MeshStandardMaterial({ color: 0x8a8e94, roughness: 0.82 });
   const glass = new THREE.MeshStandardMaterial({ color: 0x6a88a8, roughness: 0.25, metalness: 0.45, transparent: true, opacity: 0.72 });
   const purple = new THREE.MeshStandardMaterial({ color: 0x4a1a58, roughness: 0.55 });
@@ -48,11 +47,20 @@ export function buildAirport(scene, world) {
     dash(237 - 4 + i * 1.15, 188, 0.7, 10);
   }
   dash(237, 0, 12, 1.2);
+  const edgeMat = new THREE.MeshStandardMaterial({
+    color: 0xc9a020, roughness: 0.45, metalness: 0.2,
+    emissive: 0xc9a020, emissiveIntensity: 0.12,
+  });
+  const runwayLights = [];
   for (let z = -40; z <= 40; z += 20) {
-    const edge = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.05, 8), yellowMat);
-    edge.position.set(229.2, 0.1, z); scene.add(edge);
-    const edge2 = edge.clone(); edge2.position.x = 244.8; scene.add(edge2);
+    for (const x of [229.2, 244.8]) {
+      const edge = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.05, 8), edgeMat);
+      edge.name = 'runway-edge';
+      edge.position.set(x, 0.1, z); scene.add(edge);
+      runwayLights.push(edge);
+    }
   }
+  G.runwayLights = { lights: runwayLights, mat: edgeMat, t: 0 };
 
   const terminal = solid(new THREE.Vector3(209, 7, 0), new THREE.Vector3(10, 14, 52), concrete);
   const glassBand = new THREE.Mesh(new THREE.BoxGeometry(10.2, 5, 48), glass);

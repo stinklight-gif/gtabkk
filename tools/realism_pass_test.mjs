@@ -5991,6 +5991,32 @@ async function main() {
     });
     assert(sock.flag && sock.named && sock.near, 'a windsock stands on the south Suvarnabhumi apron');
     assert(sock.fluttered && sock.stronger, 'it fills with the breeze and leans harder in the rain');
+
+    console.log('\n[169] Suvarnabhumi runway edge lights');
+    const edges = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.runwayLights;
+      const list = (c && c.lights) || [];
+      const n = list.filter(m => m && m.name === 'runway-edge').length;
+      const near = list.filter(m => m && Math.abs(m.position.x - 237) < 12 && Math.abs(m.position.z) <= 45).length;
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updateRunwayLights(0.05);
+      const day = c && c.mat ? c.mat.emissiveIntensity : 1;
+      G.time.dayT = 21 / 24;
+      if (c) c.t = 0.2;
+      main.updateRunwayLights(0.05);
+      const night0 = c && c.mat ? c.mat.emissiveIntensity : 0;
+      if (c) c.t = 0.2 + Math.PI / 6.2;
+      main.updateRunwayLights(0.05);
+      const night1 = c && c.mat ? c.mat.emissiveIntensity : 0;
+      return {
+        flag: !!(G.gameplay && G.gameplay.airport),
+        n, near, day, night0, pulsed: Math.abs(night1 - night0) > 0.04, brighter: night0 > day + 0.3,
+      };
+    });
+    assert(edges.flag && edges.n >= 8 && edges.near >= 8, `runway edge lights line the Suvarnabhumi strip (${edges.n})`);
+    assert(edges.brighter && edges.pulsed, 'they glow after dark and pulse');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
