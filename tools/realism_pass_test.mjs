@@ -4134,6 +4134,27 @@ async function main() {
     });
     assert(court.flag && court.table && court.n >= 3 && court.tray && court.near, `eaters sit Pier 21 Food Court (${court.n})`);
     assert(court.night >= 3 && court.lunch >= 3 && court.folded >= 3, 'they hide after 21:00 and sit with trays at lunch');
+
+    console.log('\n[120] Phrom Phong tuk-tuk rank');
+    const phromTuk = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      main.updateVehicles(0.016);
+      const rec = G.world && G.world.phromTuktuk;
+      const v = rec && rec.vehicle;
+      const kind = v && (v.kind || (v.spec && v.spec.kind));
+      const dist = (v && v.pos) ? Math.hypot(v.pos.x - 100, v.pos.z) : null;
+      const sign = !!(v && (v.hireSign || (v.mesh && v.mesh.getObjectByName('hire-sign'))));
+      return {
+        flag: !!(G.gameplay && G.gameplay.btsTuktuk),
+        rec: !!rec, kind,
+        stand: !!(v && v.btsTuktuk && v.driver !== 'player' && v._standHome),
+        near: dist != null && dist < 28,
+        waiter: !!(rec && rec.waiter && rec.waiter.btsTuktuk && rec.waiter.stop === 'phrom'),
+        sign,
+      };
+    });
+    assert(phromTuk.flag && phromTuk.kind === 'tuktuk' && phromTuk.near, 'a tuk-tuk waits at Phrom Phong');
+    assert(phromTuk.stand && phromTuk.waiter && phromTuk.sign, 'Phrom Phong tuk-tuk is pinned, hired, and has a driver waiting');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

@@ -270,7 +270,7 @@ export const GAMEPLAY = {
   rainPack: true,         // food stalls pack tarps and queues when the rain hits
   btsSongthaew: true,     // parked songthaew + hawker at the Asok BTS exit
   iceCart: true,          // vendor ice carts patrol the sois and ding
-  btsTuktuk: true,        // parked tuk-tuk + driver at the Asok BTS exit
+  btsTuktuk: true,        // parked tuk-tuk + driver at the Asok and Phrom Phong BTS exits
   khlongMonitor: true,    // water monitors loaf on the river bank and bolt
   stallGecko: true,       // tiny geckos on stall parasols after dark
   soiFootball: true,      // after-school kickabout in a soi
