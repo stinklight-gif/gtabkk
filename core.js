@@ -285,7 +285,7 @@ export const GAMEPLAY = {
   btsSitters: true,       // people sit the Asok and Phrom Phong BTS escalators with their phones
   mooPing: true,          // grilled-pork cart on a soi; E for a skewer
   watTurtles: true,       // turtles paddle the pond at the wat
-  sevenGuard: true,       // plastic-chair security at the walk-in and south 7-Elevens
+  sevenGuard: true,       // plastic-chair security at the walk-in, south, and west 7-Elevens
   soiPa: true,            // village PA horns on soi poles; crackle at dawn and afternoon
   soiChairs: true,        // plastic chairs + beer crates; drinkers sit after dark
   soiMechanic: true,      // paddock-stand bike + mechanic; E repairs your ride for ฿80

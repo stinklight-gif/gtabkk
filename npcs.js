@@ -1768,7 +1768,7 @@ export function updateSevenGuard(dt) {
   if (!GAMEPLAY.sevenGuard) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const night = h >= 19 || h < 6;
-  for (const g of [G.sevenGuard, G.southSevenGuard]) {
+  for (const g of [G.sevenGuard, G.southSevenGuard, G.westSevenGuard]) {
     if (!g) continue;
     if (g.light) g.light.intensity = night ? 1.1 : 0;
     if (g.beam) g.beam.visible = night;
