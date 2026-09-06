@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.sevenShop || ped.btsPaper || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -2661,6 +2661,76 @@ export function spawnSevenShoppers(scene) {
     shoppers.push(ped);
   }
   G.sevenShoppers = { shoppers, doorZ, curbZ, x: seven.pos.x, z: seven.pos.z };
+}
+
+export function spawnSevenSlush(scene) {
+  if (!GAMEPLAY.sevenSlush) return;
+  const seven = G.world && G.world.sevenWalkIn;
+  if (!seven || !seven.pos) return;
+  const hz = seven.hz || 4;
+  const x = seven.pos.x + 2.55, z = seven.pos.z + hz - 1.2;
+  const g = new THREE.Group();
+  g.name = 'seven-slush';
+  const cab = new THREE.Mesh(
+    new THREE.BoxGeometry(0.62, 0.85, 0.42),
+    new THREE.MeshStandardMaterial({ color: 0xe8eaee, roughness: 0.45, metalness: 0.15 })
+  );
+  cab.position.y = 0.48;
+  g.add(cab);
+  const tray = new THREE.Mesh(
+    new THREE.BoxGeometry(0.56, 0.04, 0.16),
+    new THREE.MeshStandardMaterial({ color: 0x2a2a30, roughness: 0.5 })
+  );
+  tray.position.set(0, 0.92, 0.18);
+  g.add(tray);
+  const colors = [0xe23a6a, 0x2ec8c0];
+  for (let i = 0; i < 2; i++) {
+    const tank = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.12, 0.12, 0.38, 10),
+      new THREE.MeshStandardMaterial({
+        color: colors[i], roughness: 0.25, transparent: true, opacity: 0.72,
+        emissive: colors[i], emissiveIntensity: 0.18,
+      })
+    );
+    tank.name = 'seven-slush-tank';
+    tank.position.set(-0.14 + i * 0.28, 1.22, 0);
+    g.add(tank);
+    const lid = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.13, 0.13, 0.04, 10),
+      new THREE.MeshStandardMaterial({ color: 0xd0d4da, roughness: 0.4, metalness: 0.2 })
+    );
+    lid.position.set(-0.14 + i * 0.28, 1.43, 0);
+    g.add(lid);
+    const spout = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04, 0.1, 0.08),
+      new THREE.MeshStandardMaterial({ color: 0x3a3a40, roughness: 0.45, metalness: 0.3 })
+    );
+    spout.position.set(-0.14 + i * 0.28, 0.98, 0.16);
+    g.add(spout);
+  }
+  g.position.set(x, 0, z);
+  scene.add(g);
+  const px = x - 0.7, pz = z;
+  const ped = spawnPed(scene, new THREE.Vector3(px, 0, pz), 'office');
+  ped.sevenSlush = true;
+  ped.speed = 0;
+  ped.state = 'idle';
+  ped.heading = PI / 2;
+  ped.anchor = { slot: new THREE.Vector3(px, 0, pz), facing: PI / 2 };
+  if (ped.mesh) {
+    ped.mesh.rotation.y = PI / 2;
+    ped.mesh.visible = false;
+  }
+  const cup = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.04, 0.035, 0.1, 8),
+    new THREE.MeshStandardMaterial({ color: 0xe23a6a, roughness: 0.4, transparent: true, opacity: 0.85 })
+  );
+  cup.name = 'seven-slush-cup';
+  const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+  if (parts && parts.foreR) { cup.position.set(0.02, -0.26, 0.05); parts.foreR.add(cup); }
+  else if (ped.mesh) { cup.position.set(0.2, 1.05, 0.1); ped.mesh.add(cup); }
+  ped._slushCup = cup;
+  G.sevenSlush = { mesh: g, customer: ped, x, z, t: 0 };
 }
 
 export function spawnBtsBusker(scene) {

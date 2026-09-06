@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes','btsPigeons','watLotus','watCats','sevenShoppers','watFeed','btsPaper','yaoDuck']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes','btsPigeons','watLotus','watCats','sevenShoppers','watFeed','btsPaper','yaoDuck','sevenSlush']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -462,7 +462,7 @@ async function main() {
     const peds = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
       const ways = (G.world.walkways || []).length;
-      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart && !p.songthaewRide && !p.watSweep && !p.yaoGold && !p.yaoDuck && !p.sevenAtm && !p.btsBusker && !p.watLotus && !p.sevenShop && !p.btsPaper);
+      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart && !p.songthaewRide && !p.watSweep && !p.yaoGold && !p.yaoDuck && !p.sevenAtm && !p.btsBusker && !p.watLotus && !p.sevenShop && !p.sevenSlush && !p.btsPaper);
       const b = G.world.buildings.find(x => x.size.y > 8 && x.size.x > 4 && x.size.z > 4) || G.world.buildings[0];
       const insideBefore = wanderer && b && Math.abs(wanderer.mesh.position.x - b.pos.x) < b.size.x / 2 && Math.abs(wanderer.mesh.position.z - b.pos.z) < b.size.z / 2;
       if (wanderer && b) {
@@ -3528,6 +3528,53 @@ async function main() {
     });
     assert(duck.flag && duck.named && duck.n >= 5 && duck.lamp && duck.near, `a roast-duck window waits on Yaowarat (${duck.n})`);
     assert(duck.day >= 2 && duck.night >= 2 && duck.swayed && duck.glow && duck.paid, 'the ducks sway after dark and E buys a plate for ฿80');
+
+    console.log('\n[104] 7-Eleven slushie machine');
+    const slush = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.sevenSlush;
+      const named = !!(c && c.mesh && c.mesh.name === 'seven-slush');
+      const n = c && c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'seven-slush-tank').length : 0;
+      const cup = !!(c && c.customer && (c.customer._slushCup || (c.customer.mesh && c.customer.mesh.getObjectByName('seven-slush-cup'))));
+      const seven = G.world && G.world.sevenWalkIn;
+      const near = !!(c && seven && seven.pos && Math.hypot(c.x - seven.pos.x, c.z - seven.pos.z) < 8);
+      G.time.dayT = 23 / 24;
+      main.updateSevenSlush(0.05);
+      const late = !!(c && c.customer && c.customer.mesh && c.customer.mesh.visible === false);
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updateSevenSlush(0.05);
+      const day = !!(c && c.customer && c.customer.sevenSlush && c.customer.mesh && c.customer.mesh.visible);
+      const t0 = c && c.mesh && c.mesh.children.find(ch => ch && ch.name === 'seven-slush-tank');
+      const r0 = t0 ? t0.rotation.y : 0;
+      if (c) c.t = 0.2 + 0.4;
+      main.updateSevenSlush(0.05);
+      const spun = !!(t0 && Math.abs(t0.rotation.y - r0) > 0.4);
+      G.player.inVehicle = null;
+      G._eating = null;
+      if (c && c.mesh) G.player.group.position.copy(c.mesh.position);
+      G.cash = 50;
+      G._sevenSlush = 0;
+      const stam0 = G.player.stam;
+      G.player.stam = Math.max(0, (G.player.stamMax || 100) * 0.2);
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let paid = false;
+      for (let i = 0; i < 4 && !paid; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateSevenSlush(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        paid = G.cash === 25 && (G._sevenSlush || 0) >= 1 && G.player.stam === G.player.stamMax;
+      }
+      G.player.stam = stam0;
+      return {
+        flag: !!(G.gameplay && G.gameplay.sevenSlush),
+        named, n, cup, near, late, day, spun, paid,
+      };
+    });
+    assert(slush.flag && slush.named && slush.n >= 2 && slush.cup && slush.near, `a slushie machine waits inside 7-Eleven (${slush.n})`);
+    assert(slush.late && slush.day && slush.spun && slush.paid, 'the tanks spin and E buys a slushie for ฿25');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
