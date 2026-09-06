@@ -7082,6 +7082,31 @@ async function main() {
     });
     assert(booth21B.flag && booth21B.seated && booth21B.chair && booth21B.near && booth21B.other, 'a second guard sits outside Terminal 21');
     assert(booth21B.torch && booth21B.dayOff && booth21B.nightOn, 'the east mall guard torch only comes on at night');
+
+    console.log('\n[200] east bank guard at Krung Thep Bank');
+    const bankBoothB = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const g = G.bankGuardB;
+      const first = G.bankGuard;
+      const bank = G.world && G.world.poi && G.world.poi.bank;
+      main.updatePeds(0.05);
+      main.updateBankGuard(0.05);
+      const ped = g && g.ped;
+      const seated = !!(ped && ped.bankGuard && ped.mesh && ped.mesh.position.y >= 0.3);
+      const chair = !!(g && g.chair && g.chair.name === 'east-bank-chair');
+      const near = !!(bank && ped && ped.mesh && Math.hypot(ped.mesh.position.x - bank.x, ped.mesh.position.z - bank.z) < 8);
+      const other = !!(g && first && Math.hypot(g.x - first.x, g.z - first.z) > 2);
+      const torch = !!(ped && ped.mesh && ped.mesh.getObjectByName('flashlight'));
+      G.time.dayT = 12 / 24;
+      main.updateBankGuard(0.05);
+      const dayOff = !!(g && g.beam && g.beam.visible === false && g.light && g.light.intensity === 0);
+      G.time.dayT = 21.5 / 24;
+      main.updateBankGuard(0.05);
+      const nightOn = !!(g && g.beam && g.beam.visible && g.light && g.light.intensity > 0.4);
+      return { flag: !!(G.gameplay && G.gameplay.bankGuard), seated, chair, near, other, torch, dayOff, nightOn };
+    });
+    assert(bankBoothB.flag && bankBoothB.seated && bankBoothB.chair && bankBoothB.near && bankBoothB.other, 'a second guard sits outside Krung Thep Bank');
+    assert(bankBoothB.torch && bankBoothB.dayOff && bankBoothB.nightOn, 'the east bank guard torch only comes on at night');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

@@ -1846,21 +1846,23 @@ export function updateMallGuard(dt) {
 }
 
 export function updateBankGuard(dt) {
-  if (!GAMEPLAY.bankGuard || !G.bankGuard) return;
+  if (!GAMEPLAY.bankGuard) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const night = h >= 19 || h < 6;
-  const g = G.bankGuard;
-  if (g.light) g.light.intensity = night ? 1.1 : 0;
-  if (g.beam) g.beam.visible = night;
-  const ped = g.ped;
-  if (ped && ped.mesh) {
-    ped.bankGuard = true;
-    ped.mesh.visible = true;
-    if (ped.anchor && ped.anchor.slot) {
-      ped.mesh.position.set(ped.anchor.slot.x, ped.anchor.slot.y || 0.42, ped.anchor.slot.z);
-      ped.heading = ped.anchor.facing;
-      ped.mesh.rotation.y = ped.heading;
-      ped.speed = 0;
+  for (const g of [G.bankGuard, G.bankGuardB]) {
+    if (!g) continue;
+    if (g.light) g.light.intensity = night ? 1.1 : 0;
+    if (g.beam) g.beam.visible = night;
+    const ped = g.ped;
+    if (ped && ped.mesh) {
+      ped.bankGuard = true;
+      ped.mesh.visible = true;
+      if (ped.anchor && ped.anchor.slot) {
+        ped.mesh.position.set(ped.anchor.slot.x, ped.anchor.slot.y || 0.42, ped.anchor.slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+        ped.speed = 0;
+      }
     }
   }
 }
