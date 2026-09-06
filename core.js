@@ -328,7 +328,7 @@ export const GAMEPLAY = {
   watCats: true,          // temple cats loaf the wat courtyard and bolt when you get close
   sevenShoppers: true,    // people walk in and out of the walk-in 7-Eleven
   watFeed: true,          // pellet tin at the wat pond; E feeds the turtles
-  btsPaper: true,         // newspaper rack at Asok BTS; morning papers, E for a copy
+  btsPaper: true,         // newspaper racks at Asok and Phrom Phong BTS; morning papers, E for a copy
   yaoDuck: true,          // roast-duck window on Yaowarat; hanging birds after dark, E for a plate
   sevenSlush: true,       // slushie machine inside the walk-in 7-Eleven; tanks spin, E for a cup
   phromFruit: true,       // fruit smoothie cart at Phrom Phong BTS; blender spins, E for a cup

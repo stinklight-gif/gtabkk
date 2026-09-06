@@ -3065,35 +3065,39 @@ export function spawnBtsPaper(scene) {
   if (!GAMEPLAY.btsPaper) return;
   const bts = G.world && G.world.bts;
   if (!bts) return;
-  const x = bts.x - 1.0, z = -27.8;
-  const g = new THREE.Group();
-  g.name = 'bts-paper-rack';
-  const frame = new THREE.Mesh(
-    new THREE.BoxGeometry(0.85, 1.15, 0.12),
-    new THREE.MeshStandardMaterial({ color: 0x3a3a40, roughness: 0.6, metalness: 0.25 })
-  );
-  frame.position.y = 0.7;
-  g.add(frame);
-  const colors = [0xc03030, 0x1a3a6a, 0xf0ead8, 0x2a6a3a, 0xe8c04a, 0xf5f0e4];
-  for (let i = 0; i < 6; i++) {
-    const paper = new THREE.Mesh(
-      new THREE.BoxGeometry(0.22, 0.28, 0.02),
-      new THREE.MeshStandardMaterial({ color: colors[i], roughness: 0.8 })
+  const rack = (x, z, stop) => {
+    const g = new THREE.Group();
+    g.name = 'bts-paper-rack';
+    const frame = new THREE.Mesh(
+      new THREE.BoxGeometry(0.85, 1.15, 0.12),
+      new THREE.MeshStandardMaterial({ color: 0x3a3a40, roughness: 0.6, metalness: 0.25 })
     );
-    paper.name = 'bts-paper';
-    paper.position.set(-0.28 + (i % 3) * 0.28, 0.55 + Math.floor(i / 3) * 0.38, 0.08);
-    g.add(paper);
-  }
-  g.position.set(x, 0, z);
-  scene.add(g);
-  const vendor = spawnPed(scene, new THREE.Vector3(x + 0.7, 0, z + 0.15), 'laborer');
-  vendor.btsPaper = true;
-  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI };
-  vendor.speed = 0;
-  vendor.state = 'idle';
-  vendor.heading = PI;
-  if (vendor.mesh) vendor.mesh.rotation.y = PI;
-  G.btsPaper = { mesh: g, vendor, x, z, t: 0 };
+    frame.position.y = 0.7;
+    g.add(frame);
+    const colors = [0xc03030, 0x1a3a6a, 0xf0ead8, 0x2a6a3a, 0xe8c04a, 0xf5f0e4];
+    for (let i = 0; i < 6; i++) {
+      const paper = new THREE.Mesh(
+        new THREE.BoxGeometry(0.22, 0.28, 0.02),
+        new THREE.MeshStandardMaterial({ color: colors[i], roughness: 0.8 })
+      );
+      paper.name = 'bts-paper';
+      paper.position.set(-0.28 + (i % 3) * 0.28, 0.55 + Math.floor(i / 3) * 0.38, 0.08);
+      g.add(paper);
+    }
+    g.position.set(x, 0, z);
+    scene.add(g);
+    const vendor = spawnPed(scene, new THREE.Vector3(x + 0.7, 0, z + 0.15), 'laborer');
+    vendor.btsPaper = true;
+    vendor.stop = stop;
+    vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI };
+    vendor.speed = 0;
+    vendor.state = 'idle';
+    vendor.heading = PI;
+    if (vendor.mesh) vendor.mesh.rotation.y = PI;
+    return { mesh: g, vendor, x, z, t: 0, stop };
+  };
+  G.btsPaper = rack(bts.x - 1.0, -27.8, 'asok');
+  G.phromPaper = rack(100 - 1.0, -27.8, 'phrom');
 }
 
 export function spawnBtsShine(scene) {

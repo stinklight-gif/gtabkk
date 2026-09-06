@@ -2502,39 +2502,42 @@ export function updateSongthaewRiders(dt) {
 }
 
 export function updateBtsPaper(dt) {
-  if (!GAMEPLAY.btsPaper || !G.btsPaper) return;
-  const c = G.btsPaper;
-  c.t = (c.t || 0) + dt;
+  if (!GAMEPLAY.btsPaper) return;
+  const racks = [G.btsPaper, G.phromPaper];
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const open = h >= 6 && h < 18;
-  const papers = c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'bts-paper') : [];
-  for (let i = 0; i < papers.length; i++) {
-    papers[i].rotation.z = Math.sin(c.t * 2.6 + i) * 0.08;
-  }
-  const ped = c.vendor;
-  if (ped && ped.mesh) {
-    ped.btsPaper = true;
-    ped.mesh.visible = open;
-    const slot = ped.anchor && ped.anchor.slot;
-    if (slot) {
-      ped.mesh.position.set(slot.x, 0, slot.z);
-      ped.heading = ped.anchor.facing;
-      ped.mesh.rotation.y = ped.heading;
+  const pp = G.player && G.player.group && G.player.group.position;
+  for (const c of racks) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    const papers = c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'bts-paper') : [];
+    for (let i = 0; i < papers.length; i++) {
+      papers[i].rotation.z = Math.sin(c.t * 2.6 + i) * 0.08;
     }
-    ped.speed = 0;
-    ped.state = 'idle';
+    const ped = c.vendor;
+    if (ped && ped.mesh) {
+      ped.btsPaper = true;
+      ped.mesh.visible = open;
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        ped.mesh.position.set(slot.x, 0, slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+    }
+    if (!open || G.player.inVehicle || G._eating || !pp) continue;
+    if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) continue;
+    G.hud.showPrompt('Press <b>E</b> for a paper · ฿15', 0.4);
+    if (!G.input.pressed('KeyE')) continue;
+    if (G.cash < 15) { G.hud.showNotif('Need ฿15 for a paper'); continue; }
+    G.cash -= 15;
+    G._btsPaper = (G._btsPaper || 0) + 1;
+    if (G.hud.setCash) G.hud.setCash(G.cash);
+    G.hud.showNotif('Thai Rath — ไทยรัฐ');
+    if (G.audio && G.audio.chime) G.audio.chime();
   }
-  if (!open || G.player.inVehicle || G._eating) return;
-  const pp = G.player.group.position;
-  if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) return;
-  G.hud.showPrompt('Press <b>E</b> for a paper · ฿15', 0.4);
-  if (!G.input.pressed('KeyE')) return;
-  if (G.cash < 15) { G.hud.showNotif('Need ฿15 for a paper'); return; }
-  G.cash -= 15;
-  G._btsPaper = (G._btsPaper || 0) + 1;
-  if (G.hud.setCash) G.hud.setCash(G.cash);
-  G.hud.showNotif('Thai Rath — ไทยรัฐ');
-  if (G.audio && G.audio.chime) G.audio.chime();
 }
 
 export function updateBtsShine(dt) {

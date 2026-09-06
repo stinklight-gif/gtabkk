@@ -4255,6 +4255,50 @@ async function main() {
     assert(phromTap.flag && phromTap.stop === 'phrom' && phromTap.near && phromTap.n >= 3 && phromTap.flaps >= 3 && phromTap.machine && phromTap.screen, `Phrom Phong ticket gates (${phromTap.n})`);
     assert(phromTap.paid, 'E buys a Rabbit card at Phrom Phong for ฿50');
     assert(phromTap.hopped && phromTap.opened && phromTap.tapped, 'hopping Phrom Phong is a star; a tap opens the flaps');
+
+    console.log('\n[123] newspaper rack at Phrom Phong');
+    const phromPaper = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.phromPaper;
+      const named = !!(c && c.mesh && c.mesh.name === 'bts-paper-rack');
+      const n = c && c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'bts-paper').length : 0;
+      const dist = (c && c.x != null) ? Math.hypot(c.x - 100, c.z) : null;
+      G.time.dayT = 21.2 / 24;
+      main.updateBtsPaper(0.05);
+      const night = !!(c && c.vendor && c.vendor.mesh && c.vendor.mesh.visible === false);
+      G.time.dayT = 8 / 24;
+      if (c) c.t = 0.2;
+      main.updateBtsPaper(0.05);
+      const day = !!(c && c.vendor && c.vendor.btsPaper && c.vendor.stop === 'phrom' && c.vendor.mesh && c.vendor.mesh.visible);
+      const p0 = c && c.mesh && c.mesh.children.find(ch => ch && ch.name === 'bts-paper');
+      const r0 = p0 ? p0.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.6;
+      main.updateBtsPaper(0.05);
+      const fluttered = !!(p0 && Math.abs(p0.rotation.z - r0) > 0.02);
+      G.player.inVehicle = null;
+      G._eating = null;
+      if (c && c.mesh) G.player.group.position.copy(c.mesh.position);
+      G.cash = 50;
+      G._btsPaper = 0;
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let paid = false;
+      for (let i = 0; i < 4 && !paid; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateBtsPaper(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        paid = G.cash === 35 && (G._btsPaper || 0) >= 1;
+      }
+      return {
+        flag: !!(G.gameplay && G.gameplay.btsPaper),
+        named, n, stop: c && c.stop,
+        near: dist != null && dist < 28,
+        night, day, fluttered, paid,
+      };
+    });
+    assert(phromPaper.flag && phromPaper.named && phromPaper.stop === 'phrom' && phromPaper.n >= 6 && phromPaper.near, 'a newspaper rack waits at Phrom Phong');
+    assert(phromPaper.night && phromPaper.day && phromPaper.fluttered && phromPaper.paid, 'the Phrom Phong vendor works mornings and E buys a paper for ฿15');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

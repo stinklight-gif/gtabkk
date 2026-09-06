@@ -419,7 +419,11 @@ export function updateInteraction(dt) {
   if (GAMEPLAY.watLotus && G.watLotus && G.watLotus.mesh && dist2(G.watLotus.mesh.position, pp0) < 2.4 * 2.4) return;
   if (GAMEPLAY.watAmulet && G.watAmulet && G.watAmulet.mesh && dist2(G.watAmulet.mesh.position, pp0) < 2.4 * 2.4) return;
   if (GAMEPLAY.watFeed && G.watFeed && dist2({ x: G.watFeed.x, z: G.watFeed.z }, pp0) < 2.4 * 2.4) return;
-  if (GAMEPLAY.btsPaper && G.btsPaper && G.btsPaper.mesh && dist2(G.btsPaper.mesh.position, pp0) < 2.4 * 2.4) return;
+  if (GAMEPLAY.btsPaper) {
+    for (const c of [G.btsPaper, G.phromPaper]) {
+      if (c && c.mesh && dist2(c.mesh.position, pp0) < 2.4 * 2.4) return;
+    }
+  }
   if (GAMEPLAY.yaoDuck && G.yaoDuck && G.yaoDuck.mesh && dist2(G.yaoDuck.mesh.position, pp0) < 2.4 * 2.4) return;
   if (GAMEPLAY.yaoFortune && G.yaoFortune && G.yaoFortune.mesh && dist2(G.yaoFortune.mesh.position, pp0) < 2.4 * 2.4) return;
   if (GAMEPLAY.sevenSlush && G.sevenSlush && G.sevenSlush.mesh && dist2(G.sevenSlush.mesh.position, pp0) < 2.4 * 2.4) return;
