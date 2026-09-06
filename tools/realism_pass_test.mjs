@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes','btsPigeons','watLotus','watCats','sevenShoppers','watFeed','btsPaper','yaoDuck','sevenSlush','phromFruit','pierWait','btsShine','watAmulet']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes','btsPigeons','watLotus','watCats','sevenShoppers','watFeed','btsPaper','yaoDuck','sevenSlush','phromFruit','pierWait','btsShine','watAmulet','yaoFortune']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -462,7 +462,7 @@ async function main() {
     const peds = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
       const ways = (G.world.walkways || []).length;
-      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart && !p.songthaewRide && !p.watSweep && !p.yaoGold && !p.yaoDuck && !p.sevenAtm && !p.btsBusker && !p.watLotus && !p.watAmulet && !p.sevenShop && !p.sevenSlush && !p.btsPaper && !p.phromFruit && !p.pierWait && !p.btsShine);
+      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart && !p.songthaewRide && !p.watSweep && !p.yaoGold && !p.yaoDuck && !p.yaoFortune && !p.sevenAtm && !p.btsBusker && !p.watLotus && !p.watAmulet && !p.sevenShop && !p.sevenSlush && !p.btsPaper && !p.phromFruit && !p.pierWait && !p.btsShine);
       const b = G.world.buildings.find(x => x.size.y > 8 && x.size.x > 4 && x.size.z > 4) || G.world.buildings[0];
       const insideBefore = wanderer && b && Math.abs(wanderer.mesh.position.x - b.pos.x) < b.size.x / 2 && Math.abs(wanderer.mesh.position.z - b.pos.z) < b.size.z / 2;
       if (wanderer && b) {
@@ -3783,6 +3783,54 @@ async function main() {
     assert(amulet.flag && amulet.named && amulet.n >= 6 && amulet.nearWat, `an amulet board waits at the wat (${amulet.n})`);
     assert(amulet.night && amulet.day && amulet.swayed && amulet.paid, 'E buys an amulet; the shrine takes it for extra heat cool');
     assert(amulet.offered && amulet.cooled, 'the shrine takes the amulet for extra heat cool');
+
+    console.log('\n[109] Yaowarat fortune teller');
+    const fortune = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.yaoFortune;
+      const named = !!(c && c.mesh && c.mesh.name === 'yao-fortune');
+      const n = c && c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'yao-card').length : 0;
+      const lamp = !!(c && c.mesh && c.mesh.getObjectByName('yao-fortune-lamp'));
+      const poi = G.world && G.world.poi && G.world.poi.yaowarat;
+      const near = !!(c && poi && Math.hypot(c.x - poi.x, c.z - poi.z) < 40);
+      G.time.dayT = 8 / 24;
+      main.updateYaoFortune(0.05);
+      const day = !!(c && c.vendor && c.vendor.mesh && c.vendor.mesh.visible === false);
+      G.time.dayT = 21.2 / 24;
+      if (c) { c.t = 0.2; c.readyAt = 0; }
+      main.updateYaoFortune(0.05);
+      const night = !!(c && c.vendor && c.vendor.yaoFortune && c.vendor.mesh && c.vendor.mesh.visible);
+      const glow = !!(c && c.lampMat && c.lampMat.emissiveIntensity > 0.4);
+      const card = c && c.mesh && c.mesh.children.find(ch => ch && ch.name === 'yao-card');
+      const r0 = card ? card.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 3.6;
+      main.updateYaoFortune(0.05);
+      const flipped = !!(card && Math.abs(card.rotation.z - r0) > 0.1);
+      G.player.inVehicle = null;
+      G._eating = null;
+      if (c && c.mesh) G.player.group.position.copy(c.mesh.position);
+      G.cash = 120;
+      G._yaoFortune = 0;
+      G.wanted.lastSeenAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() + 20000 : 20000;
+      const seen0 = G.wanted.lastSeenAt;
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let paid = false;
+      for (let i = 0; i < 4 && !paid; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateYaoFortune(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        paid = G.cash === 60 && (G._yaoFortune || 0) >= 1;
+      }
+      const cooled = G.wanted.lastSeenAt < seen0 - 5000;
+      return {
+        flag: !!(G.gameplay && G.gameplay.yaoFortune),
+        named, n, lamp, near, day, night, glow, flipped, paid, cooled,
+      };
+    });
+    assert(fortune.flag && fortune.named && fortune.n >= 4 && fortune.lamp && fortune.near, `a fortune teller waits on Yaowarat (${fortune.n})`);
+    assert(fortune.day && fortune.night && fortune.glow && fortune.flipped && fortune.paid && fortune.cooled, 'the cards turn after dark and E buys a ฿60 reading');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

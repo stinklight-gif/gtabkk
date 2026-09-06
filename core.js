@@ -335,6 +335,7 @@ export const GAMEPLAY = {
   pierWait: true,         // ferry passengers wait on the pier; E for a ฿15 express-boat ticket
   btsShine: true,         // shoe-shine box on the north side of Asok BTS; E for a polish
   watAmulet: true,        // amulet board at the wat; E buys one, shrine offering cools extra
+  yaoFortune: true,       // fortune teller on Yaowarat after dark; E for a reading that cools last-seen
 };
 G.gameplay = GAMEPLAY;
 

@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -1850,6 +1850,67 @@ export function spawnYaoDuck(scene) {
     shoppers.push(ped);
   }
   G.yaoDuck = { mesh, shoppers, x, z, t: 0, duckMat: mesh.userData.duckMat, lampMat: mesh.userData.lampMat, signMat: mesh.userData.signMat };
+}
+
+export function spawnYaoFortune(scene) {
+  if (!GAMEPLAY.yaoFortune) return;
+  const poi = G.world && G.world.poi && G.world.poi.yaowarat;
+  if (!poi) return;
+  const x = poi.x - 8.2, z = poi.z + 22;
+  const g = new THREE.Group();
+  g.name = 'yao-fortune';
+  const table = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.42, 0.44, 0.08, 10),
+    new THREE.MeshStandardMaterial({ color: 0x6a1a18, roughness: 0.7 })
+  );
+  table.position.y = 0.72;
+  g.add(table);
+  const cloth = new THREE.Mesh(
+    new THREE.CircleGeometry(0.4, 10),
+    new THREE.MeshStandardMaterial({ color: 0xc03030, roughness: 0.75 })
+  );
+  cloth.rotation.x = -PI / 2;
+  cloth.position.y = 0.77;
+  g.add(cloth);
+  const colors = [0xf5f0e4, 0xe8c04a, 0x2a4a8a, 0xc03030];
+  for (let i = 0; i < 4; i++) {
+    const card = new THREE.Mesh(
+      new THREE.BoxGeometry(0.1, 0.01, 0.14),
+      new THREE.MeshStandardMaterial({ color: colors[i], roughness: 0.65 })
+    );
+    card.name = 'yao-card';
+    const a = (i / 4) * TAU;
+    card.position.set(Math.sin(a) * 0.16, 0.79, Math.cos(a) * 0.16);
+    card.rotation.y = a;
+    g.add(card);
+  }
+  const lamp = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.05, 0.07, 0.16, 8),
+    new THREE.MeshStandardMaterial({ color: 0xffcc66, roughness: 0.4, emissive: 0xffaa33, emissiveIntensity: 0.2 })
+  );
+  lamp.name = 'yao-fortune-lamp';
+  lamp.position.set(0.22, 0.9, -0.12);
+  g.add(lamp);
+  g.userData.lampMat = lamp.material;
+  const stick = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.012, 0.012, 0.22, 5),
+    new THREE.MeshStandardMaterial({ color: 0xc8a070, roughness: 0.7 })
+  );
+  stick.position.set(-0.18, 0.9, 0.12);
+  g.add(stick);
+  g.position.set(x, 0, z);
+  scene.add(g);
+  const vendor = spawnPed(scene, new THREE.Vector3(x + 0.55, 0, z), 'local');
+  vendor.yaoFortune = true;
+  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: -PI / 2 };
+  vendor.speed = 0;
+  vendor.state = 'idle';
+  vendor.heading = -PI / 2;
+  if (vendor.mesh) {
+    vendor.mesh.rotation.y = -PI / 2;
+    vendor.mesh.visible = false;
+  }
+  G.yaoFortune = { mesh: g, vendor, x, z, t: 0, lampMat: g.userData.lampMat };
 }
 
 export function makeCoconutCartMesh() {
