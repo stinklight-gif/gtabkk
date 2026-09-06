@@ -2667,39 +2667,43 @@ export function updateCheckpoint(dt) {
 }
 
 export function updateLottery(dt) {
-  if (!GAMEPLAY.lottery || !G.lottery) return;
+  if (!GAMEPLAY.lottery) return;
   if (G.player.inVehicle || G._eating) return;
   const pp = G.player.group.position;
-  if (dist2(G.lottery.pos, pp) > 2.4 * 2.4) return;
   const now = performance.now();
-  if (G.lottery.readyAt && now < G.lottery.readyAt) {
-    G.hud.showPrompt('Counting out tickets…', 0.35);
+  for (const L of [G.lottery, G.southLottery]) {
+    if (!L || !L.pos) continue;
+    if (dist2(L.pos, pp) > 2.4 * 2.4) continue;
+    if (L.readyAt && now < L.readyAt) {
+      G.hud.showPrompt('Counting out tickets…', 0.35);
+      return;
+    }
+    G.hud.showPrompt('Press <b>E</b> for a lottery ticket · ฿80', 0.4);
+    if (!G.input.pressed('KeyE')) return;
+    if (G.cash < 80) { G.hud.showNotif('Need ฿80 for a ticket'); return; }
+    G.cash -= 80;
+    if (G.hud.setCash) G.hud.setCash(G.cash);
+    L.readyAt = now + 1800;
+    const forced = G._lotteryForce;
+    G._lotteryForce = null;
+    const roll = forced != null ? 0 : Math.random();
+    let win = forced != null ? forced : 0;
+    if (forced == null) {
+      if (roll < 0.08) win = 1200;
+      else if (roll < 0.32) win = 240;
+    }
+    if (win) {
+      G.cash += win;
+      if (G.hud.setCash) G.hud.setCash(G.cash);
+      G.hud.showNotif(`Lottery +฿${win}`);
+      if (G.audio && G.audio.chime) G.audio.chime();
+    } else {
+      G.hud.showNotif('Not this time');
+      if (G.audio && G.audio.blip) G.audio.blip({ freq: 220, dur: 0.12, gain: 0.08 });
+    }
+    G._lotteryLast = { spent: 80, win };
     return;
   }
-  G.hud.showPrompt('Press <b>E</b> for a lottery ticket · ฿80', 0.4);
-  if (!G.input.pressed('KeyE')) return;
-  if (G.cash < 80) { G.hud.showNotif('Need ฿80 for a ticket'); return; }
-  G.cash -= 80;
-  if (G.hud.setCash) G.hud.setCash(G.cash);
-  G.lottery.readyAt = now + 1800;
-  const forced = G._lotteryForce;
-  G._lotteryForce = null;
-  const roll = forced != null ? 0 : Math.random();
-  let win = forced != null ? forced : 0;
-  if (forced == null) {
-    if (roll < 0.08) win = 1200;
-    else if (roll < 0.32) win = 240;
-  }
-  if (win) {
-    G.cash += win;
-    if (G.hud.setCash) G.hud.setCash(G.cash);
-    G.hud.showNotif(`Lottery +฿${win}`);
-    if (G.audio && G.audio.chime) G.audio.chime();
-  } else {
-    G.hud.showNotif('Not this time');
-    if (G.audio && G.audio.blip) G.audio.blip({ freq: 220, dur: 0.12, gain: 0.08 });
-  }
-  G._lotteryLast = { spent: 80, win };
 }
 
 export function updateMallShoppers(dt) {

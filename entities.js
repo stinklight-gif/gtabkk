@@ -1536,38 +1536,42 @@ export function makeIceCartMesh() {
 
 export function spawnLottery(scene) {
   if (!GAMEPLAY.lottery) return;
-  const seven = G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0]));
-  if (!seven || !seven.pos) return;
-  const hz = seven.hz || 4;
-  const x = seven.pos.x + 2.4;
-  const z = seven.pos.z + hz + 1.6;
-  const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'vendor');
-  ped.lottery = true;
-  ped.anchor = { slot: ped.mesh.position.clone(), facing: PI };
-  ped.speed = 0;
-  ped.state = 'idle';
-  const board = new THREE.Group();
-  board.name = 'lottery-board';
-  const pole = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.04, 0.05, 1.45, 6),
-    new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.6 })
-  );
-  pole.position.y = 0.72; board.add(pole);
-  const sheet = new THREE.Mesh(
-    new THREE.BoxGeometry(0.72, 0.95, 0.04),
-    new THREE.MeshStandardMaterial({ color: 0xf5e6a3, roughness: 0.7 })
-  );
-  sheet.position.set(0, 1.38, 0.05); board.add(sheet);
-  for (let r = 0; r < 4; r++) {
-    const strip = new THREE.Mesh(
-      new THREE.BoxGeometry(0.56, 0.12, 0.02),
-      new THREE.MeshStandardMaterial({ color: pick([0xc03030, 0x2a7d3a, 0x2a4a8a, 0xd9a020]), roughness: 0.55 })
+  const pack = (seven) => {
+    if (!seven || !seven.pos) return null;
+    const hz = seven.hz || 4;
+    const x = seven.pos.x + 2.4;
+    const z = seven.pos.z + hz + 1.6;
+    const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'vendor');
+    ped.lottery = true;
+    ped.anchor = { slot: ped.mesh.position.clone(), facing: PI };
+    ped.speed = 0;
+    ped.state = 'idle';
+    const board = new THREE.Group();
+    board.name = 'lottery-board';
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.04, 0.05, 1.45, 6),
+      new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.6 })
     );
-    strip.position.set(0, 1.62 - r * 0.18, 0.08); board.add(strip);
-  }
-  board.position.set(x - 0.5, 0, z + 0.2);
-  scene.add(board);
-  G.lottery = { ped, board, pos: new THREE.Vector3(x, 0, z), readyAt: 0 };
+    pole.position.y = 0.72; board.add(pole);
+    const sheet = new THREE.Mesh(
+      new THREE.BoxGeometry(0.72, 0.95, 0.04),
+      new THREE.MeshStandardMaterial({ color: 0xf5e6a3, roughness: 0.7 })
+    );
+    sheet.position.set(0, 1.38, 0.05); board.add(sheet);
+    for (let r = 0; r < 4; r++) {
+      const strip = new THREE.Mesh(
+        new THREE.BoxGeometry(0.56, 0.12, 0.02),
+        new THREE.MeshStandardMaterial({ color: pick([0xc03030, 0x2a7d3a, 0x2a4a8a, 0xd9a020]), roughness: 0.55 })
+      );
+      strip.position.set(0, 1.62 - r * 0.18, 0.08); board.add(strip);
+    }
+    board.position.set(x - 0.5, 0, z + 0.2);
+    scene.add(board);
+    return { ped, board, pos: new THREE.Vector3(x, 0, z), readyAt: 0 };
+  };
+  G.lottery = pack(G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0])));
+  const south = (G.world.sevenElevens || []).find(s => s && s.pos && Math.abs(s.pos.x) < 8 && s.pos.z < -80);
+  G.southLottery = pack(south);
 }
 
 export function makeKanomKrokMesh() {

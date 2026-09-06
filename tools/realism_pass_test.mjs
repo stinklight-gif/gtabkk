@@ -5715,6 +5715,39 @@ async function main() {
     });
     assert(eastShop.flag && eastShop.n >= 3 && eastShop.bags >= 3 && eastShop.near && eastShop.farWalk, `shoppers work the east 7-Eleven door (${eastShop.n})`);
     assert(eastShop.late >= 3 && eastShop.day >= 3 && eastShop.walked && eastShop.bagOut, 'they hide late, walk the door, and leave with a bag');
+
+    console.log('\n[162] lottery seller at the south 7-Eleven');
+    const southLotto = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const L = G.southLottery;
+      const south = (G.world.sevenElevens || []).find(s => s && s.pos && Math.abs(s.pos.x) < 8 && s.pos.z < -80);
+      const walk = G.world && G.world.sevenWalkIn;
+      const near = !!(L && L.pos && south && south.pos && Math.hypot(L.pos.x - south.pos.x, L.pos.z - south.pos.z) < 12);
+      const farWalk = !!(L && L.pos && walk && walk.pos && Math.hypot(L.pos.x - walk.pos.x, L.pos.z - walk.pos.z) > 80);
+      const board = !!(L && L.board && L.board.name === 'lottery-board');
+      const seller = !!(L && L.ped && L.ped.lottery);
+      G.player.inVehicle = null;
+      G._eating = null;
+      G._btsRide = null;
+      G.player.group.visible = true;
+      G.cash = 200;
+      G._lotteryForce = 1200;
+      G._lotteryLast = null;
+      if (L && L.pos) G.player.group.position.copy(L.pos);
+      if (L) L.readyAt = 0;
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+      main.updateLottery(0.016);
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      return {
+        flag: !!(G.gameplay && G.gameplay.lottery),
+        near, farWalk, board, seller,
+        last: G._lotteryLast,
+        cash: G.cash,
+      };
+    });
+    assert(southLotto.flag && southLotto.seller && southLotto.board && southLotto.near && southLotto.farWalk, 'a lottery board waits outside the south 7-Eleven');
+    assert(southLotto.last && southLotto.last.spent === 80 && southLotto.last.win === 1200 && southLotto.cash === 1320, 'E buys a ticket at the south board (฿80) and can pay out');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
