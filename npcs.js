@@ -2399,30 +2399,32 @@ export function updateAirportCargo(dt) {
 }
 
 export function updateAirportTower(dt) {
-  if (!GAMEPLAY.airportTower || !G.towerCtl) return;
-  const c = G.towerCtl;
-  c.t = (c.t || 0) + dt;
+  if (!GAMEPLAY.airportTower) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const open = h >= 6 && h < 22;
-  const ped = c.ped;
-  if (ped && ped.mesh) {
-    ped.airportTower = true;
-    ped.mesh.visible = open;
-    if (!open) {
-      ped.speed = 0;
-      ped.state = 'idle';
-    } else {
-      const slot = ped.anchor && ped.anchor.slot;
-      if (slot) {
-        const bob = Math.sin(c.t * 2.2) * 0.05;
-        ped.mesh.position.set(slot.x, 0, slot.z + bob);
-        ped.heading = ped.anchor.facing;
-        ped.mesh.rotation.y = ped.heading;
+  for (const c of [G.towerCtl, G.towerCtlB]) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    const ped = c.ped;
+    if (ped && ped.mesh) {
+      ped.airportTower = true;
+      ped.mesh.visible = open;
+      if (!open) {
+        ped.speed = 0;
+        ped.state = 'idle';
+      } else {
+        const slot = ped.anchor && ped.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(c.t * 2.2) * 0.05;
+          ped.mesh.position.set(slot.x, 0, slot.z + bob);
+          ped.heading = ped.anchor.facing;
+          ped.mesh.rotation.y = ped.heading;
+        }
+        ped.speed = 0;
+        ped.state = 'idle';
+        const binocs = ped.mesh.getObjectByName('tower-binocs');
+        if (binocs) binocs.rotation.x = Math.sin(c.t * 3.2) * 0.22;
       }
-      ped.speed = 0;
-      ped.state = 'idle';
-      const binocs = ped.mesh.getObjectByName('tower-binocs');
-      if (binocs) binocs.rotation.x = Math.sin(c.t * 3.2) * 0.22;
     }
   }
 }

@@ -3428,38 +3428,41 @@ export function spawnAirportTower(scene) {
   if (!GAMEPLAY.airportTower) return;
   const poi = G.world && G.world.poi && G.world.poi.airportTower;
   if (!poi) return;
-  const x = poi.x + 4.8, z = poi.z;
-  const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'office');
-  recolorTorso(ped.mesh.userData.parts, 0x1a3a6a, 0.7);
-  ped.airportTower = true;
-  ped.speed = 0;
-  ped.state = 'idle';
-  ped.heading = PI / 2;
-  ped.anchor = { slot: new THREE.Vector3(x, 0, z), facing: PI / 2 };
-  if (ped.mesh) {
-    ped.mesh.rotation.y = PI / 2;
-    ped.mesh.visible = false;
-  }
-  const binocs = new THREE.Group();
-  binocs.name = 'tower-binocs';
-  const mat = new THREE.MeshStandardMaterial({ color: 0x2a2a32, roughness: 0.45, metalness: 0.35 });
-  for (const ox of [-0.035, 0.035]) {
-    const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.026, 0.16, 8), mat);
-    tube.rotation.x = PI / 2;
-    tube.position.x = ox;
-    binocs.add(tube);
-  }
-  const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.018, 0.03), mat);
-  binocs.add(bridge);
-  const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
-  if (parts && parts.foreR) {
-    binocs.position.set(0.02, -0.22, 0.1);
-    parts.foreR.add(binocs);
-  } else if (ped.mesh) {
-    binocs.position.set(0.22, 1.15, 0.12);
-    ped.mesh.add(binocs);
-  }
-  G.towerCtl = { ped, x, z, t: 0 };
+  const packCtl = (x, z, facing) => {
+    const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'office');
+    recolorTorso(ped.mesh.userData.parts, 0x1a3a6a, 0.7);
+    ped.airportTower = true;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = facing;
+    ped.anchor = { slot: new THREE.Vector3(x, 0, z), facing };
+    if (ped.mesh) {
+      ped.mesh.rotation.y = facing;
+      ped.mesh.visible = false;
+    }
+    const binocs = new THREE.Group();
+    binocs.name = 'tower-binocs';
+    const mat = new THREE.MeshStandardMaterial({ color: 0x2a2a32, roughness: 0.45, metalness: 0.35 });
+    for (const ox of [-0.035, 0.035]) {
+      const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.026, 0.16, 8), mat);
+      tube.rotation.x = PI / 2;
+      tube.position.x = ox;
+      binocs.add(tube);
+    }
+    const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.018, 0.03), mat);
+    binocs.add(bridge);
+    const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+    if (parts && parts.foreR) {
+      binocs.position.set(0.02, -0.22, 0.1);
+      parts.foreR.add(binocs);
+    } else if (ped.mesh) {
+      binocs.position.set(0.22, 1.15, 0.12);
+      ped.mesh.add(binocs);
+    }
+    return { ped, x, z, t: 0 };
+  };
+  G.towerCtl = packCtl(poi.x + 4.8, poi.z, PI / 2);
+  G.towerCtlB = packCtl(poi.x - 4.8, poi.z, -PI / 2);
 }
 
 export function spawnAirportTaxi(scene) {

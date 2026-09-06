@@ -7020,6 +7020,43 @@ async function main() {
     });
     assert(mechB.flag && mechB.rec && mechB.wrench && mechB.near && mechB.other, 'a second mechanic waits at the U-Spray bay');
     assert(mechB.night && mechB.day && mechB.shifted && mechB.swung, 'they hide after 19:00 and the wrench turns');
+
+    console.log('\n[198] second Suvarnabhumi tower controller');
+    const towerB = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.towerCtlB;
+      const ped = c && c.ped;
+      const binocs = !!(ped && ped.mesh && ped.mesh.getObjectByName('tower-binocs'));
+      const poi = G.world && G.world.poi && G.world.poi.airportTower;
+      const first = G.towerCtl;
+      const near = !!(c && poi && Math.hypot(c.x - poi.x, c.z - poi.z) < 8);
+      const other = !!(c && first && Math.hypot(c.x - first.x, c.z - first.z) > 2);
+      G.time.dayT = 23 / 24;
+      main.updateAirportTower(0.05);
+      const night = !!(ped && ped.mesh && ped.mesh.visible === false);
+      G.time.dayT = 12.5 / 24;
+      if (c) c.t = 0.2;
+      main.updateAirportTower(0.05);
+      const day = !!(ped && ped.airportTower && ped.mesh && ped.mesh.visible);
+      const z0 = ped && ped.mesh ? ped.mesh.position.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateAirportTower(0.05);
+      const shifted = !!(ped && ped.mesh && Math.abs(ped.mesh.position.z - z0) > 0.02);
+      const tool = ped && ped.mesh && ped.mesh.getObjectByName('tower-binocs');
+      if (c) c.t = 0.2;
+      main.updateAirportTower(0.05);
+      const r0 = tool ? tool.rotation.x : 0;
+      if (c) c.t = 0.2 + Math.PI / 3.2;
+      main.updateAirportTower(0.05);
+      const swung = !!(tool && Math.abs(tool.rotation.x - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.airportTower),
+        rec: !!(ped && ped.airportTower),
+        binocs, near, other, night, day, shifted, swung,
+      };
+    });
+    assert(towerB.flag && towerB.rec && towerB.binocs && towerB.near && towerB.other, 'a second controller waits at the Suvarnabhumi tower');
+    assert(towerB.night && towerB.day && towerB.shifted && towerB.swung, 'they hide after 22:00 and the binoculars tilt');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
