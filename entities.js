@@ -1484,28 +1484,34 @@ export function spawnMotosaiStands(scene) {
     G.world.motosaiStands.push({ bike, rider, waiter, soi: s, x, z });
   }
   if (GAMEPLAY.btsMotosai && G.world.bts) {
-    const x = G.world.bts.x + 7.6, z = -22, heading = 0;
-    const bike = makeVehicle('bike', scene);
-    bike.pos.set(x, 0, z);
-    bike.heading = heading;
-    bike.mesh.position.copy(bike.pos);
-    bike.mesh.rotation.y = heading;
-    bike.driver = null;
-    bike.vel = 0;
-    bike.motosaiStand = true;
-    bike._standHome = { x, z, heading };
-    const rider = spawnPed(scene, new THREE.Vector3(x + 1.15, 0, z));
-    dressMotosaiVest(rider);
-    wearBikeHelmet(rider, 0xffcf2a);
-    rider.anchor = { slot: rider.mesh.position.clone(), facing: heading + PI };
-    rider.motosaiRider = true;
-    rider.speed = 0;
-    const waiter = spawnPed(scene, new THREE.Vector3(x + 1.7, 0, z + 0.4));
-    waiter.anchor = { slot: waiter.mesh.position.clone(), facing: heading + PI };
-    waiter.motosaiWait = true;
-    waiter.speed = 0;
-    bike.standRider = rider;
-    G.world.motosaiStands.push({ bike, rider, waiter, soi: null, x, z, bts: true });
+    const ranks = [
+      { x: G.world.bts.x + 7.6, z: -22, stop: 'asok' },
+      { x: 100 + 7.6, z: -20, stop: 'phrom' },
+    ];
+    for (const r of ranks) {
+      const x = r.x, z = r.z, heading = 0;
+      const bike = makeVehicle('bike', scene);
+      bike.pos.set(x, 0, z);
+      bike.heading = heading;
+      bike.mesh.position.copy(bike.pos);
+      bike.mesh.rotation.y = heading;
+      bike.driver = null;
+      bike.vel = 0;
+      bike.motosaiStand = true;
+      bike._standHome = { x, z, heading };
+      const rider = spawnPed(scene, new THREE.Vector3(x + 1.15, 0, z));
+      dressMotosaiVest(rider);
+      wearBikeHelmet(rider, 0xffcf2a);
+      rider.anchor = { slot: rider.mesh.position.clone(), facing: heading + PI };
+      rider.motosaiRider = true;
+      rider.speed = 0;
+      const waiter = spawnPed(scene, new THREE.Vector3(x + 1.7, 0, z + 0.4));
+      waiter.anchor = { slot: waiter.mesh.position.clone(), facing: heading + PI };
+      waiter.motosaiWait = true;
+      waiter.speed = 0;
+      bike.standRider = rider;
+      G.world.motosaiStands.push({ bike, rider, waiter, soi: null, x, z, bts: r.stop === 'asok' ? true : r.stop });
+    }
   }
 }
 

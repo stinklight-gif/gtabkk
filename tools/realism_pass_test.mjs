@@ -1306,8 +1306,8 @@ async function main() {
       const G = window.GAME;
       const bts = G.world && G.world.bts;
       const list = (G.world && G.world.motosaiStands) || [];
-      const atBts = list.filter(s => s && (s.bts || (bts && Math.hypot(s.x - bts.x, s.z - (bts.z || 0)) < 28)));
-      const s0 = atBts[0] || list.find(s => s && s.bts);
+      const atBts = list.filter(s => s && s.bts !== 'phrom' && (s.bts || (bts && Math.hypot(s.x - bts.x, s.z - (bts.z || 0)) < 28)));
+      const s0 = atBts[0] || list.find(s => s && s.bts && s.bts !== 'phrom');
       const vest = !!(s0 && s0.rider && (s0.rider.motosaiVest || (s0.rider.mesh && s0.rider.mesh.getObjectByName('motosai-vest'))));
       const helm = !!(s0 && s0.rider && (s0.rider.bikeHelmet || (s0.rider.mesh && s0.rider.mesh.getObjectByName('bike-helmet'))));
       const bike = s0 && s0.bike;
@@ -3955,6 +3955,27 @@ async function main() {
     });
     assert(phromSit.flag && phromSit.n >= 3 && phromSit.atPhrom >= 3, `people sit the Phrom Phong escalator (${phromSit.n})`);
     assert(phromSit.onStairs >= 1 && phromSit.folded >= 3 && phromSit.still >= 3, 'at least one is up the stairs, legs folded');
+
+    console.log('\n[114] Phrom Phong motosai rank');
+    const phromRank = await page.evaluate(() => {
+      const G = window.GAME;
+      const list = (G.world && G.world.motosaiStands) || [];
+      const atPhrom = list.filter(s => s && s.bts === 'phrom');
+      const s0 = atPhrom[0];
+      const vest = !!(s0 && s0.rider && (s0.rider.motosaiVest || (s0.rider.mesh && s0.rider.mesh.getObjectByName('motosai-vest'))));
+      const helm = !!(s0 && s0.rider && (s0.rider.bikeHelmet || (s0.rider.mesh && s0.rider.mesh.getObjectByName('bike-helmet'))));
+      const bike = s0 && s0.bike;
+      const near = !!(s0 && Math.hypot(s0.x - 100, s0.z) < 28);
+      return {
+        flag: !!(G.gameplay && G.gameplay.btsMotosai),
+        n: atPhrom.length,
+        vest, helm, near,
+        stand: !!(bike && bike.motosaiStand && bike.driver !== 'player'),
+        waiter: !!(s0 && s0.waiter),
+      };
+    });
+    assert(phromRank.flag && phromRank.n >= 1 && phromRank.near, `a motosai rank waits at Phrom Phong (${phromRank.n})`);
+    assert(phromRank.vest && phromRank.helm && phromRank.stand && phromRank.waiter, 'Phrom Phong rank has a helmeted vest rider, bike, and waiter');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
