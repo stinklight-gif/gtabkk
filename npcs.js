@@ -1352,6 +1352,7 @@ function dressCrossingGuard(ped, slot) {
     ped.mesh.add(paddle);
   }
   ped.crossingGuard = true;
+  ped.stop = slot.stop;
   ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
   ped.speed = 0;
   ped.state = 'idle';
@@ -1369,8 +1370,10 @@ export function updateCrossingGuards(dt) {
   if ((h >= 6.2 && h < 8.7) || (h >= 15 && h < 16.5)) {
     G._crossingGuards = G._crossingGuards || [];
     const slots = [
-      { x: cx + kerb, z: cz - kerb, facing: PI / 2 },
-      { x: cx - kerb, z: cz + kerb, facing: -PI / 2 },
+      { x: cx + kerb, z: cz - kerb, facing: PI / 2, stop: 'asok' },
+      { x: cx - kerb, z: cz + kerb, facing: -PI / 2, stop: 'asok' },
+      { x: 100 + kerb, z: cz - kerb, facing: PI / 2, stop: 'phrom' },
+      { x: 100 - kerb, z: cz + kerb, facing: -PI / 2, stop: 'phrom' },
     ];
     while (G._crossingGuards.length < slots.length) {
       const slot = slots[G._crossingGuards.length];

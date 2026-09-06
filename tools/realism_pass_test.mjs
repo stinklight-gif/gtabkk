@@ -4358,6 +4358,32 @@ async function main() {
     });
     assert(phromBusk.flag && phromBusk.guitar && phromBusk.hat && phromBusk.stop === 'phrom' && phromBusk.near, 'a busker waits at Phrom Phong BTS');
     assert(phromBusk.day && phromBusk.eve && phromBusk.strummed && phromBusk.paid, 'they play evenings at Phrom Phong and E tips ฿20');
+
+    console.log('\n[125] Phrom Phong crossing guards');
+    const phromGuard = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      G.time.dayT = 7.4 / 24;
+      main.updateCrossingGuards(0.05);
+      const list = (G._crossingGuards || []).filter(p => p && p.crossingGuard && p.stop === 'phrom' && !p.dead);
+      const n = list.length;
+      const g0 = list[0];
+      const vest = !!(g0 && g0.mesh && g0.mesh.getObjectByName('guard-vest'));
+      const paddle = !!(g0 && g0.mesh && g0.mesh.getObjectByName('stop-paddle'));
+      const near = list.filter(p => p && p.mesh && Math.hypot(p.mesh.position.x - 100, p.mesh.position.z) < 18).length;
+      G.time.dayT = 12 / 24;
+      main.updateCrossingGuards(0.05);
+      const goneNoon = !(G._crossingGuards && G._crossingGuards.length);
+      G.time.dayT = 15.4 / 24;
+      main.updateCrossingGuards(0.05);
+      const pm = (G._crossingGuards || []).filter(p => p && p.crossingGuard && p.stop === 'phrom').length;
+      G.time.dayT = 18 / 24;
+      main.updateCrossingGuards(0.05);
+      const goneEve = !(G._crossingGuards && G._crossingGuards.length);
+      return { flag: !!(G.gameplay && G.gameplay.crossingGuard), n, vest, paddle, near, goneNoon, pm, goneEve };
+    });
+    assert(phromGuard.flag && phromGuard.n >= 2 && phromGuard.near >= 2, `crossing guards stand at Phrom Phong (${phromGuard.n})`);
+    assert(phromGuard.vest && phromGuard.paddle, 'Phrom Phong yellow vest and stop paddle');
+    assert(phromGuard.goneNoon && phromGuard.pm >= 2 && phromGuard.goneEve, 'they leave after morning and return for the afternoon pickup');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
