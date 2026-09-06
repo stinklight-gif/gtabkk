@@ -4531,6 +4531,8 @@ export function spawnSevenSlush(scene) {
   G.southSevenSlush = pack(south, 'south-seven-slush');
   const west = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x < -50 && s.pos.z > 0 && s.pos.z < 60);
   G.westSevenSlush = pack(west, 'west-seven-slush');
+  const east = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x > 100 && s.pos.z < 0 && s.pos.z > -80);
+  G.eastSevenSlush = pack(east, 'east-seven-slush');
 }
 
 export function spawnBtsBusker(scene) {

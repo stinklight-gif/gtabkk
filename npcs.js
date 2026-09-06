@@ -3788,7 +3788,7 @@ export function updateSevenSlush(dt) {
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const open = h >= 6 && h < 22;
   const pp = G.player.group.position;
-  for (const c of [G.sevenSlush, G.southSevenSlush, G.westSevenSlush]) {
+  for (const c of [G.sevenSlush, G.southSevenSlush, G.westSevenSlush, G.eastSevenSlush]) {
     if (!c) continue;
     c.t = (c.t || 0) + dt;
     const tanks = c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'seven-slush-tank') : [];
