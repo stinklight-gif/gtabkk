@@ -280,7 +280,7 @@ export const GAMEPLAY = {
   coconutCart: true,      // green-coconut cart on a soi; E for a drink
   soiLaundry: true,       // clothes lines strung across sois
   nightCheckpoint: true,  // night cones + flashlight cop; blow through and you get a star
-  sevenBikes: true,       // parked motorbike clusters outside the walk-in, south, and west 7-Elevens
+  sevenBikes: true,       // parked motorbike clusters outside every 7-Eleven storefront
   hyacinth: true,         // water hyacinth mats drift on the khlong
   btsSitters: true,       // people sit the Asok and Phrom Phong BTS escalators with their phones
   mooPing: true,          // grilled-pork cart on a soi; E for a skewer

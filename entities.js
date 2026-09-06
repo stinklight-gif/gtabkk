@@ -2622,6 +2622,8 @@ export function spawnSevenBikes(scene) {
   G.southSevenBikes = rack(south);
   const west = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x < -50 && s.pos.z > 0 && s.pos.z < 60);
   G.westSevenBikes = rack(west);
+  const east = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x > 100 && s.pos.z < 0 && s.pos.z > -80);
+  G.eastSevenBikes = rack(east);
 }
 
 export function spawnSevenGuard(scene) {

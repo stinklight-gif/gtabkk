@@ -2910,7 +2910,7 @@ export function updateWatDrum(dt) {
 export function updateBikeSeatCover(dt) {
   if (!GAMEPLAY.bikeSeatCover) return;
   const wet = (G.time.rainStrength || 0) > 0.4;
-  for (const bike of [...(G.sevenBikes || []), ...(G.southSevenBikes || []), ...(G.westSevenBikes || [])]) {
+  for (const bike of [...(G.sevenBikes || []), ...(G.southSevenBikes || []), ...(G.westSevenBikes || []), ...(G.eastSevenBikes || [])]) {
     const cover = bike && (bike.seatCover || (bike.mesh && bike.mesh.getObjectByName('seat-cover')));
     if (!cover) continue;
     cover.visible = !!(wet && bike.driver !== 'player' && !bike.dead);
