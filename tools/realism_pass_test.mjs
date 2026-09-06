@@ -6570,6 +6570,41 @@ async function main() {
     });
     assert(watMerit.flag && watMerit.rec && watMerit.tray && watMerit.box && watMerit.near, 'a merit-box attendant waits at the wat gate');
     assert(watMerit.night && watMerit.day && watMerit.shifted && watMerit.swung, 'they hide after 18:00 and the gold tray turns');
+
+    console.log('\n[186] pier bank fisherman');
+    const pierFish = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.pierFish;
+      const ped = c && c.ped;
+      const rod = !!(ped && ped.mesh && ped.mesh.getObjectByName('pier-rod'));
+      const wait = G.pierWait;
+      const near = !!(c && wait && Math.hypot(c.x - wait.x, c.z - wait.z) < 12);
+      G.time.dayT = 22 / 24;
+      main.updatePierWait(0.05);
+      const night = !!(ped && ped.mesh && ped.mesh.visible === false);
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updatePierWait(0.05);
+      const day = !!(ped && ped.pierWait && ped.pierFish && ped.mesh && ped.mesh.visible);
+      const z0 = ped && ped.mesh ? ped.mesh.position.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updatePierWait(0.05);
+      const shifted = !!(ped && ped.mesh && Math.abs(ped.mesh.position.z - z0) > 0.02);
+      const tool = ped && ped.mesh && ped.mesh.getObjectByName('pier-rod');
+      if (c) c.t = 0.2;
+      main.updatePierWait(0.05);
+      const r0 = tool ? tool.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 3.4;
+      main.updatePierWait(0.05);
+      const swung = !!(tool && Math.abs(tool.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.pierWait),
+        rec: !!(ped && ped.pierWait && ped.pierFish),
+        rod, near, night, day, shifted, swung,
+      };
+    });
+    assert(pierFish.flag && pierFish.rec && pierFish.rod && pierFish.near, 'a fisherman waits on the pier bank');
+    assert(pierFish.night && pierFish.day && pierFish.shifted && pierFish.swung, 'they hide after 21:00 and the rod dips');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
