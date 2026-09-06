@@ -312,7 +312,7 @@ export const GAMEPLAY = {
   bikeSeatCover: true,    // plastic seat covers on parked 7-Eleven bikes in the rain
   watBell: true,          // temple bell at the wat; E rings it and cools last-seen
   stallIncense: true,     // mosquito coils hang under stall parasols; glow after dusk
-  mangoSticky: true,      // khao niao mamuang cart at Asok BTS; evening, E for a plate
+  mangoSticky: true,      // khao niao mamuang carts at Asok and Phrom Phong BTS; evening, E for a plate
   watBats: true,          // flying foxes circle the wat after dusk
   yaoPhotos: true,        // tourists stop to snap Yaowarat after 18:00
   kanomKrok: true,        // coconut pancake pan outside 7-Eleven; afternoon, E for a bag

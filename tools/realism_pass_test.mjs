@@ -4962,6 +4962,54 @@ async function main() {
     });
     assert(phromMalai.flag && phromMalai.named && phromMalai.stop === 'phrom' && phromMalai.strands >= 4 && phromMalai.near && phromMalai.vendor, `a malai stand waits at Phrom Phong (${phromMalai.strands} strands)`);
     assert(phromMalai.swayed && phromMalai.paid && phromMalai.offered && phromMalai.cooled, 'E buys a malai at Phrom Phong and the shrine takes it for extra heat cool');
+
+    console.log('\n[141] mango sticky rice at Phrom Phong');
+    const phromMango = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.phromMango;
+      const named = !!(c && c.mesh && c.mesh.name === 'mango-cart');
+      const rice = !!(c && c.mesh && c.mesh.getObjectByName('sticky-rice'));
+      const halves = c && c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'mango-half').length : 0;
+      const cream = c && c.mesh && c.mesh.getObjectByName('coconut-cream');
+      const dist = (c && c.x != null) ? Math.hypot(c.x - 100, c.z) : null;
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updateMangoSticky(0.05);
+      const dayGlow = cream && cream.material ? cream.material.emissiveIntensity : 9;
+      const dayVendor = !!(c && c.vendor && c.vendor.mesh && c.vendor.mesh.visible === false);
+      G.time.dayT = 18.4 / 24;
+      if (c) c.t = Math.PI / 16;
+      main.updateMangoSticky(0.05);
+      const duskGlow = cream && cream.material ? cream.material.emissiveIntensity : 0;
+      const duskVendor = !!(c && c.vendor && c.vendor.mango && c.vendor.stop === 'phrom' && c.vendor.mesh && c.vendor.mesh.visible);
+      G.player.inVehicle = null;
+      G._eating = null;
+      if (c && c.mesh) G.player.group.position.copy(c.mesh.position);
+      G.cash = 120;
+      G.player.hp = 40;
+      G.player.stam = 10;
+      G._mangoSticky = 0;
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let paid = false;
+      for (let i = 0; i < 4 && !paid; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateMangoSticky(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        paid = G.cash === 60 && (G._mangoSticky || 0) >= 1;
+      }
+      return {
+        flag: !!(G.gameplay && G.gameplay.mangoSticky),
+        named, rice, halves, stop: c && c.stop,
+        near: dist != null && dist < 28,
+        dayGlow, duskGlow, dayVendor, duskVendor, paid,
+        hp: G.player.hp, stam: G.player.stam,
+      };
+    });
+    assert(phromMango.flag && phromMango.named && phromMango.stop === 'phrom' && phromMango.rice && phromMango.halves >= 3 && phromMango.near, 'a mango sticky-rice cart waits at Phrom Phong');
+    assert(phromMango.dayVendor && phromMango.duskVendor && phromMango.dayGlow < phromMango.duskGlow, 'the Phrom Phong vendor works evenings and the cream warms up');
+    assert(phromMango.paid && phromMango.hp > 40 && phromMango.stam > 10, 'E buys mango sticky rice at Phrom Phong for ฿60');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

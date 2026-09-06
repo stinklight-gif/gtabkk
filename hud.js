@@ -251,6 +251,11 @@ export function bindHud() {
       const open = hh >= 16 && hh < 22.5;
       out.push({ name: 'Mango sticky rice', status: open ? 'ข้าวเหนียวมะม่วง · ฿60' : 'opens 16:00', dist: d(G.mangoSticky.mesh.position) });
     }
+    if (G.phromMango && G.phromMango.mesh) {
+      const hh = ((G.time.dayT % 1) + 1) % 1 * 24;
+      const open = hh >= 16 && hh < 22.5;
+      out.push({ name: 'Mango sticky rice (Phrom Phong)', status: open ? 'ข้าวเหนียวมะม่วง · ฿60' : 'opens 16:00', dist: d(G.phromMango.mesh.position) });
+    }
     if (poi.yaowarat) out.push({ name: 'Yaowarat', status: 'night market', dist: d(poi.yaowarat) });
     if (G.squidGrill && G.squidGrill.mesh) {
       const hh = ((G.time.dayT % 1) + 1) % 1 * 24;

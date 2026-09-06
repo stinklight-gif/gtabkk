@@ -3313,37 +3313,40 @@ export function updateKanomKrok(dt) {
 }
 
 export function updateMangoSticky(dt) {
-  if (!GAMEPLAY.mangoSticky || !G.mangoSticky) return;
-  const c = G.mangoSticky;
-  c.t = (c.t || 0) + dt;
+  if (!GAMEPLAY.mangoSticky) return;
+  const carts = [G.mangoSticky, G.phromMango];
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const open = h >= 16 && h < 22.5;
-  const cream = c.mesh && c.mesh.getObjectByName('coconut-cream');
-  if (cream && cream.material) cream.material.emissiveIntensity = open ? 0.18 + Math.sin(c.t * 8) * 0.08 : 0.04;
-  if (c.mesh) c.mesh.visible = true;
-  const ped = c.vendor;
-  if (ped && ped.mesh && ped.anchor && ped.anchor.slot) {
-    ped.mango = true;
-    ped.mesh.visible = open;
-    ped.mesh.position.set(ped.anchor.slot.x, 0, ped.anchor.slot.z);
-    ped.heading = ped.anchor.facing;
-    ped.mesh.rotation.y = ped.heading;
-    ped.speed = 0;
-    ped.state = 'idle';
+  const pp = G.player && G.player.group && G.player.group.position;
+  for (const c of carts) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    const cream = c.mesh && c.mesh.getObjectByName('coconut-cream');
+    if (cream && cream.material) cream.material.emissiveIntensity = open ? 0.18 + Math.sin(c.t * 8) * 0.08 : 0.04;
+    if (c.mesh) c.mesh.visible = true;
+    const ped = c.vendor;
+    if (ped && ped.mesh && ped.anchor && ped.anchor.slot) {
+      ped.mango = true;
+      ped.mesh.visible = open;
+      ped.mesh.position.set(ped.anchor.slot.x, 0, ped.anchor.slot.z);
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+      ped.speed = 0;
+      ped.state = 'idle';
+    }
+    if (!open || G.player.inVehicle || G._eating || !pp) continue;
+    if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) continue;
+    G.hud.showPrompt('Press <b>E</b> for mango sticky rice · ฿60', 0.4);
+    if (!G.input.pressed('KeyE')) continue;
+    if (G.cash < 60) { G.hud.showNotif('Need ฿60 for mango sticky rice'); continue; }
+    G.cash -= 60;
+    G.player.hp = Math.min(G.player.hpMax, G.player.hp + 30);
+    G.player.stam = G.player.stamMax;
+    if (G.hud.setCash) G.hud.setCash(G.cash);
+    G._mangoSticky = (G._mangoSticky || 0) + 1;
+    G.hud.showNotif('Mango sticky rice — ข้าวเหนียวมะม่วง');
+    if (G.audio && G.audio.chime) G.audio.chime();
   }
-  if (!open || G.player.inVehicle || G._eating) return;
-  const pp = G.player.group.position;
-  if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) return;
-  G.hud.showPrompt('Press <b>E</b> for mango sticky rice · ฿60', 0.4);
-  if (!G.input.pressed('KeyE')) return;
-  if (G.cash < 60) { G.hud.showNotif('Need ฿60 for mango sticky rice'); return; }
-  G.cash -= 60;
-  G.player.hp = Math.min(G.player.hpMax, G.player.hp + 30);
-  G.player.stam = G.player.stamMax;
-  if (G.hud.setCash) G.hud.setCash(G.cash);
-  G._mangoSticky = (G._mangoSticky || 0) + 1;
-  G.hud.showNotif('Mango sticky rice — ข้าวเหนียวมะม่วง');
-  if (G.audio && G.audio.chime) G.audio.chime();
 }
 
 export function updatePhromFruit(dt) {

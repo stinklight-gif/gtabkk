@@ -4779,18 +4779,25 @@ export function spawnMangoSticky(scene) {
   if (!GAMEPLAY.mangoSticky) return;
   const bts = G.world && G.world.bts;
   if (!bts) return;
-  const x = bts.x - 8.8, z = -22.4;
-  const mesh = makeMangoStickyMesh();
-  mesh.position.set(x, 0, z);
-  scene.add(mesh);
-  const vendor = spawnPed(scene, new THREE.Vector3(x + 0.7, 0, z + 0.15), 'vendor');
-  vendor.mango = true;
-  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI / 2 };
-  vendor.speed = 0;
-  vendor.state = 'idle';
-  vendor.heading = PI / 2;
-  if (vendor.mesh) vendor.mesh.rotation.y = PI / 2;
-  G.mangoSticky = { mesh, vendor, x, z, t: 0 };
+  const cart = (x, z, stop) => {
+    const mesh = makeMangoStickyMesh();
+    mesh.position.set(x, 0, z);
+    scene.add(mesh);
+    const vendor = spawnPed(scene, new THREE.Vector3(x + 0.7, 0, z + 0.15), 'vendor');
+    vendor.mango = true;
+    vendor.stop = stop;
+    vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI / 2 };
+    vendor.speed = 0;
+    vendor.state = 'idle';
+    vendor.heading = PI / 2;
+    if (vendor.mesh) {
+      vendor.mesh.rotation.y = PI / 2;
+      vendor.mesh.visible = false;
+    }
+    return { mesh, vendor, x, z, t: 0, stop };
+  };
+  G.mangoSticky = cart(bts.x - 8.8, -22.4, 'asok');
+  G.phromMango = cart(100 - 8.8, 8.8, 'phrom');
 }
 
 export function makePhromFruitMesh() {
