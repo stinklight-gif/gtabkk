@@ -7386,6 +7386,43 @@ async function main() {
     });
     assert(sengShopB.flag && sengShopB.rec && sengShopB.chain && sengShopB.near && sengShopB.other, "a second window shopper waits at Uncle Seng's gold-shop door");
     assert(sengShopB.night && sengShopB.day && sengShopB.shifted && sengShopB.swung, 'they hide after 20:00 and the gold chain turns');
+
+    console.log('\n[208] second pier ticket clerk');
+    const pierClerkB = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.pierClerkB;
+      const ped = c && c.ped;
+      const ticket = !!(ped && ped.mesh && ped.mesh.getObjectByName('pier-ticket'));
+      const wait = G.pierWait;
+      const first = G.pierClerk;
+      const near = !!(c && wait && Math.hypot(c.x - wait.x, c.z - wait.z) < 6);
+      const other = !!(c && first && Math.hypot(c.x - first.x, c.z - first.z) > 2);
+      G.time.dayT = 22 / 24;
+      main.updatePierWait(0.05);
+      const night = !!(ped && ped.mesh && ped.mesh.visible === false);
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updatePierWait(0.05);
+      const day = !!(ped && ped.pierWait && ped.pierClerk && ped.mesh && ped.mesh.visible);
+      const z0 = ped && ped.mesh ? ped.mesh.position.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updatePierWait(0.05);
+      const shifted = !!(ped && ped.mesh && Math.abs(ped.mesh.position.z - z0) > 0.02);
+      const tool = ped && ped.mesh && ped.mesh.getObjectByName('pier-ticket');
+      if (c) c.t = 0.2;
+      main.updatePierWait(0.05);
+      const r0 = tool ? tool.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 4.2;
+      main.updatePierWait(0.05);
+      const swung = !!(tool && Math.abs(tool.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.pierWait),
+        rec: !!(ped && ped.pierWait && ped.pierClerk),
+        ticket, near, other, night, day, shifted, swung,
+      };
+    });
+    assert(pierClerkB.flag && pierClerkB.rec && pierClerkB.ticket && pierClerkB.near && pierClerkB.other, 'a second ticket clerk waits at the pier');
+    assert(pierClerkB.night && pierClerkB.day && pierClerkB.shifted && pierClerkB.swung, 'they hide after 21:00 and the ticket pad turns');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

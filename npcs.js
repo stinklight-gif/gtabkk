@@ -3356,8 +3356,8 @@ export function updatePierWait(dt) {
     ped.speed = 0;
     ped.state = 'idle';
   }
-  const clerk = G.pierClerk;
-  if (clerk) {
+  for (const clerk of [G.pierClerk, G.pierClerkB]) {
+    if (!clerk) continue;
     clerk.t = (clerk.t || 0) + dt;
     const ped = clerk.ped;
     if (ped && ped.mesh) {
