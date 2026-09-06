@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.homeAuntie || ped.stationPorter || ped.garageMech || ped.klongDock || ped.sengClerk || ped.airportCrew || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.homeAuntie || ped.stationPorter || ped.garageMech || ped.klongDock || ped.sengClerk || ped.airportCrew || ped.airportCargo || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -3096,6 +3096,46 @@ export function spawnAirportCrew(scene) {
     hands.push(ped);
   }
   G.airportCrew = { hands, x: poi.x, z: poi.z, t: 0 };
+}
+
+export function spawnAirportCargo(scene) {
+  if (!GAMEPLAY.airportCargo) return;
+  if (!G.world || !G.world.airport) return;
+  const sx = 209, sz = -118;
+  const hands = [];
+  const slots = [
+    { x: sx + 7.4, z: sz - 3.2, facing: -PI / 2, kind: 'laborer' },
+    { x: sx + 7.4, z: sz + 4.1, facing: -PI / 2, kind: 'laborer' },
+  ];
+  for (let i = 0; i < slots.length; i++) {
+    const slot = slots[i];
+    const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
+    recolorTorso(ped.mesh.userData.parts, 0x3a6a8a, 0.7);
+    ped.airportCargo = true;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = slot.facing;
+    ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
+    if (ped.mesh) {
+      ped.mesh.rotation.y = slot.facing;
+      ped.mesh.visible = false;
+    }
+    const crate = new THREE.Mesh(
+      new THREE.BoxGeometry(0.24, 0.18, 0.2),
+      new THREE.MeshStandardMaterial({ color: i === 0 ? 0xc8a22a : 0xb45a2a, roughness: 0.7, metalness: 0.15 })
+    );
+    crate.name = 'cargo-crate';
+    const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+    if (parts && parts.foreR) {
+      crate.position.set(0.02, -0.24, 0.1);
+      parts.foreR.add(crate);
+    } else if (ped.mesh) {
+      crate.position.set(0.22, 1.05, 0.12);
+      ped.mesh.add(crate);
+    }
+    hands.push(ped);
+  }
+  G.airportCargo = { hands, x: sx, z: sz, t: 0 };
 }
 
 export function spawnMallDirectory(scene) {

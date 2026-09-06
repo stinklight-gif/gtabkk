@@ -467,7 +467,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes','btsPigeons','watLotus','watCats','sevenShoppers','watFeed','btsPaper','yaoDuck','sevenSlush','phromFruit','pierWait','btsShine','watAmulet','yaoFortune','watDrum','mallGuard','bankGuard','mallDir','officeSmoke','bankQueue','mallFood','gunClerk','mallTech','mallPharm','mallRoma','mallWatch','mallManga','mallSushi','mallCafe','mallThreads','mallSeven','mallArcade','gymBag','starterClerk','homeAuntie','stationPorter','garageMech','klongDock','sengClerk','airportCrew']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes','btsPigeons','watLotus','watCats','sevenShoppers','watFeed','btsPaper','yaoDuck','sevenSlush','phromFruit','pierWait','btsShine','watAmulet','yaoFortune','watDrum','mallGuard','bankGuard','mallDir','officeSmoke','bankQueue','mallFood','gunClerk','mallTech','mallPharm','mallRoma','mallWatch','mallManga','mallSushi','mallCafe','mallThreads','mallSeven','mallArcade','gymBag','starterClerk','homeAuntie','stationPorter','garageMech','klongDock','sengClerk','airportCrew','airportCargo']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -476,7 +476,7 @@ async function main() {
     const peds = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
       const ways = (G.world.walkways || []).length;
-      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart && !p.songthaewRide && !p.watSweep && !p.yaoGold && !p.yaoDuck && !p.yaoFortune && !p.sevenAtm && !p.btsBusker && !p.watLotus && !p.watAmulet && !p.watDrum && !p.sevenShop && !p.sevenSlush && !p.btsPaper && !p.phromFruit && !p.pierWait && !p.btsShine && !p.mallGuard && !p.bankGuard && !p.mallDir && !p.gunClerk && !p.officeSmoke && !p.bankQueue && !p.mallFood && !p.mallTech && !p.mallPharm && !p.mallRoma && !p.mallWatch && !p.mallManga && !p.mallSushi && !p.mallCafe && !p.mallThreads && !p.mallSeven && !p.mallArcade && !p.gymBag && !p.starterClerk && !p.homeAuntie && !p.stationPorter && !p.garageMech && !p.klongDock && !p.sengClerk && !p.airportCrew);
+      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart && !p.songthaewRide && !p.watSweep && !p.yaoGold && !p.yaoDuck && !p.yaoFortune && !p.sevenAtm && !p.btsBusker && !p.watLotus && !p.watAmulet && !p.watDrum && !p.sevenShop && !p.sevenSlush && !p.btsPaper && !p.phromFruit && !p.pierWait && !p.btsShine && !p.mallGuard && !p.bankGuard && !p.mallDir && !p.gunClerk && !p.officeSmoke && !p.bankQueue && !p.mallFood && !p.mallTech && !p.mallPharm && !p.mallRoma && !p.mallWatch && !p.mallManga && !p.mallSushi && !p.mallCafe && !p.mallThreads && !p.mallSeven && !p.mallArcade && !p.gymBag && !p.starterClerk && !p.homeAuntie && !p.stationPorter && !p.garageMech && !p.klongDock && !p.sengClerk && !p.airportCrew && !p.airportCargo);
       const b = G.world.buildings.find(x => x.size.y > 8 && x.size.x > 4 && x.size.z > 4) || G.world.buildings[0];
       const insideBefore = wanderer && b && Math.abs(wanderer.mesh.position.x - b.pos.x) < b.size.x / 2 && Math.abs(wanderer.mesh.position.z - b.pos.z) < b.size.z / 2;
       if (wanderer && b) {
@@ -5271,6 +5271,41 @@ async function main() {
     });
     assert(crew.flag && crew.n >= 2 && crew.paddles >= 2 && crew.near, `marshallers wait on the Suvarnabhumi apron (${crew.n})`);
     assert(crew.night >= 2 && crew.day >= 2 && crew.shifted && crew.swung, 'they hide after 21:00 and the paddles wave');
+
+    console.log('\n[149] Suvarnabhumi cargo shed');
+    const cargo = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.airportCargo;
+      const list = (c && c.hands) || [];
+      const n = list.filter(p => p && p.airportCargo && p.mesh).length;
+      const crates = list.filter(p => p && p.mesh && p.mesh.getObjectByName('cargo-crate')).length;
+      const near = !!(c && Math.hypot(c.x - 209, c.z + 118) < 8);
+      G.time.dayT = 21 / 24;
+      main.updateAirportCargo(0.05);
+      const night = list.filter(p => p && p.mesh && p.mesh.visible === false).length;
+      G.time.dayT = 12.5 / 24;
+      if (c) c.t = 0.2;
+      main.updateAirportCargo(0.05);
+      const day = list.filter(p => p && p.airportCargo && p.mesh && p.mesh.visible).length;
+      const p0 = list[0];
+      const x0 = p0 && p0.mesh ? p0.mesh.position.x : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateAirportCargo(0.05);
+      const shifted = !!(p0 && p0.mesh && Math.abs(p0.mesh.position.x - x0) > 0.02);
+      const crate = p0 && p0.mesh && p0.mesh.getObjectByName('cargo-crate');
+      if (c) c.t = 0.2;
+      main.updateAirportCargo(0.05);
+      const r0 = crate ? crate.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 3.4;
+      main.updateAirportCargo(0.05);
+      const swung = !!(crate && Math.abs(crate.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.airportCargo),
+        n, crates, near, night, day, shifted, swung,
+      };
+    });
+    assert(cargo.flag && cargo.n >= 2 && cargo.crates >= 2 && cargo.near, `cargo hands wait at the south Suvarnabhumi shed (${cargo.n})`);
+    assert(cargo.night >= 2 && cargo.day >= 2 && cargo.shifted && cargo.swung, 'they hide after 19:00 and the crates tilt');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
