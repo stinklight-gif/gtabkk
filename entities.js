@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -3298,6 +3298,69 @@ export function spawnMallCafe(scene) {
     customer.mesh.visible = false;
   }
   G.mallCafe = { clerk, customer, x, z, y, t: 0 };
+}
+
+export function spawnMallThreads(scene) {
+  if (!GAMEPLAY.mallThreads) return;
+  const mall = G.world && G.world.mall;
+  const shop = mall && (mall.shops || []).find(s => s && s.name === 'London Threads');
+  if (!shop || !shop.pos) return;
+  const x = shop.pos.x, z = shop.pos.z, y = shop.pos.y || 10;
+  const clerk = spawnPed(scene, new THREE.Vector3(x, 0, z + 1.55), 'office');
+  recolorTorso(clerk.mesh.userData.parts, 0x3a2a58, 0.7);
+  clerk.mallThreads = true;
+  clerk.threadsRole = 'clerk';
+  clerk.speed = 0;
+  clerk.state = 'idle';
+  clerk.heading = PI;
+  clerk.anchor = { slot: new THREE.Vector3(x, y, z + 1.55), facing: PI };
+  if (clerk.mesh) {
+    clerk.mesh.position.y = y;
+    clerk.mesh.rotation.y = PI;
+    clerk.mesh.visible = false;
+  }
+  const hanger = new THREE.Group();
+  hanger.name = 'mall-threads-hanger';
+  const hook = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.006, 0.006, 0.08, 6),
+    new THREE.MeshStandardMaterial({ color: 0x888890, roughness: 0.4, metalness: 0.45 })
+  );
+  hanger.add(hook);
+  const bar = new THREE.Mesh(
+    new THREE.BoxGeometry(0.16, 0.01, 0.02),
+    new THREE.MeshStandardMaterial({ color: 0x888890, roughness: 0.4, metalness: 0.45 })
+  );
+  bar.position.y = -0.04;
+  hanger.add(bar);
+  const shirt = new THREE.Mesh(
+    new THREE.BoxGeometry(0.14, 0.16, 0.03),
+    new THREE.MeshStandardMaterial({ color: 0xb24bff, roughness: 0.7 })
+  );
+  shirt.name = 'mall-threads-shirt';
+  shirt.position.y = -0.13;
+  hanger.add(shirt);
+  const parts = clerk.mesh && clerk.mesh.userData && clerk.mesh.userData.parts;
+  if (parts && parts.foreR) {
+    hanger.position.set(0.02, -0.18, 0.08);
+    parts.foreR.add(hanger);
+  } else if (clerk.mesh) {
+    hanger.position.set(0.22, 1.05, 0.12);
+    clerk.mesh.add(hanger);
+  }
+  clerk._hanger = hanger;
+  const customer = spawnPed(scene, new THREE.Vector3(x + 0.12, 0, z - 0.15), 'tourist');
+  customer.mallThreads = true;
+  customer.threadsRole = 'customer';
+  customer.speed = 0;
+  customer.state = 'idle';
+  customer.heading = 0;
+  customer.anchor = { slot: new THREE.Vector3(x + 0.12, y, z - 0.15), facing: 0 };
+  if (customer.mesh) {
+    customer.mesh.position.y = y;
+    customer.mesh.rotation.y = 0;
+    customer.mesh.visible = false;
+  }
+  G.mallThreads = { clerk, customer, x, z, y, t: 0 };
 }
 
 export function spawnSevenAtm(scene) {

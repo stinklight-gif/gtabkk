@@ -467,7 +467,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes','btsPigeons','watLotus','watCats','sevenShoppers','watFeed','btsPaper','yaoDuck','sevenSlush','phromFruit','pierWait','btsShine','watAmulet','yaoFortune','watDrum','mallGuard','bankGuard','mallDir','officeSmoke','bankQueue','mallFood','gunClerk','mallTech','mallPharm','mallRoma','mallWatch','mallManga','mallSushi','mallCafe']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes','btsPigeons','watLotus','watCats','sevenShoppers','watFeed','btsPaper','yaoDuck','sevenSlush','phromFruit','pierWait','btsShine','watAmulet','yaoFortune','watDrum','mallGuard','bankGuard','mallDir','officeSmoke','bankQueue','mallFood','gunClerk','mallTech','mallPharm','mallRoma','mallWatch','mallManga','mallSushi','mallCafe','mallThreads']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -476,7 +476,7 @@ async function main() {
     const peds = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
       const ways = (G.world.walkways || []).length;
-      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart && !p.songthaewRide && !p.watSweep && !p.yaoGold && !p.yaoDuck && !p.yaoFortune && !p.sevenAtm && !p.btsBusker && !p.watLotus && !p.watAmulet && !p.watDrum && !p.sevenShop && !p.sevenSlush && !p.btsPaper && !p.phromFruit && !p.pierWait && !p.btsShine && !p.mallGuard && !p.bankGuard && !p.mallDir && !p.gunClerk && !p.officeSmoke && !p.bankQueue && !p.mallFood && !p.mallTech && !p.mallPharm && !p.mallRoma && !p.mallWatch && !p.mallManga && !p.mallSushi && !p.mallCafe);
+      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart && !p.songthaewRide && !p.watSweep && !p.yaoGold && !p.yaoDuck && !p.yaoFortune && !p.sevenAtm && !p.btsBusker && !p.watLotus && !p.watAmulet && !p.watDrum && !p.sevenShop && !p.sevenSlush && !p.btsPaper && !p.phromFruit && !p.pierWait && !p.btsShine && !p.mallGuard && !p.bankGuard && !p.mallDir && !p.gunClerk && !p.officeSmoke && !p.bankQueue && !p.mallFood && !p.mallTech && !p.mallPharm && !p.mallRoma && !p.mallWatch && !p.mallManga && !p.mallSushi && !p.mallCafe && !p.mallThreads);
       const b = G.world.buildings.find(x => x.size.y > 8 && x.size.x > 4 && x.size.z > 4) || G.world.buildings[0];
       const insideBefore = wanderer && b && Math.abs(wanderer.mesh.position.x - b.pos.x) < b.size.x / 2 && Math.abs(wanderer.mesh.position.z - b.pos.z) < b.size.z / 2;
       if (wanderer && b) {
@@ -4753,6 +4753,44 @@ async function main() {
     });
     assert(cafe.flag && cafe.clerk && cafe.customer && cafe.cup && cafe.near && cafe.up, 'a barista waits at Le Café');
     assert(cafe.night >= 2 && cafe.day >= 2 && cafe.shifted && cafe.steamed, 'they hide after 21:00 on floor 2 and the steam rises');
+
+    console.log('\n[136] London Threads counter');
+    const threads = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.mallThreads;
+      const clerk = c && c.clerk;
+      const customer = c && c.customer;
+      const hanger = !!(clerk && clerk.mesh && clerk.mesh.getObjectByName('mall-threads-hanger'));
+      const shop = G.world && G.world.mall && (G.world.mall.shops || []).find(s => s && s.name === 'London Threads');
+      const near = !!(c && shop && shop.pos && Math.hypot(c.x - shop.pos.x, c.z - shop.pos.z) < 3);
+      const up = !!(clerk && clerk.mesh && clerk.mesh.position.y >= 8);
+      G.time.dayT = 22 / 24;
+      main.updateMallThreads(0.05);
+      const night = [clerk, customer].filter(p => p && p.mesh && p.mesh.visible === false).length;
+      G.time.dayT = 12.5 / 24;
+      if (c) c.t = 0.2;
+      main.updateMallThreads(0.05);
+      const day = [clerk, customer].filter(p => p && p.mallThreads && p.mesh && p.mesh.visible && p.mesh.position.y >= 8).length;
+      const x0 = customer && customer.mesh ? customer.mesh.position.x : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateMallThreads(0.05);
+      const shifted = !!(customer && customer.mesh && Math.abs(customer.mesh.position.x - x0) > 0.02);
+      const shirt = clerk && clerk.mesh && clerk.mesh.getObjectByName('mall-threads-shirt');
+      if (c) c.t = 0.2;
+      main.updateMallThreads(0.05);
+      const r0 = shirt ? shirt.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.6;
+      main.updateMallThreads(0.05);
+      const swung = !!(shirt && Math.abs(shirt.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.mallThreads),
+        clerk: !!(clerk && clerk.mallThreads && clerk.threadsRole === 'clerk'),
+        customer: !!(customer && customer.mallThreads && customer.threadsRole === 'customer'),
+        hanger, near, up, night, day, shifted, swung,
+      };
+    });
+    assert(threads.flag && threads.clerk && threads.customer && threads.hanger && threads.near && threads.up, 'a clerk waits at London Threads');
+    assert(threads.night >= 2 && threads.day >= 2 && threads.shifted && threads.swung, 'they hide after 21:00 on floor 2 and the shirt swings');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
