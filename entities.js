@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.squid || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.squid || ped.songthaewRide || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -3149,7 +3149,34 @@ export function spawnBtsSongthaew(scene) {
   waiter.btsSongthaew = true;
   waiter.speed = 0;
   waiter.state = 'idle';
-  G.world.btsSongthaew = { vehicle: v, waiter, x, z };
+  const riders = [];
+  if (GAMEPLAY.songthaewRiders) {
+    for (let i = 0; i < 3; i++) {
+      const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), i === 1 ? 'tourist' : 'local');
+      ped.songthaewRide = true;
+      ped.speed = 0;
+      ped.state = 'idle';
+      ped.heading = heading + PI;
+      if (ped.mesh) {
+        scene.remove(ped.mesh);
+        v.mesh.add(ped.mesh);
+        // sit the side benches under the canopy (standing y=1.08 clips the roof)
+        ped.mesh.position.set((i % 2 === 0 ? -0.42 : 0.42), 0.55, -0.25 - i * 0.52);
+        ped.mesh.rotation.set(0.08, PI, 0);
+        const parts = ped.mesh.userData && ped.mesh.userData.parts;
+        if (parts) {
+          if (parts.legL) parts.legL.rotation.x = 1.22;
+          if (parts.legR) parts.legR.rotation.x = 1.12;
+          if (parts.shinL) parts.shinL.rotation.x = -1.08;
+          if (parts.shinR) parts.shinR.rotation.x = -0.98;
+          if (parts.armL) parts.armL.rotation.x = -0.4;
+          if (parts.armR) parts.armR.rotation.x = -0.28;
+        }
+      }
+      riders.push(ped);
+    }
+  }
+  G.world.btsSongthaew = { vehicle: v, waiter, riders, x, z };
 }
 
 export function spawnBtsTuktuk(scene) {

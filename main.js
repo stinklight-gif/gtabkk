@@ -35,7 +35,7 @@ import {
 } from './physics.js';
 export * from './npcs.js';
 import {
-  CROWD_CURVE, buildClusterAnchors, crowdFactor, crowdTarget, makeBarkSprite, resyncCrowd, spawnAnchoredPed, spawnBark, spawnSpikeStrip, updateAlms, updateArmorPickups, updateBarks, updateCats, updateClusters, updateDogs, updateFoodStalls, updateMuggings, updatePeds, updateSchoolKids, updateSeekShade, updateShrines, updateSpikes, updateTurf, updateVigilante, updateYaowaratNight, updateYaoPhotos, updateBtsPlatform, updateBtsGates, updateOfficeCommute, updateCrossingGuards, updateCheckpoint, updateSevenGuard, updateSoiChairs, updateSoiCowboy, updateCowboyClose, updateSoiMechanic, updateSoiBarber, updateRainPack, updateRainPoncho, updateBikeSeatCover, updateIceCarts, updateCoconutCarts, updateChaYen, updateRotiCart, updateMooPing, updateSomTam, updateBtsMalai, updateMangoSticky, updateKanomKrok, updateSquidGrill, updatePlaKat, updateBoatNoodle, updateMonitors, updateHyacinth, updateWatTurtles, updateWatBell, updateWatBats, updateGeckos, updateStallIncense, updateSoiFootball, updateMallShoppers, updateLottery, updateSoiWires, updateRainFrogs, updateSoiCctv, vigilanteEnd, vigilanteSpawnTarget
+  CROWD_CURVE, buildClusterAnchors, crowdFactor, crowdTarget, makeBarkSprite, resyncCrowd, spawnAnchoredPed, spawnBark, spawnSpikeStrip, updateAlms, updateArmorPickups, updateBarks, updateCats, updateClusters, updateDogs, updateFoodStalls, updateMuggings, updatePeds, updateSchoolKids, updateSeekShade, updateShrines, updateSpikes, updateTurf, updateVigilante, updateYaowaratNight, updateYaoPhotos, updateBtsPlatform, updateBtsGates, updateOfficeCommute, updateCrossingGuards, updateCheckpoint, updateSevenGuard, updateSoiChairs, updateSoiCowboy, updateCowboyClose, updateSoiMechanic, updateSoiBarber, updateRainPack, updateRainPoncho, updateBikeSeatCover, updateIceCarts, updateCoconutCarts, updateChaYen, updateRotiCart, updateMooPing, updateSomTam, updateBtsMalai, updateMangoSticky, updateKanomKrok, updateSquidGrill, updateSongthaewRiders, updatePlaKat, updateBoatNoodle, updateMonitors, updateHyacinth, updateWatTurtles, updateWatBell, updateWatBats, updateGeckos, updateStallIncense, updateSoiFootball, updateMallShoppers, updateLottery, updateSoiWires, updateRainFrogs, updateSoiCctv, vigilanteEnd, vigilanteSpawnTarget
 } from './npcs.js';
 export * from './combat.js';
 import {
@@ -1768,6 +1768,7 @@ export function loop() {
     updateMangoSticky(dt);
     updateKanomKrok(dt);
     updateSquidGrill(dt);
+    updateSongthaewRiders(dt);
     updatePlaKat(dt);
     updateBoatNoodle(dt);
     updateAlms(dt);

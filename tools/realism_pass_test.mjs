@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -462,7 +462,7 @@ async function main() {
     const peds = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
       const ways = (G.world.walkways || []).length;
-      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart);
+      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart && !p.songthaewRide);
       const b = G.world.buildings.find(x => x.size.y > 8 && x.size.x > 4 && x.size.z > 4) || G.world.buildings[0];
       const insideBefore = wanderer && b && Math.abs(wanderer.mesh.position.x - b.pos.x) < b.size.x / 2 && Math.abs(wanderer.mesh.position.z - b.pos.z) < b.size.z / 2;
       if (wanderer && b) {
@@ -3042,6 +3042,35 @@ async function main() {
     assert(squid.flag && squid.named && squid.coals && squid.sticks >= 4 && squid.nearYao, 'a squid grill waits on Yaowarat');
     assert(squid.dayVendor && squid.nightVendor && squid.dayGlow < squid.nightGlow && squid.smokeDay && squid.turned, 'coals and vendor only work after dark');
     assert(squid.paid && squid.hp > 40, 'E buys grilled squid for ฿50');
+
+    console.log('\n[91] songthaew riders at Asok');
+    const bench = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const stand = G.world && G.world.btsSongthaew;
+      const v = stand && stand.vehicle;
+      const riders = (stand && stand.riders) || [];
+      const n = riders.filter(p => p && p.songthaewRide && p.mesh).length;
+      const seated = riders.filter(p => p && p.mesh && p.mesh.parent === (v && v.mesh)).length;
+      const yao = riders.filter(p => p && p.mesh && p.mesh.position.y > 0.4).length;
+      G.player.inVehicle = null;
+      if (v) v.driver = null;
+      stand._dumped = false;
+      main.updateSongthaewRiders(0.05);
+      const parked = riders.filter(p => p && p.songthaewRide && p.mesh && p.mesh.parent === v.mesh).length;
+      if (v) v.driver = 'player';
+      main.updateSongthaewRiders(0.05);
+      const dumped = stand._dumped === true;
+      const off = riders.filter(p => p && !p.songthaewRide && p.mesh && p.mesh.parent === G.scene).length;
+      const grounded = riders.filter(p => p && p.mesh && p.mesh.position.y < 0.2).length;
+      if (v) v.driver = null;
+      return {
+        flag: !!(G.gameplay && G.gameplay.songthaewRiders),
+        n, seated, yao, parked, dumped, off, grounded,
+        vehicle: !!(v && v.btsSongthaew),
+      };
+    });
+    assert(bench.flag && bench.vehicle && bench.n >= 3 && bench.seated >= 3 && bench.yao >= 3, `passengers sit the BTS songthaew (${bench.n})`);
+    assert(bench.parked >= 3 && bench.dumped && bench.off >= 3 && bench.grounded >= 3, 'they hop off onto the pavement when you take the ride');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

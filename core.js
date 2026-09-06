@@ -317,6 +317,7 @@ export const GAMEPLAY = {
   yaoPhotos: true,        // tourists stop to snap Yaowarat after 18:00
   kanomKrok: true,        // coconut pancake pan outside 7-Eleven; afternoon, E for a bag
   squidGrill: true,       // grilled-squid cart on Yaowarat after dark; E for a stick
+  songthaewRiders: true,  // passengers sit the BTS songthaew bench; hop off when you take it
 };
 G.gameplay = GAMEPLAY;
 
