@@ -2671,7 +2671,7 @@ export function updateLottery(dt) {
   if (G.player.inVehicle || G._eating) return;
   const pp = G.player.group.position;
   const now = performance.now();
-  for (const L of [G.lottery, G.southLottery, G.westLottery]) {
+  for (const L of [G.lottery, G.southLottery, G.westLottery, G.eastLottery]) {
     if (!L || !L.pos) continue;
     if (dist2(L.pos, pp) > 2.4 * 2.4) continue;
     if (L.readyAt && now < L.readyAt) {

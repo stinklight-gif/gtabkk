@@ -275,7 +275,7 @@ export const GAMEPLAY = {
   stallGecko: true,       // tiny geckos on stall parasols after dark
   soiFootball: true,      // after-school kickabout in a soi
   mallShoppers: true,     // evening bags walking from Terminal 21 to the BTS
-  lottery: true,          // Government Lottery boards outside the walk-in, south, and west 7-Elevens; E buys a ticket
+  lottery: true,          // Government Lottery boards outside every 7-Eleven storefront; E buys a ticket
   watChant: true,         // dawn and dusk chant from the wat when you're nearby
   coconutCart: true,      // green-coconut cart on a soi; E for a drink
   soiLaundry: true,       // clothes lines strung across sois
