@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes','btsPigeons']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -3242,6 +3242,44 @@ async function main() {
     });
     assert(robes.flag && robes.named && robes.n >= 6 && robes.nearWat, `saffron robes hang at the wat (${robes.n})`);
     assert(robes.dry && robes.fluttered && robes.packed && robes.back, 'they flutter in the sun and come in when it rains');
+
+    console.log('\n[97] pigeons on the Asok platform');
+    const birds = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = G.btsPigeons || [];
+      const n = list.filter(p => p && p.mesh && p.mesh.name === 'bts-pigeon').length;
+      const wings = list.filter(p => p && p.mesh && p.mesh.children.filter(ch => ch && ch.name === 'pigeon-wing').length >= 2).length;
+      const bts = G.world && G.world.bts;
+      const near = list.filter(p => p && p.home && bts && Math.hypot(p.home.x - bts.x, p.home.z - (bts.z || 0)) < 30 && p.home.y > 10).length;
+      G.time.dayT = 21.2 / 24;
+      main.updateBtsPigeons(0.05);
+      const night = list.filter(p => p && p.mesh && p.mesh.visible === false).length;
+      G.time.dayT = 12 / 24;
+      const p0 = list[0];
+      if (p0) { p0.t = 0.2; p0.state = 'loaf'; if (p0.home) p0.mesh.position.set(p0.home.x, p0.home.y, p0.home.z); }
+      G.player.group.position.set(0, 0, 80);
+      main.updateBtsPigeons(0.05);
+      const day = list.filter(p => p && p.mesh && p.mesh.visible).length;
+      const yHome = p0 && p0.home ? p0.home.y : 0;
+      const wing = p0 && p0.mesh && p0.mesh.children.find(ch => ch && ch.name === 'pigeon-wing');
+      const f0 = wing ? wing.rotation.z : 0;
+      if (p0) p0.t = 0.2 + Math.PI / 6;
+      main.updateBtsPigeons(0.05);
+      const flapped = !!(wing && Math.abs(wing.rotation.z - f0) > 0.02);
+      if (p0 && p0.home) {
+        G.player.group.position.set(p0.home.x, p0.home.y, p0.home.z);
+        p0.state = 'loaf';
+        p0.mesh.position.set(p0.home.x, p0.home.y, p0.home.z);
+      }
+      for (let i = 0; i < 20; i++) main.updateBtsPigeons(0.08);
+      const scattered = !!(p0 && p0.mesh && p0.mesh.position.y > yHome + 0.8);
+      return {
+        flag: !!(G.gameplay && G.gameplay.btsPigeons),
+        n, wings, near, night, day, flapped, scattered,
+      };
+    });
+    assert(birds.flag && birds.n >= 6 && birds.wings >= 6 && birds.near >= 6, `pigeons loaf the Asok platform (${birds.n})`);
+    assert(birds.night >= 6 && birds.day >= 6 && birds.flapped && birds.scattered, 'they hide at night and scatter when you walk up');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

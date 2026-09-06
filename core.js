@@ -323,6 +323,7 @@ export const GAMEPLAY = {
   sevenAtm: true,         // a short queue at the walk-in 7-Eleven ATM
   btsBusker: true,        // guitar busker at the Asok BTS exit; E tips ฿20
   watRobes: true,         // saffron robes dry on a line in the wat courtyard
+  btsPigeons: true,       // pigeons loaf the Asok platform by day and scatter
 };
 G.gameplay = GAMEPLAY;
 

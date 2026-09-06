@@ -2728,6 +2728,44 @@ export function updateWatSweep(dt) {
   }
 }
 
+export function updateBtsPigeons(dt) {
+  if (!GAMEPLAY.btsPigeons || !G.btsPigeons) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const day = h >= 6 && h < 18.5;
+  const pp = G.player.group.position;
+  for (const p of G.btsPigeons) {
+    if (!p.mesh) continue;
+    p.t = (p.t || 0) + dt;
+    p.mesh.visible = day;
+    if (!day) continue;
+    const dx = p.mesh.position.x - pp.x, dy = p.mesh.position.y - pp.y, dz = p.mesh.position.z - pp.z;
+    const d3 = Math.hypot(dx, dy, dz);
+    if (d3 < 4.2) p.state = 'bolt';
+    else if (p.state === 'bolt' && d3 > 9) p.state = 'return';
+    if (p.state === 'loaf') {
+      p.mesh.position.set(p.home.x, p.home.y + Math.sin(p.t * 2.2) * 0.02, p.home.z);
+    } else if (p.state === 'bolt') {
+      const len = Math.hypot(dx, dz) || 1;
+      p.mesh.position.x += dx / len * 4.2 * dt;
+      p.mesh.position.z += dz / len * 4.2 * dt;
+      p.mesh.position.y = Math.min(p.home.y + 4.2, p.mesh.position.y + 3.6 * dt);
+      p.heading = Math.atan2(dx, dz);
+    } else {
+      const hx = p.home.x - p.mesh.position.x, hz = p.home.z - p.mesh.position.z;
+      const len = Math.hypot(hx, hz) || 1;
+      p.mesh.position.x += hx / len * 2.2 * dt;
+      p.mesh.position.z += hz / len * 2.2 * dt;
+      p.mesh.position.y += (p.home.y - p.mesh.position.y) * Math.min(1, dt * 2.4);
+      if (len < 0.35 && Math.abs(p.mesh.position.y - p.home.y) < 0.2) p.state = 'loaf';
+    }
+    p.mesh.rotation.y = p.heading || 0;
+    const flap = (p.state === 'loaf' ? 0.12 : 0.55) * Math.sin(p.t * (p.state === 'loaf' ? 6 : 16));
+    const wings = p.mesh.children.filter(ch => ch && ch.name === 'pigeon-wing');
+    if (wings[0]) wings[0].rotation.z = flap;
+    if (wings[1]) wings[1].rotation.z = -flap;
+  }
+}
+
 export function updateWatRobes(dt) {
   if (!GAMEPLAY.watRobes || !G.watRobes) return;
   const c = G.watRobes;

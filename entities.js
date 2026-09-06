@@ -2733,6 +2733,47 @@ export function spawnWatBats(scene) {
   }
 }
 
+function makePigeonMesh() {
+  const g = new THREE.Group();
+  g.name = 'bts-pigeon';
+  const grey = new THREE.MeshStandardMaterial({ color: pick([0x7a7a78, 0x6a6a6c, 0x8a8480]), roughness: 0.85 });
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.055, 6, 5), grey);
+  body.scale.set(0.75, 0.55, 1.15);
+  g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.03, 5, 4), grey);
+  head.position.set(0, 0.03, 0.07);
+  g.add(head);
+  const wingL = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.015, 0.08), grey);
+  wingL.name = 'pigeon-wing';
+  wingL.position.set(-0.08, 0.01, 0);
+  g.add(wingL);
+  const wingR = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.015, 0.08), grey);
+  wingR.name = 'pigeon-wing';
+  wingR.position.set(0.08, 0.01, 0);
+  g.add(wingR);
+  return g;
+}
+
+export function spawnBtsPigeons(scene) {
+  if (!GAMEPLAY.btsPigeons) return;
+  const bts = G.world && G.world.bts;
+  if (!bts) return;
+  const sx = bts.x, py = (bts.platformY || 13.9) + 0.12;
+  G.btsPigeons = [];
+  for (let i = 0; i < 8; i++) {
+    const side = i < 4 ? -1 : 1;
+    const k = i % 4;
+    const home = { x: sx + side * 3.35, y: py, z: -7.2 + k * 2.4 };
+    const mesh = makePigeonMesh();
+    mesh.position.set(home.x, home.y, home.z);
+    mesh.visible = false;
+    scene.add(mesh);
+    G.btsPigeons.push({
+      mesh, home, t: i * 0.4, state: 'loaf', heading: side > 0 ? -PI / 2 : PI / 2,
+    });
+  }
+}
+
 export function spawnWatRobes(scene) {
   if (!GAMEPLAY.watRobes) return;
   const temple = G.world && G.world.poi && G.world.poi.temple;
