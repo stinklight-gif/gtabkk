@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -2750,6 +2750,39 @@ export function spawnBankGuard(scene) {
   else { torch.position.set(0.2, 0.9, 0.15); ped.mesh.add(torch); }
   beam.visible = false;
   G.bankGuard = { ped, chair, light, beam, x, z };
+}
+
+export function spawnMallDirectory(scene) {
+  if (!GAMEPLAY.mallDir) return;
+  const mall = G.world && G.world.mall;
+  if (!mall || !mall.center) return;
+  const x = mall.center.x, z = mall.center.z - 4;
+  const g = new THREE.Group();
+  g.name = 'mall-directory';
+  const board = new THREE.Mesh(
+    new THREE.BoxGeometry(1.15, 0.72, 0.08),
+    new THREE.MeshStandardMaterial({ color: 0x1a2230, roughness: 0.45 })
+  );
+  board.position.y = 1.28;
+  g.add(board);
+  const screen = new THREE.Mesh(
+    new THREE.BoxGeometry(1.02, 0.58, 0.04),
+    new THREE.MeshStandardMaterial({ color: 0x88e0ff, emissive: 0x226688, emissiveIntensity: 0.4, roughness: 0.3 })
+  );
+  screen.name = 'mall-dir-screen';
+  screen.position.set(0, 1.28, 0.05);
+  g.add(screen);
+  g.position.set(x, 0, z);
+  g.rotation.y = PI;
+  scene.add(g);
+  const clerk = spawnPed(scene, new THREE.Vector3(x - 1.6, 0, z + 1.35), 'office');
+  clerk.mallDir = true;
+  clerk.anchor = { slot: new THREE.Vector3(x - 1.6, 0, z + 1.35), facing: PI };
+  clerk.speed = 0;
+  clerk.state = 'idle';
+  clerk.heading = PI;
+  if (clerk.mesh) clerk.mesh.rotation.y = PI;
+  G.mallDir = { mesh: g, screen, clerk, x, z, t: 0, idx: 0 };
 }
 
 export function spawnSevenAtm(scene) {

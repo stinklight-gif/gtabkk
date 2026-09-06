@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes','btsPigeons','watLotus','watCats','sevenShoppers','watFeed','btsPaper','yaoDuck','sevenSlush','phromFruit','pierWait','btsShine','watAmulet','yaoFortune','watDrum','mallGuard','bankGuard']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes','btsPigeons','watLotus','watCats','sevenShoppers','watFeed','btsPaper','yaoDuck','sevenSlush','phromFruit','pierWait','btsShine','watAmulet','yaoFortune','watDrum','mallGuard','bankGuard','mallDir']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -462,7 +462,7 @@ async function main() {
     const peds = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
       const ways = (G.world.walkways || []).length;
-      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart && !p.songthaewRide && !p.watSweep && !p.yaoGold && !p.yaoDuck && !p.yaoFortune && !p.sevenAtm && !p.btsBusker && !p.watLotus && !p.watAmulet && !p.watDrum && !p.sevenShop && !p.sevenSlush && !p.btsPaper && !p.phromFruit && !p.pierWait && !p.btsShine && !p.mallGuard && !p.bankGuard);
+      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart && !p.songthaewRide && !p.watSweep && !p.yaoGold && !p.yaoDuck && !p.yaoFortune && !p.sevenAtm && !p.btsBusker && !p.watLotus && !p.watAmulet && !p.watDrum && !p.sevenShop && !p.sevenSlush && !p.btsPaper && !p.phromFruit && !p.pierWait && !p.btsShine && !p.mallGuard && !p.bankGuard && !p.mallDir);
       const b = G.world.buildings.find(x => x.size.y > 8 && x.size.x > 4 && x.size.z > 4) || G.world.buildings[0];
       const insideBefore = wanderer && b && Math.abs(wanderer.mesh.position.x - b.pos.x) < b.size.x / 2 && Math.abs(wanderer.mesh.position.z - b.pos.z) < b.size.z / 2;
       if (wanderer && b) {
@@ -3999,6 +3999,47 @@ async function main() {
     });
     assert(bankBooth.flag && bankBooth.seated && bankBooth.chair && bankBooth.near, 'a guard sits outside Krung Thep Bank');
     assert(bankBooth.torch && bankBooth.dayOff && bankBooth.nightOn, 'the bank guard torch only comes on at night');
+
+    console.log('\n[116] mall directory at Terminal 21');
+    const dir = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.mallDir;
+      const named = !!(c && c.mesh && c.mesh.name === 'mall-directory');
+      const screen = !!(c && c.screen && c.screen.name === 'mall-dir-screen');
+      const mall = G.world && G.world.mall && G.world.mall.center;
+      const near = !!(c && mall && Math.hypot(c.x - mall.x, c.z - mall.z) < 8);
+      G.time.dayT = 23 / 24;
+      main.updateMallDirectory(0.05);
+      const night = !!(c && c.clerk && c.clerk.mesh && c.clerk.mesh.visible === false);
+      G.time.dayT = 12 / 24;
+      main.updateMallDirectory(0.05);
+      const day = !!(c && c.clerk && c.clerk.mallDir && c.clerk.mesh && c.clerk.mesh.visible);
+      const glow0 = c && c.screen && c.screen.material ? c.screen.material.emissiveIntensity : 0;
+      if (c) c.t = 0.2 + Math.PI / 3.2;
+      main.updateMallDirectory(0.05);
+      const glowed = !!(c && c.screen && Math.abs(c.screen.material.emissiveIntensity - glow0) > 0.02);
+      G.player.inVehicle = null;
+      G._eating = null;
+      if (c && c.mesh) G.player.group.position.set(c.x, 0, c.z - 1.6);
+      G._mallDir = 0;
+      G._mallDirShop = null;
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let asked = false;
+      for (let i = 0; i < 4 && !asked; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateMallDirectory(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        asked = (G._mallDir || 0) >= 1 && !!G._mallDirShop;
+      }
+      return {
+        flag: !!(G.gameplay && G.gameplay.mallDir),
+        named, screen, near, night, day, glowed, asked, shop: G._mallDirShop,
+      };
+    });
+    assert(dir.flag && dir.named && dir.screen && dir.near, 'a directory board waits at Terminal 21');
+    assert(dir.night && dir.day && dir.glowed && dir.asked, 'the clerk works the desk and E names a shop');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

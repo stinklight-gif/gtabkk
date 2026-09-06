@@ -422,6 +422,7 @@ export function updateInteraction(dt) {
   if (GAMEPLAY.sevenSlush && G.sevenSlush && G.sevenSlush.mesh && dist2(G.sevenSlush.mesh.position, pp0) < 2.4 * 2.4) return;
   if (GAMEPLAY.phromFruit && G.phromFruit && G.phromFruit.mesh && dist2(G.phromFruit.mesh.position, pp0) < 2.4 * 2.4) return;
   if (GAMEPLAY.btsShine && G.btsShine && G.btsShine.mesh && dist2(G.btsShine.mesh.position, pp0) < 2.4 * 2.4) return;
+  if (GAMEPLAY.mallDir && G.mallDir && G.mallDir.mesh && dist2(G.mallDir.mesh.position, pp0) < 2.8 * 2.8) return;
 
   const crate = G.world.yaowaratCrate;
   if (crate && !crate.taken && dist2(p.group.position, crate.pos) < 2.6 * 2.6) {

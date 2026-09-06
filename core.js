@@ -339,6 +339,7 @@ export const GAMEPLAY = {
   watDrum: true,          // temple drum opposite the bell; E beats it and cools last-seen
   mallGuard: true,        // plastic-chair security at the Terminal 21 entrance; torch after dark
   bankGuard: true,        // plastic-chair security at Krung Thep Bank; torch after dark
+  mallDir: true,          // directory clerk at the Terminal 21 desk; E names a shop and floor
 };
 G.gameplay = GAMEPLAY;
 
