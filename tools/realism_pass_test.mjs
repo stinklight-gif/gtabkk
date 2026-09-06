@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes','btsPigeons','watLotus','watCats','sevenShoppers','watFeed','btsPaper','yaoDuck','sevenSlush','phromFruit','pierWait','btsShine']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes','btsPigeons','watLotus','watCats','sevenShoppers','watFeed','btsPaper','yaoDuck','sevenSlush','phromFruit','pierWait','btsShine','watAmulet']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -462,7 +462,7 @@ async function main() {
     const peds = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
       const ways = (G.world.walkways || []).length;
-      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart && !p.songthaewRide && !p.watSweep && !p.yaoGold && !p.yaoDuck && !p.sevenAtm && !p.btsBusker && !p.watLotus && !p.sevenShop && !p.sevenSlush && !p.btsPaper && !p.phromFruit && !p.pierWait && !p.btsShine);
+      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart && !p.songthaewRide && !p.watSweep && !p.yaoGold && !p.yaoDuck && !p.sevenAtm && !p.btsBusker && !p.watLotus && !p.watAmulet && !p.sevenShop && !p.sevenSlush && !p.btsPaper && !p.phromFruit && !p.pierWait && !p.btsShine);
       const b = G.world.buildings.find(x => x.size.y > 8 && x.size.x > 4 && x.size.z > 4) || G.world.buildings[0];
       const insideBefore = wanderer && b && Math.abs(wanderer.mesh.position.x - b.pos.x) < b.size.x / 2 && Math.abs(wanderer.mesh.position.z - b.pos.z) < b.size.z / 2;
       if (wanderer && b) {
@@ -3717,6 +3717,72 @@ async function main() {
     });
     assert(shine.flag && shine.named && shine.box && shine.n >= 2 && shine.cloth && shine.near, 'a shoe-shine box waits north of Asok');
     assert(shine.night && shine.day && shine.wiped && shine.paid, 'the rag wipes by day and E buys a shine for ฿30');
+
+    console.log('\n[108] amulet stall at the wat');
+    const amulet = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.watAmulet;
+      const named = !!(c && c.mesh && c.mesh.name === 'wat-amulet-board');
+      const n = c && c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'wat-amulet').length : 0;
+      const temple = G.world && G.world.poi && G.world.poi.temple;
+      const nearWat = !!(c && temple && Math.hypot(c.x - temple.x, c.z - temple.z) < 16);
+      G.time.dayT = 21.2 / 24;
+      main.updateWatAmulet(0.05);
+      const night = !!(c && c.vendor && c.vendor.mesh && c.vendor.mesh.visible === false);
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updateWatAmulet(0.05);
+      const day = !!(c && c.vendor && c.vendor.watAmulet && c.vendor.mesh && c.vendor.mesh.visible);
+      const a0 = c && c.mesh && c.mesh.children.find(ch => ch && ch.name === 'wat-amulet');
+      const r0 = a0 ? a0.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.4;
+      main.updateWatAmulet(0.05);
+      const swayed = !!(a0 && Math.abs(a0.rotation.z - r0) > 0.08);
+      G.player.inVehicle = null;
+      G._eating = null;
+      G._malai = false;
+      G._lotus = false;
+      G._amulet = false;
+      G._amuletOffered = 0;
+      if (c && c.mesh) G.player.group.position.copy(c.mesh.position);
+      G.cash = 100;
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let paid = false;
+      for (let i = 0; i < 4 && !paid; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateWatAmulet(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        paid = G.cash === 50 && G._amulet === true;
+      }
+      const s = (G.world.shrines || [])[0];
+      let offered = false, cooled = false;
+      if (s && s.pos) {
+        G.player.group.position.set(s.pos.x, 0, s.pos.z);
+        G.wanted.stars = 2;
+        G.wanted.lastSeenAt = performance.now() + 30000;
+        s.readyAt = 1;
+        const seen0 = G.wanted.lastSeenAt;
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        for (let i = 0; i < 4 && !offered; i++) {
+          window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+          main.updateShrines(0.016);
+          window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+          if (G.input && G.input.endFrame) G.input.endFrame();
+          offered = (G._amuletOffered || 0) >= 1 && G._amulet === false;
+        }
+        cooled = G.wanted.lastSeenAt < seen0 - 18000;
+      }
+      return {
+        flag: !!(G.gameplay && G.gameplay.watAmulet),
+        named, n, nearWat, night, day, swayed, paid, offered, cooled,
+      };
+    });
+    assert(amulet.flag && amulet.named && amulet.n >= 6 && amulet.nearWat, `an amulet board waits at the wat (${amulet.n})`);
+    assert(amulet.night && amulet.day && amulet.swayed && amulet.paid, 'E buys an amulet; the shrine takes it for extra heat cool');
+    assert(amulet.offered && amulet.cooled, 'the shrine takes the amulet for extra heat cool');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

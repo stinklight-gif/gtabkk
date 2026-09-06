@@ -334,6 +334,7 @@ export const GAMEPLAY = {
   phromFruit: true,       // fruit smoothie cart at Phrom Phong BTS; blender spins, E for a cup
   pierWait: true,         // ferry passengers wait on the pier; E for a ฿15 express-boat ticket
   btsShine: true,         // shoe-shine box on the north side of Asok BTS; E for a polish
+  watAmulet: true,        // amulet board at the wat; E buys one, shrine offering cools extra
 };
 G.gameplay = GAMEPLAY;
 

@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -3167,6 +3167,45 @@ export function spawnWatLotus(scene) {
   vendor.heading = PI;
   if (vendor.mesh) vendor.mesh.rotation.y = PI;
   G.watLotus = { mesh: g, vendor, x, z, t: 0 };
+}
+
+export function spawnWatAmulet(scene) {
+  if (!GAMEPLAY.watAmulet) return;
+  const temple = G.world && G.world.poi && G.world.poi.temple;
+  if (!temple) return;
+  const x = temple.x - 8.8, z = temple.z + 1.0;
+  const g = new THREE.Group();
+  g.name = 'wat-amulet-board';
+  const board = new THREE.Mesh(
+    new THREE.BoxGeometry(0.85, 1.15, 0.08),
+    new THREE.MeshStandardMaterial({ color: 0x5a3a18, roughness: 0.8 })
+  );
+  board.position.y = 1.05;
+  g.add(board);
+  const gold = [
+    new THREE.MeshStandardMaterial({ color: 0xe8c04a, roughness: 0.35, metalness: 0.65, emissive: 0xd4a020, emissiveIntensity: 0.12 }),
+    new THREE.MeshStandardMaterial({ color: 0xb08a3a, roughness: 0.4, metalness: 0.55, emissive: 0x8a6010, emissiveIntensity: 0.1 }),
+  ];
+  for (let i = 0; i < 6; i++) {
+    const charm = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.02, 8), gold[i % 2]);
+    charm.name = 'wat-amulet';
+    charm.rotation.x = PI / 2;
+    charm.position.set(-0.22 + (i % 3) * 0.22, 0.75 + Math.floor(i / 3) * 0.38, 0.06);
+    g.add(charm);
+  }
+  g.position.set(x, 0, z);
+  scene.add(g);
+  const vendor = spawnPed(scene, new THREE.Vector3(x + 0.7, 0, z + 0.12), 'vendor');
+  vendor.watAmulet = true;
+  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI };
+  vendor.speed = 0;
+  vendor.state = 'idle';
+  vendor.heading = PI;
+  if (vendor.mesh) {
+    vendor.mesh.rotation.y = PI;
+    vendor.mesh.visible = false;
+  }
+  G.watAmulet = { mesh: g, vendor, x, z, t: 0 };
 }
 
 export function spawnWatCats(scene) {
