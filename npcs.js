@@ -2203,8 +2203,8 @@ export function updateGarageMech(dt) {
       }
     }
   }
-  const wait = G.garageWait;
-  if (wait) {
+  for (const wait of [G.garageWait, G.garageWaitB]) {
+    if (!wait) continue;
     wait.t = (wait.t || 0) + dt;
     const wp = wait.ped;
     if (wp && wp.mesh) {

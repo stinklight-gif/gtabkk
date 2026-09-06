@@ -3197,32 +3197,35 @@ export function spawnGarageMech(scene) {
   };
   G.garageMech = packMech(g.pos.x + 5.4, g.pos.z - 4.8, -PI / 2);
   G.garageMechB = packMech(g.pos.x - 5.4, g.pos.z - 4.8, PI / 2);
-  const cx = g.pos.x + 2.8, cz = g.pos.z - 6.6;
-  const wait = spawnPed(scene, new THREE.Vector3(cx, 0, cz), 'office');
-  wait.garageMech = true;
-  wait.garageWait = true;
-  wait.speed = 0;
-  wait.state = 'idle';
-  wait.heading = 0;
-  wait.anchor = { slot: new THREE.Vector3(cx, 0, cz), facing: 0 };
-  if (wait.mesh) {
-    wait.mesh.rotation.y = 0;
-    wait.mesh.visible = false;
-  }
-  const helm = new THREE.Mesh(
-    new THREE.BoxGeometry(0.12, 0.08, 0.14),
-    new THREE.MeshStandardMaterial({ color: 0x1a1a22, roughness: 0.45, metalness: 0.3 })
-  );
-  helm.name = 'garage-helmet';
-  const wp = wait.mesh && wait.mesh.userData && wait.mesh.userData.parts;
-  if (wp && wp.foreL) {
-    helm.position.set(0.02, -0.24, 0.06);
-    wp.foreL.add(helm);
-  } else if (wait.mesh) {
-    helm.position.set(-0.18, 1.0, 0.1);
-    wait.mesh.add(helm);
-  }
-  G.garageWait = { ped: wait, x: cx, z: cz, t: 0 };
+  const packWait = (cx, cz, facing) => {
+    const wait = spawnPed(scene, new THREE.Vector3(cx, 0, cz), 'office');
+    wait.garageMech = true;
+    wait.garageWait = true;
+    wait.speed = 0;
+    wait.state = 'idle';
+    wait.heading = facing;
+    wait.anchor = { slot: new THREE.Vector3(cx, 0, cz), facing };
+    if (wait.mesh) {
+      wait.mesh.rotation.y = facing;
+      wait.mesh.visible = false;
+    }
+    const helm = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.08, 0.14),
+      new THREE.MeshStandardMaterial({ color: 0x1a1a22, roughness: 0.45, metalness: 0.3 })
+    );
+    helm.name = 'garage-helmet';
+    const wp = wait.mesh && wait.mesh.userData && wait.mesh.userData.parts;
+    if (wp && wp.foreL) {
+      helm.position.set(0.02, -0.24, 0.06);
+      wp.foreL.add(helm);
+    } else if (wait.mesh) {
+      helm.position.set(-0.18, 1.0, 0.1);
+      wait.mesh.add(helm);
+    }
+    return { ped: wait, x: cx, z: cz, t: 0 };
+  };
+  G.garageWait = packWait(g.pos.x + 2.8, g.pos.z - 6.6, 0);
+  G.garageWaitB = packWait(g.pos.x - 2.8, g.pos.z - 6.6, 0);
 }
 
 export function spawnKlongDock(scene) {
