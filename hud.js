@@ -233,6 +233,13 @@ export function bindHud() {
         dist: d(G.btsGates.machine.position),
       });
     }
+    if (G.phromGates && G.phromGates.machine) {
+      out.push({
+        name: 'BTS ticket (Phrom Phong)',
+        status: G._btsTicket ? 'rabbit in wallet' : (G._btsHopped ? 'hopped the gate' : 'แรบบิท · ฿50'),
+        dist: d(G.phromGates.machine.position),
+      });
+    }
     if (G.btsMalai && G.btsMalai.mesh) {
       out.push({ name: 'Malai at Asok', status: G._malai ? 'garland in hand' : 'พวงมาลัย · ฿20', dist: d(G.btsMalai.mesh.position) });
     }

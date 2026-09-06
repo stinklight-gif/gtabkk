@@ -303,7 +303,7 @@ export const GAMEPLAY = {
   plaKat: true,           // fighting-fish bags hanging on a soi; E buys a bag
   chaYen: true,           // Thai iced-tea cart on a soi; E for a cup
   soiBarber: true,        // plastic-chair barber on a soi; E for a cut
-  btsGates: true,         // Asok ticket gates + Rabbit machine; hop is 1★
+  btsGates: true,         // Asok and Phrom Phong ticket gates + Rabbit machines; hop is 1★
   soiWires: true,         // tangled cables between soi PA poles; sparks in the rain
   rainFrogs: true,        // frogs hop flooded sois while it rains
   soiCctv: true,          // soi pole cameras; a shot in view is a ping and 1★

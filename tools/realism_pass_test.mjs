@@ -4192,6 +4192,69 @@ async function main() {
     assert(phromSong.stand && phromSong.waiter && phromSong.sign, 'Phrom Phong songthaew is pinned, hired, and has a hawker waiting');
     assert(phromSong.n >= 3 && phromSong.seated >= 3 && phromSong.parked >= 3, `passengers sit the Phrom Phong songthaew (${phromSong.n})`);
     assert(phromSong.dumped && phromSong.off >= 3 && phromSong.grounded >= 3, 'they hop off onto the pavement when you take the ride');
+
+    console.log('\n[122] Phrom Phong ticket gates');
+    const phromTap = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const st = G.phromGates;
+      const n = st && st.gates ? st.gates.filter(g => g && g.mesh && g.mesh.name === 'bts-gate').length : 0;
+      const flaps = st && st.gates ? st.gates.filter(g => g && g.flap && g.flap.name === 'bts-flap').length : 0;
+      const machine = !!(st && st.machine && st.machine.name === 'bts-ticket-machine');
+      const screen = !!(st && st.machine && st.machine.getObjectByName('bts-ticket-screen'));
+      const dist = (st && st.sx != null) ? Math.abs(st.sx - 100) : null;
+      G.player.inVehicle = null;
+      G._btsRide = null;
+      G._eating = null;
+      G._barberCut = null;
+      G._btsTicket = false;
+      G._btsHopped = 0;
+      G._btsTapped = 0;
+      G.policeOff = false;
+      G.wanted.stars = 0;
+      G.wanted.crime = 0;
+      if (st && st.machine) G.player.group.position.set(st.machine.position.x, 0, st.machine.position.z);
+      G.cash = 100;
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let paid = false;
+      for (let i = 0; i < 4 && !paid; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateBtsGates(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        paid = G.cash === 50 && !!G._btsTicket;
+      }
+      G._btsTicket = false;
+      st.openT = 0;
+      st._pz = st.zGate - 1.2;
+      G.player.group.position.set(st.sx, st.py, st.zGate - 1.2);
+      main.updateBtsGates(0.016);
+      G.player.group.position.set(st.sx, st.py, st.zGate + 0.8);
+      main.updateBtsGates(0.016);
+      const hopped = (G._btsHopped || 0) >= 1 && G.wanted.stars >= 1;
+      G.wanted.stars = 0;
+      G.wanted.crime = 0;
+      G._btsHopped = 0;
+      G._btsTicket = true;
+      st.openT = 0;
+      st._pz = st.zGate - 1.2;
+      G.player.group.position.set(st.sx, st.py, st.zGate - 1.2);
+      main.updateBtsGates(0.016);
+      G.player.group.position.set(st.sx, st.py, st.zGate + 0.8);
+      main.updateBtsGates(0.016);
+      const flap = st.gates && st.gates[0] && st.gates[0].flap;
+      const opened = !!(flap && flap.rotation.y > 0.5);
+      const tapped = (G._btsTapped || 0) >= 1 && G.wanted.stars === 0;
+      return {
+        flag: !!(G.gameplay && G.gameplay.btsGates),
+        rec: !!st, stop: st && st.stop, n, flaps, machine, screen,
+        near: dist != null && dist < 2,
+        paid, hopped, opened, tapped,
+      };
+    });
+    assert(phromTap.flag && phromTap.stop === 'phrom' && phromTap.near && phromTap.n >= 3 && phromTap.flaps >= 3 && phromTap.machine && phromTap.screen, `Phrom Phong ticket gates (${phromTap.n})`);
+    assert(phromTap.paid, 'E buys a Rabbit card at Phrom Phong for ฿50');
+    assert(phromTap.hopped && phromTap.opened && phromTap.tapped, 'hopping Phrom Phong is a star; a tap opens the flaps');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
