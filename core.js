@@ -332,7 +332,7 @@ export const GAMEPLAY = {
   yaoDuck: true,          // roast-duck window on Yaowarat; hanging birds after dark, E for a plate
   sevenSlush: true,       // slushie machine inside the walk-in 7-Eleven; tanks spin, E for a cup
   phromFruit: true,       // fruit smoothie carts at Asok and Phrom Phong BTS; blender spins, E for a cup
-  pierWait: true,         // ferry passengers wait on the pier; E for a ฿15 express-boat ticket
+  pierWait: true,         // ferry waiters and a ticket clerk at the pier; E for a ฿15 express-boat ticket, they hide after 21:00
   btsShine: true,         // shoe-shine boxes north of Asok and Phrom Phong BTS; E for a polish
   watAmulet: true,        // amulet board at the wat; E buys one, shrine offering cools extra
   yaoFortune: true,       // fortune teller on Yaowarat after dark; E for a reading that cools last-seen

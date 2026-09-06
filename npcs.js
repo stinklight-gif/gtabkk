@@ -3240,6 +3240,29 @@ export function updatePierWait(dt) {
     ped.speed = 0;
     ped.state = 'idle';
   }
+  const clerk = G.pierClerk;
+  if (clerk) {
+    clerk.t = (clerk.t || 0) + dt;
+    const ped = clerk.ped;
+    if (ped && ped.mesh) {
+      ped.pierWait = true;
+      ped.pierClerk = true;
+      ped.mesh.visible = open;
+      if (open) {
+        const slot = ped.anchor && ped.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(clerk.t * 2.2) * 0.05;
+          ped.mesh.position.set(slot.x, 0, slot.z + bob);
+          ped.heading = ped.anchor.facing;
+          ped.mesh.rotation.y = ped.heading;
+        }
+        const ticket = ped.mesh.getObjectByName('pier-ticket');
+        if (ticket) ticket.rotation.z = Math.sin(clerk.t * 4.2) * 0.35;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+    }
+  }
   if (!open || G.player.inVehicle || G._eating) return;
   const pp = G.player.group.position;
   if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) return;

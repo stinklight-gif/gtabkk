@@ -5940,6 +5940,33 @@ export function spawnPierWait(scene) {
     waiters.push(ped);
   }
   G.pierWait = { mesh: post, waiters, x, z, t: 0 };
+  const cx = x - 1.6, cz = z + 2.2;
+  const clerk = spawnPed(scene, new THREE.Vector3(cx, 0, cz), 'office');
+  recolorTorso(clerk.mesh.userData.parts, 0x1a5a8a, 0.7);
+  clerk.pierWait = true;
+  clerk.pierClerk = true;
+  clerk.speed = 0;
+  clerk.state = 'idle';
+  clerk.heading = PI / 2;
+  clerk.anchor = { slot: new THREE.Vector3(cx, 0, cz), facing: PI / 2 };
+  if (clerk.mesh) {
+    clerk.mesh.rotation.y = PI / 2;
+    clerk.mesh.visible = false;
+  }
+  const ticket = new THREE.Mesh(
+    new THREE.BoxGeometry(0.08, 0.12, 0.02),
+    new THREE.MeshStandardMaterial({ color: 0xf0ead8, roughness: 0.7 })
+  );
+  ticket.name = 'pier-ticket';
+  const parts = clerk.mesh && clerk.mesh.userData && clerk.mesh.userData.parts;
+  if (parts && parts.foreR) {
+    ticket.position.set(0.02, -0.22, 0.06);
+    parts.foreR.add(ticket);
+  } else if (clerk.mesh) {
+    ticket.position.set(0.22, 1.05, 0.12);
+    clerk.mesh.add(ticket);
+  }
+  G.pierClerk = { ped: clerk, x: cx, z: cz, t: 0 };
 }
 
 export function spawnBoat(scene) {
