@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -3172,6 +3172,69 @@ export function spawnMallManga(scene) {
     readers.push(ped);
   }
   G.mallManga = { readers, x, z, y, t: 0 };
+}
+
+export function spawnMallSushi(scene) {
+  if (!GAMEPLAY.mallSushi) return;
+  const mall = G.world && G.world.mall;
+  const shop = mall && (mall.shops || []).find(s => s && s.name === 'Sushi Bar');
+  if (!shop || !shop.pos) return;
+  const x = shop.pos.x, z = shop.pos.z, y = shop.pos.y || 5;
+  const chef = spawnPed(scene, new THREE.Vector3(x + 1.55, 0, z), 'laborer');
+  recolorTorso(chef.mesh.userData.parts, 0xf4f0e8, 0.75);
+  chef.mallSushi = true;
+  chef.sushiRole = 'chef';
+  chef.speed = 0;
+  chef.state = 'idle';
+  chef.heading = -PI / 2;
+  chef.anchor = { slot: new THREE.Vector3(x + 1.55, y, z), facing: -PI / 2 };
+  if (chef.mesh) {
+    chef.mesh.position.y = y;
+    chef.mesh.rotation.y = -PI / 2;
+    chef.mesh.visible = false;
+  }
+  const plate = new THREE.Group();
+  plate.name = 'mall-sushi-plate';
+  const dish = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.07, 0.08, 0.012, 10),
+    new THREE.MeshStandardMaterial({ color: 0xf5f0e4, roughness: 0.45 })
+  );
+  plate.add(dish);
+  const rice = new THREE.Mesh(
+    new THREE.BoxGeometry(0.05, 0.018, 0.03),
+    new THREE.MeshStandardMaterial({ color: 0xf8f4ea, roughness: 0.8 })
+  );
+  rice.position.y = 0.016;
+  plate.add(rice);
+  const fish = new THREE.Mesh(
+    new THREE.BoxGeometry(0.06, 0.01, 0.028),
+    new THREE.MeshStandardMaterial({ color: 0xff8a3a, roughness: 0.55 })
+  );
+  fish.name = 'mall-sushi-fish';
+  fish.position.y = 0.028;
+  plate.add(fish);
+  const parts = chef.mesh && chef.mesh.userData && chef.mesh.userData.parts;
+  if (parts && parts.foreR) {
+    plate.position.set(0.02, -0.22, 0.08);
+    parts.foreR.add(plate);
+  } else if (chef.mesh) {
+    plate.position.set(0.22, 1.05, 0.12);
+    chef.mesh.add(plate);
+  }
+  chef._plate = plate;
+  const customer = spawnPed(scene, new THREE.Vector3(x - 0.15, 0, z + 0.12), 'tourist');
+  customer.mallSushi = true;
+  customer.sushiRole = 'customer';
+  customer.speed = 0;
+  customer.state = 'idle';
+  customer.heading = PI / 2;
+  customer.anchor = { slot: new THREE.Vector3(x - 0.15, y, z + 0.12), facing: PI / 2 };
+  if (customer.mesh) {
+    customer.mesh.position.y = y;
+    customer.mesh.rotation.y = PI / 2;
+    customer.mesh.visible = false;
+  }
+  G.mallSushi = { chef, customer, x, z, y, t: 0 };
 }
 
 export function spawnSevenAtm(scene) {
