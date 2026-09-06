@@ -2667,6 +2667,8 @@ export function spawnSevenGuard(scene) {
   G.southSevenGuard = make(south, 'south-seven-chair');
   const west = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x < -50 && s.pos.z > 0 && s.pos.z < 60);
   G.westSevenGuard = make(west, 'west-seven-chair');
+  const east = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x > 100 && s.pos.z < 0 && s.pos.z > -80);
+  G.eastSevenGuard = make(east, 'east-seven-chair');
 }
 
 export function spawnMallGuard(scene) {

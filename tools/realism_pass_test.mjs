@@ -5399,6 +5399,35 @@ async function main() {
     });
     assert(westBooth.flag && westBooth.rec && westBooth.seated && westBooth.chair && westBooth.near && westBooth.farWalk, 'a guard sits outside the west 7-Eleven');
     assert(westBooth.torch && westBooth.dayOff && westBooth.nightOn, 'the west guard torch only comes on at night');
+
+    console.log('\n[153] east 7-Eleven security guard');
+    const eastBooth = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const g = G.eastSevenGuard;
+      const walk = G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0]));
+      const east = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x > 100 && s.pos.z < 0 && s.pos.z > -80);
+      main.updatePeds(0.05);
+      main.updateSevenGuard(0.05);
+      const ped = g && g.ped;
+      const seated = !!(ped && ped.sevenGuard && ped.mesh && ped.mesh.position.y >= 0.3);
+      const chair = !!(g && g.chair && g.chair.name === 'east-seven-chair');
+      const near = !!(east && east.pos && ped && ped.mesh && Math.hypot(ped.mesh.position.x - east.pos.x, ped.mesh.position.z - east.pos.z) < 10);
+      const farWalk = !!(walk && walk.pos && ped && ped.mesh && Math.hypot(ped.mesh.position.x - walk.pos.x, ped.mesh.position.z - walk.pos.z) > 80);
+      const torch = !!(ped && ped.mesh && ped.mesh.getObjectByName('flashlight'));
+      G.time.dayT = 12 / 24;
+      main.updateSevenGuard(0.05);
+      const dayOff = !!(g && g.beam && g.beam.visible === false && g.light && g.light.intensity === 0);
+      G.time.dayT = 21.5 / 24;
+      main.updateSevenGuard(0.05);
+      const nightOn = !!(g && g.beam && g.beam.visible && g.light && g.light.intensity > 0.4);
+      return {
+        flag: !!(G.gameplay && G.gameplay.sevenGuard),
+        rec: !!(g && ped && ped.sevenGuard),
+        seated, chair, near, farWalk, torch, dayOff, nightOn,
+      };
+    });
+    assert(eastBooth.flag && eastBooth.rec && eastBooth.seated && eastBooth.chair && eastBooth.near && eastBooth.farWalk, 'a guard sits outside the east 7-Eleven');
+    assert(eastBooth.torch && eastBooth.dayOff && eastBooth.nightOn, 'the east guard torch only comes on at night');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
