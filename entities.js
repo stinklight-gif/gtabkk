@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -2808,6 +2808,59 @@ export function spawnBtsPaper(scene) {
   vendor.heading = PI;
   if (vendor.mesh) vendor.mesh.rotation.y = PI;
   G.btsPaper = { mesh: g, vendor, x, z, t: 0 };
+}
+
+export function spawnBtsShine(scene) {
+  if (!GAMEPLAY.btsShine) return;
+  const bts = G.world && G.world.bts;
+  if (!bts) return;
+  const x = bts.x + 8.4, z = 9.2;
+  const g = new THREE.Group();
+  g.name = 'bts-shine';
+  const box = new THREE.Mesh(
+    new THREE.BoxGeometry(0.55, 0.32, 0.42),
+    new THREE.MeshStandardMaterial({ color: 0x6a4a28, roughness: 0.82 })
+  );
+  box.name = 'shine-box';
+  box.position.y = 0.22;
+  g.add(box);
+  const tinMat = [
+    new THREE.MeshStandardMaterial({ color: 0x3a2a18, roughness: 0.45, metalness: 0.25 }),
+    new THREE.MeshStandardMaterial({ color: 0x1a1a1e, roughness: 0.45, metalness: 0.25 }),
+  ];
+  for (let i = 0; i < 2; i++) {
+    const tin = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.04, 8), tinMat[i]);
+    tin.name = 'shine-tin';
+    tin.position.set(-0.1 + i * 0.16, 0.4, 0.04);
+    g.add(tin);
+  }
+  const cloth = new THREE.Mesh(
+    new THREE.BoxGeometry(0.14, 0.02, 0.1),
+    new THREE.MeshStandardMaterial({ color: 0xc03030, roughness: 0.75 })
+  );
+  cloth.name = 'shine-cloth';
+  cloth.position.set(0.16, 0.42, 0.02);
+  g.add(cloth);
+  const stool = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.14, 0.16, 0.08, 8),
+    new THREE.MeshStandardMaterial({ color: 0x4a3a22, roughness: 0.8 })
+  );
+  stool.position.set(0.48, 0.22, 0);
+  g.add(stool);
+  g.position.set(x, 0, z);
+  scene.add(g);
+  const vendor = spawnPed(scene, new THREE.Vector3(x + 0.48, 0, z), 'laborer');
+  vendor.btsShine = true;
+  vendor.anchor = { slot: new THREE.Vector3(x + 0.48, 0.38, z), facing: -PI / 2 };
+  vendor.speed = 0;
+  vendor.state = 'idle';
+  vendor.heading = -PI / 2;
+  if (vendor.mesh) {
+    vendor.mesh.position.set(x + 0.48, 0.38, z);
+    vendor.mesh.rotation.y = -PI / 2;
+    vendor.mesh.visible = false;
+  }
+  G.btsShine = { mesh: g, vendor, x, z, t: 0 };
 }
 
 export function spawnBtsSitters(scene) {

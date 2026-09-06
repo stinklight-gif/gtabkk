@@ -333,6 +333,7 @@ export const GAMEPLAY = {
   sevenSlush: true,       // slushie machine inside the walk-in 7-Eleven; tanks spin, E for a cup
   phromFruit: true,       // fruit smoothie cart at Phrom Phong BTS; blender spins, E for a cup
   pierWait: true,         // ferry passengers wait on the pier; E for a ฿15 express-boat ticket
+  btsShine: true,         // shoe-shine box on the north side of Asok BTS; E for a polish
 };
 G.gameplay = GAMEPLAY;
 
