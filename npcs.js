@@ -3598,42 +3598,44 @@ export function updateSquidGrill(dt) {
 }
 
 export function updateKanomKrok(dt) {
-  if (!GAMEPLAY.kanomKrok || !G.kanomKrok) return;
-  const c = G.kanomKrok;
-  c.t = (c.t || 0) + dt;
+  if (!GAMEPLAY.kanomKrok) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const open = h >= 15 && h < 21.5;
-  const pan = c.mesh && c.mesh.getObjectByName('kanom-pan');
-  if (pan && pan.material) pan.material.emissiveIntensity = open ? 0.22 + Math.sin(c.t * 10) * 0.1 : 0.06;
-  const ladle = c.mesh && c.mesh.getObjectByName('kanom-ladle');
-  if (ladle) {
-    const scoop = Math.sin(c.t * 28);
-    ladle.rotation.z = 0.15 + scoop * 0.45;
-    ladle.position.y = 0.88 + Math.max(0, scoop) * 0.08;
+  const pp = G.player && G.player.group && G.player.group.position;
+  for (const c of [G.kanomKrok, G.southKanomKrok]) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    const pan = c.mesh && c.mesh.getObjectByName('kanom-pan');
+    if (pan && pan.material) pan.material.emissiveIntensity = open ? 0.22 + Math.sin(c.t * 10) * 0.1 : 0.06;
+    const ladle = c.mesh && c.mesh.getObjectByName('kanom-ladle');
+    if (ladle) {
+      const scoop = Math.sin(c.t * 28);
+      ladle.rotation.z = 0.15 + scoop * 0.45;
+      ladle.position.y = 0.88 + Math.max(0, scoop) * 0.08;
+    }
+    const ped = c.vendor;
+    if (ped && ped.mesh && ped.anchor && ped.anchor.slot) {
+      ped.kanom = true;
+      ped.mesh.visible = open;
+      ped.mesh.position.set(ped.anchor.slot.x, 0, ped.anchor.slot.z);
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+      ped.speed = 0;
+      ped.state = 'idle';
+    }
+    if (!open || G.player.inVehicle || G._eating || !pp) continue;
+    if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) continue;
+    G.hud.showPrompt('Press <b>E</b> for kanom krok · ฿25', 0.4);
+    if (!G.input.pressed('KeyE')) continue;
+    if (G.cash < 25) { G.hud.showNotif('Need ฿25 for kanom krok'); continue; }
+    G.cash -= 25;
+    G.player.hp = Math.min(G.player.hpMax, G.player.hp + 16);
+    G.player.stam = G.player.stamMax;
+    if (G.hud.setCash) G.hud.setCash(G.cash);
+    G._kanomKrok = (G._kanomKrok || 0) + 1;
+    G.hud.showNotif('Kanom krok — ขนมครก');
+    if (G.audio && G.audio.chime) G.audio.chime();
   }
-  const ped = c.vendor;
-  if (ped && ped.mesh && ped.anchor && ped.anchor.slot) {
-    ped.kanom = true;
-    ped.mesh.visible = open;
-    ped.mesh.position.set(ped.anchor.slot.x, 0, ped.anchor.slot.z);
-    ped.heading = ped.anchor.facing;
-    ped.mesh.rotation.y = ped.heading;
-    ped.speed = 0;
-    ped.state = 'idle';
-  }
-  if (!open || G.player.inVehicle || G._eating) return;
-  const pp = G.player.group.position;
-  if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) return;
-  G.hud.showPrompt('Press <b>E</b> for kanom krok · ฿25', 0.4);
-  if (!G.input.pressed('KeyE')) return;
-  if (G.cash < 25) { G.hud.showNotif('Need ฿25 for kanom krok'); return; }
-  G.cash -= 25;
-  G.player.hp = Math.min(G.player.hpMax, G.player.hp + 16);
-  G.player.stam = G.player.stamMax;
-  if (G.hud.setCash) G.hud.setCash(G.cash);
-  G._kanomKrok = (G._kanomKrok || 0) + 1;
-  G.hud.showNotif('Kanom krok — ขนมครก');
-  if (G.audio && G.audio.chime) G.audio.chime();
 }
 
 export function updateMangoSticky(dt) {

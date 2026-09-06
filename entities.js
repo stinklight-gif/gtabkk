@@ -1622,22 +1622,26 @@ export function makeKanomKrokMesh() {
 
 export function spawnKanomKrok(scene) {
   if (!GAMEPLAY.kanomKrok) return;
-  const seven = G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0]));
-  if (!seven || !seven.pos) return;
-  const hz = seven.hz || 4;
-  const x = seven.pos.x - 2.2;
-  const z = seven.pos.z + hz + 1.6;
-  const mesh = makeKanomKrokMesh();
-  mesh.position.set(x, 0, z);
-  scene.add(mesh);
-  const vendor = spawnPed(scene, new THREE.Vector3(x + 0.65, 0, z + 0.1), 'vendor');
-  vendor.kanom = true;
-  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI };
-  vendor.speed = 0;
-  vendor.state = 'idle';
-  vendor.heading = PI;
-  if (vendor.mesh) vendor.mesh.rotation.y = PI;
-  G.kanomKrok = { mesh, vendor, x, z, t: 0 };
+  const pack = (seven) => {
+    if (!seven || !seven.pos) return null;
+    const hz = seven.hz || 4;
+    const x = seven.pos.x - 2.2;
+    const z = seven.pos.z + hz + 1.6;
+    const mesh = makeKanomKrokMesh();
+    mesh.position.set(x, 0, z);
+    scene.add(mesh);
+    const vendor = spawnPed(scene, new THREE.Vector3(x + 0.65, 0, z + 0.1), 'vendor');
+    vendor.kanom = true;
+    vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI };
+    vendor.speed = 0;
+    vendor.state = 'idle';
+    vendor.heading = PI;
+    if (vendor.mesh) vendor.mesh.rotation.y = PI;
+    return { mesh, vendor, x, z, t: 0 };
+  };
+  G.kanomKrok = pack(G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0])));
+  const south = (G.world.sevenElevens || []).find(s => s && s.pos && Math.abs(s.pos.x) < 8 && s.pos.z < -80);
+  G.southKanomKrok = pack(south);
 }
 
 export function makeSquidGrillMesh() {
