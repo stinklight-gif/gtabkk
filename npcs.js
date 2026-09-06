@@ -1906,6 +1906,32 @@ export function updateMallDirectory(dt) {
     if (G.hud.showNotif) G.hud.showNotif(`${s.name} — floor ${floor}`);
     if (G.audio && G.audio.chime) G.audio.chime();
   }
+  const ask = G.mallDirAsk;
+  if (ask) {
+    ask.t = (ask.t || 0) + dt;
+    const ped = ask.ped;
+    if (ped && ped.mesh) {
+      ped.mallDir = true;
+      ped.mallDirAsk = true;
+      ped.mesh.visible = open;
+      if (!open) {
+        ped.speed = 0;
+        ped.state = 'idle';
+      } else {
+        const slot = ped.anchor && ped.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(ask.t * 2.2) * 0.05;
+          ped.mesh.position.set(slot.x, 0, slot.z + bob);
+          ped.heading = ped.anchor.facing;
+          ped.mesh.rotation.y = ped.heading;
+        }
+        ped.speed = 0;
+        ped.state = 'idle';
+        const map = ped.mesh.getObjectByName('mall-dir-map');
+        if (map) map.rotation.z = Math.sin(ask.t * 4.2) * 0.35;
+      }
+    }
+  }
 }
 
 export function updateOfficeSmoke(dt) {

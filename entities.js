@@ -3661,6 +3661,32 @@ export function spawnMallDirectory(scene) {
   G.mallDir = pack(x, z, PI, 'mall-directory', 'mall-dir-screen', x - 1.6, z + 1.35);
   const nx = mall.center.x, nz = mall.center.z + 4;
   G.mallDirB = pack(nx, nz, 0, 'north-mall-directory', 'north-mall-dir-screen', nx - 1.6, nz - 1.35);
+  const ax = x + 1.6, az = z - 1.45;
+  const asker = spawnPed(scene, new THREE.Vector3(ax, 0, az), 'tourist');
+  asker.mallDir = true;
+  asker.mallDirAsk = true;
+  asker.speed = 0;
+  asker.state = 'idle';
+  asker.heading = 0;
+  asker.anchor = { slot: new THREE.Vector3(ax, 0, az), facing: 0 };
+  if (asker.mesh) {
+    asker.mesh.rotation.y = 0;
+    asker.mesh.visible = false;
+  }
+  const map = new THREE.Mesh(
+    new THREE.BoxGeometry(0.16, 0.22, 0.01),
+    new THREE.MeshStandardMaterial({ color: 0xf4f0e0, roughness: 0.75 })
+  );
+  map.name = 'mall-dir-map';
+  const ap = asker.mesh && asker.mesh.userData && asker.mesh.userData.parts;
+  if (ap && ap.foreL) {
+    map.position.set(0.02, -0.22, 0.08);
+    ap.foreL.add(map);
+  } else if (asker.mesh) {
+    map.position.set(-0.16, 0.95, 0.12);
+    asker.mesh.add(map);
+  }
+  G.mallDirAsk = { ped: asker, x: ax, z: az, t: 0 };
 }
 
 export function spawnMallFood(scene) {
