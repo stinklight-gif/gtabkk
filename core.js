@@ -315,7 +315,7 @@ export const GAMEPLAY = {
   mangoSticky: true,      // khao niao mamuang carts at Asok and Phrom Phong BTS; evening, E for a plate
   watBats: true,          // flying foxes circle the wat after dusk
   yaoPhotos: true,        // tourists stop to snap Yaowarat after 18:00
-  kanomKrok: true,        // coconut pancake pans outside the walk-in, south, and west 7-Elevens; afternoon, E for a bag
+  kanomKrok: true,        // coconut pancake pans outside every 7-Eleven storefront; afternoon, E for a bag
   squidGrill: true,       // grilled-squid cart on Yaowarat after dark; E for a stick
   songthaewRiders: true,  // passengers sit the BTS songthaew bench; hop off when you take it
   watSweep: true,         // monks sweep the wat courtyard at dawn

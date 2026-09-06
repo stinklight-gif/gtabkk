@@ -381,7 +381,7 @@ export function updateInteraction(dt) {
     }
   }
   if (GAMEPLAY.kanomKrok) {
-    for (const c of [G.kanomKrok, G.southKanomKrok, G.westKanomKrok]) {
+    for (const c of [G.kanomKrok, G.southKanomKrok, G.westKanomKrok, G.eastKanomKrok]) {
       if (c && c.mesh && dist2(c.mesh.position, pp0) < 2.4 * 2.4) return;
     }
   }
