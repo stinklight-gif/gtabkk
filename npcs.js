@@ -1762,21 +1762,23 @@ export function updateSoiMechanic(dt) {
 }
 
 export function updateSevenGuard(dt) {
-  if (!GAMEPLAY.sevenGuard || !G.sevenGuard) return;
+  if (!GAMEPLAY.sevenGuard) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const night = h >= 19 || h < 6;
-  const g = G.sevenGuard;
-  if (g.light) g.light.intensity = night ? 1.1 : 0;
-  if (g.beam) g.beam.visible = night;
-  const ped = g.ped;
-  if (ped && ped.mesh) {
-    ped.sevenGuard = true;
-    ped.mesh.visible = true;
-    if (ped.anchor && ped.anchor.slot) {
-      ped.mesh.position.set(ped.anchor.slot.x, ped.anchor.slot.y || 0.42, ped.anchor.slot.z);
-      ped.heading = ped.anchor.facing;
-      ped.mesh.rotation.y = ped.heading;
-      ped.speed = 0;
+  for (const g of [G.sevenGuard, G.southSevenGuard]) {
+    if (!g) continue;
+    if (g.light) g.light.intensity = night ? 1.1 : 0;
+    if (g.beam) g.beam.visible = night;
+    const ped = g.ped;
+    if (ped && ped.mesh) {
+      ped.sevenGuard = true;
+      ped.mesh.visible = true;
+      if (ped.anchor && ped.anchor.slot) {
+        ped.mesh.position.set(ped.anchor.slot.x, ped.anchor.slot.y || 0.42, ped.anchor.slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+        ped.speed = 0;
+      }
     }
   }
 }
