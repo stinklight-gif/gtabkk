@@ -7918,6 +7918,39 @@ async function main() {
     });
     assert(eastSlush.flag && eastSlush.named && eastSlush.n >= 2 && eastSlush.cup && eastSlush.near && eastSlush.other, `a slushie machine waits inside the east 7-Eleven (${eastSlush.n})`);
     assert(eastSlush.late && eastSlush.day && eastSlush.spun && eastSlush.paid, 'the east tanks spin and E buys a slushie for ฿25');
+
+    console.log('\n[221] third customer in the Krung Thep Bank teller queue');
+    const bankQueueB = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.bankQueueB;
+      const first = G.bankQueue;
+      const teller = G.world && G.world.bank && G.world.bank.teller;
+      const n = (c && c.queue || []).filter(p => p && p.bankQueue && p.mesh).length;
+      const phone = (c && c.queue || []).some(p => p && p.mesh && p.mesh.getObjectByName('bank-queue-phone'));
+      const near = !!(c && teller && Math.hypot(c.x - teller.x, c.z - teller.z) < 4);
+      const other = !!(c && first && Math.hypot(c.x - first.x, c.z - first.z) > 1.2);
+      G.time.dayT = 18 / 24;
+      main.updateBankQueue(0.05);
+      const late = (c && c.queue || []).filter(p => p && p.mesh && p.mesh.visible === false).length;
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updateBankQueue(0.05);
+      const day = (c && c.queue || []).filter(p => p && p.bankQueue && p.mesh && p.mesh.visible).length;
+      const p0 = c && c.queue && c.queue[0];
+      const z0 = p0 && p0.mesh ? p0.mesh.position.z : 0;
+      const tool = p0 && p0.mesh && p0.mesh.getObjectByName('bank-queue-phone');
+      const e0 = tool && tool.material ? tool.material.emissiveIntensity : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.4;
+      main.updateBankQueue(0.05);
+      const shifted = !!(p0 && p0.mesh && Math.abs(p0.mesh.position.z - z0) > 0.04);
+      const glowed = !!(tool && tool.material && Math.abs(tool.material.emissiveIntensity - e0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.bankQueue),
+        n, phone, near, other, late, day, shifted, glowed,
+      };
+    });
+    assert(bankQueueB.flag && bankQueueB.n >= 1 && bankQueueB.phone && bankQueueB.near && bankQueueB.other, `a third customer waits in the Krung Thep Bank teller queue (${bankQueueB.n})`);
+    assert(bankQueueB.late >= 1 && bankQueueB.day >= 1 && bankQueueB.shifted && bankQueueB.glowed, 'they hide after hours and the phone glows');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

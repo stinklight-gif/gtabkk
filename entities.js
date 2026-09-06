@@ -2825,6 +2825,32 @@ export function spawnBankQueue(scene) {
     queue.push(ped);
   }
   G.bankQueue = { queue, x: tx, z: tz, t: 0, hours: [9, 16] };
+  const bx = tx + 0.24, bz = tz + 1.7;
+  const extra = spawnPed(scene, new THREE.Vector3(bx, 0, bz), 'office');
+  extra.bankQueue = true;
+  extra.speed = 0;
+  extra.state = 'idle';
+  extra.heading = PI;
+  extra.anchor = { slot: new THREE.Vector3(bx, 0, bz), facing: PI };
+  if (extra.mesh) {
+    extra.mesh.rotation.y = PI;
+    extra.mesh.visible = false;
+  }
+  const phone = new THREE.Mesh(
+    new THREE.BoxGeometry(0.05, 0.09, 0.012),
+    new THREE.MeshStandardMaterial({ color: 0x1a1a22, emissive: 0x226688, emissiveIntensity: 0.35, roughness: 0.35 })
+  );
+  phone.name = 'bank-queue-phone';
+  const ep = extra.mesh && extra.mesh.userData && extra.mesh.userData.parts;
+  if (ep && ep.foreR) {
+    phone.position.set(0.02, -0.28, 0.06);
+    ep.foreR.add(phone);
+  } else if (extra.mesh) {
+    phone.position.set(0.22, 1.05, 0.12);
+    extra.mesh.add(phone);
+  }
+  extra._phone = phone;
+  G.bankQueueB = { queue: [extra], x: bx, z: bz, t: 0, hours: [9, 16] };
   const door = G.world && G.world.poi && G.world.poi.bank;
   if (door) {
     const ax = door.x + 4.4, az = door.z + 0.6;

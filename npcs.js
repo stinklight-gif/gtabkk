@@ -1947,7 +1947,7 @@ export function updateOfficeSmoke(dt) {
 export function updateBankQueue(dt) {
   if (!GAMEPLAY.bankQueue) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
-  for (const c of [G.bankQueue, G.bankAtm]) {
+  for (const c of [G.bankQueue, G.bankAtm, G.bankQueueB]) {
     if (!c) continue;
     c.t = (c.t || 0) + dt;
     const hours = c.hours || [9, 16];
@@ -1973,6 +1973,8 @@ export function updateBankQueue(dt) {
       ped.state = 'idle';
       const parts = ped.mesh.userData && ped.mesh.userData.parts;
       if (i === 0 && parts && parts.armR) parts.armR.rotation.x = -0.85 + Math.sin(c.t * 3.1) * 0.12;
+      const phone = ped.mesh.getObjectByName('bank-queue-phone');
+      if (phone && phone.material) phone.material.emissiveIntensity = 0.28 + Math.sin(c.t * 3.4) * 0.18;
     }
   }
   for (const teller of [G.bankTeller, G.bankTellerB]) {
