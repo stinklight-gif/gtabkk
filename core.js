@@ -337,6 +337,7 @@ export const GAMEPLAY = {
   watAmulet: true,        // amulet board at the wat; E buys one, shrine offering cools extra
   yaoFortune: true,       // fortune teller on Yaowarat after dark; E for a reading that cools last-seen
   watDrum: true,          // temple drum opposite the bell; E beats it and cools last-seen
+  mallGuard: true,        // plastic-chair security at the Terminal 21 entrance; torch after dark
 };
 G.gameplay = GAMEPLAY;
 
