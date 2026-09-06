@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -3210,6 +3210,38 @@ async function main() {
     });
     assert(busk.flag && busk.guitar && busk.hat && busk.near, 'a busker waits at Asok BTS');
     assert(busk.day && busk.eve && busk.strummed && busk.paid, 'they play evenings and E tips ฿20');
+
+    console.log('\n[96] saffron robes at the wat');
+    const robes = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.watRobes;
+      const named = !!(c && c.mesh && c.mesh.name === 'wat-robes');
+      const n = c && c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'saffron-robe').length : 0;
+      const temple = G.world && G.world.poi && G.world.poi.temple;
+      const nearWat = !!(c && temple && Math.hypot(c.x - temple.x, c.z - temple.z) < 16);
+      G.time.weather = 'clear';
+      G.time.rainStrength = 0;
+      if (c) c.t = 0.2;
+      main.updateWatRobes(0.05);
+      const dry = !!(c && c.mesh && c.mesh.visible);
+      const r0 = c && c.mesh && c.mesh.children.find(ch => ch && ch.name === 'saffron-robe');
+      const z0 = r0 ? r0.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 3.4;
+      main.updateWatRobes(0.05);
+      const fluttered = !!(r0 && Math.abs(r0.rotation.z - z0) > 0.04);
+      G.time.rainStrength = 0.85;
+      main.updateWatRobes(0.05);
+      const packed = !!(c && c.mesh && c.mesh.visible === false);
+      G.time.rainStrength = 0;
+      main.updateWatRobes(0.05);
+      const back = !!(c && c.mesh && c.mesh.visible);
+      return {
+        flag: !!(G.gameplay && G.gameplay.watRobes),
+        named, n, nearWat, dry, fluttered, packed, back,
+      };
+    });
+    assert(robes.flag && robes.named && robes.n >= 6 && robes.nearWat, `saffron robes hang at the wat (${robes.n})`);
+    assert(robes.dry && robes.fluttered && robes.packed && robes.back, 'they flutter in the sun and come in when it rains');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

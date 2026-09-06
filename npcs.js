@@ -2728,6 +2728,19 @@ export function updateWatSweep(dt) {
   }
 }
 
+export function updateWatRobes(dt) {
+  if (!GAMEPLAY.watRobes || !G.watRobes) return;
+  const c = G.watRobes;
+  c.t = (c.t || 0) + dt;
+  const wet = (G.time.rainStrength || 0) > 0.4;
+  if (c.mesh) c.mesh.visible = !wet;
+  if (wet || !c.mesh) return;
+  const robes = c.mesh.children.filter(ch => ch && ch.name === 'saffron-robe');
+  for (let i = 0; i < robes.length; i++) {
+    robes[i].rotation.z = Math.sin(c.t * 3.4 + i * 0.7) * 0.22;
+  }
+}
+
 export function updateWatBats(dt) {
   if (!GAMEPLAY.watBats || !G.watBats) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;

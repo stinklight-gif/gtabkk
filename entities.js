@@ -2733,6 +2733,42 @@ export function spawnWatBats(scene) {
   }
 }
 
+export function spawnWatRobes(scene) {
+  if (!GAMEPLAY.watRobes) return;
+  const temple = G.world && G.world.poi && G.world.poi.temple;
+  if (!temple) return;
+  const x = temple.x - 1.2, z = temple.z + 8.2;
+  const g = new THREE.Group();
+  g.name = 'wat-robes';
+  const wood = new THREE.MeshStandardMaterial({ color: 0x6a4a28, roughness: 0.85 });
+  const span = 6.4;
+  for (const sx of [-span / 2, span / 2]) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 2.6, 6), wood);
+    post.position.set(sx, 1.3, 0);
+    g.add(post);
+  }
+  const rope = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.015, 0.015, span, 4),
+    new THREE.MeshStandardMaterial({ color: 0xc8b090, roughness: 0.7 })
+  );
+  rope.position.y = 2.45;
+  rope.rotation.z = PI / 2;
+  g.add(rope);
+  const saffron = [0xe07020, 0xd45a18, 0xc44a10, 0xe88830, 0xb83a0c, 0xdc6820];
+  for (let i = 0; i < 6; i++) {
+    const robe = new THREE.Mesh(
+      new THREE.BoxGeometry(0.32, 0.85, 0.05),
+      new THREE.MeshStandardMaterial({ color: saffron[i], roughness: 0.88, side: THREE.DoubleSide })
+    );
+    robe.name = 'saffron-robe';
+    robe.position.set(-span * 0.38 + i * 0.85, 1.95, 0);
+    g.add(robe);
+  }
+  g.position.set(x, 0, z);
+  scene.add(g);
+  G.watRobes = { mesh: g, x, z, t: 0 };
+}
+
 export function makeChaYenMesh() {
   const g = new THREE.Group();
   g.name = 'chayen-cart';
