@@ -1386,8 +1386,12 @@ async function main() {
       const n = list.filter(c => c && c.mesh && c.mesh.name === 'ice-cart').length;
       const vendor = list.filter(c => c && c.vendor && c.vendor.iceCart).length;
       const c0 = list[0];
-      const start = c0 && c0.mesh ? { x: c0.mesh.position.x, z: c0.mesh.position.z } : null;
       if (c0) { c0.t = 0.15; c0.dir = 1; }
+      G.player.inVehicle = null;
+      G._eating = null;
+      if (c0 && c0.mesh) G.player.group.position.set(c0.mesh.position.x + 40, 0, c0.mesh.position.z + 40);
+      main.updateIceCarts(0.05);
+      const start = c0 && c0.mesh ? { x: c0.mesh.position.x, z: c0.mesh.position.z } : null;
       for (let i = 0; i < 40; i++) main.updateIceCarts(0.25);
       const moved = !!(c0 && start && Math.hypot(c0.mesh.position.x - start.x, c0.mesh.position.z - start.z) > 0.4);
       const onSoi = !!(c0 && c0.soi);
@@ -1589,8 +1593,12 @@ async function main() {
       const list = G.coconutCarts || [];
       const n = list.filter(c => c && c.mesh && c.mesh.name === 'coconut-cart').length;
       const c0 = list[0];
-      const start = c0 && c0.mesh ? { x: c0.mesh.position.x, z: c0.mesh.position.z } : null;
       if (c0) { c0.t = 0.12; c0.dir = 1; }
+      G.player.inVehicle = null;
+      G._eating = null;
+      if (c0 && c0.mesh) G.player.group.position.set(c0.mesh.position.x + 40, 0, c0.mesh.position.z + 40);
+      main.updateCoconutCarts(0.05);
+      const start = c0 && c0.mesh ? { x: c0.mesh.position.x, z: c0.mesh.position.z } : null;
       for (let i = 0; i < 50; i++) main.updateCoconutCarts(0.3);
       const moved = !!(c0 && start && Math.hypot(c0.mesh.position.x - start.x, c0.mesh.position.z - start.z) > 0.4);
       G.player.inVehicle = null;
@@ -1745,28 +1753,36 @@ async function main() {
       const list = G.mooPing || [];
       const n = list.filter(c => c && c.mesh && c.mesh.name === 'mooping-cart').length;
       const c0 = list[0];
-      const start = c0 && c0.mesh ? { x: c0.mesh.position.x, z: c0.mesh.position.z } : null;
       if (c0) { c0.t = 0.12; c0.dir = 1; }
+      G.player.inVehicle = null;
+      G._eating = null;
+      if (c0 && c0.mesh) G.player.group.position.set(c0.mesh.position.x + 40, 0, c0.mesh.position.z + 40);
+      main.updateMooPing(0.05);
+      const start = c0 && c0.mesh ? { x: c0.mesh.position.x, z: c0.mesh.position.z } : null;
       for (let i = 0; i < 50; i++) main.updateMooPing(0.3);
       const moved = !!(c0 && start && Math.hypot(c0.mesh.position.x - start.x, c0.mesh.position.z - start.z) > 0.4);
       const coals = !!(c0 && c0.mesh && c0.mesh.getObjectByName('mooping-coals'));
       G.time.dayT = 18.5 / 24;
       main.updateMooPing(0.05);
       const duskGlow = !!(c0 && c0.coalMat && c0.coalMat.emissiveIntensity > 0.9);
-      G.player.inVehicle = null;
-      G._eating = null;
       G.player.group.visible = true;
       G.cash = 90;
       G.player.hp = 40;
       if (c0 && c0.mesh) G.player.group.position.copy(c0.mesh.position);
-      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
-      main.updateMooPing(0.016);
       window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
       if (G.input && G.input.endFrame) G.input.endFrame();
+      let paid = false;
+      for (let i = 0; i < 4 && !paid; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateMooPing(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        paid = G.cash === 55 && G.player.hp > 40;
+      }
       return {
         flag: !!(G.gameplay && G.gameplay.mooPing),
         n, moved, onSoi: !!(c0 && c0.soi), coals, duskGlow,
-        paid: G.cash === 55, healed: G.player.hp > 40,
+        paid, healed: G.player.hp > 40,
       };
     });
     assert(grill.flag && grill.n >= 1 && grill.onSoi && grill.coals, `a moo ping cart works a soi (${grill.n})`);
