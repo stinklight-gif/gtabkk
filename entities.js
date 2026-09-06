@@ -3130,20 +3130,25 @@ function makePigeonMesh() {
 export function spawnBtsPigeons(scene) {
   if (!GAMEPLAY.btsPigeons) return;
   const bts = G.world && G.world.bts;
-  if (!bts) return;
-  const sx = bts.x, py = (bts.platformY || 13.9) + 0.12;
+  const py = (bts && bts.platformY) || 13.9;
+  const stations = [
+    { sx: bts ? bts.x : -50, py: py + 0.12, n: 8, z0: -7.2, dz: 2.4, stop: 'asok' },
+    { sx: 100, py: py + 0.12, n: 6, z0: -4.2, dz: 3.2, stop: 'phrom' },
+  ];
   G.btsPigeons = [];
-  for (let i = 0; i < 8; i++) {
-    const side = i < 4 ? -1 : 1;
-    const k = i % 4;
-    const home = { x: sx + side * 3.35, y: py, z: -7.2 + k * 2.4 };
-    const mesh = makePigeonMesh();
-    mesh.position.set(home.x, home.y, home.z);
-    mesh.visible = false;
-    scene.add(mesh);
-    G.btsPigeons.push({
-      mesh, home, t: i * 0.4, state: 'loaf', heading: side > 0 ? -PI / 2 : PI / 2,
-    });
+  for (const st of stations) {
+    for (let i = 0; i < st.n; i++) {
+      const side = i < st.n / 2 ? -1 : 1;
+      const k = i % (st.n / 2);
+      const home = { x: st.sx + side * 3.35, y: st.py, z: st.z0 + k * st.dz };
+      const mesh = makePigeonMesh();
+      mesh.position.set(home.x, home.y, home.z);
+      mesh.visible = false;
+      scene.add(mesh);
+      G.btsPigeons.push({
+        mesh, home, t: i * 0.4, state: 'loaf', heading: side > 0 ? -PI / 2 : PI / 2, stop: st.stop,
+      });
+    }
   }
 }
 

@@ -3246,7 +3246,7 @@ async function main() {
     console.log('\n[97] pigeons on the Asok platform');
     const birds = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
-      const list = G.btsPigeons || [];
+      const list = (G.btsPigeons || []).filter(p => p && (p.stop === 'asok' || !p.stop));
       const n = list.filter(p => p && p.mesh && p.mesh.name === 'bts-pigeon').length;
       const wings = list.filter(p => p && p.mesh && p.mesh.children.filter(ch => ch && ch.name === 'pigeon-wing').length >= 2).length;
       const bts = G.world && G.world.bts;
@@ -3831,6 +3831,38 @@ async function main() {
     });
     assert(fortune.flag && fortune.named && fortune.n >= 4 && fortune.lamp && fortune.near, `a fortune teller waits on Yaowarat (${fortune.n})`);
     assert(fortune.day && fortune.night && fortune.glow && fortune.flipped && fortune.paid && fortune.cooled, 'the cards turn after dark and E buys a ฿60 reading');
+
+    console.log('\n[110] pigeons on the Phrom Phong platform');
+    const phromBirds = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = (G.btsPigeons || []).filter(p => p && p.stop === 'phrom');
+      const n = list.filter(p => p && p.mesh && p.mesh.name === 'bts-pigeon').length;
+      const wings = list.filter(p => p && p.mesh && p.mesh.children.filter(ch => ch && ch.name === 'pigeon-wing').length >= 2).length;
+      const near = list.filter(p => p && p.home && Math.hypot(p.home.x - 100, p.home.z) < 20 && p.home.y > 10).length;
+      G.time.dayT = 21.2 / 24;
+      main.updateBtsPigeons(0.05);
+      const night = list.filter(p => p && p.mesh && p.mesh.visible === false).length;
+      G.time.dayT = 12 / 24;
+      const p0 = list[0];
+      if (p0) { p0.t = 0.2; p0.state = 'loaf'; if (p0.home) p0.mesh.position.set(p0.home.x, p0.home.y, p0.home.z); }
+      G.player.group.position.set(0, 0, 80);
+      main.updateBtsPigeons(0.05);
+      const day = list.filter(p => p && p.mesh && p.mesh.visible).length;
+      const yHome = p0 && p0.home ? p0.home.y : 0;
+      if (p0 && p0.home) {
+        G.player.group.position.set(p0.home.x, p0.home.y, p0.home.z);
+        p0.state = 'loaf';
+        p0.mesh.position.set(p0.home.x, p0.home.y, p0.home.z);
+      }
+      for (let i = 0; i < 20; i++) main.updateBtsPigeons(0.08);
+      const scattered = !!(p0 && p0.mesh && p0.mesh.position.y > yHome + 0.8);
+      return {
+        flag: !!(G.gameplay && G.gameplay.btsPigeons),
+        n, wings, near, night, day, scattered,
+      };
+    });
+    assert(phromBirds.flag && phromBirds.n >= 6 && phromBirds.wings >= 6 && phromBirds.near >= 6, `pigeons loaf the Phrom Phong platform (${phromBirds.n})`);
+    assert(phromBirds.night >= 6 && phromBirds.day >= 6 && phromBirds.scattered, 'they hide at night and scatter when you walk up');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
