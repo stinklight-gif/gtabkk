@@ -324,6 +324,7 @@ export const GAMEPLAY = {
   btsBusker: true,        // guitar busker at the Asok BTS exit; E tips ฿20
   watRobes: true,         // saffron robes dry on a line in the wat courtyard
   btsPigeons: true,       // pigeons loaf the Asok platform by day and scatter
+  watLotus: true,         // lotus stall at the wat; E buys a bloom, shrine offering cools extra
 };
 G.gameplay = GAMEPLAY;
 

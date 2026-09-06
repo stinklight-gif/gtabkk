@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.sevenAtm || ped.btsBusker || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -2808,6 +2808,53 @@ export function spawnWatRobes(scene) {
   g.position.set(x, 0, z);
   scene.add(g);
   G.watRobes = { mesh: g, x, z, t: 0 };
+}
+
+export function spawnWatLotus(scene) {
+  if (!GAMEPLAY.watLotus) return;
+  const temple = G.world && G.world.poi && G.world.poi.temple;
+  if (!temple) return;
+  const x = temple.x + 8.4, z = temple.z + 2.2;
+  const g = new THREE.Group();
+  g.name = 'wat-lotus-stand';
+  const tub = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.42, 0.38, 0.32, 10),
+    new THREE.MeshStandardMaterial({ color: 0x4a3a28, roughness: 0.8 })
+  );
+  tub.position.y = 0.22;
+  g.add(tub);
+  const water = new THREE.Mesh(
+    new THREE.CircleGeometry(0.36, 10),
+    new THREE.MeshStandardMaterial({ color: 0x3a6a88, roughness: 0.25, metalness: 0.15, transparent: true, opacity: 0.7 })
+  );
+  water.rotation.x = -PI / 2;
+  water.position.y = 0.36;
+  g.add(water);
+  const petal = new THREE.MeshStandardMaterial({ color: 0xe878a0, roughness: 0.55 });
+  const pad = new THREE.MeshStandardMaterial({ color: 0x2a7a38, roughness: 0.8 });
+  for (let i = 0; i < 5; i++) {
+    const bloom = new THREE.Group();
+    bloom.name = 'wat-lotus';
+    const leaf = new THREE.Mesh(new THREE.CircleGeometry(0.1, 8), pad);
+    leaf.rotation.x = -PI / 2;
+    bloom.add(leaf);
+    const flower = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.12, 7), petal);
+    flower.position.y = 0.08;
+    bloom.add(flower);
+    const a = (i / 5) * TAU;
+    bloom.position.set(Math.sin(a) * 0.18, 0.38, Math.cos(a) * 0.18);
+    g.add(bloom);
+  }
+  g.position.set(x, 0, z);
+  scene.add(g);
+  const vendor = spawnPed(scene, new THREE.Vector3(x + 0.7, 0, z + 0.15), 'vendor');
+  vendor.watLotus = true;
+  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI };
+  vendor.speed = 0;
+  vendor.state = 'idle';
+  vendor.heading = PI;
+  if (vendor.mesh) vendor.mesh.rotation.y = PI;
+  G.watLotus = { mesh: g, vendor, x, z, t: 0 };
 }
 
 export function makeChaYenMesh() {

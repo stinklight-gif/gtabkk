@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes','btsPigeons']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes','btsPigeons','watLotus']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -462,7 +462,7 @@ async function main() {
     const peds = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
       const ways = (G.world.walkways || []).length;
-      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart && !p.songthaewRide && !p.watSweep && !p.yaoGold && !p.sevenAtm && !p.btsBusker);
+      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart && !p.songthaewRide && !p.watSweep && !p.yaoGold && !p.sevenAtm && !p.btsBusker && !p.watLotus);
       const b = G.world.buildings.find(x => x.size.y > 8 && x.size.x > 4 && x.size.z > 4) || G.world.buildings[0];
       const insideBefore = wanderer && b && Math.abs(wanderer.mesh.position.x - b.pos.x) < b.size.x / 2 && Math.abs(wanderer.mesh.position.z - b.pos.z) < b.size.z / 2;
       if (wanderer && b) {
@@ -3280,6 +3280,69 @@ async function main() {
     });
     assert(birds.flag && birds.n >= 6 && birds.wings >= 6 && birds.near >= 6, `pigeons loaf the Asok platform (${birds.n})`);
     assert(birds.night >= 6 && birds.day >= 6 && birds.flapped && birds.scattered, 'they hide at night and scatter when you walk up');
+
+    console.log('\n[98] lotus stall at the wat');
+    const lotus = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.watLotus;
+      const named = !!(c && c.mesh && c.mesh.name === 'wat-lotus-stand');
+      const blooms = c && c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'wat-lotus').length : 0;
+      const temple = G.world && G.world.poi && G.world.poi.temple;
+      const nearWat = !!(c && temple && Math.hypot(c.x - temple.x, c.z - temple.z) < 16);
+      G.time.dayT = 21.2 / 24;
+      main.updateWatLotus(0.05);
+      const night = !!(c && c.vendor && c.vendor.mesh && c.vendor.mesh.visible === false);
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updateWatLotus(0.05);
+      const day = !!(c && c.vendor && c.vendor.watLotus && c.vendor.mesh && c.vendor.mesh.visible);
+      const b0 = c && c.mesh && c.mesh.children.find(ch => ch && ch.name === 'wat-lotus');
+      const y0 = b0 ? b0.position.y : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateWatLotus(0.05);
+      const bobbed = !!(b0 && Math.abs(b0.position.y - y0) > 0.01);
+      G.player.inVehicle = null;
+      G._eating = null;
+      G._lotus = false;
+      G._lotusOffered = 0;
+      if (c && c.mesh) G.player.group.position.copy(c.mesh.position);
+      G.cash = 80;
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let paid = false;
+      for (let i = 0; i < 4 && !paid; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateWatLotus(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        paid = G.cash === 50 && G._lotus === true;
+      }
+      const s = (G.world.shrines || [])[0];
+      let offered = false, cooled = false;
+      if (s && s.pos) {
+        G.player.group.position.set(s.pos.x, 0, s.pos.z);
+        G.wanted.stars = 2;
+        G.wanted.lastSeenAt = performance.now() + 30000;
+        s.readyAt = 1;
+        const seen0 = G.wanted.lastSeenAt;
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        for (let i = 0; i < 4 && !offered; i++) {
+          window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+          main.updateShrines(0.016);
+          window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+          if (G.input && G.input.endFrame) G.input.endFrame();
+          offered = (G._lotusOffered || 0) >= 1 && G._lotus === false;
+        }
+        cooled = G.wanted.lastSeenAt < seen0 - 18000;
+      }
+      return {
+        flag: !!(G.gameplay && G.gameplay.watLotus),
+        named, blooms, nearWat, night, day, bobbed, paid, offered, cooled,
+      };
+    });
+    assert(lotus.flag && lotus.named && lotus.blooms >= 5 && lotus.nearWat, `a lotus stall waits at the wat (${lotus.blooms})`);
+    assert(lotus.night && lotus.day && lotus.bobbed && lotus.paid && lotus.offered && lotus.cooled, 'E buys a lotus; the shrine takes it for extra heat cool');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
