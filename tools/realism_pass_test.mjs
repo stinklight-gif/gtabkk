@@ -7538,6 +7538,46 @@ async function main() {
     });
     assert(northPorters.flag && northPorters.n >= 2 && northPorters.bags >= 2 && northPorters.near && northPorters.other, `porters wait north of the Hua Lamphong canopy (${northPorters.n})`);
     assert(northPorters.night >= 2 && northPorters.day >= 2 && northPorters.shifted && northPorters.swung, 'they hide after 22:00 and the bags swing');
+
+    console.log('\n[212] west Klong Toey dockhands');
+    const westDock = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.klongDockB;
+      const list = (c && c.hands) || [];
+      const n = list.filter(p => p && p.klongDock && p.mesh).length;
+      const crates = list.filter(p => p && p.mesh && p.mesh.getObjectByName('dock-crate')).length;
+      const first = G.klongDock;
+      const poi = G.world && G.world.poi && G.world.poi.klongToey;
+      const near = !!(c && poi && Math.hypot(c.x - poi.x, c.z - poi.z) < 8);
+      const s0 = list[0] && list[0].anchor && list[0].anchor.slot;
+      const f0 = first && first.hands && first.hands[0] && first.hands[0].anchor && first.hands[0].anchor.slot;
+      const other = !!(s0 && f0 && Math.hypot(s0.x - f0.x, s0.z - f0.z) > 2);
+      G.time.dayT = 21 / 24;
+      main.updateKlongDock(0.05);
+      const night = list.filter(p => p && p.mesh && p.mesh.visible === false).length;
+      G.time.dayT = 12.5 / 24;
+      if (c) c.t = 0.2;
+      main.updateKlongDock(0.05);
+      const day = list.filter(p => p && p.klongDock && p.mesh && p.mesh.visible).length;
+      const p0 = list[0];
+      const x0 = p0 && p0.mesh ? p0.mesh.position.x : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateKlongDock(0.05);
+      const shifted = !!(p0 && p0.mesh && Math.abs(p0.mesh.position.x - x0) > 0.02);
+      const crate = p0 && p0.mesh && p0.mesh.getObjectByName('dock-crate');
+      if (c) c.t = 0.2;
+      main.updateKlongDock(0.05);
+      const r0 = crate ? crate.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 3.4;
+      main.updateKlongDock(0.05);
+      const swung = !!(crate && Math.abs(crate.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.klongDock),
+        n, crates, near, other, night, day, shifted, swung,
+      };
+    });
+    assert(westDock.flag && westDock.n >= 2 && westDock.crates >= 2 && westDock.near && westDock.other, `dockhands wait west of the Klong Toey yard (${westDock.n})`);
+    assert(westDock.night >= 2 && westDock.day >= 2 && westDock.shifted && westDock.swung, 'they hide after 19:00 and the crates tilt');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

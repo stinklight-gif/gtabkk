@@ -2234,32 +2234,34 @@ export function updateGarageMech(dt) {
 }
 
 export function updateKlongDock(dt) {
-  if (!GAMEPLAY.klongDock || !G.klongDock) return;
-  const c = G.klongDock;
-  c.t = (c.t || 0) + dt;
+  if (!GAMEPLAY.klongDock) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const open = h >= 6 && h < 19;
-  for (let i = 0; i < (c.hands || []).length; i++) {
-    const ped = c.hands[i];
-    if (!ped || ped.dead || !ped.mesh) continue;
-    ped.klongDock = true;
-    ped.mesh.visible = open;
-    if (!open) {
+  for (const c of [G.klongDock, G.klongDockB]) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    for (let i = 0; i < (c.hands || []).length; i++) {
+      const ped = c.hands[i];
+      if (!ped || ped.dead || !ped.mesh) continue;
+      ped.klongDock = true;
+      ped.mesh.visible = open;
+      if (!open) {
+        ped.speed = 0;
+        ped.state = 'idle';
+        continue;
+      }
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        const bob = Math.sin(c.t * 2.2 + i) * 0.05;
+        ped.mesh.position.set(slot.x + (i === 0 ? bob : 0), 0, slot.z + (i === 1 ? bob : 0));
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
       ped.speed = 0;
       ped.state = 'idle';
-      continue;
+      const crate = ped.mesh.getObjectByName('dock-crate');
+      if (crate) crate.rotation.z = Math.sin(c.t * 3.4 + i) * 0.22;
     }
-    const slot = ped.anchor && ped.anchor.slot;
-    if (slot) {
-      const bob = Math.sin(c.t * 2.2 + i) * 0.05;
-      ped.mesh.position.set(slot.x + (i === 0 ? bob : 0), 0, slot.z + (i === 1 ? bob : 0));
-      ped.heading = ped.anchor.facing;
-      ped.mesh.rotation.y = ped.heading;
-    }
-    ped.speed = 0;
-    ped.state = 'idle';
-    const crate = ped.mesh.getObjectByName('dock-crate');
-    if (crate) crate.rotation.z = Math.sin(c.t * 3.4 + i) * 0.22;
   }
   for (const check of [G.klongCheck, G.klongCheckB]) {
     if (!check) continue;

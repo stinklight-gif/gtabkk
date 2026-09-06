@@ -3238,40 +3238,46 @@ export function spawnKlongDock(scene) {
   if (!GAMEPLAY.klongDock) return;
   const poi = G.world && G.world.poi && G.world.poi.klongToey;
   if (!poi) return;
-  const hands = [];
-  const slots = [
+  const packHands = (slots) => {
+    const hands = [];
+    for (let i = 0; i < slots.length; i++) {
+      const slot = slots[i];
+      const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
+      recolorTorso(ped.mesh.userData.parts, 0xe8b020, 0.7);
+      ped.klongDock = true;
+      ped.speed = 0;
+      ped.state = 'idle';
+      ped.heading = slot.facing;
+      ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
+      if (ped.mesh) {
+        ped.mesh.rotation.y = slot.facing;
+        ped.mesh.visible = false;
+      }
+      const crate = new THREE.Mesh(
+        new THREE.BoxGeometry(0.22, 0.16, 0.18),
+        new THREE.MeshStandardMaterial({ color: i === 0 ? 0xb45a2a : 0x3a6a8a, roughness: 0.7, metalness: 0.2 })
+      );
+      crate.name = 'dock-crate';
+      const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+      if (parts && parts.foreR) {
+        crate.position.set(0.02, -0.22, 0.1);
+        parts.foreR.add(crate);
+      } else if (ped.mesh) {
+        crate.position.set(0.22, 1.05, 0.12);
+        ped.mesh.add(crate);
+      }
+      hands.push(ped);
+    }
+    return { hands, x: poi.x, z: poi.z, t: 0 };
+  };
+  G.klongDock = packHands([
     { x: poi.x - 4.2, z: poi.z - 3.1, facing: PI, kind: 'laborer' },
     { x: poi.x + 5.1, z: poi.z - 2.6, facing: -PI / 2, kind: 'laborer' },
-  ];
-  for (let i = 0; i < slots.length; i++) {
-    const slot = slots[i];
-    const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
-    recolorTorso(ped.mesh.userData.parts, 0xe8b020, 0.7);
-    ped.klongDock = true;
-    ped.speed = 0;
-    ped.state = 'idle';
-    ped.heading = slot.facing;
-    ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
-    if (ped.mesh) {
-      ped.mesh.rotation.y = slot.facing;
-      ped.mesh.visible = false;
-    }
-    const crate = new THREE.Mesh(
-      new THREE.BoxGeometry(0.22, 0.16, 0.18),
-      new THREE.MeshStandardMaterial({ color: i === 0 ? 0xb45a2a : 0x3a6a8a, roughness: 0.7, metalness: 0.2 })
-    );
-    crate.name = 'dock-crate';
-    const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
-    if (parts && parts.foreR) {
-      crate.position.set(0.02, -0.22, 0.1);
-      parts.foreR.add(crate);
-    } else if (ped.mesh) {
-      crate.position.set(0.22, 1.05, 0.12);
-      ped.mesh.add(crate);
-    }
-    hands.push(ped);
-  }
-  G.klongDock = { hands, x: poi.x, z: poi.z, t: 0 };
+  ]);
+  G.klongDockB = packHands([
+    { x: poi.x - 7.4, z: poi.z - 3.1, facing: PI, kind: 'laborer' },
+    { x: poi.x - 7.4, z: poi.z + 3.4, facing: 0, kind: 'laborer' },
+  ]);
   const packCheck = (cx, cz, facing) => {
     const check = spawnPed(scene, new THREE.Vector3(cx, 0, cz), 'office');
     recolorTorso(check.mesh.userData.parts, 0x2a4a6a, 0.7);
