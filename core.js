@@ -316,6 +316,7 @@ export const GAMEPLAY = {
   watBats: true,          // flying foxes circle the wat after dusk
   yaoPhotos: true,        // tourists stop to snap Yaowarat after 18:00
   kanomKrok: true,        // coconut pancake pan outside 7-Eleven; afternoon, E for a bag
+  squidGrill: true,       // grilled-squid cart on Yaowarat after dark; E for a stick
 };
 G.gameplay = GAMEPLAY;
 

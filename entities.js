@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.squid || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -1624,6 +1624,74 @@ export function spawnKanomKrok(scene) {
   vendor.heading = PI;
   if (vendor.mesh) vendor.mesh.rotation.y = PI;
   G.kanomKrok = { mesh, vendor, x, z, t: 0 };
+}
+
+export function makeSquidGrillMesh() {
+  const g = new THREE.Group();
+  g.name = 'squid-cart';
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.5, 1.25), new THREE.MeshStandardMaterial({ color: 0x4a2a18, roughness: 0.82 }));
+  box.position.y = 0.48; g.add(box);
+  const coalMat = new THREE.MeshStandardMaterial({ color: 0x1a1210, roughness: 0.7, emissive: 0xff5510, emissiveIntensity: 0.4 });
+  const coals = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.08, 0.85), coalMat);
+  coals.name = 'squid-coals';
+  coals.position.y = 0.78; g.add(coals);
+  g.userData.coalMat = coalMat;
+  const grate = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.02, 0.88), new THREE.MeshStandardMaterial({ color: 0x3a3a40, metalness: 0.45, roughness: 0.4 }));
+  grate.position.y = 0.84; g.add(grate);
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xd8c8b0, roughness: 0.6 });
+  for (let i = 0; i < 4; i++) {
+    const sk = new THREE.Group();
+    sk.name = 'squid-stick';
+    const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.7, 4), new THREE.MeshStandardMaterial({ color: 0xc8a070, roughness: 0.7 }));
+    stick.rotation.x = PI / 2;
+    sk.add(stick);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.05, 0.22), bodyMat);
+    body.position.z = 0.08;
+    sk.add(body);
+    const tent = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.03, 0.08), bodyMat);
+    tent.position.z = -0.12;
+    sk.add(tent);
+    sk.position.set((i - 1.5) * 0.16, 0.92, 0);
+    g.add(sk);
+  }
+  const umb = new THREE.Mesh(
+    new THREE.ConeGeometry(0.7, 0.26, 8),
+    new THREE.MeshStandardMaterial({ color: 0xc03030, roughness: 0.7, side: THREE.DoubleSide })
+  );
+  umb.position.y = 1.9; umb.rotation.x = PI; g.add(umb);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.05, 5), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+  pole.position.y = 1.38; g.add(pole);
+  const puff = new THREE.Mesh(
+    new THREE.SphereGeometry(0.2, 6, 5),
+    new THREE.MeshBasicMaterial({ color: 0x887766, transparent: true, opacity: 0.2, depthWrite: false })
+  );
+  puff.name = 'squid-smoke';
+  puff.position.set(0, 1.12, 0);
+  g.add(puff);
+  const tire = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+  for (const z of [-0.42, 0.42]) for (const x of [-0.34, 0.34]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 8), tire);
+    w.rotation.z = PI / 2; w.position.set(x, 0.12, z); g.add(w);
+  }
+  return g;
+}
+
+export function spawnSquidGrill(scene) {
+  if (!GAMEPLAY.squidGrill) return;
+  const poi = G.world && G.world.poi && G.world.poi.yaowarat;
+  if (!poi) return;
+  const x = poi.x + 3.2, z = poi.z + 22;
+  const mesh = makeSquidGrillMesh();
+  mesh.position.set(x, 0, z);
+  scene.add(mesh);
+  const vendor = spawnPed(scene, new THREE.Vector3(x + 0.7, 0, z), 'vendor');
+  vendor.squid = true;
+  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI };
+  vendor.speed = 0;
+  vendor.state = 'idle';
+  vendor.heading = PI;
+  if (vendor.mesh) vendor.mesh.rotation.y = PI;
+  G.squidGrill = { mesh, vendor, x, z, t: 0, coalMat: mesh.userData.coalMat };
 }
 
 export function makeCoconutCartMesh() {

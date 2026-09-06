@@ -242,6 +242,11 @@ export function bindHud() {
       out.push({ name: 'Mango sticky rice', status: open ? 'ข้าวเหนียวมะม่วง · ฿60' : 'opens 16:00', dist: d(G.mangoSticky.mesh.position) });
     }
     if (poi.yaowarat) out.push({ name: 'Yaowarat', status: 'night market', dist: d(poi.yaowarat) });
+    if (G.squidGrill && G.squidGrill.mesh) {
+      const hh = ((G.time.dayT % 1) + 1) % 1 * 24;
+      const night = hh >= 18 || hh < 2;
+      out.push({ name: 'Grilled squid', status: night ? 'ปลาหมึกย่าง · ฿50' : 'after 18:00', dist: d(G.squidGrill.mesh.position) });
+    }
     if (poi.cowboy || (G.soiCowboy && G.soiCowboy.origin)) {
       const loc = poi.cowboy || G.soiCowboy.origin;
       const hh = ((G.time.dayT % 1) + 1) % 1 * 24;

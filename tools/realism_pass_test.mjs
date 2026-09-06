@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -2991,6 +2991,57 @@ async function main() {
     assert(krok.flag && krok.named && krok.pan && krok.cakes >= 6 && krok.nearSeven, 'a kanom krok pan waits outside 7-Eleven');
     assert(krok.dayVendor && krok.eveVendor && krok.scooped, 'the vendor works afternoons and the ladle scoops');
     assert(krok.paid && krok.hp > 40 && krok.stam > 10, 'E buys kanom krok for ฿25');
+
+    console.log('\n[90] grilled squid on Yaowarat');
+    const squid = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.squidGrill;
+      const named = !!(c && c.mesh && c.mesh.name === 'squid-cart');
+      const coals = !!(c && c.mesh && c.mesh.getObjectByName('squid-coals'));
+      const sticks = c && c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'squid-stick').length : 0;
+      const poi = G.world && G.world.poi && G.world.poi.yaowarat;
+      const nearYao = !!(c && poi && Math.hypot(c.x - poi.x, c.z - poi.z) < 40);
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updateSquidGrill(0.05);
+      const dayGlow = c && c.coalMat ? c.coalMat.emissiveIntensity : 9;
+      const dayVendor = !!(c && c.vendor && c.vendor.mesh && c.vendor.mesh.visible === false);
+      const smokeDay = !!(c && c.mesh && c.mesh.getObjectByName('squid-smoke') && c.mesh.getObjectByName('squid-smoke').visible === false);
+      G.time.dayT = 21.2 / 24;
+      if (c) c.t = Math.PI / 18;
+      main.updateSquidGrill(0.05);
+      const nightGlow = c && c.coalMat ? c.coalMat.emissiveIntensity : 0;
+      const nightVendor = !!(c && c.vendor && c.vendor.squid && c.vendor.mesh && c.vendor.mesh.visible);
+      const z0 = c && c.mesh && c.mesh.children.find(ch => ch && ch.name === 'squid-stick');
+      const r0 = z0 ? z0.rotation.z : 0;
+      if (c) c.t = 0.6;
+      main.updateSquidGrill(0.05);
+      const turned = !!(z0 && Math.abs(z0.rotation.z - r0) > 0.01);
+      G.player.inVehicle = null;
+      G._eating = null;
+      if (c && c.mesh) G.player.group.position.copy(c.mesh.position);
+      G.cash = 100;
+      G.player.hp = 40;
+      G._squidGrill = 0;
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let paid = false;
+      for (let i = 0; i < 4 && !paid; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateSquidGrill(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        paid = G.cash === 50 && (G._squidGrill || 0) >= 1;
+      }
+      return {
+        flag: !!(G.gameplay && G.gameplay.squidGrill),
+        named, coals, sticks, nearYao, dayGlow, nightGlow, dayVendor, nightVendor, smokeDay, turned, paid,
+        hp: G.player.hp,
+      };
+    });
+    assert(squid.flag && squid.named && squid.coals && squid.sticks >= 4 && squid.nearYao, 'a squid grill waits on Yaowarat');
+    assert(squid.dayVendor && squid.nightVendor && squid.dayGlow < squid.nightGlow && squid.smokeDay && squid.turned, 'coals and vendor only work after dark');
+    assert(squid.paid && squid.hp > 40, 'E buys grilled squid for ฿50');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
