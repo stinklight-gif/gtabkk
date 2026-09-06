@@ -268,7 +268,7 @@ export const GAMEPLAY = {
   crossingGuard: true,    // yellow-vest stop-paddle at Asok during the school walk
   btsMotosai: true,       // extra orange-vest stands at the Asok and Phrom Phong BTS mouths
   rainPack: true,         // food stalls pack tarps and queues when the rain hits
-  btsSongthaew: true,     // parked songthaew + hawker at the Asok BTS exit
+  btsSongthaew: true,     // parked songthaew + hawker at the Asok and Phrom Phong BTS exits
   iceCart: true,          // vendor ice carts patrol the sois and ding
   btsTuktuk: true,        // parked tuk-tuk + driver at the Asok and Phrom Phong BTS exits
   khlongMonitor: true,    // water monitors loaf on the river bank and bolt

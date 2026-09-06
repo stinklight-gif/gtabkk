@@ -4258,50 +4258,56 @@ export function spawnBtsSongthaew(scene) {
   if (!GAMEPLAY.btsSongthaew) return;
   const bts = G.world && G.world.bts;
   if (!bts) return;
-  const x = bts.x + 11.5, z = -22, heading = PI / 2;
-  const v = makeVehicle('songthaew', scene);
-  v.pos.set(x, 0, z);
-  v.heading = heading;
-  v.mesh.position.copy(v.pos);
-  v.mesh.rotation.y = heading;
-  v.driver = null;
-  v.vel = 0;
-  v.btsSongthaew = true;
-  v._standHome = { x, z, heading };
-  addHireSign(v, 0xffcf4a);
-  const waiter = spawnPed(scene, new THREE.Vector3(x + 2.4, 0, z + 0.4), 'laborer');
-  waiter.anchor = { slot: waiter.mesh.position.clone(), facing: heading + PI };
-  waiter.btsSongthaew = true;
-  waiter.speed = 0;
-  waiter.state = 'idle';
-  const riders = [];
-  if (GAMEPLAY.songthaewRiders) {
-    for (let i = 0; i < 3; i++) {
-      const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), i === 1 ? 'tourist' : 'local');
-      ped.songthaewRide = true;
-      ped.speed = 0;
-      ped.state = 'idle';
-      ped.heading = heading + PI;
-      if (ped.mesh) {
-        scene.remove(ped.mesh);
-        v.mesh.add(ped.mesh);
-        // sit the side benches under the canopy (standing y=1.08 clips the roof)
-        ped.mesh.position.set((i % 2 === 0 ? -0.42 : 0.42), 0.55, -0.25 - i * 0.52);
-        ped.mesh.rotation.set(0.08, PI, 0);
-        const parts = ped.mesh.userData && ped.mesh.userData.parts;
-        if (parts) {
-          if (parts.legL) parts.legL.rotation.x = 1.22;
-          if (parts.legR) parts.legR.rotation.x = 1.12;
-          if (parts.shinL) parts.shinL.rotation.x = -1.08;
-          if (parts.shinR) parts.shinR.rotation.x = -0.98;
-          if (parts.armL) parts.armL.rotation.x = -0.4;
-          if (parts.armR) parts.armR.rotation.x = -0.28;
+  const rank = (x, z, stop) => {
+    const heading = PI / 2;
+    const v = makeVehicle('songthaew', scene);
+    v.pos.set(x, 0, z);
+    v.heading = heading;
+    v.mesh.position.copy(v.pos);
+    v.mesh.rotation.y = heading;
+    v.driver = null;
+    v.vel = 0;
+    v.btsSongthaew = true;
+    v._standHome = { x, z, heading };
+    addHireSign(v, 0xffcf4a);
+    const waiter = spawnPed(scene, new THREE.Vector3(x + 2.4, 0, z + 0.4), 'laborer');
+    waiter.anchor = { slot: waiter.mesh.position.clone(), facing: heading + PI };
+    waiter.btsSongthaew = true;
+    waiter.speed = 0;
+    waiter.state = 'idle';
+    waiter.stop = stop;
+    const riders = [];
+    if (GAMEPLAY.songthaewRiders) {
+      for (let i = 0; i < 3; i++) {
+        const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), i === 1 ? 'tourist' : 'local');
+        ped.songthaewRide = true;
+        ped.stop = stop;
+        ped.speed = 0;
+        ped.state = 'idle';
+        ped.heading = heading + PI;
+        if (ped.mesh) {
+          scene.remove(ped.mesh);
+          v.mesh.add(ped.mesh);
+          // sit the side benches under the canopy (standing y=1.08 clips the roof)
+          ped.mesh.position.set((i % 2 === 0 ? -0.42 : 0.42), 0.55, -0.25 - i * 0.52);
+          ped.mesh.rotation.set(0.08, PI, 0);
+          const parts = ped.mesh.userData && ped.mesh.userData.parts;
+          if (parts) {
+            if (parts.legL) parts.legL.rotation.x = 1.22;
+            if (parts.legR) parts.legR.rotation.x = 1.12;
+            if (parts.shinL) parts.shinL.rotation.x = -1.08;
+            if (parts.shinR) parts.shinR.rotation.x = -0.98;
+            if (parts.armL) parts.armL.rotation.x = -0.4;
+            if (parts.armR) parts.armR.rotation.x = -0.28;
+          }
         }
+        riders.push(ped);
       }
-      riders.push(ped);
     }
-  }
-  G.world.btsSongthaew = { vehicle: v, waiter, riders, x, z };
+    return { vehicle: v, waiter, riders, x, z, stop };
+  };
+  G.world.btsSongthaew = rank(bts.x + 11.5, -22, 'asok');
+  G.world.phromSongthaew = rank(100 + 11.5, -22, 'phrom');
 }
 
 function makeWatBroom() {

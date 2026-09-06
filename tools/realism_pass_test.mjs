@@ -4155,6 +4155,43 @@ async function main() {
     });
     assert(phromTuk.flag && phromTuk.kind === 'tuktuk' && phromTuk.near, 'a tuk-tuk waits at Phrom Phong');
     assert(phromTuk.stand && phromTuk.waiter && phromTuk.sign, 'Phrom Phong tuk-tuk is pinned, hired, and has a driver waiting');
+
+    console.log('\n[121] Phrom Phong songthaew rank');
+    const phromSong = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      main.updateVehicles(0.016);
+      const rec = G.world && G.world.phromSongthaew;
+      const v = rec && rec.vehicle;
+      const kind = v && (v.kind || (v.spec && v.spec.kind));
+      const dist = (v && v.pos) ? Math.hypot(v.pos.x - 100, v.pos.z) : null;
+      const sign = !!(v && (v.hireSign || (v.mesh && v.mesh.getObjectByName('hire-sign'))));
+      const riders = (rec && rec.riders) || [];
+      const n = riders.filter(p => p && p.songthaewRide && p.mesh).length;
+      const seated = riders.filter(p => p && p.mesh && p.mesh.parent === (v && v.mesh)).length;
+      G.player.inVehicle = null;
+      if (v) v.driver = null;
+      if (rec) rec._dumped = false;
+      main.updateSongthaewRiders(0.05);
+      const parked = riders.filter(p => p && p.songthaewRide && p.mesh && p.mesh.parent === v.mesh).length;
+      if (v) v.driver = 'player';
+      main.updateSongthaewRiders(0.05);
+      const dumped = rec && rec._dumped === true;
+      const off = riders.filter(p => p && !p.songthaewRide && p.mesh && p.mesh.parent === G.scene).length;
+      const grounded = riders.filter(p => p && p.mesh && p.mesh.position.y < 0.2).length;
+      if (v) v.driver = null;
+      return {
+        flag: !!(G.gameplay && G.gameplay.btsSongthaew && G.gameplay.songthaewRiders),
+        rec: !!rec, kind,
+        stand: !!(v && v.btsSongthaew && v.driver !== 'player' && v._standHome),
+        near: dist != null && dist < 28,
+        waiter: !!(rec && rec.waiter && rec.waiter.btsSongthaew && rec.waiter.stop === 'phrom'),
+        sign, n, seated, parked, dumped, off, grounded,
+      };
+    });
+    assert(phromSong.flag && phromSong.kind === 'songthaew' && phromSong.near, 'a songthaew waits at Phrom Phong');
+    assert(phromSong.stand && phromSong.waiter && phromSong.sign, 'Phrom Phong songthaew is pinned, hired, and has a hawker waiting');
+    assert(phromSong.n >= 3 && phromSong.seated >= 3 && phromSong.parked >= 3, `passengers sit the Phrom Phong songthaew (${phromSong.n})`);
+    assert(phromSong.dumped && phromSong.off >= 3 && phromSong.grounded >= 3, 'they hop off onto the pavement when you take the ride');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

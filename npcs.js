@@ -2461,37 +2461,39 @@ export function updatePlaKat(dt) {
 
 export function updateSongthaewRiders(dt) {
   if (!GAMEPLAY.songthaewRiders) return;
-  const stand = G.world && G.world.btsSongthaew;
-  if (!stand || !stand.vehicle) return;
-  const v = stand.vehicle;
-  const riders = stand.riders || [];
-  if (v.driver === 'player') {
-    if (!stand._dumped) {
-      for (const ped of riders) {
-        if (!ped || ped.dead || !ped.mesh) continue;
-        const wp = ped.mesh.getWorldPosition(new THREE.Vector3());
-        if (ped.mesh.parent) ped.mesh.parent.remove(ped.mesh);
-        G.scene.add(ped.mesh);
-        // hop to the curb on the BTS side of the rank, not along the chassis
-        const side = 1.7;
-        ped.mesh.position.set(wp.x - Math.cos(v.heading) * side, 0, wp.z + Math.sin(v.heading) * side);
-        ped.mesh.rotation.set(0, v.heading + PI / 2, 0);
-        ped.songthaewRide = false;
-        ped.heading = v.heading + PI / 2;
-        ped.speed = 1.2;
-        ped.state = 'walking';
+  const stands = [G.world && G.world.btsSongthaew, G.world && G.world.phromSongthaew];
+  for (const stand of stands) {
+    if (!stand || !stand.vehicle) continue;
+    const v = stand.vehicle;
+    const riders = stand.riders || [];
+    if (v.driver === 'player') {
+      if (!stand._dumped) {
+        for (const ped of riders) {
+          if (!ped || ped.dead || !ped.mesh) continue;
+          const wp = ped.mesh.getWorldPosition(new THREE.Vector3());
+          if (ped.mesh.parent) ped.mesh.parent.remove(ped.mesh);
+          G.scene.add(ped.mesh);
+          // hop to the curb on the BTS side of the rank, not along the chassis
+          const side = 1.7;
+          ped.mesh.position.set(wp.x - Math.cos(v.heading) * side, 0, wp.z + Math.sin(v.heading) * side);
+          ped.mesh.rotation.set(0, v.heading + PI / 2, 0);
+          ped.songthaewRide = false;
+          ped.heading = v.heading + PI / 2;
+          ped.speed = 1.2;
+          ped.state = 'walking';
+        }
+        stand._dumped = true;
+        if (G.hud) G.hud.showNotif('Passengers hop off');
       }
-      stand._dumped = true;
-      if (G.hud) G.hud.showNotif('Passengers hop off');
+      continue;
     }
-    return;
-  }
-  if (stand._dumped) return;
-  for (const ped of riders) {
-    if (!ped || ped.dead || !ped.mesh) continue;
-    ped.songthaewRide = true;
-    ped.speed = 0;
-    ped.state = 'idle';
+    if (stand._dumped) continue;
+    for (const ped of riders) {
+      if (!ped || ped.dead || !ped.mesh) continue;
+      ped.songthaewRide = true;
+      ped.speed = 0;
+      ped.state = 'idle';
+    }
   }
 }
 
