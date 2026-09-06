@@ -4313,6 +4313,51 @@ async function main() {
     });
     assert(phromPaper.flag && phromPaper.named && phromPaper.stop === 'phrom' && phromPaper.n >= 6 && phromPaper.near, 'a newspaper rack waits at Phrom Phong');
     assert(phromPaper.night && phromPaper.day && phromPaper.fluttered && phromPaper.paid, 'the Phrom Phong vendor works mornings and E buys a paper for ฿15');
+
+    console.log('\n[124] BTS busker at Phrom Phong');
+    const phromBusk = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.phromBusker;
+      const ped = c && c.ped;
+      const guitar = !!(ped && ped.mesh && ped.mesh.getObjectByName('bts-guitar'));
+      const hat = !!(c && c.hat && c.hat.name === 'bts-busker-hat');
+      const dist = (c && c.x != null) ? Math.hypot(c.x - 100, c.z) : null;
+      G.time.dayT = 12 / 24;
+      main.updateBtsBusker(0.05);
+      const day = !!(ped && ped.mesh && ped.mesh.visible === false);
+      G.time.dayT = 17.5 / 24;
+      if (c) c.t = 0.2;
+      main.updateBtsBusker(0.05);
+      const eve = !!(ped && ped.btsBusker && ped.stop === 'phrom' && ped.mesh && ped.mesh.visible);
+      const g = ped && ped.mesh && ped.mesh.getObjectByName('bts-guitar');
+      const r0 = g ? g.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 10;
+      main.updateBtsBusker(0.05);
+      const strummed = !!(g && Math.abs(g.rotation.z - r0) > 0.04);
+      G.player.inVehicle = null;
+      G._eating = null;
+      if (c) G.player.group.position.set(c.x, 0, c.z);
+      G.cash = 100;
+      G._btsBusker = 0;
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let paid = false;
+      for (let i = 0; i < 4 && !paid; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateBtsBusker(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        paid = G.cash === 80 && (G._btsBusker || 0) >= 1;
+      }
+      return {
+        flag: !!(G.gameplay && G.gameplay.btsBusker),
+        guitar, hat, stop: c && c.stop,
+        near: dist != null && dist < 28,
+        day, eve, strummed, paid,
+      };
+    });
+    assert(phromBusk.flag && phromBusk.guitar && phromBusk.hat && phromBusk.stop === 'phrom' && phromBusk.near, 'a busker waits at Phrom Phong BTS');
+    assert(phromBusk.day && phromBusk.eve && phromBusk.strummed && phromBusk.paid, 'they play evenings at Phrom Phong and E tips ฿20');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
