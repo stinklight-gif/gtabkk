@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -3235,6 +3235,69 @@ export function spawnMallSushi(scene) {
     customer.mesh.visible = false;
   }
   G.mallSushi = { chef, customer, x, z, y, t: 0 };
+}
+
+export function spawnMallCafe(scene) {
+  if (!GAMEPLAY.mallCafe) return;
+  const mall = G.world && G.world.mall;
+  const shop = mall && (mall.shops || []).find(s => s && s.name === 'Le Café');
+  if (!shop || !shop.pos) return;
+  const x = shop.pos.x, z = shop.pos.z, y = shop.pos.y || 10;
+  const clerk = spawnPed(scene, new THREE.Vector3(x - 1.55, 0, z), 'office');
+  recolorTorso(clerk.mesh.userData.parts, 0x5a3a28, 0.7);
+  clerk.mallCafe = true;
+  clerk.cafeRole = 'clerk';
+  clerk.speed = 0;
+  clerk.state = 'idle';
+  clerk.heading = PI / 2;
+  clerk.anchor = { slot: new THREE.Vector3(x - 1.55, y, z), facing: PI / 2 };
+  if (clerk.mesh) {
+    clerk.mesh.position.y = y;
+    clerk.mesh.rotation.y = PI / 2;
+    clerk.mesh.visible = false;
+  }
+  const cup = new THREE.Group();
+  cup.name = 'mall-cafe-cup';
+  const saucer = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.045, 0.045, 0.008, 10),
+    new THREE.MeshStandardMaterial({ color: 0xf5f0e4, roughness: 0.45 })
+  );
+  cup.add(saucer);
+  const mug = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.028, 0.024, 0.04, 10),
+    new THREE.MeshStandardMaterial({ color: 0xffcf4a, roughness: 0.5 })
+  );
+  mug.position.y = 0.024;
+  cup.add(mug);
+  const steam = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.008, 0.014, 0.05, 6),
+    new THREE.MeshStandardMaterial({ color: 0xe8e4dc, emissive: 0x887766, emissiveIntensity: 0.18, transparent: true, opacity: 0.45, roughness: 1 })
+  );
+  steam.name = 'mall-cafe-steam';
+  steam.position.y = 0.06;
+  cup.add(steam);
+  const parts = clerk.mesh && clerk.mesh.userData && clerk.mesh.userData.parts;
+  if (parts && parts.foreR) {
+    cup.position.set(0.02, -0.22, 0.08);
+    parts.foreR.add(cup);
+  } else if (clerk.mesh) {
+    cup.position.set(0.22, 1.05, 0.12);
+    clerk.mesh.add(cup);
+  }
+  clerk._cup = cup;
+  const customer = spawnPed(scene, new THREE.Vector3(x + 0.15, 0, z - 0.12), 'tourist');
+  customer.mallCafe = true;
+  customer.cafeRole = 'customer';
+  customer.speed = 0;
+  customer.state = 'idle';
+  customer.heading = -PI / 2;
+  customer.anchor = { slot: new THREE.Vector3(x + 0.15, y, z - 0.12), facing: -PI / 2 };
+  if (customer.mesh) {
+    customer.mesh.position.y = y;
+    customer.mesh.rotation.y = -PI / 2;
+    customer.mesh.visible = false;
+  }
+  G.mallCafe = { clerk, customer, x, z, y, t: 0 };
 }
 
 export function spawnSevenAtm(scene) {
