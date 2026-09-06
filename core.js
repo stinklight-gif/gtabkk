@@ -360,6 +360,7 @@ export const GAMEPLAY = {
   stationPorter: true,    // red-vest porters with bags under the Hua Lamphong canopy; they hide after 22:00
   garageMech: true,       // mechanic at the U-Spray bay mouth; they hide after 19:00
   klongDock: true,        // dockhands at the Klong Toey container yard; they hide after 19:00
+  sengClerk: true,        // clerk at Uncle Seng's gold-shop door; they hide after 20:00
 };
 G.gameplay = GAMEPLAY;
 

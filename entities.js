@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.homeAuntie || ped.stationPorter || ped.garageMech || ped.klongDock || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.homeAuntie || ped.stationPorter || ped.garageMech || ped.klongDock || ped.sengClerk || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -3024,6 +3024,38 @@ export function spawnKlongDock(scene) {
     hands.push(ped);
   }
   G.klongDock = { hands, x: poi.x, z: poi.z, t: 0 };
+}
+
+export function spawnSengClerk(scene) {
+  if (!GAMEPLAY.sengClerk) return;
+  const poi = G.world && G.world.poi && G.world.poi.goldShop;
+  if (!poi) return;
+  const x = poi.x, z = poi.z + 5.2;
+  const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'laborer');
+  recolorTorso(ped.mesh.userData.parts, 0x8a2020, 0.7);
+  ped.sengClerk = true;
+  ped.speed = 0;
+  ped.state = 'idle';
+  ped.heading = PI;
+  ped.anchor = { slot: new THREE.Vector3(x, 0, z), facing: PI };
+  if (ped.mesh) {
+    ped.mesh.rotation.y = PI;
+    ped.mesh.visible = false;
+  }
+  const tray = new THREE.Mesh(
+    new THREE.BoxGeometry(0.16, 0.02, 0.1),
+    new THREE.MeshStandardMaterial({ color: 0xffcf4a, metalness: 0.65, roughness: 0.28 })
+  );
+  tray.name = 'seng-tray';
+  const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+  if (parts && parts.foreR) {
+    tray.position.set(0.02, -0.22, 0.08);
+    parts.foreR.add(tray);
+  } else if (ped.mesh) {
+    tray.position.set(0.22, 1.05, 0.12);
+    ped.mesh.add(tray);
+  }
+  G.sengClerk = { ped, x, z, t: 0 };
 }
 
 export function spawnMallDirectory(scene) {
