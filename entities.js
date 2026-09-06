@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -1562,6 +1562,68 @@ export function spawnLottery(scene) {
   board.position.set(x - 0.5, 0, z + 0.2);
   scene.add(board);
   G.lottery = { ped, board, pos: new THREE.Vector3(x, 0, z), readyAt: 0 };
+}
+
+export function makeKanomKrokMesh() {
+  const g = new THREE.Group();
+  g.name = 'kanomkrok-cart';
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.48, 1.15), new THREE.MeshStandardMaterial({ color: 0x6a3a18, roughness: 0.8 }));
+  box.position.y = 0.46; g.add(box);
+  const pan = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.34, 0.34, 0.06, 12),
+    new THREE.MeshStandardMaterial({ color: 0x3a3a40, roughness: 0.4, metalness: 0.45, emissive: 0x331808, emissiveIntensity: 0.2 })
+  );
+  pan.name = 'kanom-pan';
+  pan.position.set(0, 0.74, 0.06);
+  g.add(pan);
+  const cakeMat = new THREE.MeshStandardMaterial({ color: 0xe8c070, roughness: 0.65 });
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * TAU;
+    const cake = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.06, 0.04, 6), cakeMat);
+    cake.name = 'kanom-cake';
+    cake.position.set(Math.sin(a) * 0.2, 0.79, 0.06 + Math.cos(a) * 0.2);
+    g.add(cake);
+  }
+  const ladle = new THREE.Mesh(
+    new THREE.BoxGeometry(0.04, 0.01, 0.28),
+    new THREE.MeshStandardMaterial({ color: 0x888890, metalness: 0.45, roughness: 0.4 })
+  );
+  ladle.name = 'kanom-ladle';
+  ladle.position.set(0.16, 0.88, 0.08);
+  g.add(ladle);
+  const umb = new THREE.Mesh(
+    new THREE.ConeGeometry(0.68, 0.24, 8),
+    new THREE.MeshStandardMaterial({ color: 0xc03030, roughness: 0.7, side: THREE.DoubleSide })
+  );
+  umb.position.y = 1.88; umb.rotation.x = PI; g.add(umb);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.0, 5), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+  pole.position.y = 1.35; g.add(pole);
+  const tire = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+  for (const z of [-0.38, 0.38]) for (const x of [-0.3, 0.3]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 8), tire);
+    w.rotation.z = PI / 2; w.position.set(x, 0.12, z); g.add(w);
+  }
+  return g;
+}
+
+export function spawnKanomKrok(scene) {
+  if (!GAMEPLAY.kanomKrok) return;
+  const seven = G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0]));
+  if (!seven || !seven.pos) return;
+  const hz = seven.hz || 4;
+  const x = seven.pos.x - 2.2;
+  const z = seven.pos.z + hz + 1.6;
+  const mesh = makeKanomKrokMesh();
+  mesh.position.set(x, 0, z);
+  scene.add(mesh);
+  const vendor = spawnPed(scene, new THREE.Vector3(x + 0.65, 0, z + 0.1), 'vendor');
+  vendor.kanom = true;
+  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI };
+  vendor.speed = 0;
+  vendor.state = 'idle';
+  vendor.heading = PI;
+  if (vendor.mesh) vendor.mesh.rotation.y = PI;
+  G.kanomKrok = { mesh, vendor, x, z, t: 0 };
 }
 
 export function makeCoconutCartMesh() {

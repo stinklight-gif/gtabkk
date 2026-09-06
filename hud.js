@@ -278,6 +278,11 @@ export function bindHud() {
     if (G.rotiCart && G.rotiCart[0] && G.rotiCart[0].mesh) {
       out.push({ name: 'Roti cart', status: 'โรตี · ฿35', dist: d(G.rotiCart[0].mesh.position) });
     }
+    if (G.kanomKrok && G.kanomKrok.mesh) {
+      const hh = ((G.time.dayT % 1) + 1) % 1 * 24;
+      const open = hh >= 15 && hh < 21.5;
+      out.push({ name: 'Kanom krok', status: open ? 'ขนมครก · ฿25' : 'opens 15:00', dist: d(G.kanomKrok.mesh.position) });
+    }
     if (G.soiBarber) {
       out.push({ name: 'Soi barber', status: G._haircut ? 'fresh fade' : 'ตัดผม · ฿80', dist: d(G.soiBarber) });
     }

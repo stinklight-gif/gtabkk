@@ -376,6 +376,7 @@ export function updateInteraction(dt) {
     for (const c of G.iceCarts) if (c.mesh && dist2(c.mesh.position, pp0) < 2.2 * 2.2) return;
   }
   if (GAMEPLAY.lottery && G.lottery && G.lottery.pos && dist2(G.lottery.pos, pp0) < 2.4 * 2.4) return;
+  if (GAMEPLAY.kanomKrok && G.kanomKrok && G.kanomKrok.mesh && dist2(G.kanomKrok.mesh.position, pp0) < 2.4 * 2.4) return;
   if (GAMEPLAY.coconutCart && G.coconutCarts) {
     for (const c of G.coconutCarts) if (c.mesh && dist2(c.mesh.position, pp0) < 2.2 * 2.2) return;
   }

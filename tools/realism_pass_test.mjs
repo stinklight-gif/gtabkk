@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -2943,6 +2943,54 @@ async function main() {
     });
     assert(snap.flag && snap.day === 0 && snap.night >= 4 && snap.phones >= 4 && snap.near, `tourists snap Yaowarat after dark (${snap.night})`);
     assert(snap.flashed && snap.gone, 'the phones flash and they clear by day');
+
+    console.log('\n[89] kanom krok at 7-Eleven');
+    const krok = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.kanomKrok;
+      const named = !!(c && c.mesh && c.mesh.name === 'kanomkrok-cart');
+      const pan = !!(c && c.mesh && c.mesh.getObjectByName('kanom-pan'));
+      const cakes = c && c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'kanom-cake').length : 0;
+      const ladle = c && c.mesh && c.mesh.getObjectByName('kanom-ladle');
+      const seven = G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0]));
+      const nearSeven = !!(c && seven && seven.pos && Math.hypot(c.x - seven.pos.x, c.z - seven.pos.z) < 12);
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.12;
+      main.updateKanomKrok(0.05);
+      const dayVendor = !!(c && c.vendor && c.vendor.mesh && c.vendor.mesh.visible === false);
+      const z0 = ladle ? ladle.rotation.z : 0;
+      if (c) c.t = 0.18;
+      main.updateKanomKrok(0.05);
+      const scooped = !!(ladle && Math.abs(ladle.rotation.z - z0) > 0.05);
+      G.time.dayT = 17.2 / 24;
+      main.updateKanomKrok(0.05);
+      const eveVendor = !!(c && c.vendor && c.vendor.kanom && c.vendor.mesh && c.vendor.mesh.visible);
+      G.player.inVehicle = null;
+      G._eating = null;
+      if (c && c.mesh) G.player.group.position.copy(c.mesh.position);
+      G.cash = 75;
+      G.player.hp = 40;
+      G.player.stam = 10;
+      G._kanomKrok = 0;
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let paid = false;
+      for (let i = 0; i < 4 && !paid; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateKanomKrok(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        paid = G.cash === 50 && (G._kanomKrok || 0) >= 1;
+      }
+      return {
+        flag: !!(G.gameplay && G.gameplay.kanomKrok),
+        named, pan, cakes, nearSeven, dayVendor, eveVendor, scooped, paid,
+        hp: G.player.hp, stam: G.player.stam,
+      };
+    });
+    assert(krok.flag && krok.named && krok.pan && krok.cakes >= 6 && krok.nearSeven, 'a kanom krok pan waits outside 7-Eleven');
+    assert(krok.dayVendor && krok.eveVendor && krok.scooped, 'the vendor works afternoons and the ladle scoops');
+    assert(krok.paid && krok.hp > 40 && krok.stam > 10, 'E buys kanom krok for ฿25');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
