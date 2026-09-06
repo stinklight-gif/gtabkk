@@ -4550,6 +4550,34 @@ export function spawnSevenAtm(scene) {
   if (east && east.pos) {
     const hz = east.hz || 4;
     G.eastSevenAtm = pack(east.pos.x + 4.2, east.pos.z + hz + 1.4, 'east-seven-atm');
+    if (G.eastSevenAtm) {
+      const ax = G.eastSevenAtm.ax + 2.65, az = G.eastSevenAtm.az + 0.36;
+      const extra = spawnPed(scene, new THREE.Vector3(ax, 0, az), 'office');
+      extra.sevenAtm = true;
+      extra.speed = 0;
+      extra.state = 'idle';
+      extra.heading = -PI / 2;
+      extra.anchor = { slot: new THREE.Vector3(ax, 0, az), facing: -PI / 2 };
+      if (extra.mesh) {
+        extra.mesh.rotation.y = -PI / 2;
+        extra.mesh.visible = false;
+      }
+      const phone = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05, 0.09, 0.012),
+        new THREE.MeshStandardMaterial({ color: 0x1a1a22, emissive: 0x226688, emissiveIntensity: 0.35, roughness: 0.35 })
+      );
+      phone.name = 'east-seven-atm-phone';
+      const ep = extra.mesh && extra.mesh.userData && extra.mesh.userData.parts;
+      if (ep && ep.foreR) {
+        phone.position.set(0.02, -0.28, 0.06);
+        ep.foreR.add(phone);
+      } else if (extra.mesh) {
+        phone.position.set(0.22, 1.05, 0.12);
+        extra.mesh.add(phone);
+      }
+      extra._phone = phone;
+      G.eastSevenAtmB = { queue: [extra], ax, az, t: 0 };
+    }
   }
 }
 
