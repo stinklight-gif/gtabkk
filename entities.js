@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.sevenShop || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.sevenShop || ped.btsPaper || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -2608,6 +2608,41 @@ export function spawnBtsBusker(scene) {
   hat.position.set(x + 0.45, 0.04, z + 0.35);
   scene.add(hat);
   G.btsBusker = { ped, guitar, hat, x, z, t: 0 };
+}
+
+export function spawnBtsPaper(scene) {
+  if (!GAMEPLAY.btsPaper) return;
+  const bts = G.world && G.world.bts;
+  if (!bts) return;
+  const x = bts.x - 1.0, z = -27.8;
+  const g = new THREE.Group();
+  g.name = 'bts-paper-rack';
+  const frame = new THREE.Mesh(
+    new THREE.BoxGeometry(0.85, 1.15, 0.12),
+    new THREE.MeshStandardMaterial({ color: 0x3a3a40, roughness: 0.6, metalness: 0.25 })
+  );
+  frame.position.y = 0.7;
+  g.add(frame);
+  const colors = [0xc03030, 0x1a3a6a, 0xf0ead8, 0x2a6a3a, 0xe8c04a, 0xf5f0e4];
+  for (let i = 0; i < 6; i++) {
+    const paper = new THREE.Mesh(
+      new THREE.BoxGeometry(0.22, 0.28, 0.02),
+      new THREE.MeshStandardMaterial({ color: colors[i], roughness: 0.8 })
+    );
+    paper.name = 'bts-paper';
+    paper.position.set(-0.28 + (i % 3) * 0.28, 0.55 + Math.floor(i / 3) * 0.38, 0.08);
+    g.add(paper);
+  }
+  g.position.set(x, 0, z);
+  scene.add(g);
+  const vendor = spawnPed(scene, new THREE.Vector3(x + 0.7, 0, z + 0.15), 'laborer');
+  vendor.btsPaper = true;
+  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI };
+  vendor.speed = 0;
+  vendor.state = 'idle';
+  vendor.heading = PI;
+  if (vendor.mesh) vendor.mesh.rotation.y = PI;
+  G.btsPaper = { mesh: g, vendor, x, z, t: 0 };
 }
 
 export function spawnBtsSitters(scene) {

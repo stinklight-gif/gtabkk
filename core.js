@@ -328,6 +328,7 @@ export const GAMEPLAY = {
   watCats: true,          // temple cats loaf the wat courtyard and bolt when you get close
   sevenShoppers: true,    // people walk in and out of the walk-in 7-Eleven
   watFeed: true,          // pellet tin at the wat pond; E feeds the turtles
+  btsPaper: true,         // newspaper rack at Asok BTS; morning papers, E for a copy
 };
 G.gameplay = GAMEPLAY;
 

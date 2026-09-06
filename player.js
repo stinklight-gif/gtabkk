@@ -413,6 +413,7 @@ export function updateInteraction(dt) {
   if (GAMEPLAY.btsBusker && G.btsBusker && dist2({ x: G.btsBusker.x, z: G.btsBusker.z }, pp0) < 2.4 * 2.4) return;
   if (GAMEPLAY.watLotus && G.watLotus && G.watLotus.mesh && dist2(G.watLotus.mesh.position, pp0) < 2.4 * 2.4) return;
   if (GAMEPLAY.watFeed && G.watFeed && dist2({ x: G.watFeed.x, z: G.watFeed.z }, pp0) < 2.4 * 2.4) return;
+  if (GAMEPLAY.btsPaper && G.btsPaper && G.btsPaper.mesh && dist2(G.btsPaper.mesh.position, pp0) < 2.4 * 2.4) return;
 
   const crate = G.world.yaowaratCrate;
   if (crate && !crate.taken && dist2(p.group.position, crate.pos) < 2.6 * 2.6) {

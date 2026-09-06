@@ -22,7 +22,7 @@ export * from './traffic.js';
 import { buildTrafficLights, updateTrafficLights } from './traffic.js';
 export * from './entities.js';
 import {
-  animateWalk, makeCamera, makeCatMesh, makeDogMesh, makePedMesh, makePlayer, makeRain, makeVehicle, makeVehicleMesh, sidewalkPos, spawnBoat, spawnBoatNoodle, spawnCats, spawnDog, spawnDogs, spawnMotosaiStands, spawnBtsSongthaew, spawnBtsTuktuk, spawnBtsMalai, spawnMangoSticky, spawnBtsGates, spawnIceCarts, spawnCoconutCarts, spawnChaYen, spawnRotiCart, spawnMooPing, spawnSomTam, spawnPlaKat, spawnLaundry, spawnSoiPa, spawnSoiCctv, spawnSoiWires, spawnRainFrogs, spawnSoiChairs, spawnSoiMechanic, spawnSoiBarber, spawnSoiCowboy, spawnCheckpoint, spawnSevenBikes, spawnSevenGuard, spawnSevenAtm, spawnSevenShoppers, spawnBtsBusker, spawnBtsSitters, spawnWatTurtles, spawnWatFeed, spawnWatBell, spawnWatBats, spawnWatSweep, spawnWatRobes, spawnBtsPigeons, spawnWatLotus, spawnWatCats, spawnMonitors, spawnHyacinth, spawnGeckos, spawnStallIncense, spawnLottery, spawnKanomKrok, spawnSquidGrill, spawnYaoGold, spawnParkedCars, spawnPed, spawnPeds, spawnTraffic, updateEntityLod, wearBikeHelmet
+  animateWalk, makeCamera, makeCatMesh, makeDogMesh, makePedMesh, makePlayer, makeRain, makeVehicle, makeVehicleMesh, sidewalkPos, spawnBoat, spawnBoatNoodle, spawnCats, spawnDog, spawnDogs, spawnMotosaiStands, spawnBtsSongthaew, spawnBtsTuktuk, spawnBtsMalai, spawnMangoSticky, spawnBtsGates, spawnIceCarts, spawnCoconutCarts, spawnChaYen, spawnRotiCart, spawnMooPing, spawnSomTam, spawnPlaKat, spawnLaundry, spawnSoiPa, spawnSoiCctv, spawnSoiWires, spawnRainFrogs, spawnSoiChairs, spawnSoiMechanic, spawnSoiBarber, spawnSoiCowboy, spawnCheckpoint, spawnSevenBikes, spawnSevenGuard, spawnSevenAtm, spawnSevenShoppers, spawnBtsBusker, spawnBtsPaper, spawnBtsSitters, spawnWatTurtles, spawnWatFeed, spawnWatBell, spawnWatBats, spawnWatSweep, spawnWatRobes, spawnBtsPigeons, spawnWatLotus, spawnWatCats, spawnMonitors, spawnHyacinth, spawnGeckos, spawnStallIncense, spawnLottery, spawnKanomKrok, spawnSquidGrill, spawnYaoGold, spawnParkedCars, spawnPed, spawnPeds, spawnTraffic, updateEntityLod, wearBikeHelmet
 } from './entities.js';
 import { spawnAirportPlanes } from './airport.js';
 export * from './wanted.js';
@@ -35,7 +35,7 @@ import {
 } from './physics.js';
 export * from './npcs.js';
 import {
-  CROWD_CURVE, buildClusterAnchors, crowdFactor, crowdTarget, makeBarkSprite, resyncCrowd, spawnAnchoredPed, spawnBark, spawnSpikeStrip, updateAlms, updateArmorPickups, updateBarks, updateCats, updateClusters, updateDogs, updateFoodStalls, updateMuggings, updatePeds, updateSchoolKids, updateSeekShade, updateShrines, updateSpikes, updateTurf, updateVigilante, updateYaowaratNight, updateYaoPhotos, updateBtsPlatform, updateBtsGates, updateOfficeCommute, updateCrossingGuards, updateCheckpoint, updateSevenGuard, updateSevenAtm, updateSevenShoppers, updateBtsBusker, updateSoiChairs, updateSoiCowboy, updateCowboyClose, updateSoiMechanic, updateSoiBarber, updateRainPack, updateRainPoncho, updateBikeSeatCover, updateIceCarts, updateCoconutCarts, updateChaYen, updateRotiCart, updateMooPing, updateSomTam, updateBtsMalai, updateMangoSticky, updateKanomKrok, updateSquidGrill, updateYaoGold, updateSongthaewRiders, updatePlaKat, updateBoatNoodle, updateMonitors, updateHyacinth, updateWatTurtles, updateWatFeed, updateWatBell, updateWatBats, updateWatSweep, updateWatRobes, updateBtsPigeons, updateWatLotus, updateWatCats, updateGeckos, updateStallIncense, updateSoiFootball, updateMallShoppers, updateLottery, updateSoiWires, updateRainFrogs, updateSoiCctv, vigilanteEnd, vigilanteSpawnTarget
+  CROWD_CURVE, buildClusterAnchors, crowdFactor, crowdTarget, makeBarkSprite, resyncCrowd, spawnAnchoredPed, spawnBark, spawnSpikeStrip, updateAlms, updateArmorPickups, updateBarks, updateCats, updateClusters, updateDogs, updateFoodStalls, updateMuggings, updatePeds, updateSchoolKids, updateSeekShade, updateShrines, updateSpikes, updateTurf, updateVigilante, updateYaowaratNight, updateYaoPhotos, updateBtsPlatform, updateBtsGates, updateOfficeCommute, updateCrossingGuards, updateCheckpoint, updateSevenGuard, updateSevenAtm, updateSevenShoppers, updateBtsBusker, updateBtsPaper, updateSoiChairs, updateSoiCowboy, updateCowboyClose, updateSoiMechanic, updateSoiBarber, updateRainPack, updateRainPoncho, updateBikeSeatCover, updateIceCarts, updateCoconutCarts, updateChaYen, updateRotiCart, updateMooPing, updateSomTam, updateBtsMalai, updateMangoSticky, updateKanomKrok, updateSquidGrill, updateYaoGold, updateSongthaewRiders, updatePlaKat, updateBoatNoodle, updateMonitors, updateHyacinth, updateWatTurtles, updateWatFeed, updateWatBell, updateWatBats, updateWatSweep, updateWatRobes, updateBtsPigeons, updateWatLotus, updateWatCats, updateGeckos, updateStallIncense, updateSoiFootball, updateMallShoppers, updateLottery, updateSoiWires, updateRainFrogs, updateSoiCctv, vigilanteEnd, vigilanteSpawnTarget
 } from './npcs.js';
 export * from './combat.js';
 import {
@@ -538,6 +538,7 @@ async function init() {
   spawnSevenAtm(scene);
   spawnSevenShoppers(scene);
   spawnBtsBusker(scene);
+  spawnBtsPaper(scene);
   spawnBtsSitters(scene);
   spawnWatTurtles(scene);
   spawnWatFeed(scene);
@@ -1796,6 +1797,7 @@ export function loop() {
     updateSevenAtm(dt);
     updateSevenShoppers(dt);
     updateBtsBusker(dt);
+    updateBtsPaper(dt);
     updateSoiChairs(dt);
     updateSoiCowboy(dt);
     updateCowboyClose(dt);
