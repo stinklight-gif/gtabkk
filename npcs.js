@@ -1906,8 +1906,8 @@ export function updateMallDirectory(dt) {
     if (G.hud.showNotif) G.hud.showNotif(`${s.name} — floor ${floor}`);
     if (G.audio && G.audio.chime) G.audio.chime();
   }
-  const ask = G.mallDirAsk;
-  if (ask) {
+  for (const ask of [G.mallDirAsk, G.mallDirAskB]) {
+    if (!ask) continue;
     ask.t = (ask.t || 0) + dt;
     const ped = ask.ped;
     if (ped && ped.mesh) {

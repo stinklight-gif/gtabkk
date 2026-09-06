@@ -7988,6 +7988,43 @@ async function main() {
     });
     assert(dirAsk.flag && dirAsk.rec && dirAsk.map && dirAsk.near && dirAsk.other, 'a visitor asks at the Terminal 21 directory');
     assert(dirAsk.night && dirAsk.day && dirAsk.shifted && dirAsk.swung, 'they hide after 22:00 and the floor map turns');
+
+    console.log('\n[223] visitor at the north Terminal 21 directory');
+    const dirAskB = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.mallDirAskB;
+      const ped = c && c.ped;
+      const map = !!(ped && ped.mesh && ped.mesh.getObjectByName('mall-dir-map'));
+      const desk = G.mallDirB;
+      const first = G.mallDirAsk;
+      const near = !!(c && desk && Math.hypot(c.x - desk.x, c.z - desk.z) < 4);
+      const other = !!(c && first && Math.hypot(c.x - first.x, c.z - first.z) > 6);
+      G.time.dayT = 23 / 24;
+      main.updateMallDirectory(0.05);
+      const night = !!(ped && ped.mesh && ped.mesh.visible === false);
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updateMallDirectory(0.05);
+      const day = !!(ped && ped.mallDir && ped.mallDirAsk && ped.mesh && ped.mesh.visible);
+      const z0 = ped && ped.mesh ? ped.mesh.position.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateMallDirectory(0.05);
+      const shifted = !!(ped && ped.mesh && Math.abs(ped.mesh.position.z - z0) > 0.02);
+      const tool = ped && ped.mesh && ped.mesh.getObjectByName('mall-dir-map');
+      if (c) c.t = 0.2;
+      main.updateMallDirectory(0.05);
+      const r0 = tool ? tool.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 4.2;
+      main.updateMallDirectory(0.05);
+      const swung = !!(tool && Math.abs(tool.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.mallDir),
+        rec: !!(ped && ped.mallDir && ped.mallDirAsk),
+        map, near, other, night, day, shifted, swung,
+      };
+    });
+    assert(dirAskB.flag && dirAskB.rec && dirAskB.map && dirAskB.near && dirAskB.other, 'a visitor asks at the north Terminal 21 directory');
+    assert(dirAskB.night && dirAskB.day && dirAskB.shifted && dirAskB.swung, 'they hide after 22:00 and the floor map turns');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
