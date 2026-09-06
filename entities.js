@@ -2689,6 +2689,32 @@ export function spawnWatTurtles(scene) {
   G.watPond = pond;
 }
 
+export function spawnWatFeed(scene) {
+  if (!GAMEPLAY.watFeed) return;
+  const pond = G.watPond;
+  const turtles = G.watTurtles;
+  if (!pond || !turtles || !turtles.length) return;
+  const cx = turtles[0].cx, cz = turtles[0].cz;
+  const x = cx + 2.05, z = cz + 0.15;
+  const g = new THREE.Group();
+  g.name = 'wat-feed';
+  const can = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.08, 0.09, 0.16, 8),
+    new THREE.MeshStandardMaterial({ color: 0xc45a18, roughness: 0.55, metalness: 0.15 })
+  );
+  can.position.y = 0.14;
+  g.add(can);
+  const lid = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.085, 0.085, 0.03, 8),
+    new THREE.MeshStandardMaterial({ color: 0x8a3a10, roughness: 0.5 })
+  );
+  lid.position.y = 0.23;
+  g.add(lid);
+  g.position.set(x, 0, z);
+  scene.add(g);
+  G.watFeed = { mesh: g, x, z, cx, cz, feedT: 0 };
+}
+
 export function spawnWatBell(scene) {
   if (!GAMEPLAY.watBell) return;
   const temple = G.world && G.world.poi && G.world.poi.temple;

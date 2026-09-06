@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes','btsPigeons','watLotus','watCats','sevenShoppers']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes','btsPigeons','watLotus','watCats','sevenShoppers','watFeed']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -3399,6 +3399,47 @@ async function main() {
     });
     assert(shop.flag && shop.n >= 3 && shop.bags >= 3 && shop.near, `shoppers work the 7-Eleven door (${shop.n})`);
     assert(shop.late >= 3 && shop.day >= 3 && shop.walked && shop.bagOut, 'they hide late, walk the door, and leave with a bag');
+
+    console.log('\n[101] turtle pellets at the wat pond');
+    const feed = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const f = G.watFeed;
+      const named = !!(f && f.mesh && f.mesh.name === 'wat-feed');
+      const turtles = G.watTurtles || [];
+      const n = turtles.filter(t => t && t.mesh && t.mesh.name === 'wat-turtle').length;
+      const pond = G.watPond;
+      const nearPond = !!(f && pond && Math.hypot(f.x - pond.position.x, f.z - pond.position.z) < 4);
+      if (f) f.feedT = 0;
+      main.updateWatTurtles(0.05);
+      const t0 = turtles[0];
+      const d0 = t0 && t0.mesh && f ? Math.hypot(t0.mesh.position.x - f.x, t0.mesh.position.z - f.z) : 99;
+      if (f) f.feedT = 5;
+      for (let i = 0; i < 12; i++) main.updateWatTurtles(0.1);
+      const d1 = t0 && t0.mesh && f ? Math.hypot(t0.mesh.position.x - f.x, t0.mesh.position.z - f.z) : 99;
+      const swarmed = d1 < d0 - 0.15;
+      G.player.inVehicle = null;
+      G._eating = null;
+      if (f) G.player.group.position.set(f.x, 0, f.z);
+      G.cash = 40;
+      G._turtleFeed = 0;
+      if (f) f.feedT = 0;
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let paid = false;
+      for (let i = 0; i < 4 && !paid; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateWatFeed(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        paid = G.cash === 30 && (G._turtleFeed || 0) >= 1 && f && f.feedT > 0;
+      }
+      return {
+        flag: !!(G.gameplay && G.gameplay.watFeed),
+        named, n, nearPond, swarmed, paid, d0, d1,
+      };
+    });
+    assert(feed.flag && feed.named && feed.n >= 4 && feed.nearPond, `a pellet tin waits at the wat pond (${feed.n} turtles)`);
+    assert(feed.swarmed && feed.paid, 'E feeds the turtles and they swarm the tin');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

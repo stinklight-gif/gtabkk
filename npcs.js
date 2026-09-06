@@ -2921,14 +2921,38 @@ export function updateWatBats(dt) {
 
 export function updateWatTurtles(dt) {
   if (!GAMEPLAY.watTurtles || !G.watTurtles) return;
+  const feed = GAMEPLAY.watFeed && G.watFeed && G.watFeed.feedT > 0;
+  const k = feed ? Math.min(1, G.watFeed.feedT / 4) : 0;
+  const fx = feed ? G.watFeed.x : 0, fz = feed ? G.watFeed.z : 0;
   for (const t of G.watTurtles) {
     if (!t.mesh) continue;
-    t.ang += t.spin * dt;
-    t.mesh.position.x = t.cx + Math.sin(t.ang) * t.r;
-    t.mesh.position.z = t.cz + Math.cos(t.ang) * t.r;
+    t.ang += t.spin * dt * (feed ? 1.8 : 1);
+    const r = feed ? Math.max(0.28, t.r * (1 - 0.65 * k)) : t.r;
+    const ox = feed ? t.cx + (fx - t.cx) * 0.5 * k : t.cx;
+    const oz = feed ? t.cz + (fz - t.cz) * 0.5 * k : t.cz;
+    t.mesh.position.x = ox + Math.sin(t.ang) * r;
+    t.mesh.position.z = oz + Math.cos(t.ang) * r;
     t.mesh.position.y = 0.12 + Math.sin(t.ang * 3) * 0.02;
     t.mesh.rotation.y = t.ang + PI / 2;
   }
+}
+
+export function updateWatFeed(dt) {
+  if (!GAMEPLAY.watFeed || !G.watFeed) return;
+  const f = G.watFeed;
+  if (f.feedT > 0) f.feedT = Math.max(0, f.feedT - dt);
+  if (G.player.inVehicle || G._eating) return;
+  const pp = G.player.group.position;
+  if (dist2({ x: f.x, z: f.z }, pp) > 2.4 * 2.4) return;
+  G.hud.showPrompt('Press <b>E</b> to feed the turtles · ฿10', 0.4);
+  if (!G.input.pressed('KeyE')) return;
+  if (G.cash < 10) { G.hud.showNotif('Need ฿10 for turtle pellets'); return; }
+  G.cash -= 10;
+  f.feedT = 5;
+  G._turtleFeed = (G._turtleFeed || 0) + 1;
+  if (G.hud.setCash) G.hud.setCash(G.cash);
+  G.hud.showNotif('The turtles swarm — ให้อาหารเต่า');
+  if (G.audio && G.audio.chime) G.audio.chime();
 }
 
 export function updateHyacinth(dt) {
