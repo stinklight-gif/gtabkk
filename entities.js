@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.officeSmoke || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.officeSmoke || ped.bankQueue || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -2750,6 +2750,40 @@ export function spawnBankGuard(scene) {
   else { torch.position.set(0.2, 0.9, 0.15); ped.mesh.add(torch); }
   beam.visible = false;
   G.bankGuard = { ped, chair, light, beam, x, z };
+}
+
+export function spawnBankQueue(scene) {
+  if (!GAMEPLAY.bankQueue) return;
+  const bank = G.world && G.world.bank;
+  if (!bank || !bank.teller) return;
+  const tx = bank.teller.x, tz = bank.teller.z;
+  const queue = [];
+  for (let i = 0; i < 2; i++) {
+    const x = tx + i * 0.12, z = tz + i * 0.85;
+    const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), i === 0 ? 'office' : 'local');
+    ped.bankQueue = true;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = PI;
+    ped.anchor = { slot: new THREE.Vector3(x, 0, z), facing: PI };
+    if (ped.mesh) {
+      ped.mesh.rotation.y = PI;
+      ped.mesh.visible = false;
+    }
+    if (i === 0 && ped.mesh) {
+      const book = new THREE.Mesh(
+        new THREE.BoxGeometry(0.09, 0.012, 0.12),
+        new THREE.MeshStandardMaterial({ color: 0xc45a18, roughness: 0.55 })
+      );
+      book.name = 'bank-passbook';
+      const parts = ped.mesh.userData && ped.mesh.userData.parts;
+      if (parts && parts.foreR) { book.position.set(0.02, -0.28, 0.06); parts.foreR.add(book); }
+      else { book.position.set(0.22, 1.05, 0.12); ped.mesh.add(book); }
+      ped._passbook = book;
+    }
+    queue.push(ped);
+  }
+  G.bankQueue = { queue, x: tx, z: tz, t: 0 };
 }
 
 export function spawnMallDirectory(scene) {

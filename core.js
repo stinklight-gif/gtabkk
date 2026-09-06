@@ -341,6 +341,7 @@ export const GAMEPLAY = {
   bankGuard: true,        // plastic-chair security at Krung Thep Bank; torch after dark
   mallDir: true,          // directory clerk at the Terminal 21 desk; E names a shop and floor
   officeSmoke: true,      // office smokers on the north-west Asok sidewalk at lunch; ember tips
+  bankQueue: true,        // two customers wait at the Krung Thep Bank teller with a passbook; they hide after hours
 };
 G.gameplay = GAMEPLAY;
 
