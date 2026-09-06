@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.soiBarber || ped.yaowaratNight || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.soiBarber || ped.yaowaratNight || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -2376,6 +2376,80 @@ export function spawnChaYen(scene) {
   vendor.anchor = { slot: vendor.mesh.position.clone(), facing: alongZ ? 0 : PI / 2 };
   vendor.speed = 0;
   G.chaYen.push({ mesh, vendor, soi: s, alongZ, t: t0, dir: -1 });
+}
+
+export function makeRotiMesh() {
+  const g = new THREE.Group();
+  g.name = 'roti-cart';
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.48, 1.2), new THREE.MeshStandardMaterial({ color: 0xc45a18, roughness: 0.8 }));
+  box.position.y = 0.46; g.add(box);
+  const pan = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.32, 0.32, 0.04, 12),
+    new THREE.MeshStandardMaterial({ color: 0x3a3a40, roughness: 0.4, metalness: 0.45, emissive: 0x331808, emissiveIntensity: 0.2 })
+  );
+  pan.name = 'roti-pan';
+  pan.position.set(0, 0.74, 0.08);
+  g.add(pan);
+  const dough = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.22, 0.22, 0.02, 10),
+    new THREE.MeshStandardMaterial({ color: 0xe8c878, roughness: 0.7 })
+  );
+  dough.name = 'roti-dough';
+  dough.position.set(0, 0.77, 0.08);
+  g.add(dough);
+  const banana = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.035, 0.16, 4, 6),
+    new THREE.MeshStandardMaterial({ color: 0xe8c020, roughness: 0.6 })
+  );
+  banana.rotation.z = 0.6;
+  banana.position.set(0.28, 0.82, -0.22);
+  g.add(banana);
+  const spatula = new THREE.Mesh(
+    new THREE.BoxGeometry(0.06, 0.01, 0.28),
+    new THREE.MeshStandardMaterial({ color: 0x888890, metalness: 0.45, roughness: 0.4 })
+  );
+  spatula.name = 'roti-spatula';
+  spatula.position.set(0.18, 0.86, 0.12);
+  spatula.rotation.y = 0.4;
+  g.add(spatula);
+  const umb = new THREE.Mesh(
+    new THREE.ConeGeometry(0.7, 0.26, 8),
+    new THREE.MeshStandardMaterial({ color: 0x2a6aad, roughness: 0.7, side: THREE.DoubleSide })
+  );
+  umb.position.y = 1.9; umb.rotation.x = PI; g.add(umb);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.05, 5), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+  pole.position.y = 1.38; g.add(pole);
+  const tire = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+  for (const z of [-0.4, 0.4]) for (const x of [-0.32, 0.32]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 8), tire);
+    w.rotation.z = PI / 2; w.position.set(x, 0.12, z); g.add(w);
+  }
+  return g;
+}
+
+export function spawnRotiCart(scene) {
+  if (!GAMEPLAY.rotiCart) return;
+  const sois = (G.world && G.world.sois) || [];
+  G.rotiCart = [];
+  if (!sois.length) return;
+  const ranked = sois.slice().sort((a, b) => {
+    const la = a.axis === 'z' ? (a.z1 - a.z0) : (a.x1 - a.x0);
+    const lb = b.axis === 'z' ? (b.z1 - b.z0) : (b.x1 - b.x0);
+    return lb - la;
+  });
+  const s = ranked[5] || ranked[ranked.length - 1] || ranked[0];
+  const alongZ = s.axis === 'z';
+  const t0 = 0.34;
+  const x = alongZ ? (s.x0 + s.x1) * 0.5 : s.x0 + (s.x1 - s.x0) * t0;
+  const z = alongZ ? s.z0 + (s.z1 - s.z0) * t0 : (s.z0 + s.z1) * 0.5;
+  const mesh = makeRotiMesh();
+  mesh.position.set(x, 0, z);
+  scene.add(mesh);
+  const vendor = spawnPed(scene, new THREE.Vector3(x, 0, z), 'vendor');
+  vendor.roti = true;
+  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: alongZ ? 0 : PI / 2 };
+  vendor.speed = 0;
+  G.rotiCart.push({ mesh, vendor, soi: s, alongZ, t: t0, dir: 1 });
 }
 
 export function spawnCoconutCarts(scene) {

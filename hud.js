@@ -269,6 +269,9 @@ export function bindHud() {
     if (G.chaYen && G.chaYen[0] && G.chaYen[0].mesh) {
       out.push({ name: 'Cha yen cart', status: 'ชาเย็น · ฿25', dist: d(G.chaYen[0].mesh.position) });
     }
+    if (G.rotiCart && G.rotiCart[0] && G.rotiCart[0].mesh) {
+      out.push({ name: 'Roti cart', status: 'โรตี · ฿35', dist: d(G.rotiCart[0].mesh.position) });
+    }
     if (G.soiBarber) {
       out.push({ name: 'Soi barber', status: G._haircut ? 'fresh fade' : 'ตัดผม · ฿80', dist: d(G.soiBarber) });
     }

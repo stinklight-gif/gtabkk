@@ -307,6 +307,7 @@ export const GAMEPLAY = {
   soiWires: true,         // tangled cables between soi PA poles; sparks in the rain
   rainFrogs: true,        // frogs hop flooded sois while it rains
   soiCctv: true,          // soi pole cameras; a shot in view is a ping and 1★
+  rotiCart: true,         // banana roti cart on a soi; E for a fold
 };
 G.gameplay = GAMEPLAY;
 

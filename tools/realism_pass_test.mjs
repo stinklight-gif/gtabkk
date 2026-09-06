@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -2666,6 +2666,53 @@ async function main() {
     assert(cams.flag && cams.n >= 3 && cams.leds >= 3 && cams.onSoi, `soi CCTV poles (${cams.n})`);
     assert(cams.dayLed < 0.4 && cams.nightLed > 0.6, 'the red LED wakes up at night');
     assert(cams.pinged, 'a shot in view of a soi camera is a star');
+
+    console.log('\n[81] banana roti cart');
+    const fold = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = G.rotiCart || [];
+      const n = list.filter(c => c && c.mesh && c.mesh.name === 'roti-cart').length;
+      const c0 = list[0];
+      const pan = !!(c0 && c0.mesh && c0.mesh.getObjectByName('roti-pan'));
+      const spat = c0 && c0.mesh && c0.mesh.getObjectByName('roti-spatula');
+      if (c0) { c0.t = 0.12; c0.dir = 1; }
+      G.player.inVehicle = null;
+      G._eating = null;
+      if (c0 && c0.mesh) G.player.group.position.set(c0.mesh.position.x + 40, 0, c0.mesh.position.z + 40);
+      main.updateRotiCart(0.05);
+      const start = c0 && c0.mesh ? { x: c0.mesh.position.x, z: c0.mesh.position.z } : null;
+      const z0 = spat ? spat.rotation.z : 0;
+      if (c0) c0.t = 0.18;
+      main.updateRotiCart(0.05);
+      const flipped = !!(spat && Math.abs(spat.rotation.z - z0) > 0.05);
+      if (c0) { c0.t = 0.12; c0.dir = 1; }
+      main.updateRotiCart(0.05);
+      const start2 = c0 && c0.mesh ? { x: c0.mesh.position.x, z: c0.mesh.position.z } : start;
+      for (let i = 0; i < 50; i++) main.updateRotiCart(0.3);
+      const moved = !!(c0 && start2 && Math.hypot(c0.mesh.position.x - start2.x, c0.mesh.position.z - start2.z) > 0.4);
+      if (c0 && c0.mesh) G.player.group.position.copy(c0.mesh.position);
+      G.cash = 70;
+      G.player.hp = 40;
+      G.player.stam = 10;
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let paid = false;
+      for (let i = 0; i < 4 && !paid; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateRotiCart(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        paid = G.cash === 35;
+      }
+      return {
+        flag: !!(G.gameplay && G.gameplay.rotiCart),
+        n, pan, moved, flipped, paid, hp: G.player.hp, stam: G.player.stam,
+        onSoi: !!(c0 && c0.soi), vendor: !!(c0 && c0.vendor && c0.vendor.roti),
+      };
+    });
+    assert(fold.flag && fold.n >= 1 && fold.onSoi && fold.pan && fold.vendor, `a roti cart works a soi (${fold.n})`);
+    assert(fold.moved && fold.flipped, 'the cart rolls the soi and the spatula flips');
+    assert(fold.paid && fold.hp > 40 && fold.stam > 10, 'E buys banana roti for ฿35');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
