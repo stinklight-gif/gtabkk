@@ -4412,6 +4412,52 @@ async function main() {
     });
     assert(gunClerk.flag && gunClerk.rec && gunClerk.cloth && gunClerk.near, 'a clerk waits behind the Sukhumvit Gun Shop counter');
     assert(gunClerk.night && gunClerk.day && gunClerk.wiped, 'they hide after hours and wipe the counter by day');
+
+    console.log('\n[127] shoe shine at Phrom Phong north');
+    const phromShine = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.phromShine;
+      const named = !!(c && c.mesh && c.mesh.name === 'bts-shine');
+      const box = !!(c && c.mesh && c.mesh.getObjectByName('shine-box'));
+      const n = c && c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'shine-tin').length : 0;
+      const cloth = !!(c && c.mesh && c.mesh.getObjectByName('shine-cloth'));
+      const dist = (c && c.x != null) ? Math.hypot(c.x - 100, c.z) : null;
+      G.time.dayT = 21.2 / 24;
+      main.updateBtsShine(0.05);
+      const night = !!(c && c.vendor && c.vendor.mesh && c.vendor.mesh.visible === false);
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updateBtsShine(0.05);
+      const day = !!(c && c.vendor && c.vendor.btsShine && c.vendor.stop === 'phrom' && c.vendor.mesh && c.vendor.mesh.visible);
+      const rag = c && c.mesh && c.mesh.getObjectByName('shine-cloth');
+      const r0 = rag ? rag.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 9;
+      main.updateBtsShine(0.05);
+      const wiped = !!(rag && Math.abs(rag.rotation.z - r0) > 0.2);
+      G.player.inVehicle = null;
+      G._eating = null;
+      if (c && c.mesh) G.player.group.position.copy(c.mesh.position);
+      G.cash = 60;
+      G._btsShine = 0;
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let paid = false;
+      for (let i = 0; i < 4 && !paid; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateBtsShine(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        paid = G.cash === 30 && (G._btsShine || 0) >= 1;
+      }
+      return {
+        flag: !!(G.gameplay && G.gameplay.btsShine),
+        named, box, n, cloth, stop: c && c.stop,
+        near: dist != null && dist < 28 && c.z > 0,
+        night, day, wiped, paid,
+      };
+    });
+    assert(phromShine.flag && phromShine.named && phromShine.box && phromShine.n >= 2 && phromShine.cloth && phromShine.stop === 'phrom' && phromShine.near, 'a shoe-shine box waits north of Phrom Phong');
+    assert(phromShine.night && phromShine.day && phromShine.wiped && phromShine.paid, 'the rag wipes by day and E buys a shine for ฿30');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

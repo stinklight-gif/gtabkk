@@ -2571,40 +2571,43 @@ export function updateBtsPaper(dt) {
 }
 
 export function updateBtsShine(dt) {
-  if (!GAMEPLAY.btsShine || !G.btsShine) return;
-  const c = G.btsShine;
-  c.t = (c.t || 0) + dt;
+  if (!GAMEPLAY.btsShine) return;
+  const stands = [G.btsShine, G.phromShine];
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const open = h >= 8 && h < 18;
-  const cloth = c.mesh && c.mesh.getObjectByName('shine-cloth');
-  if (cloth) {
-    cloth.rotation.z = open ? Math.sin(c.t * 9) * 0.45 : 0;
-    cloth.position.y = 0.42 + (open ? Math.abs(Math.sin(c.t * 9)) * 0.04 : 0);
-  }
-  const ped = c.vendor;
-  if (ped && ped.mesh) {
-    ped.btsShine = true;
-    ped.mesh.visible = open;
-    const slot = ped.anchor && ped.anchor.slot;
-    if (slot) {
-      ped.mesh.position.set(slot.x, slot.y || 0.38, slot.z);
-      ped.heading = ped.anchor.facing;
-      ped.mesh.rotation.y = ped.heading;
+  const pp = G.player && G.player.group && G.player.group.position;
+  for (const c of stands) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    const cloth = c.mesh && c.mesh.getObjectByName('shine-cloth');
+    if (cloth) {
+      cloth.rotation.z = open ? Math.sin(c.t * 9) * 0.45 : 0;
+      cloth.position.y = 0.42 + (open ? Math.abs(Math.sin(c.t * 9)) * 0.04 : 0);
     }
-    ped.speed = 0;
-    ped.state = 'idle';
+    const ped = c.vendor;
+    if (ped && ped.mesh) {
+      ped.btsShine = true;
+      ped.mesh.visible = open;
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        ped.mesh.position.set(slot.x, slot.y || 0.38, slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+    }
+    if (!open || G.player.inVehicle || G._eating || !pp) continue;
+    if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) continue;
+    G.hud.showPrompt('Press <b>E</b> for a shoe shine · ฿30', 0.4);
+    if (!G.input.pressed('KeyE')) continue;
+    if (G.cash < 30) { G.hud.showNotif('Need ฿30 for a shine'); continue; }
+    G.cash -= 30;
+    if (G.hud.setCash) G.hud.setCash(G.cash);
+    G._btsShine = (G._btsShine || 0) + 1;
+    G.hud.showNotif('Shoe shine — ขัดรองเท้า');
+    if (G.audio && G.audio.chime) G.audio.chime();
   }
-  if (!open || G.player.inVehicle || G._eating) return;
-  const pp = G.player.group.position;
-  if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) return;
-  G.hud.showPrompt('Press <b>E</b> for a shoe shine · ฿30', 0.4);
-  if (!G.input.pressed('KeyE')) return;
-  if (G.cash < 30) { G.hud.showNotif('Need ฿30 for a shine'); return; }
-  G.cash -= 30;
-  if (G.hud.setCash) G.hud.setCash(G.cash);
-  G._btsShine = (G._btsShine || 0) + 1;
-  G.hud.showNotif('Shoe shine — ขัดรองเท้า');
-  if (G.audio && G.audio.chime) G.audio.chime();
 }
 
 export function updateBtsBusker(dt) {

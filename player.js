@@ -432,7 +432,11 @@ export function updateInteraction(dt) {
   if (GAMEPLAY.yaoFortune && G.yaoFortune && G.yaoFortune.mesh && dist2(G.yaoFortune.mesh.position, pp0) < 2.4 * 2.4) return;
   if (GAMEPLAY.sevenSlush && G.sevenSlush && G.sevenSlush.mesh && dist2(G.sevenSlush.mesh.position, pp0) < 2.4 * 2.4) return;
   if (GAMEPLAY.phromFruit && G.phromFruit && G.phromFruit.mesh && dist2(G.phromFruit.mesh.position, pp0) < 2.4 * 2.4) return;
-  if (GAMEPLAY.btsShine && G.btsShine && G.btsShine.mesh && dist2(G.btsShine.mesh.position, pp0) < 2.4 * 2.4) return;
+  if (GAMEPLAY.btsShine) {
+    for (const c of [G.btsShine, G.phromShine]) {
+      if (c && c.mesh && dist2(c.mesh.position, pp0) < 2.4 * 2.4) return;
+    }
+  }
   if (GAMEPLAY.mallDir && G.mallDir && G.mallDir.mesh && dist2(G.mallDir.mesh.position, pp0) < 2.8 * 2.8) return;
 
   const crate = G.world.yaowaratCrate;
