@@ -1959,6 +1959,32 @@ export function updateGunClerk(dt) {
     if (open && parts && parts.armR) parts.armR.rotation.x = -0.7 + Math.sin(c.t * 4.2) * 0.22;
     if (c.cloth) c.cloth.rotation.z = open ? Math.sin(c.t * 4.2) * 0.35 : 0;
   }
+  const shop = G.gunShopper;
+  if (shop) {
+    shop.t = (shop.t || 0) + dt;
+    const sp = shop.ped;
+    if (sp && sp.mesh) {
+      sp.gunClerk = true;
+      sp.gunShop = true;
+      sp.mesh.visible = open;
+      if (!open) {
+        sp.speed = 0;
+        sp.state = 'idle';
+      } else {
+        const slot = sp.anchor && sp.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(shop.t * 2.2) * 0.05;
+          sp.mesh.position.set(slot.x, 0, slot.z + bob);
+          sp.heading = sp.anchor.facing;
+          sp.mesh.rotation.y = sp.heading;
+        }
+        sp.speed = 0;
+        sp.state = 'idle';
+        const cse = sp.mesh.getObjectByName('gun-case');
+        if (cse) cse.rotation.z = Math.sin(shop.t * 4.2) * 0.35;
+      }
+    }
+  }
 }
 
 export function updateStarterClerk(dt) {

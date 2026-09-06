@@ -2890,6 +2890,32 @@ export function spawnGunClerk(scene) {
     ped.mesh.add(cloth);
   }
   G.gunClerk = { ped, cloth, x, z, t: 0 };
+  const cx = x + 1.4, cz = z - 2.0;
+  const shopper = spawnPed(scene, new THREE.Vector3(cx, 0, cz), 'office');
+  shopper.gunClerk = true;
+  shopper.gunShop = true;
+  shopper.speed = 0;
+  shopper.state = 'idle';
+  shopper.heading = 0;
+  shopper.anchor = { slot: new THREE.Vector3(cx, 0, cz), facing: 0 };
+  if (shopper.mesh) {
+    shopper.mesh.rotation.y = 0;
+    shopper.mesh.visible = false;
+  }
+  const cse = new THREE.Mesh(
+    new THREE.BoxGeometry(0.16, 0.08, 0.28),
+    new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.7, metalness: 0.15 })
+  );
+  cse.name = 'gun-case';
+  const sp = shopper.mesh && shopper.mesh.userData && shopper.mesh.userData.parts;
+  if (sp && sp.foreL) {
+    cse.position.set(0.02, -0.24, 0.08);
+    sp.foreL.add(cse);
+  } else if (shopper.mesh) {
+    cse.position.set(-0.18, 1.0, 0.1);
+    shopper.mesh.add(cse);
+  }
+  G.gunShopper = { ped: shopper, x: cx, z: cz, t: 0 };
 }
 
 export function spawnStarterClerk(scene) {

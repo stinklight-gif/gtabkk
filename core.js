@@ -343,7 +343,7 @@ export const GAMEPLAY = {
   officeSmoke: true,      // office smokers on the north-west Asok and Phrom Phong sidewalks at lunch; ember tips
   bankQueue: true,        // teller queue inside Krung Thep Bank, plus an outdoor ATM; they hide after hours
   mallFood: true,         // eaters sit Pier 21 Food Court at Terminal 21; trays, they hide after 21:00
-  gunClerk: true,         // clerk behind the Sukhumvit Gun Shop counter; they hide after hours
+  gunClerk: true,         // clerk and a customer at the Sukhumvit Gun Shop counter; they hide after hours
   mallTech: true,         // window shoppers at Tokyo Tech in Terminal 21; phones, they hide after 21:00
   mallPharm: true,        // pharmacist and a customer at Paris Pharmacy in Terminal 21; they hide after 21:00
   mallRoma: true,         // clerk and a customer at Roma Boutique in Terminal 21; they hide after 21:00
