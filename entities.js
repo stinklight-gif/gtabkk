@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.homeAuntie || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -2848,6 +2848,61 @@ export function spawnStarterClerk(scene) {
     ped.mesh.add(cloth);
   }
   G.starterClerk = { ped, cloth, x, z, t: 0 };
+}
+
+export function spawnHomeAuntie(scene) {
+  if (!GAMEPLAY.homeAuntie) return;
+  const door = G.world && G.world.poi && G.world.poi.safehouse;
+  if (!door) return;
+  const x = door.x - 2.4, z = door.z + 1.6;
+  const chair = new THREE.Group();
+  chair.name = 'home-chair';
+  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.04, 0.42), new THREE.MeshStandardMaterial({ color: 0xd8d0c0, roughness: 0.7 }));
+  seat.position.y = 0.42; chair.add(seat);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.46, 0.04), seat.material);
+  back.position.set(0, 0.65, -0.2); chair.add(back);
+  for (const [sx, sz] of [[-0.16, -0.16], [0.16, -0.16], [-0.16, 0.16], [0.16, 0.16]]) {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.42, 5), new THREE.MeshStandardMaterial({ color: 0x888890, roughness: 0.5, metalness: 0.3 }));
+    leg.position.set(sx, 0.21, sz); chair.add(leg);
+  }
+  chair.position.set(x, 0, z);
+  scene.add(chair);
+  const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'local');
+  recolorTorso(ped.mesh.userData.parts, 0xc45a3a, 0.7);
+  ped.homeAuntie = true;
+  ped.anchor = { slot: new THREE.Vector3(x, 0.42, z), facing: PI };
+  ped.speed = 0;
+  ped.state = 'idle';
+  ped.heading = PI;
+  if (ped.mesh) {
+    ped.mesh.position.set(x, 0.42, z);
+    ped.mesh.rotation.y = PI;
+    ped.mesh.visible = false;
+  }
+  const paper = new THREE.Group();
+  paper.name = 'home-paper';
+  const sheet = new THREE.Mesh(
+    new THREE.BoxGeometry(0.16, 0.02, 0.2),
+    new THREE.MeshStandardMaterial({ color: 0xf5f0e4, roughness: 0.85 })
+  );
+  paper.add(sheet);
+  const page = new THREE.Mesh(
+    new THREE.BoxGeometry(0.14, 0.004, 0.18),
+    new THREE.MeshStandardMaterial({ color: 0xe8e0d0, roughness: 0.9 })
+  );
+  page.name = 'home-paper-page';
+  page.position.y = 0.014;
+  paper.add(page);
+  const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+  if (parts && parts.foreL) {
+    paper.position.set(0.02, -0.18, 0.1);
+    paper.rotation.set(-0.9, 0.2, 0.15);
+    parts.foreL.add(paper);
+  } else if (ped.mesh) {
+    paper.position.set(-0.12, 0.72, 0.16);
+    ped.mesh.add(paper);
+  }
+  G.homeAuntie = { ped, chair, x, z, t: 0 };
 }
 
 export function spawnMallDirectory(scene) {

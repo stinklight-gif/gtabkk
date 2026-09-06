@@ -356,6 +356,7 @@ export const GAMEPLAY = {
   mallArcade: true,       // two players at Akihabara Arcade cabinets on Terminal 21 floor 1; they hide after 21:00
   gymBag: true,           // a pad man hits the heavy bag at the Muay Thai gym; they hide after 21:00
   starterClerk: true,     // clerk behind the Hua Lamphong starter gun counter; they hide after 21:00
+  homeAuntie: true,       // neighbor sits a plastic chair beside the safehouse door; they hide after 22:00
 };
 G.gameplay = GAMEPLAY;
 
