@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.sevenAtm || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -2498,6 +2498,41 @@ export function spawnSevenGuard(scene) {
   else { torch.position.set(0.2, 0.9, 0.15); ped.mesh.add(torch); }
   beam.visible = false;
   G.sevenGuard = { ped, chair, light, beam, x, z };
+}
+
+export function spawnSevenAtm(scene) {
+  if (!GAMEPLAY.sevenAtm) return;
+  const seven = G.world && G.world.sevenWalkIn;
+  if (!seven || !seven.atm) return;
+  const ax = seven.atm.x, az = seven.atm.z;
+  const queue = [];
+  for (let i = 0; i < 2; i++) {
+    const x = ax + 1.05 + i * 0.8;
+    const z = az + i * 0.18;
+    const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), i === 0 ? 'office' : 'local');
+    ped.sevenAtm = true;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = -PI / 2;
+    ped.anchor = { slot: new THREE.Vector3(x, 0, z), facing: -PI / 2 };
+    if (ped.mesh) {
+      ped.mesh.rotation.y = -PI / 2;
+      ped.mesh.visible = false;
+    }
+    if (i === 0 && ped.mesh) {
+      const card = new THREE.Mesh(
+        new THREE.BoxGeometry(0.08, 0.05, 0.004),
+        new THREE.MeshStandardMaterial({ color: 0xc45a18, roughness: 0.45, metalness: 0.2 })
+      );
+      card.name = 'seven-atm-card';
+      const parts = ped.mesh.userData && ped.mesh.userData.parts;
+      if (parts && parts.foreR) { card.position.set(0.02, -0.28, 0.06); parts.foreR.add(card); }
+      else { card.position.set(0.22, 1.05, 0.12); ped.mesh.add(card); }
+      ped._atmCard = card;
+    }
+    queue.push(ped);
+  }
+  G.sevenAtm = { queue, ax, az, t: 0 };
 }
 
 export function spawnBtsSitters(scene) {

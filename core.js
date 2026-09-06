@@ -320,6 +320,7 @@ export const GAMEPLAY = {
   songthaewRiders: true,  // passengers sit the BTS songthaew bench; hop off when you take it
   watSweep: true,         // monks sweep the wat courtyard at dawn
   yaoGold: true,          // gold-shop window on Yaowarat; shoppers after dark
+  sevenAtm: true,         // a short queue at the walk-in 7-Eleven ATM
 };
 G.gameplay = GAMEPLAY;
 
