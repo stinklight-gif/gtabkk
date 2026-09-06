@@ -1143,9 +1143,18 @@ async function main() {
       window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
       if (G.input && G.input.endFrame) G.input.endFrame();
       const smoke = s.mesh && s.mesh.getObjectByName('incense');
+      const list = G.world.shrines || [];
+      let spread = true;
+      for (let i = 0; i < list.length; i++) {
+        for (let j = i + 1; j < list.length; j++) {
+          const a = list[i] && list[i].pos, b = list[j] && list[j].pos;
+          if (!a || !b || Math.hypot(a.x - b.x, a.z - b.z) <= 2) spread = false;
+        }
+      }
       return {
         flag: !!(G.gameplay && G.gameplay.spiritWai),
-        n: (G.world.shrines || []).length,
+        n: list.length,
+        spread,
         paid: G.cash === 40,
         cooled: G.wanted.lastSeenAt < seen0 - 1000,
         count: G._waiCount,
@@ -1153,7 +1162,7 @@ async function main() {
         lit: (s.incenseT || 0) > 4,
       };
     });
-    assert(wai.flag && wai.n >= 4, `spirit houses exist (${wai.n})`);
+    assert(wai.flag && wai.n >= 4 && wai.spread, `spirit houses exist (${wai.n})`);
     assert(wai.paid && wai.cooled && wai.count >= 1, 'wai costs ฿10 and cools wanted contact');
     assert(wai.incense && wai.lit, 'wai lights the incense plume');
 
