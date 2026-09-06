@@ -4393,6 +4393,30 @@ export function updateWatLotus(dt) {
     ped.speed = 0;
     ped.state = 'idle';
   }
+  const merit = G.watMerit;
+  if (merit) {
+    merit.t = (merit.t || 0) + dt;
+    const mp = merit.ped;
+    if (mp && mp.mesh) {
+      mp.watLotus = true;
+      mp.watMerit = true;
+      mp.mesh.visible = open;
+      if (open) {
+        const slot = mp.anchor && mp.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(merit.t * 2.2) * 0.05;
+          mp.mesh.position.set(slot.x, 0, slot.z + bob);
+          mp.heading = mp.anchor.facing;
+          mp.mesh.rotation.y = mp.heading;
+        }
+        const tray = mp.mesh.getObjectByName('wat-merit-tray');
+        if (tray) tray.rotation.z = Math.sin(merit.t * 4.2) * 0.35;
+      }
+      mp.speed = 0;
+      mp.state = 'idle';
+    }
+    if (merit.box) merit.box.visible = true;
+  }
   if (!open || G.player.inVehicle || G._eating) return;
   const pp = G.player.group.position;
   if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) return;

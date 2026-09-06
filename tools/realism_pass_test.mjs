@@ -6534,6 +6534,42 @@ async function main() {
     });
     assert(gymWait.flag && gymWait.rec && gymWait.wrap && gymWait.near, 'a fighter waits at the Muay Thai gym');
     assert(gymWait.night && gymWait.day && gymWait.shifted && gymWait.swung, 'they hide after 21:00 and the hand wrap turns');
+
+    console.log('\n[185] wat merit-box attendant');
+    const watMerit = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.watMerit;
+      const ped = c && c.ped;
+      const tray = !!(ped && ped.mesh && ped.mesh.getObjectByName('wat-merit-tray'));
+      const box = !!(c && c.box && c.box.name === 'wat-merit-box');
+      const temple = G.world && G.world.poi && G.world.poi.temple;
+      const near = !!(c && temple && Math.hypot(c.x - temple.x, c.z - temple.z) < 16);
+      G.time.dayT = 19 / 24;
+      main.updateWatLotus(0.05);
+      const night = !!(ped && ped.mesh && ped.mesh.visible === false);
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updateWatLotus(0.05);
+      const day = !!(ped && ped.watLotus && ped.watMerit && ped.mesh && ped.mesh.visible);
+      const z0 = ped && ped.mesh ? ped.mesh.position.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateWatLotus(0.05);
+      const shifted = !!(ped && ped.mesh && Math.abs(ped.mesh.position.z - z0) > 0.02);
+      const tool = ped && ped.mesh && ped.mesh.getObjectByName('wat-merit-tray');
+      if (c) c.t = 0.2;
+      main.updateWatLotus(0.05);
+      const r0 = tool ? tool.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 4.2;
+      main.updateWatLotus(0.05);
+      const swung = !!(tool && Math.abs(tool.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.watLotus),
+        rec: !!(ped && ped.watLotus && ped.watMerit),
+        tray, box, near, night, day, shifted, swung,
+      };
+    });
+    assert(watMerit.flag && watMerit.rec && watMerit.tray && watMerit.box && watMerit.near, 'a merit-box attendant waits at the wat gate');
+    assert(watMerit.night && watMerit.day && watMerit.shifted && watMerit.swung, 'they hide after 18:00 and the gold tray turns');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
