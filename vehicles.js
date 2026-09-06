@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {
   makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, UPGRADES, rankDiscount, ROAD_WIDTH, PED_TARGET, GAMEPLAY, trafficTarget, inYaowarat, inFlood, onSoi, onCarriageway, inAirport, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
-import { tip, cycleWeapon, damagePlayer, firePistol, fireSMG, fireShotgun, makeExplosion, makeSmokeEmitter, makeVehicle, onCopKilled, raiseWanted, resolveVehicleVsBuildings, resolveVehicleVsVehicles, saveGame, spawnSkid, updateCop, vehicleName } from './main.js';
+import { tip, cycleWeapon, damagePlayer, firePistol, fireSMG, fireShotgun, makeExplosion, makeSmokeEmitter, makeVehicle, onCopKilled, raiseWanted, resolveVehicleVsBuildings, resolveVehicleVsVehicles, saveGame, spawnSkid, updateCop, updateCopBoat, vehicleName } from './main.js';
 import { attachTrafficPillion, syncBikeRider } from './entities.js';
 import { lightFor } from './traffic.js';
 
@@ -386,7 +386,8 @@ export function updateVehicles(dt) {
     }
     if (v.driver !== 'player' && !v.npc) applyLooseImpactMotion(v, dt);
     if (v.driver === 'player') continue;
-    if (v.spec && v.spec.kind === 'boat' && v.npc) updateNpcBoat(v, dt);
+    if (v.spec && v.spec.kind === 'boat' && v.isCop && v.driver) updateCopBoat(v, dt);
+    else if (v.spec && v.spec.kind === 'boat' && v.npc) updateNpcBoat(v, dt);
     else if (v.isCop && v.driver) updateCop(v, dt);
     else if (v.npc) updateTrafficCar(v, dt);
     // damage smoke
@@ -616,8 +617,9 @@ export function updateTrafficCar(v, dt) {
   if (GAMEPLAY.nightCheckpoint && G.checkpoint && G.checkpoint.active) {
     const dx = v.pos.x - G.checkpoint.x, dz = v.pos.z - G.checkpoint.z;
     if (dx * dx + dz * dz < 18 * 18) {
-      obstacleTarget = Math.min(obstacleTarget, 3.2);
-      signalTarget = Math.min(signalTarget, 3.2);
+      const cap = (GAMEPLAY.twoAmCheckpoint && G.checkpoint.late) ? 2.2 : 3.2;
+      obstacleTarget = Math.min(obstacleTarget, cap);
+      signalTarget = Math.min(signalTarget, cap);
     }
   }
   const target = Math.min(obstacleTarget, signalTarget);

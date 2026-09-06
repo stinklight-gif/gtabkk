@@ -11,7 +11,7 @@ export function updatePlayer(dt) {
   const p = G.player;
   if (p.inVehicle) { updatePlayerInVehicle(dt); return; }
   if (G._btsRide) return;
-  if (G._eating) {
+  if (G._eating || G._barberCut) {
     p.velocity.x = 0; p.velocity.z = 0;
     return;
   }
@@ -364,7 +364,7 @@ export function updateCollectibles(dt) {
 
 export function updateInteraction(dt) {
   const p = G.player;
-  if (p.inVehicle || G._btsRide || G._eating) return;
+  if (p.inVehicle || G._btsRide || G._eating || G._barberCut) return;
   const pp0 = p.group.position;
   if (GAMEPLAY.stallSit && G.world.foodStalls) {
     for (const f of G.world.foodStalls) if (dist2(f.pos, pp0) < 2.4 * 2.4) return;
@@ -375,12 +375,96 @@ export function updateInteraction(dt) {
   if (GAMEPLAY.iceCart && G.iceCarts) {
     for (const c of G.iceCarts) if (c.mesh && dist2(c.mesh.position, pp0) < 2.2 * 2.2) return;
   }
-  if (GAMEPLAY.lottery && G.lottery && G.lottery.pos && dist2(G.lottery.pos, pp0) < 2.4 * 2.4) return;
+  if (GAMEPLAY.lottery) {
+    for (const L of [G.lottery, G.southLottery, G.westLottery, G.eastLottery]) {
+      if (L && L.pos && dist2(L.pos, pp0) < 2.4 * 2.4) return;
+    }
+  }
+  if (GAMEPLAY.kanomKrok) {
+    for (const c of [G.kanomKrok, G.southKanomKrok, G.westKanomKrok, G.eastKanomKrok]) {
+      if (c && c.mesh && dist2(c.mesh.position, pp0) < 2.4 * 2.4) return;
+    }
+  }
+  if (GAMEPLAY.squidGrill && G.squidGrill && G.squidGrill.mesh && dist2(G.squidGrill.mesh.position, pp0) < 2.4 * 2.4) return;
   if (GAMEPLAY.coconutCart && G.coconutCarts) {
     for (const c of G.coconutCarts) if (c.mesh && dist2(c.mesh.position, pp0) < 2.2 * 2.2) return;
   }
   if (GAMEPLAY.mooPing && G.mooPing) {
     for (const c of G.mooPing) if (c.mesh && dist2(c.mesh.position, pp0) < 2.2 * 2.2) return;
+  }
+  if (GAMEPLAY.somTam && G.somTam) {
+    for (const c of G.somTam) if (c.mesh && dist2(c.mesh.position, pp0) < 2.2 * 2.2) return;
+  }
+  if (GAMEPLAY.btsMalai) {
+    for (const c of [G.btsMalai, G.phromMalai]) {
+      if (c && c.mesh && dist2(c.mesh.position, pp0) < 2.4 * 2.4) return;
+    }
+  }
+  if (GAMEPLAY.mangoSticky) {
+    for (const c of [G.mangoSticky, G.phromMango]) {
+      if (c && c.mesh && dist2(c.mesh.position, pp0) < 2.4 * 2.4) return;
+    }
+  }
+  if (GAMEPLAY.plaKat && G.plaKat && G.plaKat.mesh && dist2(G.plaKat.mesh.position, pp0) < 2.4 * 2.4) return;
+  if (GAMEPLAY.chaYen && G.chaYen) {
+    for (const c of G.chaYen) if (c.mesh && dist2(c.mesh.position, pp0) < 2.2 * 2.2) return;
+  }
+  if (GAMEPLAY.rotiCart && G.rotiCart) {
+    for (const c of G.rotiCart) if (c.mesh && dist2(c.mesh.position, pp0) < 2.2 * 2.2) return;
+  }
+  if (GAMEPLAY.soiBarber && G.soiBarber && dist2({ x: G.soiBarber.x, z: G.soiBarber.z }, pp0) < 2.6 * 2.6) return;
+  if (GAMEPLAY.btsGates) {
+    for (const st of [G.btsGates, G.phromGates]) {
+      if (!st) continue;
+      if (st.machine && dist2(st.machine.position, pp0) < 2.4 * 2.4) return;
+      if (st.gates) {
+        for (const g of st.gates) if (g.mesh && dist2(g.mesh.position, pp0) < 2.2 * 2.2) return;
+      }
+    }
+  }
+  if (GAMEPLAY.dawnAlms && G._alms) {
+    for (const ped of G._alms) {
+      if (ped && ped.mesh && !ped.dead && dist2(ped.mesh.position, pp0) < 2.2 * 2.2) return;
+    }
+  }
+  if (GAMEPLAY.boatNoodle && G.boatNoodle && G.boatNoodle.mesh && dist2(G.boatNoodle.mesh.position, pp0) < 3.6 * 3.6) return;
+  if (GAMEPLAY.pierWait && G.pierWait && G.pierWait.mesh && dist2(G.pierWait.mesh.position, pp0) < 2.4 * 2.4) return;
+  if (GAMEPLAY.watBell && G.watBell && dist2({ x: G.watBell.x, z: G.watBell.z }, pp0) < 2.8 * 2.8) return;
+  if (GAMEPLAY.watDrum && G.watDrum && dist2({ x: G.watDrum.x, z: G.watDrum.z }, pp0) < 2.8 * 2.8) return;
+  if (GAMEPLAY.btsBusker) {
+    for (const c of [G.btsBusker, G.phromBusker]) {
+      if (c && dist2({ x: c.x, z: c.z }, pp0) < 2.4 * 2.4) return;
+    }
+  }
+  if (GAMEPLAY.watLotus && G.watLotus && G.watLotus.mesh && dist2(G.watLotus.mesh.position, pp0) < 2.4 * 2.4) return;
+  if (GAMEPLAY.watAmulet && G.watAmulet && G.watAmulet.mesh && dist2(G.watAmulet.mesh.position, pp0) < 2.4 * 2.4) return;
+  if (GAMEPLAY.watFeed && G.watFeed && dist2({ x: G.watFeed.x, z: G.watFeed.z }, pp0) < 2.4 * 2.4) return;
+  if (GAMEPLAY.btsPaper) {
+    for (const c of [G.btsPaper, G.phromPaper]) {
+      if (c && c.mesh && dist2(c.mesh.position, pp0) < 2.4 * 2.4) return;
+    }
+  }
+  if (GAMEPLAY.yaoDuck && G.yaoDuck && G.yaoDuck.mesh && dist2(G.yaoDuck.mesh.position, pp0) < 2.4 * 2.4) return;
+  if (GAMEPLAY.yaoFortune && G.yaoFortune && G.yaoFortune.mesh && dist2(G.yaoFortune.mesh.position, pp0) < 2.4 * 2.4) return;
+  if (GAMEPLAY.sevenSlush) {
+    for (const c of [G.sevenSlush, G.southSevenSlush, G.westSevenSlush, G.eastSevenSlush]) {
+      if (c && c.mesh && dist2(c.mesh.position, pp0) < 2.4 * 2.4) return;
+    }
+  }
+  if (GAMEPLAY.phromFruit) {
+    for (const c of [G.phromFruit, G.asokFruit]) {
+      if (c && c.mesh && dist2(c.mesh.position, pp0) < 2.4 * 2.4) return;
+    }
+  }
+  if (GAMEPLAY.btsShine) {
+    for (const c of [G.btsShine, G.phromShine]) {
+      if (c && c.mesh && dist2(c.mesh.position, pp0) < 2.4 * 2.4) return;
+    }
+  }
+  if (GAMEPLAY.mallDir) {
+    for (const c of [G.mallDir, G.mallDirB]) {
+      if (c && c.mesh && dist2(c.mesh.position, pp0) < 2.8 * 2.8) return;
+    }
   }
 
   const crate = G.world.yaowaratCrate;

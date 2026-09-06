@@ -72,7 +72,27 @@ export function spawnFortuner(scene, pos) {
   return v;
 }
 
-// Armored SWAT van — the 4★ unit. isCop, reuses the cop chase/damage paths.
+export function spawnCopBoat(scene, pos) {
+  const v = makeVehicle('boat', scene);
+  v.pos.copy(pos);
+  v.pos.y = 0.3;
+  v.mesh.position.copy(v.pos);
+  v.heading = 0;
+  v.driver = 'cop';
+  v.isCop = true;
+  v.npc = null;
+  v.hp = 160;
+  v.vel = 0;
+  const lampR = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.12, 0.22), new THREE.MeshBasicMaterial({ color: 0xff2222 }));
+  lampR.position.set(-0.35, 1.15, 1.4);
+  v.mesh.add(lampR);
+  const lampB = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.12, 0.22), new THREE.MeshBasicMaterial({ color: 0x2266ff }));
+  lampB.position.set(0.35, 1.15, 1.4);
+  v.mesh.add(lampB);
+  v.mesh.userData.copLamps = [lampR, lampB];
+  return v;
+}
+
 export function spawnSwat(scene, pos) {
   const v = makeVehicle('swat', scene);
   v.pos.copy(pos);
@@ -149,7 +169,18 @@ export function updateWanted(dt) {
       sx = clamp(road + 2.5, -200, HALF - 5);
     }
     if (sx < -200) sx = -200;
-    if (G.wanted.stars >= 5 && Math.random() < 0.7) {
+    const onBoat = GAMEPLAY.longtailChase && G.player.inVehicle && G.player.inVehicle.spec && G.player.inVehicle.spec.kind === 'boat';
+    if (onBoat) {
+      let boats = 0;
+      for (const cv of G.vehicles) if (cv.isCop && cv.spec && cv.spec.kind === 'boat' && !cv.dead) boats++;
+      if (boats < 2) {
+        const behind = (Math.random() < 0.5 ? -1 : 1) * rand(30, 58);
+        const z = clamp(p.z + behind, -240, 240);
+        const boat = spawnCopBoat(G.scene, new THREE.Vector3(-224, 0.3, z));
+        boat.heading = z < p.z ? 0 : PI;
+        boat.vel = 9;
+      }
+    } else if (G.wanted.stars >= 5 && Math.random() < 0.7) {
       const s = spawnSwat(G.scene, new THREE.Vector3(sx, 0, sz));
       s.vel = 7;
     } else if (G.wanted.stars >= 4 && Math.random() < 0.5) {
@@ -319,6 +350,7 @@ export function updateHelicopter(dt) {
 function maybeAmbush() {
   const p = G.player;
   if (G.wanted.stars < 3 || !p.inVehicle) return;
+  if (p.inVehicle.spec && p.inVehicle.spec.kind === 'boat') return;
   if (performance.now() < (G._ambushCD || 0)) return;
   // don't pile cop cars onto the road indefinitely — respect a population cap
   let copCars = 0;
@@ -338,6 +370,35 @@ function maybeAmbush() {
     car.heading = v.heading + PI / 2; car.vel = 0; n++; copCars++;
   }
   if (n) G.hud.showNotif('🚧 Roadblock ahead!');
+}
+
+export function updateCopBoat(v, dt) {
+  const p = G.player;
+  const ride = p.inVehicle;
+  const onBoat = !!(ride && ride.spec && ride.spec.kind === 'boat');
+  const tx = onBoat ? ride.pos.x : -220;
+  const tz = onBoat ? ride.pos.z : p.group.position.z;
+  const dx = tx - v.pos.x, dz = tz - v.pos.z;
+  const d = Math.hypot(dx, dz);
+  const prevHeading = v.heading;
+  v.heading = lerpAngle(v.heading, Math.atan2(dx, dz), 0.08);
+  const want = d > 10 ? (v.spec.topSpeed || 18) * 0.9 : (d < 5 ? 4 : 8);
+  if (v.vel < want) v.vel += (v.spec.accel || 8) * dt;
+  else v.vel -= (v.spec.brake || 7) * dt;
+  v.pos.x += Math.sin(v.heading) * v.vel * dt;
+  v.pos.z += Math.cos(v.heading) * v.vel * dt;
+  v.pos.x = clamp(v.pos.x, -248, -210);
+  v.pos.z = clamp(v.pos.z, -246, 246);
+  v.pos.y = 0.3 + Math.sin(performance.now() * 0.002 + v.pos.z * 0.15) * 0.06;
+  let headingDelta = v.heading - prevHeading;
+  while (headingDelta > PI) headingDelta -= TAU;
+  while (headingDelta < -PI) headingDelta += TAU;
+  v.steerAngle = lerp(v.steerAngle || 0, clamp(headingDelta * 6, -0.5, 0.5), 0.28);
+  v.mesh.position.copy(v.pos);
+  v.mesh.rotation.y = v.heading;
+  v.mesh.rotation.z = Math.sin(performance.now() * 0.0016 + v.pos.z * 0.1) * 0.03;
+  updateVehicleVisuals(v, dt, { braking: want < v.vel, reverse: v.vel < -0.1 });
+  if (onBoat && dist2(v.pos, ride.pos) < 5 * 5) ride.hp -= 6 * dt;
 }
 
 export function updateCop(v, dt) {
@@ -383,6 +444,27 @@ export function updateCop(v, dt) {
   const target = d > 8 ? v.spec.topSpeed * 0.7 : (d < 4 ? 0 : 4);
   if (v.vel < target) v.vel += v.spec.accel * dt;
   else v.vel -= v.spec.brake * dt;
+  // Bangkok sois are too tight for a patrol car. Foot cops still walk them;
+  // four-wheel units dump speed at the mouth instead of grinding the laundry.
+  const fat = v.spec && v.spec.kind !== 'bike' && v.spec.kind !== 'tuktuk' && v.spec.kind !== 'boat';
+  if (GAMEPLAY.copSoiBlock && fat) {
+    const look = Math.max(3.2, Math.abs(v.vel) * 0.35);
+    const nx = v.pos.x + Math.sin(v.heading) * look;
+    const nz = v.pos.z + Math.cos(v.heading) * look;
+    const here = onSoi(v.pos.x, v.pos.z);
+    const ahead = onSoi(nx, nz);
+    if (ahead && !here) {
+      v.vel = Math.max(0, v.vel - v.spec.brake * 2.2 * dt);
+      v._soiBlocked = true;
+    } else if (here) {
+      const roadX = Math.round(v.pos.x / BLOCK) * BLOCK;
+      const roadZ = Math.round(v.pos.z / BLOCK) * BLOCK;
+      const preferX = Math.abs(v.pos.x - roadX) <= Math.abs(v.pos.z - roadZ);
+      v.heading = preferX ? (v.pos.x < roadX ? PI / 2 : -PI / 2) : (v.pos.z < roadZ ? 0 : PI);
+      v.vel = Math.max(3.5, v.vel);
+      v._soiBlocked = true;
+    } else v._soiBlocked = false;
+  }
   let headingDelta = v.heading - prevHeading;
   while (headingDelta > PI) headingDelta -= TAU;
   while (headingDelta < -PI) headingDelta += TAU;

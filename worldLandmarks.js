@@ -438,11 +438,22 @@ export function buildLandmarks(env) {
 
   // ---- Shrines (spirit houses) — small gold structures ----
   world.shrines = [];
+  const shrineCells = new Set();
   for (let n = 0; n < 6; n++) {
-    const sp = new THREE.Vector3(rand(-HALF+40, HALF-40), 0, rand(-HALF+40, HALF-40));
-    // snap inside a block, not on a road
-    sp.x = Math.round(sp.x / BLOCK) * BLOCK + (sp.x < 0 ? BLOCK/2-15 : -BLOCK/2+15);
-    sp.z = Math.round(sp.z / BLOCK) * BLOCK + (sp.z < 0 ? BLOCK/2-15 : -BLOCK/2+15);
+    let sp = new THREE.Vector3(), key = '', tries = 0;
+    do {
+      sp = new THREE.Vector3(rand(-HALF+40, HALF-40), 0, rand(-HALF+40, HALF-40));
+      // snap inside a block, not on a road
+      sp.x = Math.round(sp.x / BLOCK) * BLOCK + (sp.x < 0 ? BLOCK/2-15 : -BLOCK/2+15);
+      sp.z = Math.round(sp.z / BLOCK) * BLOCK + (sp.z < 0 ? BLOCK/2-15 : -BLOCK/2+15);
+      key = `${sp.x},${sp.z}`;
+      tries++;
+    } while (shrineCells.has(key) && tries < 48);
+    if (shrineCells.has(key)) {
+      sp.x += BLOCK;
+      key = `${sp.x},${sp.z}`;
+    }
+    shrineCells.add(key);
     const shrine = new THREE.Group();
     const base = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.2, 1.5), new THREE.MeshStandardMaterial({ color: 0xc6a056, roughness: 0.4, metalness: 0.6 }));
     base.position.y = 0.6; shrine.add(base);

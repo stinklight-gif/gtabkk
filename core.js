@@ -247,7 +247,7 @@ export const GAMEPLAY = {
   btsHijack: true,
   fireAtTen: true,
   allRed: true,
-  airport: true,
+  airport: true,          // Suvarnabhumi pocket; windsock, runway lights, tower beacon after dark
   btsRide: true,
   talkChase: true,
   yaowaratNight: true,
@@ -259,36 +259,112 @@ export const GAMEPLAY = {
   schoolKids: true,       // morning uniforms walking the sois toward the BTS
   seekShade: true,        // midday / haze: wanderers pull onto walkways and stop
   stallSit: true,         // E to sit at a food stall, pay, eat, heal
-  spiritWai: true,        // E at a spirit house: incense, heat cools
+  spiritWai: true,        // E at a spirit house: incense, heat cools; keepers tend all six houses by day
   soiCats: true,          // cats loaf at food stalls and bolt when you get close
   btsPlatform: true,      // commuters wait on Asok / Phrom Phong; PA when the train pulls in
   bikeHelmets: true,      // helmeted riders on bikes; stand/pillion heads get lids too
   officeCommute: true,    // evening office crowd walking the sois toward the BTS
   afternoonStorm: true,   // after the heat, a Gulf thunderstorm breaks mid-afternoon
-  crossingGuard: true,    // yellow-vest stop-paddle at Asok during the school walk
-  btsMotosai: true,       // extra orange-vest stand at the Asok BTS escalator mouth
+  crossingGuard: true,    // yellow-vest stop-paddle at Asok and Phrom Phong during the school walk
+  btsMotosai: true,       // extra orange-vest stands at the Asok and Phrom Phong BTS mouths
   rainPack: true,         // food stalls pack tarps and queues when the rain hits
-  btsSongthaew: true,     // parked songthaew + hawker at the Asok BTS exit
+  btsSongthaew: true,     // parked songthaew + hawker at the Asok and Phrom Phong BTS exits
   iceCart: true,          // vendor ice carts patrol the sois and ding
-  btsTuktuk: true,        // parked tuk-tuk + driver at the Asok BTS exit
+  btsTuktuk: true,        // parked tuk-tuk + driver at the Asok and Phrom Phong BTS exits
   khlongMonitor: true,    // water monitors loaf on the river bank and bolt
   stallGecko: true,       // tiny geckos on stall parasols after dark
   soiFootball: true,      // after-school kickabout in a soi
   mallShoppers: true,     // evening bags walking from Terminal 21 to the BTS
-  lottery: true,          // Government Lottery board outside 7-Eleven; E buys a ticket
+  lottery: true,          // Government Lottery boards outside every 7-Eleven storefront; E buys a ticket
   watChant: true,         // dawn and dusk chant from the wat when you're nearby
   coconutCart: true,      // green-coconut cart on a soi; E for a drink
   soiLaundry: true,       // clothes lines strung across sois
   nightCheckpoint: true,  // night cones + flashlight cop; blow through and you get a star
-  sevenBikes: true,       // parked motorbike cluster outside the walk-in 7-Eleven
+  sevenBikes: true,       // parked motorbike clusters outside every 7-Eleven storefront
   hyacinth: true,         // water hyacinth mats drift on the khlong
-  btsSitters: true,       // people sit on the Asok BTS escalator with their phones
+  btsSitters: true,       // people sit the Asok and Phrom Phong BTS escalators with their phones
   mooPing: true,          // grilled-pork cart on a soi; E for a skewer
   watTurtles: true,       // turtles paddle the pond at the wat
-  sevenGuard: true,       // plastic-chair security at the walk-in 7-Eleven
+  sevenGuard: true,       // plastic-chair security at every 7-Eleven storefront
   soiPa: true,            // village PA horns on soi poles; crackle at dawn and afternoon
   soiChairs: true,        // plastic chairs + beer crates; drinkers sit after dark
   soiMechanic: true,      // paddock-stand bike + mechanic; E repairs your ride for ฿80
+  copSoiBlock: true,      // cop cars (not bikes) refuse authored sois; they stall at the mouth
+  floodSois: true,        // after a downpour the sois sheet with water; cars crawl, bikes don't
+  dawnAlms: true,         // 5–7h tak bat: monks walk a soi; E offers ฿20 and cools heat
+  soiCowboy: true,        // neon bar strip at the Soi Cowboy kiosk; touts after 20:00
+  phonePlaces: true,      // phone directory rows that were "somewhere" now point at a place
+  longtailChase: true,    // steal a longtail with stars and river cops chase in the channel
+  boatNoodle: true,       // kuay teow reua: a noodle boat works the pier; E for a bowl
+  twoAmCheckpoint: true,  // 1:30–3:40 ด่าน: spike strip across the lane; blow through is 2★
+  somTam: true,           // som tam cart on a soi; pestle, E for a plate
+  btsMalai: true,         // phuang malai vendor at Asok and Phrom Phong BTS; E buys a garland
+  cowboyClose: true,      // 4–5:30h drunks walk from Soi Cowboy toward the BTS
+  plaKat: true,           // fighting-fish bags hanging on a soi; E buys a bag
+  chaYen: true,           // Thai iced-tea cart on a soi; E for a cup
+  soiBarber: true,        // plastic-chair barber on a soi; E for a cut
+  btsGates: true,         // Asok and Phrom Phong ticket gates + Rabbit machines; hop is 1★
+  soiWires: true,         // tangled cables between soi PA poles; sparks in the rain
+  rainFrogs: true,        // frogs hop flooded sois while it rains
+  soiCctv: true,          // soi pole cameras; a shot in view is a ping and 1★
+  rotiCart: true,         // banana roti cart on a soi; E for a fold
+  rainPoncho: true,       // plastic rain capes on motorbike riders when it pours
+  bikeSeatCover: true,    // plastic seat covers on parked 7-Eleven bikes in the rain
+  watBell: true,          // temple bell at the wat; E rings it and cools last-seen; a monk tends it at dawn and dusk
+  stallIncense: true,     // mosquito coils hang under stall parasols; glow after dusk
+  mangoSticky: true,      // khao niao mamuang carts at Asok and Phrom Phong BTS; evening, E for a plate
+  watBats: true,          // flying foxes circle the wat after dusk
+  yaoPhotos: true,        // tourists stop to snap Yaowarat after 18:00
+  kanomKrok: true,        // coconut pancake pans outside every 7-Eleven storefront; afternoon, E for a bag
+  squidGrill: true,       // grilled-squid cart on Yaowarat after dark; E for a stick
+  songthaewRiders: true,  // passengers sit the BTS songthaew bench; hop off when you take it
+  watSweep: true,         // monks sweep the wat courtyard at dawn
+  yaoGold: true,          // gold-shop window on Yaowarat; shoppers after dark
+  sevenAtm: true,         // ATM queues at the walk-in interior and every outdoor 7-Eleven door
+  btsBusker: true,        // guitar buskers at the Asok and Phrom Phong BTS exits; E tips ฿20
+  watRobes: true,         // saffron robes dry on a line in the wat courtyard
+  btsPigeons: true,       // pigeons loaf the Asok platform by day and scatter
+  watLotus: true,         // lotus stall and merit-box attendants at the wat gates; they hide after 18:00
+  watCats: true,          // temple cats loaf the wat courtyard and bolt when you get close
+  sevenShoppers: true,    // people walk in and out of all four 7-Elevens
+  watFeed: true,          // pellet tin at the wat pond; E feeds the turtles
+  btsPaper: true,         // newspaper racks at Asok and Phrom Phong BTS; morning papers, E for a copy
+  yaoDuck: true,          // roast-duck window on Yaowarat; hanging birds after dark, E for a plate
+  sevenSlush: true,       // slushie machine inside the walk-in 7-Eleven; tanks spin, E for a cup
+  phromFruit: true,       // fruit smoothie carts at Asok and Phrom Phong BTS; blender spins, E for a cup
+  pierWait: true,         // ferry waiters, ticket clerks, and bank fishermen on both pier banks; they hide after 21:00
+  btsShine: true,         // shoe-shine boxes north of Asok and Phrom Phong BTS; E for a polish
+  watAmulet: true,        // amulet board at the wat; E buys one, shrine offering cools extra
+  yaoFortune: true,       // fortune teller on Yaowarat after dark; E for a reading that cools last-seen
+  watDrum: true,          // temple drum opposite the bell; E beats it and cools last-seen
+  mallGuard: true,        // plastic-chair security on both sides of the Terminal 21 entrance; torch after dark
+  bankGuard: true,        // plastic-chair security on both sides of the Krung Thep Bank door; torch after dark
+  mallDir: true,          // directory clerk at the Terminal 21 desk; E names a shop and floor
+  officeSmoke: true,      // office smokers on the north-west Asok and Phrom Phong sidewalks at lunch; ember tips
+  bankQueue: true,        // teller queue inside Krung Thep Bank, plus an outdoor ATM and two tellers behind the counter; they hide after hours
+  mallFood: true,         // eaters sit Pier 21 Food Court at Terminal 21; trays, they hide after 21:00
+  gunClerk: true,         // clerk and customers at the Sukhumvit Gun Shop counter; they hide after hours
+  mallTech: true,         // window shoppers at Tokyo Tech in Terminal 21; phones, they hide after 21:00
+  mallPharm: true,        // pharmacist and a customer at Paris Pharmacy in Terminal 21; they hide after 21:00
+  mallRoma: true,         // clerk and a customer at Roma Boutique in Terminal 21; they hide after 21:00
+  mallWatch: true,        // clerk and a customer at Watch Boutique on Terminal 21 floor 2; they hide after 21:00
+  mallManga: true,        // readers sit Manga Café on Terminal 21 floor 1; they hide after 21:00
+  mallSushi: true,        // chef and a customer at Sushi Bar on Terminal 21 floor 1; they hide after 21:00
+  mallCafe: true,         // barista and a customer at Le Café on Terminal 21 floor 2; they hide after 21:00
+  mallThreads: true,      // clerk and a customer at London Threads on Terminal 21 floor 2; they hide after 21:00
+  mallSeven: true,        // clerk and a customer at the Terminal 21 7-Eleven; they hide after 21:00
+  mallArcade: true,       // two players at Akihabara Arcade cabinets on Terminal 21 floor 1; they hide after 21:00
+  gymBag: true,           // a pad man hits the heavy bag at the Muay Thai gym, plus waiting fighters; they hide after 21:00
+  starterClerk: true,     // clerk and customers at the Hua Lamphong starter gun counter; they hide after 21:00
+  homeAuntie: true,       // neighbors sit plastic chairs beside the safehouse door; they hide after 22:00
+  stationPorter: true,    // red-vest porters and seated passengers on both sides of the Hua Lamphong canopy; they hide after 22:00
+  garageMech: true,       // mechanics on both sides of the U-Spray bay mouth, plus waiting customers; they hide after 19:00
+  klongDock: true,        // dockhands on both sides of the Klong Toey yard and checkers; they hide after 19:00
+  sengClerk: true,        // clerk and window shoppers at Uncle Seng's gold-shop door; they hide after 20:00
+  airportCrew: true,      // marshallers on both sides of the Suvarnabhumi apron; they hide after 21:00
+  airportCargo: true,     // cargo hands on both sides of the south Suvarnabhumi shed; they hide after 19:00
+  airportTower: true,     // controllers on both sides of the Suvarnabhumi tower base; they hide after 22:00
+  airportTaxi: true,      // taxi touts at the north and south Suvarnabhumi curbs, plus baggage at the main, north, and south terminals; they hide after 22:00
 };
 G.gameplay = GAMEPLAY;
 

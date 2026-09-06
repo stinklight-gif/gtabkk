@@ -3,7 +3,7 @@
 // =============================================================================
 import * as THREE from 'three';
 import {
-  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, ROAD_WIDTH, PED_TARGET, GAMEPLAY, TRAFFIC_TARGET, trafficTarget, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
+  makeStaticBaker, PI, TAU, clamp, lerp, rand, irand, pick, sign, dist2, COLORS, G, PRICE, PAINT_COLORS, BUSINESSES, ROAD_WIDTH, PED_TARGET, GAMEPLAY, TRAFFIC_TARGET, trafficTarget, _camTarget, _camOffset, _fireDir, _ray, _bbox, _vBox, _blackColor, disposeObject, BLOCK, GRID, HALF, lerpAngle
 } from './core.js';
 import { attachHeroBike } from './gltf.js';
 
@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.yaowaratNight || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.watBell || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.homeAuntie || ped.stationPorter || ped.garageMech || ped.klongDock || ped.sengClerk || ped.airportCrew || ped.airportCargo || ped.airportTower || ped.airportTaxi || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -843,6 +843,7 @@ export function makePedMesh(forcedKind = null, pos = null) {
     bag.position.set(0, -0.56, 0.02); armR.add(bag);                    // hangs from the hand, swings with the arm
   } else if (kind === 'monk') {
     const bowl = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6, 0, TAU, 0, PI/2), new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.7 }));
+    bowl.name = 'alms-bowl';
     bowl.rotation.x = PI; bowl.position.set(0, 1.0, 0.2); g.add(bowl);
   } else if (kind === 'school') {
     const pack = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.34, 0.16), new THREE.MeshStandardMaterial({ color: pick([0x1c355e, 0xc44a3a, 0x2a5a3a]), roughness: 0.82 }));
@@ -1037,6 +1038,42 @@ export function spawnGeckos(scene) {
     mesh.visible = false;
     scene.add(mesh);
     G.geckos.push({ mesh, home: { x: f.pos.x + ox, y: 1.72, z: f.pos.z + oz }, heading: rand(0, TAU), timer: rand(0.8, 2.4), chirp: rand(2, 6) });
+  }
+}
+
+export function spawnStallIncense(scene) {
+  if (!GAMEPLAY.stallIncense) return;
+  const stalls = (G.world && G.world.foodStalls) || [];
+  G.stallIncense = [];
+  const n = Math.min(4, stalls.length);
+  for (let i = 0; i < n; i++) {
+    const f = stalls[i];
+    const g = new THREE.Group();
+    g.name = 'stall-incense';
+    const coil = new THREE.Mesh(
+      new THREE.TorusGeometry(0.09, 0.018, 6, 10),
+      new THREE.MeshStandardMaterial({ color: 0x4a3a22, roughness: 0.85, emissive: 0xff5510, emissiveIntensity: 0.15 })
+    );
+    coil.name = 'incense-coil';
+    coil.rotation.x = PI / 2;
+    g.add(coil);
+    const glow = new THREE.Mesh(
+      new THREE.SphereGeometry(0.025, 6, 5),
+      new THREE.MeshStandardMaterial({ color: 0xff6622, emissive: 0xff3300, emissiveIntensity: 0.4, roughness: 0.4 })
+    );
+    glow.name = 'incense-ember';
+    glow.position.set(0.09, 0, 0);
+    g.add(glow);
+    const smoke = new THREE.Mesh(
+      new THREE.SphereGeometry(0.08, 6, 5),
+      new THREE.MeshBasicMaterial({ color: 0x887766, transparent: true, opacity: 0.18, depthWrite: false })
+    );
+    smoke.name = 'incense-smoke';
+    smoke.position.set(0.04, 0.12, 0);
+    g.add(smoke);
+    g.position.set(f.pos.x + 0.35, 1.55, f.pos.z + 0.2);
+    scene.add(g);
+    G.stallIncense.push({ mesh: g, coil, glow, smoke, t: i * 0.7, stall: f });
   }
 }
 
@@ -1324,6 +1361,23 @@ export function makeSeatedBikeRider(opts = {}) {
     arm.rotation.z = sx * 0.35;
     g.add(arm);
   }
+  if (GAMEPLAY.rainPoncho) {
+    const cape = new THREE.Mesh(
+      new THREE.ConeGeometry(0.28, 0.5, 6, 1, true),
+      new THREE.MeshStandardMaterial({
+        color: pick([0xffcf4a, 0x2a6aad, 0xe8e8e0]),
+        roughness: 0.35,
+        transparent: true,
+        opacity: 0.78,
+        side: THREE.DoubleSide,
+      })
+    );
+    cape.name = 'rain-poncho';
+    cape.visible = false;
+    cape.position.set(0, 1.12, 0.04);
+    cape.rotation.x = 0.18;
+    g.add(cape);
+  }
   g.position.set(0, 0.02, 0.12);
   return g;
 }
@@ -1376,6 +1430,22 @@ export function attachTrafficPillion(bike) {
   ped.mesh.position.set(0, 0.02, -0.42);
   ped.mesh.rotation.set(0.16, 0, 0);
   wearBikeHelmet(ped, pick([0x1a1a1e, 0xb03030, 0xffcf2a, 0x2a5a8a]));
+  if (GAMEPLAY.rainPoncho && ped.mesh && !ped.mesh.getObjectByName('rain-poncho')) {
+    const cape = new THREE.Mesh(
+      new THREE.ConeGeometry(0.26, 0.55, 6, 1, true),
+      new THREE.MeshStandardMaterial({
+        color: pick([0xffcf4a, 0x2a6aad, 0xe8e8e0]),
+        roughness: 0.35,
+        transparent: true,
+        opacity: 0.78,
+        side: THREE.DoubleSide,
+      })
+    );
+    cape.name = 'rain-poncho';
+    cape.visible = false;
+    cape.position.set(0, 1.22, 0.04);
+    ped.mesh.add(cape);
+  }
   bike.pillionPed = ped;
   return ped;
 }
@@ -1414,28 +1484,34 @@ export function spawnMotosaiStands(scene) {
     G.world.motosaiStands.push({ bike, rider, waiter, soi: s, x, z });
   }
   if (GAMEPLAY.btsMotosai && G.world.bts) {
-    const x = G.world.bts.x + 7.6, z = -22, heading = 0;
-    const bike = makeVehicle('bike', scene);
-    bike.pos.set(x, 0, z);
-    bike.heading = heading;
-    bike.mesh.position.copy(bike.pos);
-    bike.mesh.rotation.y = heading;
-    bike.driver = null;
-    bike.vel = 0;
-    bike.motosaiStand = true;
-    bike._standHome = { x, z, heading };
-    const rider = spawnPed(scene, new THREE.Vector3(x + 1.15, 0, z));
-    dressMotosaiVest(rider);
-    wearBikeHelmet(rider, 0xffcf2a);
-    rider.anchor = { slot: rider.mesh.position.clone(), facing: heading + PI };
-    rider.motosaiRider = true;
-    rider.speed = 0;
-    const waiter = spawnPed(scene, new THREE.Vector3(x + 1.7, 0, z + 0.4));
-    waiter.anchor = { slot: waiter.mesh.position.clone(), facing: heading + PI };
-    waiter.motosaiWait = true;
-    waiter.speed = 0;
-    bike.standRider = rider;
-    G.world.motosaiStands.push({ bike, rider, waiter, soi: null, x, z, bts: true });
+    const ranks = [
+      { x: G.world.bts.x + 7.6, z: -22, stop: 'asok' },
+      { x: 100 + 7.6, z: -20, stop: 'phrom' },
+    ];
+    for (const r of ranks) {
+      const x = r.x, z = r.z, heading = 0;
+      const bike = makeVehicle('bike', scene);
+      bike.pos.set(x, 0, z);
+      bike.heading = heading;
+      bike.mesh.position.copy(bike.pos);
+      bike.mesh.rotation.y = heading;
+      bike.driver = null;
+      bike.vel = 0;
+      bike.motosaiStand = true;
+      bike._standHome = { x, z, heading };
+      const rider = spawnPed(scene, new THREE.Vector3(x + 1.15, 0, z));
+      dressMotosaiVest(rider);
+      wearBikeHelmet(rider, 0xffcf2a);
+      rider.anchor = { slot: rider.mesh.position.clone(), facing: heading + PI };
+      rider.motosaiRider = true;
+      rider.speed = 0;
+      const waiter = spawnPed(scene, new THREE.Vector3(x + 1.7, 0, z + 0.4));
+      waiter.anchor = { slot: waiter.mesh.position.clone(), facing: heading + PI };
+      waiter.motosaiWait = true;
+      waiter.speed = 0;
+      bike.standRider = rider;
+      G.world.motosaiStands.push({ bike, rider, waiter, soi: null, x, z, bts: r.stop === 'asok' ? true : r.stop });
+    }
   }
 }
 
@@ -1460,38 +1536,403 @@ export function makeIceCartMesh() {
 
 export function spawnLottery(scene) {
   if (!GAMEPLAY.lottery) return;
-  const seven = G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0]));
-  if (!seven || !seven.pos) return;
-  const hz = seven.hz || 4;
-  const x = seven.pos.x + 2.4;
-  const z = seven.pos.z + hz + 1.6;
-  const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'vendor');
-  ped.lottery = true;
-  ped.anchor = { slot: ped.mesh.position.clone(), facing: PI };
-  ped.speed = 0;
-  ped.state = 'idle';
-  const board = new THREE.Group();
-  board.name = 'lottery-board';
-  const pole = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.04, 0.05, 1.45, 6),
-    new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.6 })
-  );
-  pole.position.y = 0.72; board.add(pole);
-  const sheet = new THREE.Mesh(
-    new THREE.BoxGeometry(0.72, 0.95, 0.04),
-    new THREE.MeshStandardMaterial({ color: 0xf5e6a3, roughness: 0.7 })
-  );
-  sheet.position.set(0, 1.38, 0.05); board.add(sheet);
-  for (let r = 0; r < 4; r++) {
-    const strip = new THREE.Mesh(
-      new THREE.BoxGeometry(0.56, 0.12, 0.02),
-      new THREE.MeshStandardMaterial({ color: pick([0xc03030, 0x2a7d3a, 0x2a4a8a, 0xd9a020]), roughness: 0.55 })
+  const pack = (seven) => {
+    if (!seven || !seven.pos) return null;
+    const hz = seven.hz || 4;
+    const x = seven.pos.x + 2.4;
+    const z = seven.pos.z + hz + 1.6;
+    const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'vendor');
+    ped.lottery = true;
+    ped.anchor = { slot: ped.mesh.position.clone(), facing: PI };
+    ped.speed = 0;
+    ped.state = 'idle';
+    const board = new THREE.Group();
+    board.name = 'lottery-board';
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.04, 0.05, 1.45, 6),
+      new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.6 })
     );
-    strip.position.set(0, 1.62 - r * 0.18, 0.08); board.add(strip);
+    pole.position.y = 0.72; board.add(pole);
+    const sheet = new THREE.Mesh(
+      new THREE.BoxGeometry(0.72, 0.95, 0.04),
+      new THREE.MeshStandardMaterial({ color: 0xf5e6a3, roughness: 0.7 })
+    );
+    sheet.position.set(0, 1.38, 0.05); board.add(sheet);
+    for (let r = 0; r < 4; r++) {
+      const strip = new THREE.Mesh(
+        new THREE.BoxGeometry(0.56, 0.12, 0.02),
+        new THREE.MeshStandardMaterial({ color: pick([0xc03030, 0x2a7d3a, 0x2a4a8a, 0xd9a020]), roughness: 0.55 })
+      );
+      strip.position.set(0, 1.62 - r * 0.18, 0.08); board.add(strip);
+    }
+    board.position.set(x - 0.5, 0, z + 0.2);
+    scene.add(board);
+    return { ped, board, pos: new THREE.Vector3(x, 0, z), readyAt: 0 };
+  };
+  G.lottery = pack(G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0])));
+  const south = (G.world.sevenElevens || []).find(s => s && s.pos && Math.abs(s.pos.x) < 8 && s.pos.z < -80);
+  G.southLottery = pack(south);
+  const west = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x < -50 && s.pos.z > 0 && s.pos.z < 60);
+  G.westLottery = pack(west);
+  const east = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x > 100 && s.pos.z < 0 && s.pos.z > -80);
+  G.eastLottery = pack(east);
+}
+
+export function makeKanomKrokMesh() {
+  const g = new THREE.Group();
+  g.name = 'kanomkrok-cart';
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.48, 1.15), new THREE.MeshStandardMaterial({ color: 0x6a3a18, roughness: 0.8 }));
+  box.position.y = 0.46; g.add(box);
+  const pan = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.34, 0.34, 0.06, 12),
+    new THREE.MeshStandardMaterial({ color: 0x3a3a40, roughness: 0.4, metalness: 0.45, emissive: 0x331808, emissiveIntensity: 0.2 })
+  );
+  pan.name = 'kanom-pan';
+  pan.position.set(0, 0.74, 0.06);
+  g.add(pan);
+  const cakeMat = new THREE.MeshStandardMaterial({ color: 0xe8c070, roughness: 0.65 });
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * TAU;
+    const cake = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.06, 0.04, 6), cakeMat);
+    cake.name = 'kanom-cake';
+    cake.position.set(Math.sin(a) * 0.2, 0.79, 0.06 + Math.cos(a) * 0.2);
+    g.add(cake);
   }
-  board.position.set(x - 0.5, 0, z + 0.2);
-  scene.add(board);
-  G.lottery = { ped, board, pos: new THREE.Vector3(x, 0, z), readyAt: 0 };
+  const ladle = new THREE.Mesh(
+    new THREE.BoxGeometry(0.04, 0.01, 0.28),
+    new THREE.MeshStandardMaterial({ color: 0x888890, metalness: 0.45, roughness: 0.4 })
+  );
+  ladle.name = 'kanom-ladle';
+  ladle.position.set(0.16, 0.88, 0.08);
+  g.add(ladle);
+  const umb = new THREE.Mesh(
+    new THREE.ConeGeometry(0.68, 0.24, 8),
+    new THREE.MeshStandardMaterial({ color: 0xc03030, roughness: 0.7, side: THREE.DoubleSide })
+  );
+  umb.position.y = 1.88; umb.rotation.x = PI; g.add(umb);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.0, 5), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+  pole.position.y = 1.35; g.add(pole);
+  const tire = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+  for (const z of [-0.38, 0.38]) for (const x of [-0.3, 0.3]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 8), tire);
+    w.rotation.z = PI / 2; w.position.set(x, 0.12, z); g.add(w);
+  }
+  return g;
+}
+
+export function spawnKanomKrok(scene) {
+  if (!GAMEPLAY.kanomKrok) return;
+  const pack = (seven) => {
+    if (!seven || !seven.pos) return null;
+    const hz = seven.hz || 4;
+    const x = seven.pos.x - 2.2;
+    const z = seven.pos.z + hz + 1.6;
+    const mesh = makeKanomKrokMesh();
+    mesh.position.set(x, 0, z);
+    scene.add(mesh);
+    const vendor = spawnPed(scene, new THREE.Vector3(x + 0.65, 0, z + 0.1), 'vendor');
+    vendor.kanom = true;
+    vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI };
+    vendor.speed = 0;
+    vendor.state = 'idle';
+    vendor.heading = PI;
+    if (vendor.mesh) vendor.mesh.rotation.y = PI;
+    return { mesh, vendor, x, z, t: 0 };
+  };
+  G.kanomKrok = pack(G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0])));
+  const south = (G.world.sevenElevens || []).find(s => s && s.pos && Math.abs(s.pos.x) < 8 && s.pos.z < -80);
+  G.southKanomKrok = pack(south);
+  const west = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x < -50 && s.pos.z > 0 && s.pos.z < 60);
+  G.westKanomKrok = pack(west);
+  const east = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x > 100 && s.pos.z < 0 && s.pos.z > -80);
+  G.eastKanomKrok = pack(east);
+}
+
+export function makeSquidGrillMesh() {
+  const g = new THREE.Group();
+  g.name = 'squid-cart';
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.5, 1.25), new THREE.MeshStandardMaterial({ color: 0x4a2a18, roughness: 0.82 }));
+  box.position.y = 0.48; g.add(box);
+  const coalMat = new THREE.MeshStandardMaterial({ color: 0x1a1210, roughness: 0.7, emissive: 0xff5510, emissiveIntensity: 0.4 });
+  const coals = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.08, 0.85), coalMat);
+  coals.name = 'squid-coals';
+  coals.position.y = 0.78; g.add(coals);
+  g.userData.coalMat = coalMat;
+  const grate = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.02, 0.88), new THREE.MeshStandardMaterial({ color: 0x3a3a40, metalness: 0.45, roughness: 0.4 }));
+  grate.position.y = 0.84; g.add(grate);
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xd8c8b0, roughness: 0.6 });
+  for (let i = 0; i < 4; i++) {
+    const sk = new THREE.Group();
+    sk.name = 'squid-stick';
+    const stick = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.7, 4), new THREE.MeshStandardMaterial({ color: 0xc8a070, roughness: 0.7 }));
+    stick.rotation.x = PI / 2;
+    sk.add(stick);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.05, 0.22), bodyMat);
+    body.position.z = 0.08;
+    sk.add(body);
+    const tent = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.03, 0.08), bodyMat);
+    tent.position.z = -0.12;
+    sk.add(tent);
+    sk.position.set((i - 1.5) * 0.16, 0.92, 0);
+    g.add(sk);
+  }
+  const umb = new THREE.Mesh(
+    new THREE.ConeGeometry(0.7, 0.26, 8),
+    new THREE.MeshStandardMaterial({ color: 0xc03030, roughness: 0.7, side: THREE.DoubleSide })
+  );
+  umb.position.y = 1.9; umb.rotation.x = PI; g.add(umb);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.05, 5), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+  pole.position.y = 1.38; g.add(pole);
+  const puff = new THREE.Mesh(
+    new THREE.SphereGeometry(0.2, 6, 5),
+    new THREE.MeshBasicMaterial({ color: 0x887766, transparent: true, opacity: 0.2, depthWrite: false })
+  );
+  puff.name = 'squid-smoke';
+  puff.position.set(0, 1.12, 0);
+  g.add(puff);
+  const tire = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+  for (const z of [-0.42, 0.42]) for (const x of [-0.34, 0.34]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 8), tire);
+    w.rotation.z = PI / 2; w.position.set(x, 0.12, z); g.add(w);
+  }
+  return g;
+}
+
+export function spawnSquidGrill(scene) {
+  if (!GAMEPLAY.squidGrill) return;
+  const poi = G.world && G.world.poi && G.world.poi.yaowarat;
+  if (!poi) return;
+  const x = poi.x + 3.2, z = poi.z + 22;
+  const mesh = makeSquidGrillMesh();
+  mesh.position.set(x, 0, z);
+  scene.add(mesh);
+  const vendor = spawnPed(scene, new THREE.Vector3(x + 0.7, 0, z), 'vendor');
+  vendor.squid = true;
+  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI };
+  vendor.speed = 0;
+  vendor.state = 'idle';
+  vendor.heading = PI;
+  if (vendor.mesh) vendor.mesh.rotation.y = PI;
+  G.squidGrill = { mesh, vendor, x, z, t: 0, coalMat: mesh.userData.coalMat };
+}
+
+function makeYaoGoldMesh() {
+  const g = new THREE.Group();
+  g.name = 'yao-gold';
+  const frame = new THREE.Mesh(
+    new THREE.BoxGeometry(2.4, 2.2, 0.18),
+    new THREE.MeshStandardMaterial({ color: 0x3a1a12, roughness: 0.7 })
+  );
+  frame.position.y = 1.2;
+  g.add(frame);
+  const glass = new THREE.Mesh(
+    new THREE.PlaneGeometry(2.05, 1.7),
+    new THREE.MeshStandardMaterial({ color: 0x8899aa, transparent: true, opacity: 0.28, metalness: 0.4, roughness: 0.2 })
+  );
+  glass.position.set(0, 1.2, 0.1);
+  g.add(glass);
+  const goldMat = new THREE.MeshStandardMaterial({
+    color: 0xe8c04a, roughness: 0.35, metalness: 0.75, emissive: 0xd4a020, emissiveIntensity: 0.15,
+  });
+  g.userData.goldMat = goldMat;
+  for (let i = 0; i < 5; i++) {
+    const tray = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.04, 0.18), goldMat);
+    tray.name = 'yao-gold-tray';
+    tray.position.set(-0.7 + i * 0.35, 0.85 + (i % 2) * 0.45, 0.02);
+    g.add(tray);
+  }
+  const sign = new THREE.Mesh(
+    new THREE.BoxGeometry(1.6, 0.28, 0.08),
+    new THREE.MeshStandardMaterial({ color: 0xa8261f, roughness: 0.6, emissive: 0xff2233, emissiveIntensity: 0.2 })
+  );
+  sign.name = 'yao-gold-sign';
+  sign.position.set(0, 2.42, 0.06);
+  g.add(sign);
+  g.userData.signMat = sign.material;
+  return g;
+}
+
+export function spawnYaoGold(scene) {
+  if (!GAMEPLAY.yaoGold) return;
+  const poi = G.world && G.world.poi && G.world.poi.yaowarat;
+  if (!poi) return;
+  const x = poi.x - 8.2, z = poi.z - 22;
+  const mesh = makeYaoGoldMesh();
+  mesh.position.set(x, 0, z);
+  mesh.rotation.y = PI / 2;
+  scene.add(mesh);
+  const shoppers = [];
+  for (let i = 0; i < 3; i++) {
+    const px = x + 1.15, pz = z + (i - 1) * 0.75;
+    const ped = spawnPed(scene, new THREE.Vector3(px, 0, pz), i === 1 ? 'tourist' : 'local');
+    ped.yaoGold = true;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = -PI / 2;
+    ped.anchor = { slot: new THREE.Vector3(px, 0, pz), facing: -PI / 2 };
+    if (ped.mesh) {
+      ped.mesh.rotation.y = -PI / 2;
+      ped.mesh.visible = false;
+    }
+    shoppers.push(ped);
+  }
+  G.yaoGold = { mesh, shoppers, x, z, t: 0, goldMat: mesh.userData.goldMat, signMat: mesh.userData.signMat };
+}
+
+function makeYaoDuckMesh() {
+  const g = new THREE.Group();
+  g.name = 'yao-duck';
+  const frame = new THREE.Mesh(
+    new THREE.BoxGeometry(2.2, 2.15, 0.16),
+    new THREE.MeshStandardMaterial({ color: 0x2a1810, roughness: 0.75 })
+  );
+  frame.position.y = 1.15;
+  g.add(frame);
+  const glass = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.9, 1.65),
+    new THREE.MeshStandardMaterial({ color: 0x8899aa, transparent: true, opacity: 0.22, metalness: 0.35, roughness: 0.22 })
+  );
+  glass.position.set(0, 1.15, 0.09);
+  g.add(glass);
+  const rod = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.018, 0.018, 1.7, 6),
+    new THREE.MeshStandardMaterial({ color: 0x888890, metalness: 0.55, roughness: 0.4 })
+  );
+  rod.rotation.z = PI / 2;
+  rod.position.set(0, 1.92, 0.02);
+  g.add(rod);
+  const duckMat = new THREE.MeshStandardMaterial({
+    color: 0x7a2410, roughness: 0.45, metalness: 0.15, emissive: 0xc04010, emissiveIntensity: 0.18,
+  });
+  g.userData.duckMat = duckMat;
+  for (let i = 0; i < 5; i++) {
+    const duck = new THREE.Group();
+    duck.name = 'yao-duck-body';
+    const hook = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.008, 0.008, 0.26, 4),
+      new THREE.MeshStandardMaterial({ color: 0x777780, metalness: 0.55, roughness: 0.4 })
+    );
+    hook.position.y = -0.13;
+    duck.add(hook);
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), duckMat);
+    body.scale.set(0.85, 1.4, 0.7);
+    body.position.y = -0.4;
+    duck.add(body);
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.032, 0.11, 6), duckMat);
+    neck.position.set(0, -0.26, 0.03);
+    neck.rotation.x = 0.45;
+    duck.add(neck);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.038, 6, 5), duckMat);
+    head.position.set(0, -0.2, 0.08);
+    duck.add(head);
+    duck.position.set(-0.64 + i * 0.32, 1.92, 0.02);
+    g.add(duck);
+  }
+  const lamp = new THREE.Mesh(
+    new THREE.BoxGeometry(1.6, 0.06, 0.08),
+    new THREE.MeshStandardMaterial({ color: 0xffcc66, roughness: 0.4, emissive: 0xffaa33, emissiveIntensity: 0.2 })
+  );
+  lamp.name = 'yao-duck-lamp';
+  lamp.position.set(0, 2.08, 0.04);
+  g.add(lamp);
+  g.userData.lampMat = lamp.material;
+  const sign = new THREE.Mesh(
+    new THREE.BoxGeometry(1.5, 0.26, 0.08),
+    new THREE.MeshStandardMaterial({ color: 0xa8261f, roughness: 0.6, emissive: 0xff2233, emissiveIntensity: 0.2 })
+  );
+  sign.name = 'yao-duck-sign';
+  sign.position.set(0, 2.38, 0.06);
+  g.add(sign);
+  g.userData.signMat = sign.material;
+  return g;
+}
+
+export function spawnYaoDuck(scene) {
+  if (!GAMEPLAY.yaoDuck) return;
+  const poi = G.world && G.world.poi && G.world.poi.yaowarat;
+  if (!poi) return;
+  const x = poi.x + 8.2, z = poi.z - 22;
+  const mesh = makeYaoDuckMesh();
+  mesh.position.set(x, 0, z);
+  mesh.rotation.y = -PI / 2;
+  scene.add(mesh);
+  const shoppers = [];
+  for (let i = 0; i < 2; i++) {
+    const px = x - 1.15, pz = z + (i - 0.5) * 0.8;
+    const ped = spawnPed(scene, new THREE.Vector3(px, 0, pz), i === 0 ? 'tourist' : 'local');
+    ped.yaoDuck = true;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = PI / 2;
+    ped.anchor = { slot: new THREE.Vector3(px, 0, pz), facing: PI / 2 };
+    if (ped.mesh) {
+      ped.mesh.rotation.y = PI / 2;
+      ped.mesh.visible = false;
+    }
+    shoppers.push(ped);
+  }
+  G.yaoDuck = { mesh, shoppers, x, z, t: 0, duckMat: mesh.userData.duckMat, lampMat: mesh.userData.lampMat, signMat: mesh.userData.signMat };
+}
+
+export function spawnYaoFortune(scene) {
+  if (!GAMEPLAY.yaoFortune) return;
+  const poi = G.world && G.world.poi && G.world.poi.yaowarat;
+  if (!poi) return;
+  const x = poi.x - 8.2, z = poi.z + 22;
+  const g = new THREE.Group();
+  g.name = 'yao-fortune';
+  const table = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.42, 0.44, 0.08, 10),
+    new THREE.MeshStandardMaterial({ color: 0x6a1a18, roughness: 0.7 })
+  );
+  table.position.y = 0.72;
+  g.add(table);
+  const cloth = new THREE.Mesh(
+    new THREE.CircleGeometry(0.4, 10),
+    new THREE.MeshStandardMaterial({ color: 0xc03030, roughness: 0.75 })
+  );
+  cloth.rotation.x = -PI / 2;
+  cloth.position.y = 0.77;
+  g.add(cloth);
+  const colors = [0xf5f0e4, 0xe8c04a, 0x2a4a8a, 0xc03030];
+  for (let i = 0; i < 4; i++) {
+    const card = new THREE.Mesh(
+      new THREE.BoxGeometry(0.1, 0.01, 0.14),
+      new THREE.MeshStandardMaterial({ color: colors[i], roughness: 0.65 })
+    );
+    card.name = 'yao-card';
+    const a = (i / 4) * TAU;
+    card.position.set(Math.sin(a) * 0.16, 0.79, Math.cos(a) * 0.16);
+    card.rotation.y = a;
+    g.add(card);
+  }
+  const lamp = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.05, 0.07, 0.16, 8),
+    new THREE.MeshStandardMaterial({ color: 0xffcc66, roughness: 0.4, emissive: 0xffaa33, emissiveIntensity: 0.2 })
+  );
+  lamp.name = 'yao-fortune-lamp';
+  lamp.position.set(0.22, 0.9, -0.12);
+  g.add(lamp);
+  g.userData.lampMat = lamp.material;
+  const stick = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.012, 0.012, 0.22, 5),
+    new THREE.MeshStandardMaterial({ color: 0xc8a070, roughness: 0.7 })
+  );
+  stick.position.set(-0.18, 0.9, 0.12);
+  g.add(stick);
+  g.position.set(x, 0, z);
+  scene.add(g);
+  const vendor = spawnPed(scene, new THREE.Vector3(x + 0.55, 0, z), 'local');
+  vendor.yaoFortune = true;
+  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: -PI / 2 };
+  vendor.speed = 0;
+  vendor.state = 'idle';
+  vendor.heading = -PI / 2;
+  if (vendor.mesh) {
+    vendor.mesh.rotation.y = -PI / 2;
+    vendor.mesh.visible = false;
+  }
+  G.yaoFortune = { mesh: g, vendor, x, z, t: 0, lampMat: g.userData.lampMat };
 }
 
 export function makeCoconutCartMesh() {
@@ -1645,6 +2086,162 @@ export function spawnSoiPa(scene) {
   }
 }
 
+export function spawnSoiCctv(scene) {
+  if (!GAMEPLAY.soiCctv) return;
+  const sois = (G.world && G.world.sois) || [];
+  G.soiCctv = [];
+  const n = Math.min(3, sois.length);
+  for (let i = 0; i < n; i++) {
+    const s = sois[i];
+    const alongZ = s.axis === 'z';
+    const t = 0.18 + i * 0.12;
+    const x = alongZ ? (s.x0 + s.x1) * 0.5 + 1.55 : s.x0 + (s.x1 - s.x0) * t;
+    const z = alongZ ? s.z0 + (s.z1 - s.z0) * t : (s.z0 + s.z1) * 0.5 + 1.55;
+    const g = new THREE.Group();
+    g.name = 'soi-cctv';
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.045, 0.055, 3.4, 5),
+      new THREE.MeshStandardMaterial({ color: 0x6a6a68, roughness: 0.65, metalness: 0.25 })
+    );
+    pole.position.y = 1.7;
+    g.add(pole);
+    const arm = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.05, 0.55),
+      new THREE.MeshStandardMaterial({ color: 0x4a4a48, roughness: 0.5, metalness: 0.3 })
+    );
+    arm.position.set(alongZ ? 0.22 : 0, 3.25, alongZ ? 0 : 0.22);
+    g.add(arm);
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(0.16, 0.12, 0.22),
+      new THREE.MeshStandardMaterial({ color: 0x2a2a2c, roughness: 0.45 })
+    );
+    body.position.set(alongZ ? 0.42 : 0, 3.18, alongZ ? 0 : 0.42);
+    g.add(body);
+    const lens = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.045, 0.05, 0.06, 8),
+      new THREE.MeshStandardMaterial({ color: 0x111118, roughness: 0.25, metalness: 0.4 })
+    );
+    lens.rotation.x = PI / 2;
+    lens.position.set(alongZ ? 0.42 : 0, 3.18, alongZ ? 0.14 : 0.42);
+    g.add(lens);
+    const led = new THREE.Mesh(
+      new THREE.SphereGeometry(0.025, 6, 5),
+      new THREE.MeshStandardMaterial({ color: 0xff2020, emissive: 0xff1010, emissiveIntensity: 0.15, roughness: 0.4 })
+    );
+    led.name = 'soi-cctv-led';
+    led.position.set(alongZ ? 0.5 : 0, 3.26, alongZ ? 0 : 0.5);
+    g.add(led);
+    g.position.set(x, 0, z);
+    scene.add(g);
+    G.soiCctv.push({ mesh: g, led, soi: s, x, z });
+  }
+}
+
+function addSagWire(scene, ax, ay, az, bx, by, bz, sag, mat) {
+  const g = new THREE.Group();
+  g.name = 'soi-wire';
+  const segs = 6;
+  const up = new THREE.Vector3(0, 1, 0);
+  const dir = new THREE.Vector3();
+  for (let i = 0; i < segs; i++) {
+    const t0 = i / segs, t1 = (i + 1) / segs;
+    const drop = (t) => 4 * t * (1 - t) * sag;
+    const x0 = ax + (bx - ax) * t0, y0 = ay + (by - ay) * t0 - drop(t0), z0 = az + (bz - az) * t0;
+    const x1 = ax + (bx - ax) * t1, y1 = ay + (by - ay) * t1 - drop(t1), z1 = az + (bz - az) * t1;
+    dir.set(x1 - x0, y1 - y0, z1 - z0);
+    const len = dir.length() || 0.01;
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 1, 4), mat);
+    m.position.set((x0 + x1) * 0.5, (y0 + y1) * 0.5, (z0 + z1) * 0.5);
+    m.scale.set(1, len, 1);
+    m.quaternion.setFromUnitVectors(up, dir.normalize());
+    g.add(m);
+  }
+  scene.add(g);
+  return g;
+}
+
+export function spawnSoiWires(scene) {
+  if (!GAMEPLAY.soiWires) return;
+  const poles = G.soiPa || [];
+  G.soiWires = { cables: [], sparks: [], t: 0 };
+  if (poles.length < 2) return;
+  const mat = new THREE.MeshStandardMaterial({ color: 0x1c1c18, roughness: 0.9 });
+  const y = 3.7;
+  for (let i = 0; i < poles.length - 1; i++) {
+    const a = poles[i], b = poles[i + 1];
+    const sag = 0.85 + i * 0.12;
+    G.soiWires.cables.push(addSagWire(scene, a.x, y, a.z, b.x, y, b.z, sag, mat));
+  }
+  for (let i = 0; i < poles.length; i++) {
+    const p = poles[i];
+    const soi = p.soi;
+    const alongZ = soi && soi.axis === 'z';
+    const ox = alongZ ? -3.2 : 0, oz = alongZ ? 0 : -3.2;
+    G.soiWires.cables.push(addSagWire(scene, p.x, y, p.z, p.x + ox, y - 0.4, p.z + oz, 0.55, mat));
+  }
+  const a0 = poles[0];
+  const xfmr = new THREE.Mesh(
+    new THREE.BoxGeometry(0.42, 0.34, 0.3),
+    new THREE.MeshStandardMaterial({ color: 0x6a6a38, roughness: 0.7, metalness: 0.15 })
+  );
+  xfmr.name = 'soi-transformer';
+  xfmr.position.set(a0.x + 0.22, 3.15, a0.z);
+  scene.add(xfmr);
+  G.soiWires.transformer = xfmr;
+  for (let i = 0; i < Math.min(2, G.soiWires.cables.length); i++) {
+    const c = G.soiWires.cables[i];
+    const spark = new THREE.Mesh(
+      new THREE.SphereGeometry(0.055, 6, 5),
+      new THREE.MeshStandardMaterial({ color: 0xc8fff8, emissive: 0x88eeff, emissiveIntensity: 0, roughness: 0.25 })
+    );
+    spark.name = 'soi-spark';
+    const mid = c.children[Math.floor(c.children.length / 2)];
+    if (mid) spark.position.copy(mid.position);
+    else spark.position.set(a0.x, y - 0.8, a0.z);
+    scene.add(spark);
+    G.soiWires.sparks.push(spark);
+  }
+}
+
+function makeFrogMesh() {
+  const g = new THREE.Group();
+  g.name = 'rain-frog';
+  const skin = new THREE.MeshStandardMaterial({ color: pick([0x3a7a32, 0x4a6a28, 0x2a5a30]), roughness: 0.8 });
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.09, 7, 6), skin);
+  body.scale.set(1.15, 0.7, 1.35);
+  body.position.y = 0.07;
+  g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.055, 6, 5), skin);
+  head.position.set(0, 0.1, 0.08);
+  g.add(head);
+  const eyeMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.4 });
+  for (const s of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.018, 5, 4), eyeMat);
+    eye.position.set(s * 0.035, 0.13, 0.11);
+    g.add(eye);
+  }
+  return g;
+}
+
+export function spawnRainFrogs(scene) {
+  if (!GAMEPLAY.rainFrogs) return;
+  const floods = ((G.world && G.world.flood) || []).filter(f => f && f.soi);
+  const sois = (G.world && G.world.sois) || [];
+  const patches = floods.length ? floods : sois.map(s => ({ x0: s.x0, x1: s.x1, z0: s.z0, z1: s.z1, soi: true }));
+  G.rainFrogs = [];
+  if (!patches.length) return;
+  for (let i = 0; i < 6; i++) {
+    const p = patches[i % patches.length];
+    const x = p.x0 + (p.x1 - p.x0) * (0.18 + (i % 3) * 0.28);
+    const z = p.z0 + (p.z1 - p.z0) * (0.22 + Math.floor(i / 3) * 0.4);
+    const mesh = makeFrogMesh();
+    mesh.position.set(x, 0, z);
+    mesh.visible = false;
+    scene.add(mesh);
+    G.rainFrogs.push({ mesh, patch: p, x, z, t: i * 0.37, heading: i * 1.1, hop: 8 + i * 0.7 });
+  }
+}
+
 function makePlasticChair() {
   const g = new THREE.Group();
   g.name = 'plastic-chair';
@@ -1738,6 +2335,109 @@ export function spawnSoiMechanic(scene) {
   if (pp && pp.foreR) { wrench.position.set(0.02, -0.22, 0.08); pp.foreR.add(wrench); }
   else { wrench.position.set(0.22, 1.05, 0.12); ped.mesh.add(wrench); }
   G.soiMechanic = { ped, bike, stand, soi: s, x, z };
+}
+
+export function spawnSoiBarber(scene) {
+  if (!GAMEPLAY.soiBarber) return;
+  const sois = (G.world && G.world.sois) || [];
+  if (sois.length < 5) return;
+  const s = sois[4];
+  const alongZ = s.axis === 'z';
+  const t = 0.48;
+  const x = alongZ ? (s.x0 + s.x1) * 0.5 + 1.7 : s.x0 + (s.x1 - s.x0) * t;
+  const z = alongZ ? s.z0 + (s.z1 - s.z0) * t : (s.z0 + s.z1) * 0.5 + 1.7;
+  const facing = alongZ ? -PI / 2 : 0;
+  const chair = makePlasticChair();
+  chair.name = 'barber-chair';
+  chair.position.set(x, 0, z);
+  chair.rotation.y = facing;
+  scene.add(chair);
+  const cape = new THREE.Mesh(
+    new THREE.BoxGeometry(0.55, 0.02, 0.7),
+    new THREE.MeshStandardMaterial({ color: 0x1a3a6a, roughness: 0.7 })
+  );
+  cape.name = 'barber-cape';
+  cape.position.set(x, 0.46, z + (alongZ ? 0.02 : 0.02));
+  scene.add(cape);
+  const pole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.04, 0.05, 1.8, 6),
+    new THREE.MeshStandardMaterial({ color: 0x8a8a82, roughness: 0.55, metalness: 0.25 })
+  );
+  pole.position.set(x + (alongZ ? 0.55 : 0), 0.9, z + (alongZ ? 0 : 0.55));
+  scene.add(pole);
+  const stripe = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.06, 0.06, 0.45, 8),
+    new THREE.MeshStandardMaterial({ color: 0xc03030, roughness: 0.45, emissive: 0x801010, emissiveIntensity: 0.2 })
+  );
+  stripe.name = 'barber-pole';
+  stripe.position.set(pole.position.x, 1.85, pole.position.z);
+  scene.add(stripe);
+  const mirror = new THREE.Mesh(
+    new THREE.BoxGeometry(0.35, 0.42, 0.03),
+    new THREE.MeshStandardMaterial({ color: 0xa8c8d8, roughness: 0.15, metalness: 0.4 })
+  );
+  mirror.name = 'barber-mirror';
+  mirror.position.set(pole.position.x, 1.35, pole.position.z);
+  scene.add(mirror);
+  const ped = spawnPed(scene, new THREE.Vector3(x + (alongZ ? 0 : 0.85), 0, z + (alongZ ? 0.85 : 0)), 'laborer');
+  ped.soiBarber = true;
+  ped.anchor = { slot: ped.mesh.position.clone(), facing: facing + PI };
+  ped.speed = 0;
+  ped.state = 'idle';
+  ped.heading = facing + PI;
+  if (ped.mesh) ped.mesh.rotation.y = ped.heading;
+  const clip = new THREE.Mesh(
+    new THREE.BoxGeometry(0.05, 0.04, 0.16),
+    new THREE.MeshStandardMaterial({ color: 0x888890, metalness: 0.5, roughness: 0.35 })
+  );
+  clip.name = 'clippers';
+  const pp = ped.mesh.userData.parts;
+  if (pp && pp.foreR) { clip.position.set(0.02, -0.2, 0.08); pp.foreR.add(clip); }
+  else { clip.position.set(0.22, 1.05, 0.12); ped.mesh.add(clip); }
+  G.soiBarber = { ped, chair, cape, pole: stripe, mirror, clip, soi: s, x, z, facing };
+}
+
+export function spawnSoiCowboy(scene) {
+  if (!GAMEPLAY.soiCowboy) return;
+  const bar = (BUSINESSES || []).find(b => b.id === 'bar');
+  const origin = (bar && bar.pos) || new THREE.Vector3(44, 0, 90);
+  const x = origin.x - 2.6;
+  const colors = [0xff2a86, 0x21f0ff, 0xffcf4a, 0xff3344];
+  G.soiCowboy = { signs: [], origin: { x: origin.x, z: origin.z } };
+  if (G.world && G.world.poi) G.world.poi.cowboy = new THREE.Vector3(origin.x, 0, origin.z);
+  for (let i = 0; i < 4; i++) {
+    const z = origin.z - 14 + i * 4;
+    const col = colors[i];
+    const g = new THREE.Group();
+    g.name = 'cowboy-neon';
+    const face = new THREE.Mesh(
+      new THREE.BoxGeometry(0.16, 3.1, 3.2),
+      new THREE.MeshStandardMaterial({ color: 0x161018, roughness: 0.72 })
+    );
+    face.position.y = 1.55;
+    g.add(face);
+    const signMat = new THREE.MeshStandardMaterial({
+      color: col, emissive: col, emissiveIntensity: 0.25, roughness: 0.42,
+    });
+    if (G.nightEmissive) G.nightEmissive.push({ mat: signMat, dayIntensity: 0.22, nightIntensity: 1.75 });
+    const sign = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.62, 2.4), signMat);
+    sign.name = 'cowboy-sign';
+    sign.position.set(0.14, 3.2, 0);
+    g.add(sign);
+    const awning = new THREE.Mesh(
+      new THREE.BoxGeometry(1.15, 0.07, 3.2),
+      new THREE.MeshStandardMaterial({ color: col, roughness: 0.78 })
+    );
+    awning.position.set(0.55, 2.48, 0);
+    g.add(awning);
+    const light = new THREE.PointLight(col, 0, 9, 2);
+    light.position.set(0.55, 2.7, 0);
+    g.add(light);
+    if (G.nightLights) G.nightLights.push({ light, base: 1.05 });
+    g.position.set(x, 0, z);
+    scene.add(g);
+    G.soiCowboy.signs.push({ mesh: g, mat: signMat, light, x, z });
+  }
 }
 
 function makeCheckpointCone() {
@@ -1861,6 +2561,23 @@ export function spawnCheckpoint(scene) {
   );
   post.position.set(x - 2.5, 0.48, z + 10);
   g.add(post);
+  const spikes = new THREE.Group();
+  spikes.name = 'checkpoint-spikes';
+  const strip = new THREE.Mesh(
+    new THREE.BoxGeometry(7.2, 0.08, 0.42),
+    new THREE.MeshStandardMaterial({ color: 0x1a1a1e, roughness: 0.88 })
+  );
+  strip.position.y = 0.05;
+  spikes.add(strip);
+  const spikeMat = new THREE.MeshStandardMaterial({ color: 0x9a9aa0, metalness: 0.55, roughness: 0.35 });
+  for (let i = -4; i <= 4; i++) {
+    const tooth = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.26, 4), spikeMat);
+    tooth.position.set(i * 0.78, 0.18, 0);
+    spikes.add(tooth);
+  }
+  spikes.position.set(x, 0, z);
+  spikes.visible = false;
+  g.add(spikes);
   scene.add(g);
   const slot = { x: x + ROAD_WIDTH / 2 + 1.35, z, facing: -PI / 2 };
   const cop = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), 'office');
@@ -1869,80 +2586,2343 @@ export function spawnCheckpoint(scene) {
   if (kit.beam) kit.beam.visible = false;
   if (G.nightLights) G.nightLights.push({ light: kit.light, base: 1.6 });
   G.checkpoint = {
-    x, z, mesh: g, cones, cop, light: kit.light, beam: kit.beam,
-    active: false, flagged: false,
+    x, z, mesh: g, cones, cop, light: kit.light, beam: kit.beam, spikes,
+    active: false, flagged: false, late: false,
   };
 }
 
 export function spawnSevenBikes(scene) {
   if (!GAMEPLAY.sevenBikes) return;
-  const seven = G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0]));
-  if (!seven || !seven.pos) return;
-  const hx = seven.hx || 5;
-  const px = seven.pos.x - hx - 1.55;
-  const heading = PI / 2;
-  G.sevenBikes = [];
-  const n = 5;
-  for (let i = 0; i < n; i++) {
-    const z = seven.pos.z - 2.2 + i * 1.15;
-    const x = px + (i % 2) * 0.18;
-    const bike = makeVehicle('bike', scene);
-    bike.pos.set(x, 0, z);
-    bike.heading = heading;
-    bike.mesh.position.copy(bike.pos);
-    bike.mesh.rotation.y = heading;
-    bike.driver = null;
-    bike.vel = 0;
-    bike.sevenParked = true;
-    bike._standHome = { x, z, heading };
-    G.sevenBikes.push(bike);
-  }
+  const rack = (seven) => {
+    if (!seven || !seven.pos) return [];
+    const hx = seven.hx || 5;
+    const px = seven.pos.x - hx - 1.55;
+    const heading = PI / 2;
+    const list = [];
+    const n = 5;
+    for (let i = 0; i < n; i++) {
+      const z = seven.pos.z - 2.2 + i * 1.15;
+      const x = px + (i % 2) * 0.18;
+      const bike = makeVehicle('bike', scene);
+      bike.pos.set(x, 0, z);
+      bike.heading = heading;
+      bike.mesh.position.copy(bike.pos);
+      bike.mesh.rotation.y = heading;
+      bike.driver = null;
+      bike.vel = 0;
+      bike.sevenParked = true;
+      bike._standHome = { x, z, heading };
+      if (GAMEPLAY.bikeSeatCover) {
+        const cover = new THREE.Mesh(
+          new THREE.BoxGeometry(0.28, 0.04, 0.42),
+          new THREE.MeshStandardMaterial({
+            color: pick([0xc8d8e0, 0xe8e0c8, 0xb0c8d8]),
+            roughness: 0.35,
+            transparent: true,
+            opacity: 0.72,
+          })
+        );
+        cover.name = 'seat-cover';
+        cover.visible = false;
+        cover.position.set(0, 0.78, -0.08);
+        bike.mesh.add(cover);
+        bike.seatCover = cover;
+      }
+      list.push(bike);
+    }
+    return list;
+  };
+  const walk = G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0]));
+  G.sevenBikes = rack(walk);
+  const south = (G.world.sevenElevens || []).find(s => s && s.pos && Math.abs(s.pos.x) < 8 && s.pos.z < -80);
+  G.southSevenBikes = rack(south);
+  const west = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x < -50 && s.pos.z > 0 && s.pos.z < 60);
+  G.westSevenBikes = rack(west);
+  const east = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x > 100 && s.pos.z < 0 && s.pos.z > -80);
+  G.eastSevenBikes = rack(east);
 }
 
 export function spawnSevenGuard(scene) {
   if (!GAMEPLAY.sevenGuard) return;
-  const seven = G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0]));
-  if (!seven || !seven.pos) return;
-  const hz = seven.hz || 4;
-  const x = seven.pos.x - 3.1, z = seven.pos.z + hz + 1.15;
-  const chair = new THREE.Group();
-  chair.name = 'seven-chair';
-  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.04, 0.42), new THREE.MeshStandardMaterial({ color: 0xd8d0c0, roughness: 0.7 }));
-  seat.position.y = 0.42; chair.add(seat);
-  const back = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.46, 0.04), seat.material);
-  back.position.set(0, 0.65, -0.2); chair.add(back);
-  for (const [sx, sz] of [[-0.16, -0.16], [0.16, -0.16], [-0.16, 0.16], [0.16, 0.16]]) {
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.42, 5), new THREE.MeshStandardMaterial({ color: 0x888890, roughness: 0.5, metalness: 0.3 }));
-    leg.position.set(sx, 0.21, sz); chair.add(leg);
+  const make = (seven, chairName) => {
+    if (!seven || !seven.pos) return null;
+    const hz = seven.hz || 4;
+    const x = seven.pos.x - 3.1, z = seven.pos.z + hz + 1.15;
+    const chair = new THREE.Group();
+    chair.name = chairName;
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.04, 0.42), new THREE.MeshStandardMaterial({ color: 0xd8d0c0, roughness: 0.7 }));
+    seat.position.y = 0.42; chair.add(seat);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.46, 0.04), seat.material);
+    back.position.set(0, 0.65, -0.2); chair.add(back);
+    for (const [sx, sz] of [[-0.16, -0.16], [0.16, -0.16], [-0.16, 0.16], [0.16, 0.16]]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.42, 5), new THREE.MeshStandardMaterial({ color: 0x888890, roughness: 0.5, metalness: 0.3 }));
+      leg.position.set(sx, 0.21, sz); chair.add(leg);
+    }
+    chair.position.set(x, 0, z);
+    scene.add(chair);
+    const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'laborer');
+    recolorTorso(ped.mesh.userData.parts, 0x1a3a6a, 0.7);
+    ped.sevenGuard = true;
+    ped.anchor = { slot: new THREE.Vector3(x, 0.42, z), facing: PI };
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = PI;
+    ped.mesh.position.set(x, 0.42, z);
+    ped.mesh.rotation.y = PI;
+    const torch = new THREE.Group();
+    torch.name = 'flashlight';
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.16, 6), new THREE.MeshStandardMaterial({ color: 0x1a1a1e, roughness: 0.45 }));
+    handle.rotation.x = PI / 2; torch.add(handle);
+    const beam = new THREE.Mesh(
+      new THREE.ConeGeometry(0.35, 1.6, 8, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xffe6a0, transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide })
+    );
+    beam.name = 'flashlight-beam';
+    beam.rotation.x = PI / 2; beam.position.z = 0.95; torch.add(beam);
+    const light = new THREE.PointLight(0xffe0a0, 0, 10, 2);
+    light.position.z = 0.2; torch.add(light);
+    const pp = ped.mesh.userData.parts;
+    if (pp && pp.foreR) { torch.position.set(0.02, -0.2, 0.08); pp.foreR.add(torch); }
+    else { torch.position.set(0.2, 0.9, 0.15); ped.mesh.add(torch); }
+    beam.visible = false;
+    return { ped, chair, light, beam, x, z };
+  };
+  const walk = G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0]));
+  G.sevenGuard = make(walk, 'seven-chair');
+  const south = (G.world.sevenElevens || []).find(s => s && s.pos && Math.abs(s.pos.x) < 8 && s.pos.z < -80);
+  G.southSevenGuard = make(south, 'south-seven-chair');
+  const west = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x < -50 && s.pos.z > 0 && s.pos.z < 60);
+  G.westSevenGuard = make(west, 'west-seven-chair');
+  const east = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x > 100 && s.pos.z < 0 && s.pos.z > -80);
+  G.eastSevenGuard = make(east, 'east-seven-chair');
+}
+
+export function spawnMallGuard(scene) {
+  if (!GAMEPLAY.mallGuard) return;
+  const mall = G.world && G.world.poi && G.world.poi.terminal21;
+  if (!mall) return;
+  const pack = (x, z, chairName) => {
+    const chair = new THREE.Group();
+    chair.name = chairName;
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.04, 0.42), new THREE.MeshStandardMaterial({ color: 0xd8d0c0, roughness: 0.7 }));
+    seat.position.y = 0.42; chair.add(seat);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.46, 0.04), seat.material);
+    back.position.set(0, 0.65, -0.2); chair.add(back);
+    for (const [sx, sz] of [[-0.16, -0.16], [0.16, -0.16], [-0.16, 0.16], [0.16, 0.16]]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.42, 5), new THREE.MeshStandardMaterial({ color: 0x888890, roughness: 0.5, metalness: 0.3 }));
+      leg.position.set(sx, 0.21, sz); chair.add(leg);
+    }
+    chair.position.set(x, 0, z);
+    scene.add(chair);
+    const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'laborer');
+    recolorTorso(ped.mesh.userData.parts, 0x1a3a6a, 0.7);
+    ped.mallGuard = true;
+    ped.anchor = { slot: new THREE.Vector3(x, 0.42, z), facing: PI };
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = PI;
+    ped.mesh.position.set(x, 0.42, z);
+    ped.mesh.rotation.y = PI;
+    const torch = new THREE.Group();
+    torch.name = 'flashlight';
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.16, 6), new THREE.MeshStandardMaterial({ color: 0x1a1a1e, roughness: 0.45 }));
+    handle.rotation.x = PI / 2; torch.add(handle);
+    const beam = new THREE.Mesh(
+      new THREE.ConeGeometry(0.35, 1.6, 8, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xffe6a0, transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide })
+    );
+    beam.name = 'flashlight-beam';
+    beam.rotation.x = PI / 2; beam.position.z = 0.95; torch.add(beam);
+    const light = new THREE.PointLight(0xffe0a0, 0, 10, 2);
+    light.position.z = 0.2; torch.add(light);
+    const pp = ped.mesh.userData.parts;
+    if (pp && pp.foreR) { torch.position.set(0.02, -0.2, 0.08); pp.foreR.add(torch); }
+    else { torch.position.set(0.2, 0.9, 0.15); ped.mesh.add(torch); }
+    beam.visible = false;
+    return { ped, chair, light, beam, x, z };
+  };
+  G.mallGuard = pack(mall.x - 3.4, mall.z + 0.4, 'mall-chair');
+  G.mallGuardB = pack(mall.x + 3.4, mall.z + 0.4, 'east-mall-chair');
+}
+
+export function spawnBankGuard(scene) {
+  if (!GAMEPLAY.bankGuard) return;
+  const bank = G.world && G.world.poi && G.world.poi.bank;
+  if (!bank) return;
+  const pack = (x, z, chairName) => {
+    const chair = new THREE.Group();
+    chair.name = chairName;
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.04, 0.42), new THREE.MeshStandardMaterial({ color: 0xd8d0c0, roughness: 0.7 }));
+    seat.position.y = 0.42; chair.add(seat);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.46, 0.04), seat.material);
+    back.position.set(0, 0.65, -0.2); chair.add(back);
+    for (const [sx, sz] of [[-0.16, -0.16], [0.16, -0.16], [-0.16, 0.16], [0.16, 0.16]]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.42, 5), new THREE.MeshStandardMaterial({ color: 0x888890, roughness: 0.5, metalness: 0.3 }));
+      leg.position.set(sx, 0.21, sz); chair.add(leg);
+    }
+    chair.position.set(x, 0, z);
+    scene.add(chair);
+    const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'laborer');
+    recolorTorso(ped.mesh.userData.parts, 0x1a3a6a, 0.7);
+    ped.bankGuard = true;
+    ped.anchor = { slot: new THREE.Vector3(x, 0.42, z), facing: 0 };
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = 0;
+    ped.mesh.position.set(x, 0.42, z);
+    ped.mesh.rotation.y = 0;
+    const torch = new THREE.Group();
+    torch.name = 'flashlight';
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.16, 6), new THREE.MeshStandardMaterial({ color: 0x1a1a1e, roughness: 0.45 }));
+    handle.rotation.x = PI / 2; torch.add(handle);
+    const beam = new THREE.Mesh(
+      new THREE.ConeGeometry(0.35, 1.6, 8, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xffe6a0, transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide })
+    );
+    beam.name = 'flashlight-beam';
+    beam.rotation.x = PI / 2; beam.position.z = 0.95; torch.add(beam);
+    const light = new THREE.PointLight(0xffe0a0, 0, 10, 2);
+    light.position.z = 0.2; torch.add(light);
+    const pp = ped.mesh.userData.parts;
+    if (pp && pp.foreR) { torch.position.set(0.02, -0.2, 0.08); pp.foreR.add(torch); }
+    else { torch.position.set(0.2, 0.9, 0.15); ped.mesh.add(torch); }
+    beam.visible = false;
+    return { ped, chair, light, beam, x, z };
+  };
+  G.bankGuard = pack(bank.x - 3.4, bank.z + 0.4, 'bank-chair');
+  G.bankGuardB = pack(bank.x + 2.2, bank.z + 0.4, 'east-bank-chair');
+}
+
+export function spawnBankQueue(scene) {
+  if (!GAMEPLAY.bankQueue) return;
+  const bank = G.world && G.world.bank;
+  if (!bank || !bank.teller) return;
+  const tx = bank.teller.x, tz = bank.teller.z;
+  const queue = [];
+  for (let i = 0; i < 2; i++) {
+    const x = tx + i * 0.12, z = tz + i * 0.85;
+    const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), i === 0 ? 'office' : 'local');
+    ped.bankQueue = true;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = PI;
+    ped.anchor = { slot: new THREE.Vector3(x, 0, z), facing: PI };
+    if (ped.mesh) {
+      ped.mesh.rotation.y = PI;
+      ped.mesh.visible = false;
+    }
+    if (i === 0 && ped.mesh) {
+      const book = new THREE.Mesh(
+        new THREE.BoxGeometry(0.09, 0.012, 0.12),
+        new THREE.MeshStandardMaterial({ color: 0xc45a18, roughness: 0.55 })
+      );
+      book.name = 'bank-passbook';
+      const parts = ped.mesh.userData && ped.mesh.userData.parts;
+      if (parts && parts.foreR) { book.position.set(0.02, -0.28, 0.06); parts.foreR.add(book); }
+      else { book.position.set(0.22, 1.05, 0.12); ped.mesh.add(book); }
+      ped._passbook = book;
+    }
+    queue.push(ped);
   }
-  chair.position.set(x, 0, z);
-  scene.add(chair);
+  G.bankQueue = { queue, x: tx, z: tz, t: 0, hours: [9, 16] };
+  const bx = tx + 0.24, bz = tz + 1.7;
+  const extra = spawnPed(scene, new THREE.Vector3(bx, 0, bz), 'office');
+  extra.bankQueue = true;
+  extra.speed = 0;
+  extra.state = 'idle';
+  extra.heading = PI;
+  extra.anchor = { slot: new THREE.Vector3(bx, 0, bz), facing: PI };
+  if (extra.mesh) {
+    extra.mesh.rotation.y = PI;
+    extra.mesh.visible = false;
+  }
+  const phone = new THREE.Mesh(
+    new THREE.BoxGeometry(0.05, 0.09, 0.012),
+    new THREE.MeshStandardMaterial({ color: 0x1a1a22, emissive: 0x226688, emissiveIntensity: 0.35, roughness: 0.35 })
+  );
+  phone.name = 'bank-queue-phone';
+  const ep = extra.mesh && extra.mesh.userData && extra.mesh.userData.parts;
+  if (ep && ep.foreR) {
+    phone.position.set(0.02, -0.28, 0.06);
+    ep.foreR.add(phone);
+  } else if (extra.mesh) {
+    phone.position.set(0.22, 1.05, 0.12);
+    extra.mesh.add(phone);
+  }
+  extra._phone = phone;
+  G.bankQueueB = { queue: [extra], x: bx, z: bz, t: 0, hours: [9, 16] };
+  const door = G.world && G.world.poi && G.world.poi.bank;
+  if (door) {
+    const ax = door.x + 4.4, az = door.z + 0.6;
+    const machine = new THREE.Mesh(
+      new THREE.BoxGeometry(0.7, 1.5, 0.45),
+      new THREE.MeshStandardMaterial({ color: 0x1a3a6a, roughness: 0.4, metalness: 0.3 })
+    );
+    machine.name = 'bank-atm';
+    machine.position.set(ax, 0.85, az);
+    scene.add(machine);
+    const atmQueue = [];
+    for (let i = 0; i < 2; i++) {
+      const x = ax + 1.05 + i * 0.8;
+      const z = az + i * 0.18;
+      const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), i === 0 ? 'office' : 'local');
+      ped.bankQueue = true;
+      ped.speed = 0;
+      ped.state = 'idle';
+      ped.heading = -PI / 2;
+      ped.anchor = { slot: new THREE.Vector3(x, 0, z), facing: -PI / 2 };
+      if (ped.mesh) {
+        ped.mesh.rotation.y = -PI / 2;
+        ped.mesh.visible = false;
+      }
+      if (i === 0 && ped.mesh) {
+        const card = new THREE.Mesh(
+          new THREE.BoxGeometry(0.08, 0.05, 0.004),
+          new THREE.MeshStandardMaterial({ color: 0xc45a18, roughness: 0.45, metalness: 0.2 })
+        );
+        card.name = 'bank-atm-card';
+        const parts = ped.mesh.userData && ped.mesh.userData.parts;
+        if (parts && parts.foreR) { card.position.set(0.02, -0.28, 0.06); parts.foreR.add(card); }
+        else { card.position.set(0.22, 1.05, 0.12); ped.mesh.add(card); }
+        ped._atmCard = card;
+      }
+      atmQueue.push(ped);
+    }
+    G.bankAtm = { queue: atmQueue, machine, x: ax, z: az, t: 0, hours: [6, 22] };
+    const tx3 = ax + 2.65, tz3 = az + 0.36;
+    const extraAtm = spawnPed(scene, new THREE.Vector3(tx3, 0, tz3), 'office');
+    extraAtm.bankQueue = true;
+    extraAtm.speed = 0;
+    extraAtm.state = 'idle';
+    extraAtm.heading = -PI / 2;
+    extraAtm.anchor = { slot: new THREE.Vector3(tx3, 0, tz3), facing: -PI / 2 };
+    if (extraAtm.mesh) {
+      extraAtm.mesh.rotation.y = -PI / 2;
+      extraAtm.mesh.visible = false;
+    }
+    const phoneAtm = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.09, 0.012),
+      new THREE.MeshStandardMaterial({ color: 0x1a1a22, emissive: 0x226688, emissiveIntensity: 0.35, roughness: 0.35 })
+    );
+    phoneAtm.name = 'bank-atm-phone';
+    const ap = extraAtm.mesh && extraAtm.mesh.userData && extraAtm.mesh.userData.parts;
+    if (ap && ap.foreR) {
+      phoneAtm.position.set(0.02, -0.28, 0.06);
+      ap.foreR.add(phoneAtm);
+    } else if (extraAtm.mesh) {
+      phoneAtm.position.set(0.22, 1.05, 0.12);
+      extraAtm.mesh.add(phoneAtm);
+    }
+    extraAtm._phone = phoneAtm;
+    G.bankAtmB = { queue: [extraAtm], x: tx3, z: tz3, t: 0, hours: [6, 22] };
+  }
+  const packTeller = (sx, sz) => {
+    const tellerPed = spawnPed(scene, new THREE.Vector3(sx, 0, sz), 'office');
+    recolorTorso(tellerPed.mesh.userData.parts, 0x1a3a6a, 0.7);
+    tellerPed.bankQueue = true;
+    tellerPed.bankTeller = true;
+    tellerPed.speed = 0;
+    tellerPed.state = 'idle';
+    tellerPed.heading = 0;
+    tellerPed.anchor = { slot: new THREE.Vector3(sx, 0, sz), facing: 0 };
+    if (tellerPed.mesh) {
+      tellerPed.mesh.rotation.y = 0;
+      tellerPed.mesh.visible = false;
+    }
+    const stamp = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.04, 0.08),
+      new THREE.MeshStandardMaterial({ color: 0xc45a18, roughness: 0.45, metalness: 0.2 })
+    );
+    stamp.name = 'bank-stamp';
+    const tp = tellerPed.mesh && tellerPed.mesh.userData && tellerPed.mesh.userData.parts;
+    if (tp && tp.foreR) {
+      stamp.position.set(0.02, -0.22, 0.06);
+      tp.foreR.add(stamp);
+    } else if (tellerPed.mesh) {
+      stamp.position.set(0.22, 1.05, 0.12);
+      tellerPed.mesh.add(stamp);
+    }
+    return { ped: tellerPed, x: sx, z: sz, t: 0 };
+  };
+  G.bankTeller = packTeller(tx, tz - 4.6);
+  G.bankTellerB = packTeller(tx + 4.2, tz - 4.6);
+}
+
+export function spawnGunClerk(scene) {
+  if (!GAMEPLAY.gunClerk) return;
+  const shop = G.world && G.world.gunShop;
+  if (!shop) return;
+  const x = shop.x, z = shop.z + 1.7;
   const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'laborer');
-  recolorTorso(ped.mesh.userData.parts, 0x1a3a6a, 0.7);
-  ped.sevenGuard = true;
-  ped.anchor = { slot: new THREE.Vector3(x, 0.42, z), facing: PI };
+  recolorTorso(ped.mesh.userData.parts, 0x2a2a32, 0.7);
+  ped.gunClerk = true;
+  ped.anchor = { slot: new THREE.Vector3(x, 0, z), facing: PI };
   ped.speed = 0;
   ped.state = 'idle';
   ped.heading = PI;
-  ped.mesh.position.set(x, 0.42, z);
-  ped.mesh.rotation.y = PI;
-  const torch = new THREE.Group();
-  torch.name = 'flashlight';
-  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.16, 6), new THREE.MeshStandardMaterial({ color: 0x1a1a1e, roughness: 0.45 }));
-  handle.rotation.x = PI / 2; torch.add(handle);
-  const beam = new THREE.Mesh(
-    new THREE.ConeGeometry(0.35, 1.6, 8, 1, true),
-    new THREE.MeshBasicMaterial({ color: 0xffe6a0, transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide })
+  if (ped.mesh) {
+    ped.mesh.rotation.y = PI;
+    ped.mesh.visible = false;
+  }
+  const cloth = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 0.02, 0.16),
+    new THREE.MeshStandardMaterial({ color: 0x6a6a70, roughness: 0.85 })
   );
-  beam.name = 'flashlight-beam';
-  beam.rotation.x = PI / 2; beam.position.z = 0.95; torch.add(beam);
-  const light = new THREE.PointLight(0xffe0a0, 0, 10, 2);
-  light.position.z = 0.2; torch.add(light);
-  const pp = ped.mesh.userData.parts;
-  if (pp && pp.foreR) { torch.position.set(0.02, -0.2, 0.08); pp.foreR.add(torch); }
-  else { torch.position.set(0.2, 0.9, 0.15); ped.mesh.add(torch); }
-  beam.visible = false;
-  G.sevenGuard = { ped, chair, light, beam, x, z };
+  cloth.name = 'gun-cloth';
+  const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+  if (parts && parts.foreR) {
+    cloth.position.set(0.02, -0.22, 0.08);
+    parts.foreR.add(cloth);
+  } else if (ped.mesh) {
+    cloth.position.set(0.22, 1.05, 0.12);
+    ped.mesh.add(cloth);
+  }
+  G.gunClerk = { ped, cloth, x, z, t: 0 };
+  const packShop = (cx, cz, facing) => {
+    const shopper = spawnPed(scene, new THREE.Vector3(cx, 0, cz), 'office');
+    shopper.gunClerk = true;
+    shopper.gunShop = true;
+    shopper.speed = 0;
+    shopper.state = 'idle';
+    shopper.heading = facing;
+    shopper.anchor = { slot: new THREE.Vector3(cx, 0, cz), facing };
+    if (shopper.mesh) {
+      shopper.mesh.rotation.y = facing;
+      shopper.mesh.visible = false;
+    }
+    const cse = new THREE.Mesh(
+      new THREE.BoxGeometry(0.16, 0.08, 0.28),
+      new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.7, metalness: 0.15 })
+    );
+    cse.name = 'gun-case';
+    const sp = shopper.mesh && shopper.mesh.userData && shopper.mesh.userData.parts;
+    if (sp && sp.foreL) {
+      cse.position.set(0.02, -0.24, 0.08);
+      sp.foreL.add(cse);
+    } else if (shopper.mesh) {
+      cse.position.set(-0.18, 1.0, 0.1);
+      shopper.mesh.add(cse);
+    }
+    return { ped: shopper, x: cx, z: cz, t: 0 };
+  };
+  G.gunShopper = packShop(x + 1.4, z - 2.0, 0);
+  G.gunShopperB = packShop(x - 1.4, z - 2.0, 0);
+}
+
+export function spawnStarterClerk(scene) {
+  if (!GAMEPLAY.starterClerk) return;
+  const shop = (G.world && G.world.gunShops || []).find(s => s && s.id === 'starter');
+  if (!shop || !shop.pos) return;
+  const x = shop.pos.x, z = shop.pos.z + 1.7;
+  const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'laborer');
+  recolorTorso(ped.mesh.userData.parts, 0x3a2a22, 0.7);
+  ped.starterClerk = true;
+  ped.anchor = { slot: new THREE.Vector3(x, 0, z), facing: PI };
+  ped.speed = 0;
+  ped.state = 'idle';
+  ped.heading = PI;
+  if (ped.mesh) {
+    ped.mesh.rotation.y = PI;
+    ped.mesh.visible = false;
+  }
+  const cloth = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 0.02, 0.16),
+    new THREE.MeshStandardMaterial({ color: 0x8a6a40, roughness: 0.85 })
+  );
+  cloth.name = 'starter-gun-cloth';
+  const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+  if (parts && parts.foreR) {
+    cloth.position.set(0.02, -0.22, 0.08);
+    parts.foreR.add(cloth);
+  } else if (ped.mesh) {
+    cloth.position.set(0.22, 1.05, 0.12);
+    ped.mesh.add(cloth);
+  }
+  G.starterClerk = { ped, cloth, x, z, t: 0 };
+  const packShop = (cx, cz, facing) => {
+    const shopper = spawnPed(scene, new THREE.Vector3(cx, 0, cz), 'office');
+    shopper.starterClerk = true;
+    shopper.starterShop = true;
+    shopper.speed = 0;
+    shopper.state = 'idle';
+    shopper.heading = facing;
+    shopper.anchor = { slot: new THREE.Vector3(cx, 0, cz), facing };
+    if (shopper.mesh) {
+      shopper.mesh.rotation.y = facing;
+      shopper.mesh.visible = false;
+    }
+    const cse = new THREE.Mesh(
+      new THREE.BoxGeometry(0.16, 0.08, 0.28),
+      new THREE.MeshStandardMaterial({ color: 0x4a3a28, roughness: 0.7, metalness: 0.15 })
+    );
+    cse.name = 'starter-case';
+    const sp = shopper.mesh && shopper.mesh.userData && shopper.mesh.userData.parts;
+    if (sp && sp.foreL) {
+      cse.position.set(0.02, -0.24, 0.08);
+      sp.foreL.add(cse);
+    } else if (shopper.mesh) {
+      cse.position.set(-0.18, 1.0, 0.1);
+      shopper.mesh.add(cse);
+    }
+    return { ped: shopper, x: cx, z: cz, t: 0 };
+  };
+  G.starterShopper = packShop(x + 1.4, z - 1.6, 0);
+  G.starterShopperB = packShop(x - 1.4, z - 1.6, 0);
+}
+
+export function spawnHomeAuntie(scene) {
+  if (!GAMEPLAY.homeAuntie) return;
+  const door = G.world && G.world.poi && G.world.poi.safehouse;
+  if (!door) return;
+  const packAuntie = (x, z, chairName) => {
+    const chair = new THREE.Group();
+    chair.name = chairName;
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.04, 0.42), new THREE.MeshStandardMaterial({ color: 0xd8d0c0, roughness: 0.7 }));
+    seat.position.y = 0.42; chair.add(seat);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.46, 0.04), seat.material);
+    back.position.set(0, 0.65, -0.2); chair.add(back);
+    for (const [sx, sz] of [[-0.16, -0.16], [0.16, -0.16], [-0.16, 0.16], [0.16, 0.16]]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.42, 5), new THREE.MeshStandardMaterial({ color: 0x888890, roughness: 0.5, metalness: 0.3 }));
+      leg.position.set(sx, 0.21, sz); chair.add(leg);
+    }
+    chair.position.set(x, 0, z);
+    scene.add(chair);
+    const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'local');
+    recolorTorso(ped.mesh.userData.parts, 0xc45a3a, 0.7);
+    ped.homeAuntie = true;
+    ped.anchor = { slot: new THREE.Vector3(x, 0.42, z), facing: PI };
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = PI;
+    if (ped.mesh) {
+      ped.mesh.position.set(x, 0.42, z);
+      ped.mesh.rotation.y = PI;
+      ped.mesh.visible = false;
+    }
+    const paper = new THREE.Group();
+    paper.name = 'home-paper';
+    const sheet = new THREE.Mesh(
+      new THREE.BoxGeometry(0.16, 0.02, 0.2),
+      new THREE.MeshStandardMaterial({ color: 0xf5f0e4, roughness: 0.85 })
+    );
+    paper.add(sheet);
+    const page = new THREE.Mesh(
+      new THREE.BoxGeometry(0.14, 0.004, 0.18),
+      new THREE.MeshStandardMaterial({ color: 0xe8e0d0, roughness: 0.9 })
+    );
+    page.name = 'home-paper-page';
+    page.position.y = 0.014;
+    paper.add(page);
+    const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+    if (parts && parts.foreL) {
+      paper.position.set(0.02, -0.18, 0.1);
+      paper.rotation.set(-0.9, 0.2, 0.15);
+      parts.foreL.add(paper);
+    } else if (ped.mesh) {
+      paper.position.set(-0.12, 0.72, 0.16);
+      ped.mesh.add(paper);
+    }
+    return { ped, chair, x, z, t: 0 };
+  };
+  G.homeAuntie = packAuntie(door.x - 2.4, door.z + 1.6, 'home-chair');
+  G.homeAuntieB = packAuntie(door.x + 2.4, door.z + 1.6, 'east-home-chair');
+}
+
+export function spawnStationPorter(scene) {
+  if (!GAMEPLAY.stationPorter) return;
+  const spawn = G.world && G.world.spawns && G.world.spawns.player;
+  if (!spawn) return;
+  const packPorters = (slots) => {
+    const porters = [];
+    for (let i = 0; i < slots.length; i++) {
+      const slot = slots[i];
+      const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
+      recolorTorso(ped.mesh.userData.parts, 0xc03030, 0.7);
+      ped.stationPorter = true;
+      ped.speed = 0;
+      ped.state = 'idle';
+      ped.heading = slot.facing;
+      ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
+      if (ped.mesh) {
+        ped.mesh.rotation.y = slot.facing;
+        ped.mesh.visible = false;
+      }
+      const bag = new THREE.Group();
+      bag.name = 'station-bag';
+      const body = new THREE.Mesh(
+        new THREE.BoxGeometry(0.18, 0.22, 0.12),
+        new THREE.MeshStandardMaterial({ color: i === 0 ? 0x2a4a8a : 0xffcf4a, roughness: 0.65 })
+      );
+      bag.add(body);
+      const handle = new THREE.Mesh(
+        new THREE.BoxGeometry(0.1, 0.04, 0.02),
+        new THREE.MeshStandardMaterial({ color: 0x2a2a32, roughness: 0.5 })
+      );
+      handle.position.y = 0.14;
+      bag.add(handle);
+      const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+      if (parts && parts.foreR) {
+        bag.position.set(0.02, -0.22, 0.08);
+        parts.foreR.add(bag);
+      } else if (ped.mesh) {
+        bag.position.set(0.22, 1.05, 0.12);
+        ped.mesh.add(bag);
+      }
+      ped._bag = bag;
+      porters.push(ped);
+    }
+    return { porters, x: spawn.x, z: spawn.z, t: 0 };
+  };
+  G.stationPorter = packPorters([
+    { x: spawn.x - 5.2, z: spawn.z - 2.8, facing: 0, kind: 'laborer' },
+    { x: spawn.x + 5.6, z: spawn.z - 2.6, facing: 0, kind: 'laborer' },
+  ]);
+  G.northStationPorter = packPorters([
+    { x: spawn.x - 5.2, z: spawn.z + 2.8, facing: PI, kind: 'laborer' },
+    { x: spawn.x + 5.6, z: spawn.z + 2.6, facing: PI, kind: 'laborer' },
+  ]);
+  const packSit = (sitSlots, chairName) => {
+    const sitters = [];
+    for (let i = 0; i < sitSlots.length; i++) {
+      const slot = sitSlots[i];
+      const chair = new THREE.Group();
+      chair.name = chairName;
+      const seat = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.04, 0.42), new THREE.MeshStandardMaterial({ color: 0xd8d0c0, roughness: 0.7 }));
+      seat.position.y = 0.42; chair.add(seat);
+      const back = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.46, 0.04), seat.material);
+      back.position.set(0, 0.65, -0.2); chair.add(back);
+      for (const [sx, sz] of [[-0.16, -0.16], [0.16, -0.16], [-0.16, 0.16], [0.16, 0.16]]) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.42, 5), new THREE.MeshStandardMaterial({ color: 0x888890, roughness: 0.5, metalness: 0.3 }));
+        leg.position.set(sx, 0.21, sz); chair.add(leg);
+      }
+      chair.position.set(slot.x, 0, slot.z);
+      scene.add(chair);
+      const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
+      ped.stationPorter = true;
+      ped.stationSit = true;
+      ped.speed = 0;
+      ped.state = 'idle';
+      ped.heading = slot.facing;
+      ped.anchor = { slot: new THREE.Vector3(slot.x, 0.42, slot.z), facing: slot.facing };
+      if (ped.mesh) {
+        ped.mesh.position.set(slot.x, 0.42, slot.z);
+        ped.mesh.rotation.y = slot.facing;
+        ped.mesh.visible = false;
+      }
+      const phone = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05, 0.09, 0.01),
+        new THREE.MeshStandardMaterial({ color: 0x1a1a22, roughness: 0.4, emissive: 0x4a8aff, emissiveIntensity: 0.2 })
+      );
+      phone.name = 'station-phone';
+      const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+      if (parts && parts.foreR) {
+        phone.position.set(0.02, -0.26, 0.06);
+        parts.foreR.add(phone);
+      } else if (ped.mesh) {
+        phone.position.set(0.2, 0.95, 0.12);
+        ped.mesh.add(phone);
+      }
+      ped._phone = phone;
+      sitters.push(ped);
+    }
+    return { sitters, x: spawn.x, z: spawn.z, t: 0 };
+  };
+  G.stationSit = packSit([
+    { x: spawn.x - 2.4, z: spawn.z + 2.6, facing: PI, kind: 'office' },
+    { x: spawn.x + 2.2, z: spawn.z + 2.8, facing: PI, kind: 'local' },
+  ], 'station-chair');
+  G.southStationSit = packSit([
+    { x: spawn.x - 2.4, z: spawn.z - 2.6, facing: 0, kind: 'office' },
+    { x: spawn.x + 2.2, z: spawn.z - 2.8, facing: 0, kind: 'local' },
+  ], 'south-station-chair');
+}
+
+export function spawnGarageMech(scene) {
+  if (!GAMEPLAY.garageMech) return;
+  const g = G.world && G.world.garages && G.world.garages[0];
+  if (!g || !g.pos) return;
+  const packMech = (x, z, facing) => {
+    const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'laborer');
+    recolorTorso(ped.mesh.userData.parts, 0xc45a18, 0.7);
+    ped.garageMech = true;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = facing;
+    ped.anchor = { slot: new THREE.Vector3(x, 0, z), facing };
+    if (ped.mesh) {
+      ped.mesh.rotation.y = facing;
+      ped.mesh.visible = false;
+    }
+    const wrench = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04, 0.04, 0.28),
+      new THREE.MeshStandardMaterial({ color: 0x888890, metalness: 0.5, roughness: 0.35 })
+    );
+    wrench.name = 'garage-wrench';
+    const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+    if (parts && parts.foreR) {
+      wrench.position.set(0.02, -0.22, 0.08);
+      parts.foreR.add(wrench);
+    } else if (ped.mesh) {
+      wrench.position.set(0.22, 1.05, 0.12);
+      ped.mesh.add(wrench);
+    }
+    return { ped, x, z, t: 0 };
+  };
+  G.garageMech = packMech(g.pos.x + 5.4, g.pos.z - 4.8, -PI / 2);
+  G.garageMechB = packMech(g.pos.x - 5.4, g.pos.z - 4.8, PI / 2);
+  const packWait = (cx, cz, facing) => {
+    const wait = spawnPed(scene, new THREE.Vector3(cx, 0, cz), 'office');
+    wait.garageMech = true;
+    wait.garageWait = true;
+    wait.speed = 0;
+    wait.state = 'idle';
+    wait.heading = facing;
+    wait.anchor = { slot: new THREE.Vector3(cx, 0, cz), facing };
+    if (wait.mesh) {
+      wait.mesh.rotation.y = facing;
+      wait.mesh.visible = false;
+    }
+    const helm = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.08, 0.14),
+      new THREE.MeshStandardMaterial({ color: 0x1a1a22, roughness: 0.45, metalness: 0.3 })
+    );
+    helm.name = 'garage-helmet';
+    const wp = wait.mesh && wait.mesh.userData && wait.mesh.userData.parts;
+    if (wp && wp.foreL) {
+      helm.position.set(0.02, -0.24, 0.06);
+      wp.foreL.add(helm);
+    } else if (wait.mesh) {
+      helm.position.set(-0.18, 1.0, 0.1);
+      wait.mesh.add(helm);
+    }
+    return { ped: wait, x: cx, z: cz, t: 0 };
+  };
+  G.garageWait = packWait(g.pos.x + 2.8, g.pos.z - 6.6, 0);
+  G.garageWaitB = packWait(g.pos.x - 2.8, g.pos.z - 6.6, 0);
+}
+
+export function spawnKlongDock(scene) {
+  if (!GAMEPLAY.klongDock) return;
+  const poi = G.world && G.world.poi && G.world.poi.klongToey;
+  if (!poi) return;
+  const packHands = (slots) => {
+    const hands = [];
+    for (let i = 0; i < slots.length; i++) {
+      const slot = slots[i];
+      const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
+      recolorTorso(ped.mesh.userData.parts, 0xe8b020, 0.7);
+      ped.klongDock = true;
+      ped.speed = 0;
+      ped.state = 'idle';
+      ped.heading = slot.facing;
+      ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
+      if (ped.mesh) {
+        ped.mesh.rotation.y = slot.facing;
+        ped.mesh.visible = false;
+      }
+      const crate = new THREE.Mesh(
+        new THREE.BoxGeometry(0.22, 0.16, 0.18),
+        new THREE.MeshStandardMaterial({ color: i === 0 ? 0xb45a2a : 0x3a6a8a, roughness: 0.7, metalness: 0.2 })
+      );
+      crate.name = 'dock-crate';
+      const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+      if (parts && parts.foreR) {
+        crate.position.set(0.02, -0.22, 0.1);
+        parts.foreR.add(crate);
+      } else if (ped.mesh) {
+        crate.position.set(0.22, 1.05, 0.12);
+        ped.mesh.add(crate);
+      }
+      hands.push(ped);
+    }
+    return { hands, x: poi.x, z: poi.z, t: 0 };
+  };
+  G.klongDock = packHands([
+    { x: poi.x - 4.2, z: poi.z - 3.1, facing: PI, kind: 'laborer' },
+    { x: poi.x + 5.1, z: poi.z - 2.6, facing: -PI / 2, kind: 'laborer' },
+  ]);
+  G.klongDockB = packHands([
+    { x: poi.x - 7.4, z: poi.z - 3.1, facing: PI, kind: 'laborer' },
+    { x: poi.x - 7.4, z: poi.z + 3.4, facing: 0, kind: 'laborer' },
+  ]);
+  const packCheck = (cx, cz, facing) => {
+    const check = spawnPed(scene, new THREE.Vector3(cx, 0, cz), 'office');
+    recolorTorso(check.mesh.userData.parts, 0x2a4a6a, 0.7);
+    check.klongDock = true;
+    check.klongCheck = true;
+    check.speed = 0;
+    check.state = 'idle';
+    check.heading = facing;
+    check.anchor = { slot: new THREE.Vector3(cx, 0, cz), facing };
+    if (check.mesh) {
+      check.mesh.rotation.y = facing;
+      check.mesh.visible = false;
+    }
+    const clip = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.16, 0.02),
+      new THREE.MeshStandardMaterial({ color: 0xf0ead8, roughness: 0.7 })
+    );
+    clip.name = 'klong-clip';
+    const cp = check.mesh && check.mesh.userData && check.mesh.userData.parts;
+    if (cp && cp.foreL) {
+      clip.position.set(0.02, -0.22, 0.06);
+      cp.foreL.add(clip);
+    } else if (check.mesh) {
+      clip.position.set(-0.18, 1.0, 0.1);
+      check.mesh.add(clip);
+    }
+    return { ped: check, x: cx, z: cz, t: 0 };
+  };
+  G.klongCheck = packCheck(poi.x + 1.6, poi.z + 5.8, PI);
+  G.klongCheckB = packCheck(poi.x - 1.6, poi.z + 5.8, PI);
+}
+
+export function spawnSengClerk(scene) {
+  if (!GAMEPLAY.sengClerk) return;
+  const poi = G.world && G.world.poi && G.world.poi.goldShop;
+  if (!poi) return;
+  const x = poi.x, z = poi.z + 5.2;
+  const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'laborer');
+  recolorTorso(ped.mesh.userData.parts, 0x8a2020, 0.7);
+  ped.sengClerk = true;
+  ped.speed = 0;
+  ped.state = 'idle';
+  ped.heading = PI;
+  ped.anchor = { slot: new THREE.Vector3(x, 0, z), facing: PI };
+  if (ped.mesh) {
+    ped.mesh.rotation.y = PI;
+    ped.mesh.visible = false;
+  }
+  const tray = new THREE.Mesh(
+    new THREE.BoxGeometry(0.16, 0.02, 0.1),
+    new THREE.MeshStandardMaterial({ color: 0xffcf4a, metalness: 0.65, roughness: 0.28 })
+  );
+  tray.name = 'seng-tray';
+  const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+  if (parts && parts.foreR) {
+    tray.position.set(0.02, -0.22, 0.08);
+    parts.foreR.add(tray);
+  } else if (ped.mesh) {
+    tray.position.set(0.22, 1.05, 0.12);
+    ped.mesh.add(tray);
+  }
+  G.sengClerk = { ped, x, z, t: 0 };
+  const packShop = (cx, cz, facing) => {
+    const shopper = spawnPed(scene, new THREE.Vector3(cx, 0, cz), 'office');
+    shopper.sengClerk = true;
+    shopper.sengShop = true;
+    shopper.speed = 0;
+    shopper.state = 'idle';
+    shopper.heading = facing;
+    shopper.anchor = { slot: new THREE.Vector3(cx, 0, cz), facing };
+    if (shopper.mesh) {
+      shopper.mesh.rotation.y = facing;
+      shopper.mesh.visible = false;
+    }
+    const chain = new THREE.Mesh(
+      new THREE.TorusGeometry(0.04, 0.008, 6, 10),
+      new THREE.MeshStandardMaterial({ color: 0xffcf4a, metalness: 0.7, roughness: 0.28 })
+    );
+    chain.name = 'seng-chain';
+    const sp = shopper.mesh && shopper.mesh.userData && shopper.mesh.userData.parts;
+    if (sp && sp.foreL) {
+      chain.position.set(0.02, -0.24, 0.06);
+      sp.foreL.add(chain);
+    } else if (shopper.mesh) {
+      chain.position.set(-0.18, 1.0, 0.1);
+      shopper.mesh.add(chain);
+    }
+    return { ped: shopper, x: cx, z: cz, t: 0 };
+  };
+  G.sengShopper = packShop(x + 1.55, z + 0.85, PI);
+  G.sengShopperB = packShop(x - 1.55, z + 0.85, PI);
+}
+
+export function spawnAirportCrew(scene) {
+  if (!GAMEPLAY.airportCrew) return;
+  const poi = G.world && G.world.poi && G.world.poi.suvarnabhumi;
+  if (!poi) return;
+  const packCrew = (hx, facing) => {
+    const hands = [];
+    const slots = [
+      { x: hx, z: poi.z - 6.2, facing, kind: 'laborer' },
+      { x: hx, z: poi.z + 7.4, facing, kind: 'laborer' },
+    ];
+    for (let i = 0; i < slots.length; i++) {
+      const slot = slots[i];
+      const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
+      recolorTorso(ped.mesh.userData.parts, 0xff6a00, 0.7);
+      ped.airportCrew = true;
+      ped.speed = 0;
+      ped.state = 'idle';
+      ped.heading = slot.facing;
+      ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
+      if (ped.mesh) {
+        ped.mesh.rotation.y = slot.facing;
+        ped.mesh.visible = false;
+      }
+      const paddle = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05, 0.28, 0.08),
+        new THREE.MeshStandardMaterial({ color: 0xff6a00, roughness: 0.55, emissive: 0x401000, emissiveIntensity: 0.25 })
+      );
+      paddle.name = 'marshal-paddle';
+      const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+      if (parts && parts.foreR) {
+        paddle.position.set(0.02, -0.28, 0.08);
+        parts.foreR.add(paddle);
+      } else if (ped.mesh) {
+        paddle.position.set(0.22, 1.15, 0.12);
+        ped.mesh.add(paddle);
+      }
+      hands.push(ped);
+    }
+    return { hands, x: poi.x, z: poi.z, hx, t: 0 };
+  };
+  G.airportCrew = packCrew(poi.x - 3.5, PI / 2);
+  G.eastAirportCrew = packCrew(poi.x + 3.5, -PI / 2);
+}
+
+export function spawnAirportCargo(scene) {
+  if (!GAMEPLAY.airportCargo) return;
+  if (!G.world || !G.world.airport) return;
+  const sx = 209, sz = -118;
+  const packCargo = (hx, facing) => {
+    const hands = [];
+    const slots = [
+      { x: hx, z: sz - 3.2, facing, kind: 'laborer' },
+      { x: hx, z: sz + 4.1, facing, kind: 'laborer' },
+    ];
+    for (let i = 0; i < slots.length; i++) {
+      const slot = slots[i];
+      const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
+      recolorTorso(ped.mesh.userData.parts, 0x3a6a8a, 0.7);
+      ped.airportCargo = true;
+      ped.speed = 0;
+      ped.state = 'idle';
+      ped.heading = slot.facing;
+      ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
+      if (ped.mesh) {
+        ped.mesh.rotation.y = slot.facing;
+        ped.mesh.visible = false;
+      }
+      const crate = new THREE.Mesh(
+        new THREE.BoxGeometry(0.24, 0.18, 0.2),
+        new THREE.MeshStandardMaterial({ color: i === 0 ? 0xc8a22a : 0xb45a2a, roughness: 0.7, metalness: 0.15 })
+      );
+      crate.name = 'cargo-crate';
+      const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+      if (parts && parts.foreR) {
+        crate.position.set(0.02, -0.24, 0.1);
+        parts.foreR.add(crate);
+      } else if (ped.mesh) {
+        crate.position.set(0.22, 1.05, 0.12);
+        ped.mesh.add(crate);
+      }
+      hands.push(ped);
+    }
+    return { hands, x: sx, z: sz, hx, t: 0 };
+  };
+  G.airportCargo = packCargo(sx + 7.4, -PI / 2);
+  G.westAirportCargo = packCargo(sx - 7.4, PI / 2);
+}
+
+export function spawnAirportTower(scene) {
+  if (!GAMEPLAY.airportTower) return;
+  const poi = G.world && G.world.poi && G.world.poi.airportTower;
+  if (!poi) return;
+  const packCtl = (x, z, facing) => {
+    const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'office');
+    recolorTorso(ped.mesh.userData.parts, 0x1a3a6a, 0.7);
+    ped.airportTower = true;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = facing;
+    ped.anchor = { slot: new THREE.Vector3(x, 0, z), facing };
+    if (ped.mesh) {
+      ped.mesh.rotation.y = facing;
+      ped.mesh.visible = false;
+    }
+    const binocs = new THREE.Group();
+    binocs.name = 'tower-binocs';
+    const mat = new THREE.MeshStandardMaterial({ color: 0x2a2a32, roughness: 0.45, metalness: 0.35 });
+    for (const ox of [-0.035, 0.035]) {
+      const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.026, 0.16, 8), mat);
+      tube.rotation.x = PI / 2;
+      tube.position.x = ox;
+      binocs.add(tube);
+    }
+    const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.018, 0.03), mat);
+    binocs.add(bridge);
+    const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+    if (parts && parts.foreR) {
+      binocs.position.set(0.02, -0.22, 0.1);
+      parts.foreR.add(binocs);
+    } else if (ped.mesh) {
+      binocs.position.set(0.22, 1.15, 0.12);
+      ped.mesh.add(binocs);
+    }
+    return { ped, x, z, t: 0 };
+  };
+  G.towerCtl = packCtl(poi.x + 4.8, poi.z, PI / 2);
+  G.towerCtlB = packCtl(poi.x - 4.8, poi.z, -PI / 2);
+}
+
+export function spawnAirportTaxi(scene) {
+  if (!GAMEPLAY.airportTaxi) return;
+  if (!G.world || !G.world.airport) return;
+  const pack = (cx, cz) => {
+    const touts = [];
+    const slots = [
+      { x: cx + 6.4, z: cz - 2.2, facing: PI / 2, kind: 'laborer' },
+      { x: cx + 6.4, z: cz + 2.4, facing: PI / 2, kind: 'laborer' },
+    ];
+    for (let i = 0; i < slots.length; i++) {
+      const slot = slots[i];
+      const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
+      recolorTorso(ped.mesh.userData.parts, 0xe8c020, 0.7);
+      ped.airportTaxi = true;
+      ped.speed = 0;
+      ped.state = 'idle';
+      ped.heading = slot.facing;
+      ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
+      if (ped.mesh) {
+        ped.mesh.rotation.y = slot.facing;
+        ped.mesh.visible = false;
+      }
+      const slate = new THREE.Mesh(
+        new THREE.BoxGeometry(0.12, 0.16, 0.02),
+        new THREE.MeshStandardMaterial({ color: 0xf0ead8, roughness: 0.7 })
+      );
+      slate.name = 'taxi-slate';
+      const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+      if (parts && parts.foreR) {
+        slate.position.set(0.02, -0.22, 0.08);
+        parts.foreR.add(slate);
+      } else if (ped.mesh) {
+        slate.position.set(0.22, 1.05, 0.12);
+        ped.mesh.add(slate);
+      }
+      touts.push(ped);
+    }
+    return { touts, x: cx, z: cz, t: 0 };
+  };
+  G.airportTaxi = pack(209, 50);
+  G.southAirportTaxi = pack(209, -50);
+  const packBags = (cx, cz) => {
+    const bx = cx - 6.4;
+    const hands = [];
+    const bagSlots = [
+      { x: bx, z: cz - 2.2, facing: PI / 2 },
+      { x: bx, z: cz + 2.4, facing: PI / 2 },
+    ];
+    for (let i = 0; i < bagSlots.length; i++) {
+      const slot = bagSlots[i];
+      const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), 'laborer');
+      recolorTorso(ped.mesh.userData.parts, 0x2a5a8a, 0.7);
+      ped.airportTaxi = true;
+      ped.airportBags = true;
+      ped.speed = 0;
+      ped.state = 'idle';
+      ped.heading = slot.facing;
+      ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
+      if (ped.mesh) {
+        ped.mesh.rotation.y = slot.facing;
+        ped.mesh.visible = false;
+      }
+      const cse = new THREE.Mesh(
+        new THREE.BoxGeometry(0.18, 0.14, 0.28),
+        new THREE.MeshStandardMaterial({ color: i === 0 ? 0xc8a22a : 0x3a3a44, roughness: 0.65, metalness: 0.15 })
+      );
+      cse.name = 'bag-case';
+      const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+      if (parts && parts.foreR) {
+        cse.position.set(0.02, -0.24, 0.1);
+        parts.foreR.add(cse);
+      } else if (ped.mesh) {
+        cse.position.set(0.22, 1.05, 0.12);
+        ped.mesh.add(cse);
+      }
+      hands.push(ped);
+    }
+    return { hands, x: cx, z: cz, t: 0 };
+  };
+  G.airportBags = packBags(209, 0);
+  G.southAirportBags = packBags(209, -50);
+  G.northAirportBags = packBags(209, 50);
+}
+
+export function spawnMallDirectory(scene) {
+  if (!GAMEPLAY.mallDir) return;
+  const mall = G.world && G.world.mall;
+  if (!mall || !mall.center) return;
+  const pack = (x, z, facing, meshName, screenName, clerkX, clerkZ) => {
+    const g = new THREE.Group();
+    g.name = meshName;
+    const board = new THREE.Mesh(
+      new THREE.BoxGeometry(1.15, 0.72, 0.08),
+      new THREE.MeshStandardMaterial({ color: 0x1a2230, roughness: 0.45 })
+    );
+    board.position.y = 1.28;
+    g.add(board);
+    const screen = new THREE.Mesh(
+      new THREE.BoxGeometry(1.02, 0.58, 0.04),
+      new THREE.MeshStandardMaterial({ color: 0x88e0ff, emissive: 0x226688, emissiveIntensity: 0.4, roughness: 0.3 })
+    );
+    screen.name = screenName;
+    screen.position.set(0, 1.28, 0.05);
+    g.add(screen);
+    g.position.set(x, 0, z);
+    g.rotation.y = facing;
+    scene.add(g);
+    const clerk = spawnPed(scene, new THREE.Vector3(clerkX, 0, clerkZ), 'office');
+    clerk.mallDir = true;
+    clerk.anchor = { slot: new THREE.Vector3(clerkX, 0, clerkZ), facing };
+    clerk.speed = 0;
+    clerk.state = 'idle';
+    clerk.heading = facing;
+    if (clerk.mesh) clerk.mesh.rotation.y = facing;
+    return { mesh: g, screen, clerk, x, z, t: 0, idx: 0 };
+  };
+  const x = mall.center.x, z = mall.center.z - 4;
+  G.mallDir = pack(x, z, PI, 'mall-directory', 'mall-dir-screen', x - 1.6, z + 1.35);
+  const nx = mall.center.x, nz = mall.center.z + 4;
+  G.mallDirB = pack(nx, nz, 0, 'north-mall-directory', 'north-mall-dir-screen', nx - 1.6, nz - 1.35);
+  const packAsk = (ax, az, facing) => {
+    const asker = spawnPed(scene, new THREE.Vector3(ax, 0, az), 'tourist');
+    asker.mallDir = true;
+    asker.mallDirAsk = true;
+    asker.speed = 0;
+    asker.state = 'idle';
+    asker.heading = facing;
+    asker.anchor = { slot: new THREE.Vector3(ax, 0, az), facing };
+    if (asker.mesh) {
+      asker.mesh.rotation.y = facing;
+      asker.mesh.visible = false;
+    }
+    const map = new THREE.Mesh(
+      new THREE.BoxGeometry(0.16, 0.22, 0.01),
+      new THREE.MeshStandardMaterial({ color: 0xf4f0e0, roughness: 0.75 })
+    );
+    map.name = 'mall-dir-map';
+    const ap = asker.mesh && asker.mesh.userData && asker.mesh.userData.parts;
+    if (ap && ap.foreL) {
+      map.position.set(0.02, -0.22, 0.08);
+      ap.foreL.add(map);
+    } else if (asker.mesh) {
+      map.position.set(-0.16, 0.95, 0.12);
+      asker.mesh.add(map);
+    }
+    return { ped: asker, x: ax, z: az, t: 0 };
+  };
+  G.mallDirAsk = packAsk(x + 1.6, z - 1.45, 0);
+  G.mallDirAskB = packAsk(nx - 1.6, nz + 1.45, PI);
+}
+
+export function spawnMallFood(scene) {
+  if (!GAMEPLAY.mallFood) return;
+  const mall = G.world && G.world.mall;
+  const shop = mall && (mall.shops || []).find(s => s && s.name === 'Pier 21 Food Court');
+  if (!shop || !shop.pos) return;
+  const x = shop.pos.x, z = shop.pos.z;
+  const table = new THREE.Group();
+  table.name = 'mall-food-table';
+  const top = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.55, 0.55, 0.05, 10),
+    new THREE.MeshStandardMaterial({ color: 0xd8c8b0, roughness: 0.7 })
+  );
+  top.position.y = 0.72;
+  table.add(top);
+  const pole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.04, 0.05, 0.7, 8),
+    new THREE.MeshStandardMaterial({ color: 0x888890, roughness: 0.5, metalness: 0.3 })
+  );
+  pole.position.y = 0.35;
+  table.add(pole);
+  table.position.set(x, 0, z);
+  scene.add(table);
+  const slots = [
+    { x: x - 0.7, z: z + 0.15, facing: PI / 2, kind: 'office' },
+    { x: x + 0.7, z: z - 0.1, facing: -PI / 2, kind: 'tourist' },
+    { x: x + 0.05, z: z - 0.75, facing: 0, kind: 'local' },
+  ];
+  const eaters = [];
+  for (let i = 0; i < slots.length; i++) {
+    const slot = slots[i];
+    const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
+    ped.mallFood = true;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = slot.facing;
+    ped.anchor = { slot: new THREE.Vector3(slot.x, 0.42, slot.z), facing: slot.facing };
+    if (ped.mesh) {
+      ped.mesh.position.set(slot.x, 0.42, slot.z);
+      ped.mesh.rotation.y = slot.facing;
+      ped.mesh.visible = false;
+    }
+    if (i === 0 && ped.mesh) {
+      const tray = new THREE.Mesh(
+        new THREE.BoxGeometry(0.16, 0.02, 0.22),
+        new THREE.MeshStandardMaterial({ color: 0xf0ead8, roughness: 0.6 })
+      );
+      tray.name = 'mall-food-tray';
+      const bowl = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.045, 0.04, 0.04, 8),
+        new THREE.MeshStandardMaterial({ color: 0xff5a3a, roughness: 0.55 })
+      );
+      bowl.position.y = 0.03;
+      tray.add(bowl);
+      const parts = ped.mesh.userData && ped.mesh.userData.parts;
+      if (parts && parts.foreL) { tray.position.set(0.02, -0.22, 0.08); parts.foreL.add(tray); }
+      else { tray.position.set(-0.18, 0.95, 0.12); ped.mesh.add(tray); }
+    }
+    eaters.push(ped);
+  }
+  G.mallFood = { table, eaters, x, z, t: 0 };
+}
+
+export function spawnMallTech(scene) {
+  if (!GAMEPLAY.mallTech) return;
+  const mall = G.world && G.world.mall;
+  const shop = mall && (mall.shops || []).find(s => s && s.name === 'Tokyo Tech');
+  if (!shop || !shop.pos) return;
+  const x = shop.pos.x, z = shop.pos.z;
+  const lookers = [];
+  const slots = [
+    { x: x - 0.7, z: z + 0.1, facing: 0, kind: 'tourist' },
+    { x: x + 0.65, z: z - 0.15, facing: 0.15, kind: 'office' },
+  ];
+  for (let i = 0; i < slots.length; i++) {
+    const slot = slots[i];
+    const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
+    ped.mallTech = true;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = slot.facing;
+    ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
+    if (ped.mesh) {
+      ped.mesh.rotation.y = slot.facing;
+      ped.mesh.visible = false;
+    }
+    const phone = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.09, 0.012),
+      new THREE.MeshStandardMaterial({ color: 0x1a1a22, emissive: 0x226688, emissiveIntensity: 0.35, roughness: 0.35 })
+    );
+    phone.name = 'mall-tech-phone';
+    const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+    if (parts && parts.foreL) {
+      phone.position.set(0.02, -0.22, 0.08);
+      parts.foreL.add(phone);
+    } else if (ped.mesh) {
+      phone.position.set(-0.16, 1.05, 0.14);
+      ped.mesh.add(phone);
+    }
+    ped._phone = phone;
+    lookers.push(ped);
+  }
+  G.mallTech = { lookers, x, z, t: 0 };
+}
+
+export function spawnMallPharm(scene) {
+  if (!GAMEPLAY.mallPharm) return;
+  const mall = G.world && G.world.mall;
+  const shop = mall && (mall.shops || []).find(s => s && s.name === 'Paris Pharmacy');
+  if (!shop || !shop.pos) return;
+  const x = shop.pos.x, z = shop.pos.z;
+  const clerk = spawnPed(scene, new THREE.Vector3(x + 1.55, 0, z), 'office');
+  recolorTorso(clerk.mesh.userData.parts, 0xe8f0ea, 0.75);
+  clerk.mallPharm = true;
+  clerk.pharmRole = 'clerk';
+  clerk.speed = 0;
+  clerk.state = 'idle';
+  clerk.heading = -PI / 2;
+  clerk.anchor = { slot: new THREE.Vector3(x + 1.55, 0, z), facing: -PI / 2 };
+  if (clerk.mesh) {
+    clerk.mesh.rotation.y = -PI / 2;
+    clerk.mesh.visible = false;
+  }
+  const customer = spawnPed(scene, new THREE.Vector3(x - 0.15, 0, z + 0.12), 'local');
+  customer.mallPharm = true;
+  customer.pharmRole = 'customer';
+  customer.speed = 0;
+  customer.state = 'idle';
+  customer.heading = PI / 2;
+  customer.anchor = { slot: new THREE.Vector3(x - 0.15, 0, z + 0.12), facing: PI / 2 };
+  if (customer.mesh) {
+    customer.mesh.rotation.y = PI / 2;
+    customer.mesh.visible = false;
+  }
+  const bag = new THREE.Group();
+  bag.name = 'mall-pharm-bag';
+  const paper = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 0.16, 0.06),
+    new THREE.MeshStandardMaterial({ color: 0xf4f0e8, roughness: 0.8 })
+  );
+  bag.add(paper);
+  const cross = new THREE.Mesh(
+    new THREE.BoxGeometry(0.08, 0.03, 0.01),
+    new THREE.MeshStandardMaterial({ color: 0xc03030, roughness: 0.55 })
+  );
+  cross.position.set(0, 0.02, 0.035);
+  bag.add(cross);
+  const parts = customer.mesh && customer.mesh.userData && customer.mesh.userData.parts;
+  if (parts && parts.foreL) {
+    bag.position.set(0.02, -0.22, 0.08);
+    parts.foreL.add(bag);
+  } else if (customer.mesh) {
+    bag.position.set(-0.16, 0.95, 0.12);
+    customer.mesh.add(bag);
+  }
+  customer._bag = bag;
+  G.mallPharm = { clerk, customer, x, z, t: 0 };
+}
+
+export function spawnMallRoma(scene) {
+  if (!GAMEPLAY.mallRoma) return;
+  const mall = G.world && G.world.mall;
+  const shop = mall && (mall.shops || []).find(s => s && s.name === 'Roma Boutique');
+  if (!shop || !shop.pos) return;
+  const x = shop.pos.x, z = shop.pos.z;
+  const clerk = spawnPed(scene, new THREE.Vector3(x - 1.55, 0, z), 'office');
+  recolorTorso(clerk.mesh.userData.parts, 0xc45a7a, 0.7);
+  clerk.mallRoma = true;
+  clerk.romaRole = 'clerk';
+  clerk.speed = 0;
+  clerk.state = 'idle';
+  clerk.heading = PI / 2;
+  clerk.anchor = { slot: new THREE.Vector3(x - 1.55, 0, z), facing: PI / 2 };
+  if (clerk.mesh) {
+    clerk.mesh.rotation.y = PI / 2;
+    clerk.mesh.visible = false;
+  }
+  const customer = spawnPed(scene, new THREE.Vector3(x + 0.15, 0, z - 0.12), 'tourist');
+  customer.mallRoma = true;
+  customer.romaRole = 'customer';
+  customer.speed = 0;
+  customer.state = 'idle';
+  customer.heading = -PI / 2;
+  customer.anchor = { slot: new THREE.Vector3(x + 0.15, 0, z - 0.12), facing: -PI / 2 };
+  if (customer.mesh) {
+    customer.mesh.rotation.y = -PI / 2;
+    customer.mesh.visible = false;
+  }
+  const bag = new THREE.Group();
+  bag.name = 'mall-roma-bag';
+  const paper = new THREE.Mesh(
+    new THREE.BoxGeometry(0.14, 0.18, 0.05),
+    new THREE.MeshStandardMaterial({ color: 0xff2a86, roughness: 0.7 })
+  );
+  bag.add(paper);
+  const handle = new THREE.Mesh(
+    new THREE.BoxGeometry(0.1, 0.06, 0.012),
+    new THREE.MeshStandardMaterial({ color: 0x2a2a32, roughness: 0.55 })
+  );
+  handle.position.y = 0.12;
+  bag.add(handle);
+  const parts = customer.mesh && customer.mesh.userData && customer.mesh.userData.parts;
+  if (parts && parts.foreL) {
+    bag.position.set(0.02, -0.22, 0.08);
+    parts.foreL.add(bag);
+  } else if (customer.mesh) {
+    bag.position.set(-0.16, 0.95, 0.12);
+    customer.mesh.add(bag);
+  }
+  customer._bag = bag;
+  G.mallRoma = { clerk, customer, x, z, t: 0 };
+}
+
+export function spawnMallWatch(scene) {
+  if (!GAMEPLAY.mallWatch) return;
+  const mall = G.world && G.world.mall;
+  const shop = mall && (mall.shops || []).find(s => s && s.name === 'Watch Boutique');
+  if (!shop || !shop.pos) return;
+  const x = shop.pos.x, z = shop.pos.z, y = shop.pos.y || 10;
+  const clerk = spawnPed(scene, new THREE.Vector3(x + 1.55, 0, z), 'office');
+  recolorTorso(clerk.mesh.userData.parts, 0x2a4a3a, 0.7);
+  clerk.mallWatch = true;
+  clerk.watchRole = 'clerk';
+  clerk.speed = 0;
+  clerk.state = 'idle';
+  clerk.heading = -PI / 2;
+  clerk.anchor = { slot: new THREE.Vector3(x + 1.55, y, z), facing: -PI / 2 };
+  if (clerk.mesh) {
+    clerk.mesh.position.y = y;
+    clerk.mesh.rotation.y = -PI / 2;
+    clerk.mesh.visible = false;
+  }
+  const customer = spawnPed(scene, new THREE.Vector3(x - 0.15, 0, z + 0.12), 'tourist');
+  customer.mallWatch = true;
+  customer.watchRole = 'customer';
+  customer.speed = 0;
+  customer.state = 'idle';
+  customer.heading = PI / 2;
+  customer.anchor = { slot: new THREE.Vector3(x - 0.15, y, z + 0.12), facing: PI / 2 };
+  if (customer.mesh) {
+    customer.mesh.position.y = y;
+    customer.mesh.rotation.y = PI / 2;
+    customer.mesh.visible = false;
+  }
+  const tray = new THREE.Group();
+  tray.name = 'mall-watch-tray';
+  const pad = new THREE.Mesh(
+    new THREE.BoxGeometry(0.16, 0.02, 0.1),
+    new THREE.MeshStandardMaterial({ color: 0x1a3a28, roughness: 0.7 })
+  );
+  tray.add(pad);
+  const face = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.03, 0.03, 0.012, 10),
+    new THREE.MeshStandardMaterial({ color: 0xd9a134, metalness: 0.55, roughness: 0.35, emissive: 0x886622, emissiveIntensity: 0.2 })
+  );
+  face.name = 'mall-watch-face';
+  face.rotation.x = PI / 2;
+  face.position.y = 0.02;
+  tray.add(face);
+  const parts = clerk.mesh && clerk.mesh.userData && clerk.mesh.userData.parts;
+  if (parts && parts.foreR) {
+    tray.position.set(0.02, -0.22, 0.08);
+    parts.foreR.add(tray);
+  } else if (clerk.mesh) {
+    tray.position.set(0.22, 1.05, 0.12);
+    clerk.mesh.add(tray);
+  }
+  clerk._tray = tray;
+  G.mallWatch = { clerk, customer, x, z, y, t: 0 };
+}
+
+export function spawnMallManga(scene) {
+  if (!GAMEPLAY.mallManga) return;
+  const mall = G.world && G.world.mall;
+  const shop = mall && (mall.shops || []).find(s => s && s.name === 'Manga Café');
+  if (!shop || !shop.pos) return;
+  const x = shop.pos.x, z = shop.pos.z, y = (shop.pos.y || 5) + 0.42;
+  const readers = [];
+  const slots = [
+    { x: x - 0.65, z: z - 0.1, facing: PI, kind: 'tourist' },
+    { x: x + 0.7, z: z + 0.12, facing: PI, kind: 'office' },
+  ];
+  for (let i = 0; i < slots.length; i++) {
+    const slot = slots[i];
+    const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
+    ped.mallManga = true;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = slot.facing;
+    ped.anchor = { slot: new THREE.Vector3(slot.x, y, slot.z), facing: slot.facing };
+    if (ped.mesh) {
+      ped.mesh.position.set(slot.x, y, slot.z);
+      ped.mesh.rotation.y = slot.facing;
+      ped.mesh.visible = false;
+    }
+    const book = new THREE.Group();
+    book.name = 'mall-manga-book';
+    const cover = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.02, 0.16),
+      new THREE.MeshStandardMaterial({ color: i === 0 ? 0x21f0ff : 0xff2a86, roughness: 0.65 })
+    );
+    book.add(cover);
+    const page = new THREE.Mesh(
+      new THREE.BoxGeometry(0.1, 0.004, 0.14),
+      new THREE.MeshStandardMaterial({ color: 0xf5f0e4, roughness: 0.85 })
+    );
+    page.name = 'mall-manga-page';
+    page.position.y = 0.014;
+    book.add(page);
+    const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+    if (parts && parts.foreL) {
+      book.position.set(0.02, -0.18, 0.1);
+      book.rotation.set(-0.9, 0.2, 0.15);
+      parts.foreL.add(book);
+    } else if (ped.mesh) {
+      book.position.set(-0.12, 0.72, 0.16);
+      ped.mesh.add(book);
+    }
+    ped._book = book;
+    readers.push(ped);
+  }
+  G.mallManga = { readers, x, z, y, t: 0 };
+}
+
+export function spawnMallSushi(scene) {
+  if (!GAMEPLAY.mallSushi) return;
+  const mall = G.world && G.world.mall;
+  const shop = mall && (mall.shops || []).find(s => s && s.name === 'Sushi Bar');
+  if (!shop || !shop.pos) return;
+  const x = shop.pos.x, z = shop.pos.z, y = shop.pos.y || 5;
+  const chef = spawnPed(scene, new THREE.Vector3(x + 1.55, 0, z), 'laborer');
+  recolorTorso(chef.mesh.userData.parts, 0xf4f0e8, 0.75);
+  chef.mallSushi = true;
+  chef.sushiRole = 'chef';
+  chef.speed = 0;
+  chef.state = 'idle';
+  chef.heading = -PI / 2;
+  chef.anchor = { slot: new THREE.Vector3(x + 1.55, y, z), facing: -PI / 2 };
+  if (chef.mesh) {
+    chef.mesh.position.y = y;
+    chef.mesh.rotation.y = -PI / 2;
+    chef.mesh.visible = false;
+  }
+  const plate = new THREE.Group();
+  plate.name = 'mall-sushi-plate';
+  const dish = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.07, 0.08, 0.012, 10),
+    new THREE.MeshStandardMaterial({ color: 0xf5f0e4, roughness: 0.45 })
+  );
+  plate.add(dish);
+  const rice = new THREE.Mesh(
+    new THREE.BoxGeometry(0.05, 0.018, 0.03),
+    new THREE.MeshStandardMaterial({ color: 0xf8f4ea, roughness: 0.8 })
+  );
+  rice.position.y = 0.016;
+  plate.add(rice);
+  const fish = new THREE.Mesh(
+    new THREE.BoxGeometry(0.06, 0.01, 0.028),
+    new THREE.MeshStandardMaterial({ color: 0xff8a3a, roughness: 0.55 })
+  );
+  fish.name = 'mall-sushi-fish';
+  fish.position.y = 0.028;
+  plate.add(fish);
+  const parts = chef.mesh && chef.mesh.userData && chef.mesh.userData.parts;
+  if (parts && parts.foreR) {
+    plate.position.set(0.02, -0.22, 0.08);
+    parts.foreR.add(plate);
+  } else if (chef.mesh) {
+    plate.position.set(0.22, 1.05, 0.12);
+    chef.mesh.add(plate);
+  }
+  chef._plate = plate;
+  const customer = spawnPed(scene, new THREE.Vector3(x - 0.15, 0, z + 0.12), 'tourist');
+  customer.mallSushi = true;
+  customer.sushiRole = 'customer';
+  customer.speed = 0;
+  customer.state = 'idle';
+  customer.heading = PI / 2;
+  customer.anchor = { slot: new THREE.Vector3(x - 0.15, y, z + 0.12), facing: PI / 2 };
+  if (customer.mesh) {
+    customer.mesh.position.y = y;
+    customer.mesh.rotation.y = PI / 2;
+    customer.mesh.visible = false;
+  }
+  G.mallSushi = { chef, customer, x, z, y, t: 0 };
+}
+
+export function spawnMallCafe(scene) {
+  if (!GAMEPLAY.mallCafe) return;
+  const mall = G.world && G.world.mall;
+  const shop = mall && (mall.shops || []).find(s => s && s.name === 'Le Café');
+  if (!shop || !shop.pos) return;
+  const x = shop.pos.x, z = shop.pos.z, y = shop.pos.y || 10;
+  const clerk = spawnPed(scene, new THREE.Vector3(x - 1.55, 0, z), 'office');
+  recolorTorso(clerk.mesh.userData.parts, 0x5a3a28, 0.7);
+  clerk.mallCafe = true;
+  clerk.cafeRole = 'clerk';
+  clerk.speed = 0;
+  clerk.state = 'idle';
+  clerk.heading = PI / 2;
+  clerk.anchor = { slot: new THREE.Vector3(x - 1.55, y, z), facing: PI / 2 };
+  if (clerk.mesh) {
+    clerk.mesh.position.y = y;
+    clerk.mesh.rotation.y = PI / 2;
+    clerk.mesh.visible = false;
+  }
+  const cup = new THREE.Group();
+  cup.name = 'mall-cafe-cup';
+  const saucer = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.045, 0.045, 0.008, 10),
+    new THREE.MeshStandardMaterial({ color: 0xf5f0e4, roughness: 0.45 })
+  );
+  cup.add(saucer);
+  const mug = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.028, 0.024, 0.04, 10),
+    new THREE.MeshStandardMaterial({ color: 0xffcf4a, roughness: 0.5 })
+  );
+  mug.position.y = 0.024;
+  cup.add(mug);
+  const steam = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.008, 0.014, 0.05, 6),
+    new THREE.MeshStandardMaterial({ color: 0xe8e4dc, emissive: 0x887766, emissiveIntensity: 0.18, transparent: true, opacity: 0.45, roughness: 1 })
+  );
+  steam.name = 'mall-cafe-steam';
+  steam.position.y = 0.06;
+  cup.add(steam);
+  const parts = clerk.mesh && clerk.mesh.userData && clerk.mesh.userData.parts;
+  if (parts && parts.foreR) {
+    cup.position.set(0.02, -0.22, 0.08);
+    parts.foreR.add(cup);
+  } else if (clerk.mesh) {
+    cup.position.set(0.22, 1.05, 0.12);
+    clerk.mesh.add(cup);
+  }
+  clerk._cup = cup;
+  const customer = spawnPed(scene, new THREE.Vector3(x + 0.15, 0, z - 0.12), 'tourist');
+  customer.mallCafe = true;
+  customer.cafeRole = 'customer';
+  customer.speed = 0;
+  customer.state = 'idle';
+  customer.heading = -PI / 2;
+  customer.anchor = { slot: new THREE.Vector3(x + 0.15, y, z - 0.12), facing: -PI / 2 };
+  if (customer.mesh) {
+    customer.mesh.position.y = y;
+    customer.mesh.rotation.y = -PI / 2;
+    customer.mesh.visible = false;
+  }
+  G.mallCafe = { clerk, customer, x, z, y, t: 0 };
+}
+
+export function spawnMallThreads(scene) {
+  if (!GAMEPLAY.mallThreads) return;
+  const mall = G.world && G.world.mall;
+  const shop = mall && (mall.shops || []).find(s => s && s.name === 'London Threads');
+  if (!shop || !shop.pos) return;
+  const x = shop.pos.x, z = shop.pos.z, y = shop.pos.y || 10;
+  const clerk = spawnPed(scene, new THREE.Vector3(x, 0, z + 1.55), 'office');
+  recolorTorso(clerk.mesh.userData.parts, 0x3a2a58, 0.7);
+  clerk.mallThreads = true;
+  clerk.threadsRole = 'clerk';
+  clerk.speed = 0;
+  clerk.state = 'idle';
+  clerk.heading = PI;
+  clerk.anchor = { slot: new THREE.Vector3(x, y, z + 1.55), facing: PI };
+  if (clerk.mesh) {
+    clerk.mesh.position.y = y;
+    clerk.mesh.rotation.y = PI;
+    clerk.mesh.visible = false;
+  }
+  const hanger = new THREE.Group();
+  hanger.name = 'mall-threads-hanger';
+  const hook = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.006, 0.006, 0.08, 6),
+    new THREE.MeshStandardMaterial({ color: 0x888890, roughness: 0.4, metalness: 0.45 })
+  );
+  hanger.add(hook);
+  const bar = new THREE.Mesh(
+    new THREE.BoxGeometry(0.16, 0.01, 0.02),
+    new THREE.MeshStandardMaterial({ color: 0x888890, roughness: 0.4, metalness: 0.45 })
+  );
+  bar.position.y = -0.04;
+  hanger.add(bar);
+  const shirt = new THREE.Mesh(
+    new THREE.BoxGeometry(0.14, 0.16, 0.03),
+    new THREE.MeshStandardMaterial({ color: 0xb24bff, roughness: 0.7 })
+  );
+  shirt.name = 'mall-threads-shirt';
+  shirt.position.y = -0.13;
+  hanger.add(shirt);
+  const parts = clerk.mesh && clerk.mesh.userData && clerk.mesh.userData.parts;
+  if (parts && parts.foreR) {
+    hanger.position.set(0.02, -0.18, 0.08);
+    parts.foreR.add(hanger);
+  } else if (clerk.mesh) {
+    hanger.position.set(0.22, 1.05, 0.12);
+    clerk.mesh.add(hanger);
+  }
+  clerk._hanger = hanger;
+  const customer = spawnPed(scene, new THREE.Vector3(x + 0.12, 0, z - 0.15), 'tourist');
+  customer.mallThreads = true;
+  customer.threadsRole = 'customer';
+  customer.speed = 0;
+  customer.state = 'idle';
+  customer.heading = 0;
+  customer.anchor = { slot: new THREE.Vector3(x + 0.12, y, z - 0.15), facing: 0 };
+  if (customer.mesh) {
+    customer.mesh.position.y = y;
+    customer.mesh.rotation.y = 0;
+    customer.mesh.visible = false;
+  }
+  G.mallThreads = { clerk, customer, x, z, y, t: 0 };
+}
+
+export function spawnMallSeven(scene) {
+  if (!GAMEPLAY.mallSeven) return;
+  const mall = G.world && G.world.mall;
+  const shop = mall && (mall.shops || []).find(s => s && s.name === '7-Eleven');
+  if (!shop || !shop.pos) return;
+  const x = shop.pos.x, z = shop.pos.z, y = shop.pos.y || 0;
+  const clerk = spawnPed(scene, new THREE.Vector3(x + 1.55, 0, z), 'office');
+  recolorTorso(clerk.mesh.userData.parts, 0x2a6a3a, 0.7);
+  clerk.mallSeven = true;
+  clerk.sevenRole = 'clerk';
+  clerk.speed = 0;
+  clerk.state = 'idle';
+  clerk.heading = -PI / 2;
+  clerk.anchor = { slot: new THREE.Vector3(x + 1.55, y, z), facing: -PI / 2 };
+  if (clerk.mesh) {
+    clerk.mesh.position.y = y;
+    clerk.mesh.rotation.y = -PI / 2;
+    clerk.mesh.visible = false;
+  }
+  const scan = new THREE.Mesh(
+    new THREE.BoxGeometry(0.04, 0.08, 0.03),
+    new THREE.MeshStandardMaterial({ color: 0x1a1a22, emissive: 0x39ff7a, emissiveIntensity: 0.25, roughness: 0.4 })
+  );
+  scan.name = 'mall-seven-scan';
+  const parts = clerk.mesh && clerk.mesh.userData && clerk.mesh.userData.parts;
+  if (parts && parts.foreR) {
+    scan.position.set(0.02, -0.22, 0.08);
+    parts.foreR.add(scan);
+  } else if (clerk.mesh) {
+    scan.position.set(0.22, 1.05, 0.12);
+    clerk.mesh.add(scan);
+  }
+  clerk._scan = scan;
+  const customer = spawnPed(scene, new THREE.Vector3(x - 0.15, 0, z + 0.12), 'local');
+  customer.mallSeven = true;
+  customer.sevenRole = 'customer';
+  customer.speed = 0;
+  customer.state = 'idle';
+  customer.heading = PI / 2;
+  customer.anchor = { slot: new THREE.Vector3(x - 0.15, y, z + 0.12), facing: PI / 2 };
+  if (customer.mesh) {
+    customer.mesh.position.y = y;
+    customer.mesh.rotation.y = PI / 2;
+    customer.mesh.visible = false;
+  }
+  const bag = new THREE.Group();
+  bag.name = 'mall-seven-bag';
+  const paper = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 0.16, 0.05),
+    new THREE.MeshStandardMaterial({ color: 0xff7a2a, roughness: 0.7 })
+  );
+  bag.add(paper);
+  const stripe = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 0.03, 0.012),
+    new THREE.MeshStandardMaterial({ color: 0x39ff7a, roughness: 0.55 })
+  );
+  stripe.position.set(0, 0.02, 0.032);
+  bag.add(stripe);
+  const cparts = customer.mesh && customer.mesh.userData && customer.mesh.userData.parts;
+  if (cparts && cparts.foreL) {
+    bag.position.set(0.02, -0.22, 0.08);
+    cparts.foreL.add(bag);
+  } else if (customer.mesh) {
+    bag.position.set(-0.16, 0.95, 0.12);
+    customer.mesh.add(bag);
+  }
+  customer._bag = bag;
+  G.mallSeven = { clerk, customer, x, z, y, t: 0 };
+}
+
+export function spawnMallArcade(scene) {
+  if (!GAMEPLAY.mallArcade) return;
+  const mall = G.world && G.world.mall;
+  const shop = mall && (mall.shops || []).find(s => s && s.name === 'Akihabara Arcade');
+  if (!shop || !shop.pos) return;
+  const x = shop.pos.x, z = shop.pos.z, y = shop.pos.y || 5;
+  const players = [];
+  const slots = [
+    { x: x - 0.35, z: z - 0.7, facing: -PI / 2, kind: 'tourist' },
+    { x: x - 0.35, z: z + 0.7, facing: -PI / 2, kind: 'office' },
+  ];
+  for (let i = 0; i < slots.length; i++) {
+    const slot = slots[i];
+    const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
+    ped.mallArcade = true;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = slot.facing;
+    ped.anchor = { slot: new THREE.Vector3(slot.x, y, slot.z), facing: slot.facing };
+    if (ped.mesh) {
+      ped.mesh.position.y = y;
+      ped.mesh.rotation.y = slot.facing;
+      ped.mesh.visible = false;
+    }
+    const stick = new THREE.Group();
+    stick.name = 'mall-arcade-stick';
+    const base = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.02, 0.05),
+      new THREE.MeshStandardMaterial({ color: 0x2a2a32, roughness: 0.5 })
+    );
+    stick.add(base);
+    const shaft = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.008, 0.01, 0.07, 6),
+      new THREE.MeshStandardMaterial({ color: 0x888890, roughness: 0.4, metalness: 0.35 })
+    );
+    shaft.position.y = 0.04;
+    stick.add(shaft);
+    const ball = new THREE.Mesh(
+      new THREE.SphereGeometry(0.016, 8, 6),
+      new THREE.MeshStandardMaterial({ color: 0xff2a86, emissive: 0x882244, emissiveIntensity: 0.3, roughness: 0.45 })
+    );
+    ball.name = 'mall-arcade-ball';
+    ball.position.y = 0.08;
+    stick.add(ball);
+    const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+    if (parts && parts.foreR) {
+      stick.position.set(0.02, -0.22, 0.08);
+      parts.foreR.add(stick);
+    } else if (ped.mesh) {
+      stick.position.set(0.22, 1.05, 0.12);
+      ped.mesh.add(stick);
+    }
+    ped._stick = stick;
+    players.push(ped);
+  }
+  G.mallArcade = { players, x, z, y, t: 0 };
+}
+
+export function spawnGymBag(scene) {
+  if (!GAMEPLAY.gymBag) return;
+  const gym = G.world && G.world.poi && G.world.poi.gym;
+  if (!gym) return;
+  const x = gym.x, z = gym.z;
+  const bag = new THREE.Group();
+  bag.name = 'gym-heavy-bag';
+  bag.position.set(x - 1.6, 0, z - 1.35);
+  const hook = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.02, 0.02, 0.7, 6),
+    new THREE.MeshStandardMaterial({ color: 0x888890, roughness: 0.4, metalness: 0.4 })
+  );
+  hook.position.y = 2.15;
+  bag.add(hook);
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.22, 0.24, 1.1, 10),
+    new THREE.MeshStandardMaterial({ color: 0xc45a18, roughness: 0.7 })
+  );
+  body.position.y = 1.15;
+  bag.add(body);
+  scene.add(bag);
+  const fighter = spawnPed(scene, new THREE.Vector3(x - 1.6, 0, z - 0.35), 'laborer');
+  recolorTorso(fighter.mesh.userData.parts, 0x1a1a22, 0.75);
+  fighter.gymBag = true;
+  fighter.gymRole = 'pad';
+  fighter.speed = 0;
+  fighter.state = 'idle';
+  fighter.heading = PI;
+  fighter.anchor = { slot: new THREE.Vector3(x - 1.6, 0, z - 0.35), facing: PI };
+  if (fighter.mesh) {
+    fighter.mesh.rotation.y = PI;
+    fighter.mesh.visible = false;
+  }
+  const trainer = spawnPed(scene, new THREE.Vector3(x + 1.5, 0, z + 1.2), 'office');
+  trainer.gymBag = true;
+  trainer.gymRole = 'watch';
+  trainer.speed = 0;
+  trainer.state = 'idle';
+  trainer.heading = -PI / 2;
+  trainer.anchor = { slot: new THREE.Vector3(x + 1.5, 0, z + 1.2), facing: -PI / 2 };
+  if (trainer.mesh) {
+    trainer.mesh.rotation.y = -PI / 2;
+    trainer.mesh.visible = false;
+  }
+  G.gymBag = { bag, fighter, trainer, x, z, t: 0 };
+  const packWait = (cx, cz, facing) => {
+    const wait = spawnPed(scene, new THREE.Vector3(cx, 0, cz), 'laborer');
+    recolorTorso(wait.mesh.userData.parts, 0x3a1a1a, 0.75);
+    wait.gymBag = true;
+    wait.gymWait = true;
+    wait.speed = 0;
+    wait.state = 'idle';
+    wait.heading = facing;
+    wait.anchor = { slot: new THREE.Vector3(cx, 0, cz), facing };
+    if (wait.mesh) {
+      wait.mesh.rotation.y = facing;
+      wait.mesh.visible = false;
+    }
+    const wrap = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.04, 0.1),
+      new THREE.MeshStandardMaterial({ color: 0xe8e0d0, roughness: 0.7 })
+    );
+    wrap.name = 'gym-wrap';
+    const wp = wait.mesh && wait.mesh.userData && wait.mesh.userData.parts;
+    if (wp && wp.foreL) {
+      wrap.position.set(0.02, -0.22, 0.04);
+      wp.foreL.add(wrap);
+    } else if (wait.mesh) {
+      wrap.position.set(-0.18, 1.0, 0.1);
+      wait.mesh.add(wrap);
+    }
+    return { ped: wait, x: cx, z: cz, t: 0 };
+  };
+  G.gymWait = packWait(x + 1.6, z - 1.4, -PI / 2);
+  G.gymWaitB = packWait(x - 1.6, z + 1.5, PI / 2);
+}
+
+export function spawnSevenAtm(scene) {
+  if (!GAMEPLAY.sevenAtm) return;
+  const pack = (ax, az, machineName) => {
+    if (ax == null || az == null) return null;
+    let machine = null;
+    if (machineName) {
+      machine = new THREE.Mesh(
+        new THREE.BoxGeometry(0.7, 1.5, 0.45),
+        new THREE.MeshStandardMaterial({ color: 0x1a3a6a, roughness: 0.4, metalness: 0.3 })
+      );
+      machine.name = machineName;
+      machine.position.set(ax, 0.85, az);
+      scene.add(machine);
+    }
+    const queue = [];
+    for (let i = 0; i < 2; i++) {
+      const x = ax + 1.05 + i * 0.8;
+      const z = az + i * 0.18;
+      const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), i === 0 ? 'office' : 'local');
+      ped.sevenAtm = true;
+      ped.speed = 0;
+      ped.state = 'idle';
+      ped.heading = -PI / 2;
+      ped.anchor = { slot: new THREE.Vector3(x, 0, z), facing: -PI / 2 };
+      if (ped.mesh) {
+        ped.mesh.rotation.y = -PI / 2;
+        ped.mesh.visible = false;
+      }
+      if (i === 0 && ped.mesh) {
+        const card = new THREE.Mesh(
+          new THREE.BoxGeometry(0.08, 0.05, 0.004),
+          new THREE.MeshStandardMaterial({ color: 0xc45a18, roughness: 0.45, metalness: 0.2 })
+        );
+        card.name = 'seven-atm-card';
+        const parts = ped.mesh.userData && ped.mesh.userData.parts;
+        if (parts && parts.foreR) { card.position.set(0.02, -0.28, 0.06); parts.foreR.add(card); }
+        else { card.position.set(0.22, 1.05, 0.12); ped.mesh.add(card); }
+        ped._atmCard = card;
+      }
+      queue.push(ped);
+    }
+    return { queue, ax, az, t: 0, machine };
+  };
+  const walk = G.world && G.world.sevenWalkIn;
+  G.sevenAtm = walk && walk.atm ? pack(walk.atm.x, walk.atm.z, null) : null;
+  if (G.sevenAtm) {
+    const ax = G.sevenAtm.ax + 2.65, az = G.sevenAtm.az + 0.36;
+    const extra = spawnPed(scene, new THREE.Vector3(ax, 0, az), 'office');
+    extra.sevenAtm = true;
+    extra.speed = 0;
+    extra.state = 'idle';
+    extra.heading = -PI / 2;
+    extra.anchor = { slot: new THREE.Vector3(ax, 0, az), facing: -PI / 2 };
+    if (extra.mesh) {
+      extra.mesh.rotation.y = -PI / 2;
+      extra.mesh.visible = false;
+    }
+    const phone = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.09, 0.012),
+      new THREE.MeshStandardMaterial({ color: 0x1a1a22, emissive: 0x226688, emissiveIntensity: 0.35, roughness: 0.35 })
+    );
+    phone.name = 'seven-atm-phone';
+    const ep = extra.mesh && extra.mesh.userData && extra.mesh.userData.parts;
+    if (ep && ep.foreR) {
+      phone.position.set(0.02, -0.28, 0.06);
+      ep.foreR.add(phone);
+    } else if (extra.mesh) {
+      phone.position.set(0.22, 1.05, 0.12);
+      extra.mesh.add(phone);
+    }
+    extra._phone = phone;
+    G.sevenAtmB = { queue: [extra], ax, az, t: 0 };
+  }
+  const south = (G.world.sevenElevens || []).find(s => s && s.pos && Math.abs(s.pos.x) < 8 && s.pos.z < -80);
+  if (south && south.pos) {
+    const hz = south.hz || 4;
+    G.southSevenAtm = pack(south.pos.x + 4.2, south.pos.z + hz + 1.4, 'south-seven-atm');
+    if (G.southSevenAtm) {
+      const ax = G.southSevenAtm.ax + 2.65, az = G.southSevenAtm.az + 0.36;
+      const extra = spawnPed(scene, new THREE.Vector3(ax, 0, az), 'office');
+      extra.sevenAtm = true;
+      extra.speed = 0;
+      extra.state = 'idle';
+      extra.heading = -PI / 2;
+      extra.anchor = { slot: new THREE.Vector3(ax, 0, az), facing: -PI / 2 };
+      if (extra.mesh) {
+        extra.mesh.rotation.y = -PI / 2;
+        extra.mesh.visible = false;
+      }
+      const phone = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05, 0.09, 0.012),
+        new THREE.MeshStandardMaterial({ color: 0x1a1a22, emissive: 0x226688, emissiveIntensity: 0.35, roughness: 0.35 })
+      );
+      phone.name = 'south-seven-atm-phone';
+      const ep = extra.mesh && extra.mesh.userData && extra.mesh.userData.parts;
+      if (ep && ep.foreR) {
+        phone.position.set(0.02, -0.28, 0.06);
+        ep.foreR.add(phone);
+      } else if (extra.mesh) {
+        phone.position.set(0.22, 1.05, 0.12);
+        extra.mesh.add(phone);
+      }
+      extra._phone = phone;
+      G.southSevenAtmB = { queue: [extra], ax, az, t: 0 };
+    }
+  }
+  const west = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x < -50 && s.pos.z > 0 && s.pos.z < 60);
+  if (west && west.pos) {
+    const hz = west.hz || 4;
+    G.westSevenAtm = pack(west.pos.x + 4.2, west.pos.z + hz + 1.4, 'west-seven-atm');
+    if (G.westSevenAtm) {
+      const ax = G.westSevenAtm.ax + 2.65, az = G.westSevenAtm.az + 0.36;
+      const extra = spawnPed(scene, new THREE.Vector3(ax, 0, az), 'office');
+      extra.sevenAtm = true;
+      extra.speed = 0;
+      extra.state = 'idle';
+      extra.heading = -PI / 2;
+      extra.anchor = { slot: new THREE.Vector3(ax, 0, az), facing: -PI / 2 };
+      if (extra.mesh) {
+        extra.mesh.rotation.y = -PI / 2;
+        extra.mesh.visible = false;
+      }
+      const phone = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05, 0.09, 0.012),
+        new THREE.MeshStandardMaterial({ color: 0x1a1a22, emissive: 0x226688, emissiveIntensity: 0.35, roughness: 0.35 })
+      );
+      phone.name = 'west-seven-atm-phone';
+      const ep = extra.mesh && extra.mesh.userData && extra.mesh.userData.parts;
+      if (ep && ep.foreR) {
+        phone.position.set(0.02, -0.28, 0.06);
+        ep.foreR.add(phone);
+      } else if (extra.mesh) {
+        phone.position.set(0.22, 1.05, 0.12);
+        extra.mesh.add(phone);
+      }
+      extra._phone = phone;
+      G.westSevenAtmB = { queue: [extra], ax, az, t: 0 };
+    }
+  }
+  const east = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x > 100 && s.pos.z < 0 && s.pos.z > -80);
+  if (east && east.pos) {
+    const hz = east.hz || 4;
+    G.eastSevenAtm = pack(east.pos.x + 4.2, east.pos.z + hz + 1.4, 'east-seven-atm');
+    if (G.eastSevenAtm) {
+      const ax = G.eastSevenAtm.ax + 2.65, az = G.eastSevenAtm.az + 0.36;
+      const extra = spawnPed(scene, new THREE.Vector3(ax, 0, az), 'office');
+      extra.sevenAtm = true;
+      extra.speed = 0;
+      extra.state = 'idle';
+      extra.heading = -PI / 2;
+      extra.anchor = { slot: new THREE.Vector3(ax, 0, az), facing: -PI / 2 };
+      if (extra.mesh) {
+        extra.mesh.rotation.y = -PI / 2;
+        extra.mesh.visible = false;
+      }
+      const phone = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05, 0.09, 0.012),
+        new THREE.MeshStandardMaterial({ color: 0x1a1a22, emissive: 0x226688, emissiveIntensity: 0.35, roughness: 0.35 })
+      );
+      phone.name = 'east-seven-atm-phone';
+      const ep = extra.mesh && extra.mesh.userData && extra.mesh.userData.parts;
+      if (ep && ep.foreR) {
+        phone.position.set(0.02, -0.28, 0.06);
+        ep.foreR.add(phone);
+      } else if (extra.mesh) {
+        phone.position.set(0.22, 1.05, 0.12);
+        extra.mesh.add(phone);
+      }
+      extra._phone = phone;
+      G.eastSevenAtmB = { queue: [extra], ax, az, t: 0 };
+    }
+  }
+}
+
+export function spawnSevenShoppers(scene) {
+  if (!GAMEPLAY.sevenShoppers) return;
+  const pack = (seven) => {
+    if (!seven || !seven.pos) return null;
+    const hz = seven.hz || 4;
+    const doorZ = seven.pos.z + hz + 0.35;
+    const curbZ = doorZ + 4.2;
+    const shoppers = [];
+    for (let i = 0; i < 3; i++) {
+      const x = seven.pos.x + (i - 1) * 0.55;
+      const ped = spawnPed(scene, new THREE.Vector3(x, 0, curbZ), i === 1 ? 'office' : 'local');
+      ped.sevenShop = true;
+      ped.speed = 0;
+      ped.state = 'idle';
+      ped._shopT = i * 0.32;
+      ped._shopDir = 1;
+      ped._shopX = x;
+      if (ped.mesh) ped.mesh.visible = false;
+      const bag = new THREE.Mesh(
+        new THREE.BoxGeometry(0.14, 0.2, 0.1),
+        new THREE.MeshStandardMaterial({ color: pick([0xff5a23, 0x2a2a2a, 0xf5f5f0]), roughness: 0.7 })
+      );
+      bag.name = 'seven-bag';
+      bag.visible = false;
+      const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+      if (parts && parts.foreL) { bag.position.set(0.02, -0.3, 0.04); parts.foreL.add(bag); }
+      else if (ped.mesh) { bag.position.set(-0.18, 0.95, 0.08); ped.mesh.add(bag); }
+      ped._sevenBag = bag;
+      shoppers.push(ped);
+    }
+    return { shoppers, doorZ, curbZ, x: seven.pos.x, z: seven.pos.z };
+  };
+  G.sevenShoppers = pack(G.world && G.world.sevenWalkIn);
+  const south = (G.world.sevenElevens || []).find(s => s && s.pos && Math.abs(s.pos.x) < 8 && s.pos.z < -80);
+  G.southSevenShoppers = pack(south);
+  const west = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x < -50 && s.pos.z > 0 && s.pos.z < 60);
+  G.westSevenShoppers = pack(west);
+  const east = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x > 100 && s.pos.z < 0 && s.pos.z > -80);
+  G.eastSevenShoppers = pack(east);
+}
+
+export function spawnSevenSlush(scene) {
+  if (!GAMEPLAY.sevenSlush) return;
+  const pack = (seven, meshName) => {
+    if (!seven || !seven.pos) return null;
+    const hz = seven.hz || 4;
+    const x = seven.pos.x + 2.55, z = seven.pos.z + hz - 1.2;
+    const g = new THREE.Group();
+    g.name = meshName;
+    const cab = new THREE.Mesh(
+      new THREE.BoxGeometry(0.62, 0.85, 0.42),
+      new THREE.MeshStandardMaterial({ color: 0xe8eaee, roughness: 0.45, metalness: 0.15 })
+    );
+    cab.position.y = 0.48;
+    g.add(cab);
+    const tray = new THREE.Mesh(
+      new THREE.BoxGeometry(0.56, 0.04, 0.16),
+      new THREE.MeshStandardMaterial({ color: 0x2a2a30, roughness: 0.5 })
+    );
+    tray.position.set(0, 0.92, 0.18);
+    g.add(tray);
+    const colors = [0xe23a6a, 0x2ec8c0];
+    for (let i = 0; i < 2; i++) {
+      const tank = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.12, 0.12, 0.38, 10),
+        new THREE.MeshStandardMaterial({
+          color: colors[i], roughness: 0.25, transparent: true, opacity: 0.72,
+          emissive: colors[i], emissiveIntensity: 0.18,
+        })
+      );
+      tank.name = 'seven-slush-tank';
+      tank.position.set(-0.14 + i * 0.28, 1.22, 0);
+      g.add(tank);
+      const lid = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.13, 0.13, 0.04, 10),
+        new THREE.MeshStandardMaterial({ color: 0xd0d4da, roughness: 0.4, metalness: 0.2 })
+      );
+      lid.position.set(-0.14 + i * 0.28, 1.43, 0);
+      g.add(lid);
+      const spout = new THREE.Mesh(
+        new THREE.BoxGeometry(0.04, 0.1, 0.08),
+        new THREE.MeshStandardMaterial({ color: 0x3a3a40, roughness: 0.45, metalness: 0.3 })
+      );
+      spout.position.set(-0.14 + i * 0.28, 0.98, 0.16);
+      g.add(spout);
+    }
+    g.position.set(x, 0, z);
+    scene.add(g);
+    const px = x - 0.7, pz = z;
+    const ped = spawnPed(scene, new THREE.Vector3(px, 0, pz), 'office');
+    ped.sevenSlush = true;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = PI / 2;
+    ped.anchor = { slot: new THREE.Vector3(px, 0, pz), facing: PI / 2 };
+    if (ped.mesh) {
+      ped.mesh.rotation.y = PI / 2;
+      ped.mesh.visible = false;
+    }
+    const cup = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.04, 0.035, 0.1, 8),
+      new THREE.MeshStandardMaterial({ color: 0xe23a6a, roughness: 0.4, transparent: true, opacity: 0.85 })
+    );
+    cup.name = 'seven-slush-cup';
+    const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+    if (parts && parts.foreR) { cup.position.set(0.02, -0.26, 0.05); parts.foreR.add(cup); }
+    else if (ped.mesh) { cup.position.set(0.2, 1.05, 0.1); ped.mesh.add(cup); }
+    ped._slushCup = cup;
+    return { mesh: g, customer: ped, x, z, t: 0 };
+  };
+  G.sevenSlush = pack(G.world && G.world.sevenWalkIn, 'seven-slush');
+  const south = (G.world.sevenElevens || []).find(s => s && s.pos && Math.abs(s.pos.x) < 8 && s.pos.z < -80);
+  G.southSevenSlush = pack(south, 'south-seven-slush');
+  const west = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x < -50 && s.pos.z > 0 && s.pos.z < 60);
+  G.westSevenSlush = pack(west, 'west-seven-slush');
+  const east = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x > 100 && s.pos.z < 0 && s.pos.z > -80);
+  G.eastSevenSlush = pack(east, 'east-seven-slush');
+}
+
+export function spawnBtsBusker(scene) {
+  if (!GAMEPLAY.btsBusker) return;
+  const bts = G.world && G.world.bts;
+  if (!bts) return;
+  const stand = (x, z, stop) => {
+    const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'local');
+    ped.btsBusker = true;
+    ped.stop = stop;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = 0;
+    ped.anchor = { slot: new THREE.Vector3(x, 0, z), facing: 0 };
+    if (ped.mesh) {
+      ped.mesh.rotation.y = 0;
+      ped.mesh.visible = false;
+    }
+    const guitar = new THREE.Group();
+    guitar.name = 'bts-guitar';
+    const wood = new THREE.MeshStandardMaterial({ color: 0x8a5a28, roughness: 0.65 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.07, 0.34), wood);
+    guitar.add(body);
+    const neck = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.035, 0.4), wood);
+    neck.position.z = 0.34;
+    guitar.add(neck);
+    const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+    if (parts && parts.foreL) {
+      guitar.position.set(0.02, -0.18, 0.12);
+      guitar.rotation.set(-0.4, 0.6, 0.9);
+      parts.foreL.add(guitar);
+    } else if (ped.mesh) {
+      guitar.position.set(-0.18, 0.95, 0.18);
+      ped.mesh.add(guitar);
+    }
+    const hat = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.16, 0.2, 0.06, 10),
+      new THREE.MeshStandardMaterial({ color: 0x3a2a18, roughness: 0.85 })
+    );
+    hat.name = 'bts-busker-hat';
+    hat.position.set(x + 0.45, 0.04, z + 0.35);
+    scene.add(hat);
+    return { ped, guitar, hat, x, z, t: 0, stop };
+  };
+  G.btsBusker = stand(bts.x + 4.6, -26.6, 'asok');
+  G.phromBusker = stand(100 + 4.6, -26.6, 'phrom');
+}
+
+export function spawnBtsPaper(scene) {
+  if (!GAMEPLAY.btsPaper) return;
+  const bts = G.world && G.world.bts;
+  if (!bts) return;
+  const rack = (x, z, stop) => {
+    const g = new THREE.Group();
+    g.name = 'bts-paper-rack';
+    const frame = new THREE.Mesh(
+      new THREE.BoxGeometry(0.85, 1.15, 0.12),
+      new THREE.MeshStandardMaterial({ color: 0x3a3a40, roughness: 0.6, metalness: 0.25 })
+    );
+    frame.position.y = 0.7;
+    g.add(frame);
+    const colors = [0xc03030, 0x1a3a6a, 0xf0ead8, 0x2a6a3a, 0xe8c04a, 0xf5f0e4];
+    for (let i = 0; i < 6; i++) {
+      const paper = new THREE.Mesh(
+        new THREE.BoxGeometry(0.22, 0.28, 0.02),
+        new THREE.MeshStandardMaterial({ color: colors[i], roughness: 0.8 })
+      );
+      paper.name = 'bts-paper';
+      paper.position.set(-0.28 + (i % 3) * 0.28, 0.55 + Math.floor(i / 3) * 0.38, 0.08);
+      g.add(paper);
+    }
+    g.position.set(x, 0, z);
+    scene.add(g);
+    const vendor = spawnPed(scene, new THREE.Vector3(x + 0.7, 0, z + 0.15), 'laborer');
+    vendor.btsPaper = true;
+    vendor.stop = stop;
+    vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI };
+    vendor.speed = 0;
+    vendor.state = 'idle';
+    vendor.heading = PI;
+    if (vendor.mesh) vendor.mesh.rotation.y = PI;
+    return { mesh: g, vendor, x, z, t: 0, stop };
+  };
+  G.btsPaper = rack(bts.x - 1.0, -27.8, 'asok');
+  G.phromPaper = rack(100 - 1.0, -27.8, 'phrom');
+}
+
+export function spawnBtsShine(scene) {
+  if (!GAMEPLAY.btsShine) return;
+  const bts = G.world && G.world.bts;
+  if (!bts) return;
+  const stand = (x, z, stop) => {
+    const g = new THREE.Group();
+    g.name = 'bts-shine';
+    const box = new THREE.Mesh(
+      new THREE.BoxGeometry(0.55, 0.32, 0.42),
+      new THREE.MeshStandardMaterial({ color: 0x6a4a28, roughness: 0.82 })
+    );
+    box.name = 'shine-box';
+    box.position.y = 0.22;
+    g.add(box);
+    const tinMat = [
+      new THREE.MeshStandardMaterial({ color: 0x3a2a18, roughness: 0.45, metalness: 0.25 }),
+      new THREE.MeshStandardMaterial({ color: 0x1a1a1e, roughness: 0.45, metalness: 0.25 }),
+    ];
+    for (let i = 0; i < 2; i++) {
+      const tin = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.04, 8), tinMat[i]);
+      tin.name = 'shine-tin';
+      tin.position.set(-0.1 + i * 0.16, 0.4, 0.04);
+      g.add(tin);
+    }
+    const cloth = new THREE.Mesh(
+      new THREE.BoxGeometry(0.14, 0.02, 0.1),
+      new THREE.MeshStandardMaterial({ color: 0xc03030, roughness: 0.75 })
+    );
+    cloth.name = 'shine-cloth';
+    cloth.position.set(0.16, 0.42, 0.02);
+    g.add(cloth);
+    const stool = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.14, 0.16, 0.08, 8),
+      new THREE.MeshStandardMaterial({ color: 0x4a3a22, roughness: 0.8 })
+    );
+    stool.position.set(0.48, 0.22, 0);
+    g.add(stool);
+    g.position.set(x, 0, z);
+    scene.add(g);
+    const vendor = spawnPed(scene, new THREE.Vector3(x + 0.48, 0, z), 'laborer');
+    vendor.btsShine = true;
+    vendor.stop = stop;
+    vendor.anchor = { slot: new THREE.Vector3(x + 0.48, 0.38, z), facing: -PI / 2 };
+    vendor.speed = 0;
+    vendor.state = 'idle';
+    vendor.heading = -PI / 2;
+    if (vendor.mesh) {
+      vendor.mesh.position.set(x + 0.48, 0.38, z);
+      vendor.mesh.rotation.y = -PI / 2;
+      vendor.mesh.visible = false;
+    }
+    return { mesh: g, vendor, x, z, t: 0, stop };
+  };
+  G.btsShine = stand(bts.x + 8.4, 9.2, 'asok');
+  G.phromShine = stand(100 + 8.4, 9.2, 'phrom');
+}
+
+export function spawnOfficeSmoke(scene) {
+  if (!GAMEPLAY.officeSmoke) return;
+  const bts = G.world && G.world.bts;
+  const sx = bts ? bts.x : -50;
+  const pack = (slots, stop) => {
+    const smokers = [];
+    for (let i = 0; i < slots.length; i++) {
+      const slot = slots[i];
+      const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), 'office');
+      ped.officeSmoke = true;
+      ped.stop = stop;
+      ped.speed = 0;
+      ped.state = 'idle';
+      ped.heading = slot.facing;
+      ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
+      if (ped.mesh) {
+        ped.mesh.rotation.y = slot.facing;
+        ped.mesh.visible = false;
+      }
+      const cig = new THREE.Group();
+      cig.name = 'office-cig';
+      const stick = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.01, 0.01, 0.07, 6),
+        new THREE.MeshStandardMaterial({ color: 0xf0ead8, roughness: 0.7 })
+      );
+      stick.rotation.x = PI / 2;
+      cig.add(stick);
+      const ember = new THREE.Mesh(
+        new THREE.SphereGeometry(0.012, 6, 5),
+        new THREE.MeshStandardMaterial({ color: 0xff6a18, emissive: 0xff4a10, emissiveIntensity: 0.5, roughness: 0.4 })
+      );
+      ember.name = 'office-cig-ember';
+      ember.position.z = 0.04;
+      cig.add(ember);
+      const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+      if (parts && parts.foreR) { cig.position.set(0.02, -0.28, 0.06); parts.foreR.add(cig); }
+      else if (ped.mesh) { cig.position.set(0.22, 1.05, 0.12); ped.mesh.add(cig); }
+      ped._cig = cig;
+      ped._ember = ember;
+      smokers.push(ped);
+    }
+    return { smokers, x: slots[0].x, z: slots[0].z, t: 0, stop };
+  };
+  G.officeSmoke = pack([
+    { x: sx - 9.2, z: 12.4, facing: PI / 2 },
+    { x: sx - 10.0, z: 13.1, facing: 0 },
+    { x: sx - 8.4, z: 12.8, facing: -PI / 2 },
+  ], 'asok');
+  G.phromSmoke = pack([
+    { x: 100 - 9.2, z: 12.4, facing: PI / 2 },
+    { x: 100 - 10.0, z: 13.1, facing: 0 },
+    { x: 100 - 8.4, z: 12.8, facing: -PI / 2 },
+  ], 'phrom');
 }
 
 export function spawnBtsSitters(scene) {
@@ -1950,16 +4930,21 @@ export function spawnBtsSitters(scene) {
   const bts = G.world && G.world.bts;
   const sx = bts ? bts.x : -50;
   const PY = (bts && bts.platformY) || 13.9;
-  const yAt = (z) => ((z + 25) / 20) * PY;
+  const yAtAsok = (z) => ((z + 25) / 20) * PY;
+  const yAtPhrom = (z) => ((z + 22) / 17) * PY;
   const slots = [
-    { x: sx - 3.2, z: -24.4, y: 0.42, facing: PI / 2, kind: 'office' },
-    { x: sx - 2.15, z: -17.2, y: yAt(-17.2) + 0.42, facing: PI / 2, kind: 'tourist' },
-    { x: sx + 2.15, z: -11.4, y: yAt(-11.4) + 0.42, facing: -PI / 2, kind: 'office' },
+    { x: sx - 3.2, z: -24.4, y: 0.42, facing: PI / 2, kind: 'office', stop: 'asok' },
+    { x: sx - 2.15, z: -17.2, y: yAtAsok(-17.2) + 0.42, facing: PI / 2, kind: 'tourist', stop: 'asok' },
+    { x: sx + 2.15, z: -11.4, y: yAtAsok(-11.4) + 0.42, facing: -PI / 2, kind: 'office', stop: 'asok' },
+    { x: 100 - 2.0, z: -21.6, y: 0.42, facing: PI / 2, kind: 'tourist', stop: 'phrom' },
+    { x: 100 + 1.9, z: -14.8, y: yAtPhrom(-14.8) + 0.42, facing: -PI / 2, kind: 'office', stop: 'phrom' },
+    { x: 100 - 1.9, z: -9.6, y: yAtPhrom(-9.6) + 0.42, facing: PI / 2, kind: 'local', stop: 'phrom' },
   ];
   G.btsSitters = [];
   for (const slot of slots) {
     const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
     ped.btsSit = true;
+    ped.stop = slot.stop;
     ped.anchor = { slot: new THREE.Vector3(slot.x, slot.y, slot.z), facing: slot.facing };
     ped.speed = 0;
     ped.state = 'idle';
@@ -2024,6 +5009,623 @@ export function spawnWatTurtles(scene) {
   G.watPond = pond;
 }
 
+export function spawnWatFeed(scene) {
+  if (!GAMEPLAY.watFeed) return;
+  const pond = G.watPond;
+  const turtles = G.watTurtles;
+  if (!pond || !turtles || !turtles.length) return;
+  const cx = turtles[0].cx, cz = turtles[0].cz;
+  const x = cx + 2.05, z = cz + 0.15;
+  const g = new THREE.Group();
+  g.name = 'wat-feed';
+  const can = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.08, 0.09, 0.16, 8),
+    new THREE.MeshStandardMaterial({ color: 0xc45a18, roughness: 0.55, metalness: 0.15 })
+  );
+  can.position.y = 0.14;
+  g.add(can);
+  const lid = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.085, 0.085, 0.03, 8),
+    new THREE.MeshStandardMaterial({ color: 0x8a3a10, roughness: 0.5 })
+  );
+  lid.position.y = 0.23;
+  g.add(lid);
+  g.position.set(x, 0, z);
+  scene.add(g);
+  G.watFeed = { mesh: g, x, z, cx, cz, feedT: 0 };
+}
+
+export function spawnWatBell(scene) {
+  if (!GAMEPLAY.watBell) return;
+  const temple = G.world && G.world.poi && G.world.poi.temple;
+  if (!temple) return;
+  const x = temple.x - 5.4, z = temple.z + 4.8;
+  const g = new THREE.Group();
+  g.name = 'wat-bell-frame';
+  const wood = new THREE.MeshStandardMaterial({ color: 0x6a4a28, roughness: 0.8 });
+  for (const sx of [-0.55, 0.55]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.4, 0.12), wood);
+    post.position.set(sx, 1.2, 0);
+    g.add(post);
+  }
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.12, 0.12), wood);
+  beam.position.y = 2.35;
+  g.add(beam);
+  const bronze = new THREE.MeshStandardMaterial({ color: 0xb08a3a, roughness: 0.4, metalness: 0.55 });
+  const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 0.55, 10), bronze);
+  bell.name = 'wat-bell';
+  bell.position.y = 1.85;
+  g.add(bell);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.03, 6, 12), bronze);
+  rim.position.y = 1.58;
+  rim.rotation.x = PI / 2;
+  bell.add(rim);
+  const striker = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.03, 0.04, 0.55, 5),
+    new THREE.MeshStandardMaterial({ color: 0x4a3a22, roughness: 0.75 })
+  );
+  striker.name = 'wat-bell-striker';
+  striker.position.set(0.42, 1.55, 0);
+  striker.rotation.z = 0.35;
+  g.add(striker);
+  g.position.set(x, 0, z);
+  scene.add(g);
+  G.watBell = { mesh: g, bell, striker, x, z, ringT: 0 };
+  const mx = x - 0.85, mz = z + 0.1;
+  const monk = spawnPed(scene, new THREE.Vector3(mx, 0, mz), 'monk');
+  monk.watBell = true;
+  monk.anchor = { slot: new THREE.Vector3(mx, 0, mz), facing: PI / 2 };
+  monk.speed = 0;
+  monk.state = 'idle';
+  monk.heading = PI / 2;
+  if (monk.mesh) {
+    monk.mesh.rotation.y = PI / 2;
+    monk.mesh.visible = false;
+    const bowl = monk.mesh.getObjectByName('alms-bowl');
+    if (bowl) bowl.visible = false;
+  }
+  const mallet = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.018, 0.028, 0.42, 5),
+    new THREE.MeshStandardMaterial({ color: 0x4a3a22, roughness: 0.75 })
+  );
+  mallet.name = 'wat-bell-mallet';
+  const parts = monk.mesh && monk.mesh.userData && monk.mesh.userData.parts;
+  if (parts && parts.foreR) {
+    mallet.position.set(0.02, -0.28, 0.06);
+    mallet.rotation.z = 0.55;
+    parts.foreR.add(mallet);
+  } else if (monk.mesh) {
+    mallet.position.set(0.22, 1.05, 0.12);
+    mallet.rotation.z = 0.55;
+    monk.mesh.add(mallet);
+  }
+  G.watBellMonk = { ped: monk, x: mx, z: mz, t: 0 };
+}
+
+export function spawnWatDrum(scene) {
+  if (!GAMEPLAY.watDrum) return;
+  const temple = G.world && G.world.poi && G.world.poi.temple;
+  if (!temple) return;
+  const x = temple.x + 5.4, z = temple.z + 4.8;
+  const g = new THREE.Group();
+  g.name = 'wat-drum-frame';
+  const wood = new THREE.MeshStandardMaterial({ color: 0x6a4a28, roughness: 0.8 });
+  for (const sx of [-0.55, 0.55]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.2, 0.12), wood);
+    post.position.set(sx, 1.1, 0);
+    g.add(post);
+  }
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.12, 0.12), wood);
+  beam.position.y = 2.15;
+  g.add(beam);
+  const hide = new THREE.MeshStandardMaterial({ color: 0x5a2a14, roughness: 0.75 });
+  const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.55, 12), hide);
+  drum.name = 'wat-drum';
+  drum.rotation.z = PI / 2;
+  drum.position.y = 1.55;
+  g.add(drum);
+  const skin = new THREE.MeshStandardMaterial({ color: 0xe8d8b0, roughness: 0.7 });
+  for (const sx of [-0.28, 0.28]) {
+    const head = new THREE.Mesh(new THREE.CircleGeometry(0.32, 12), skin);
+    head.rotation.y = PI / 2;
+    head.position.set(sx, 1.55, 0);
+    g.add(head);
+  }
+  const beater = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.025, 0.035, 0.62, 5),
+    new THREE.MeshStandardMaterial({ color: 0x4a3a22, roughness: 0.75 })
+  );
+  beater.name = 'wat-drum-beater';
+  beater.position.set(0.55, 1.35, 0.15);
+  beater.rotation.z = 0.55;
+  g.add(beater);
+  g.position.set(x, 0, z);
+  scene.add(g);
+  const monk = spawnPed(scene, new THREE.Vector3(x + 0.85, 0, z + 0.1), 'monk');
+  monk.watDrum = true;
+  monk.anchor = { slot: monk.mesh.position.clone(), facing: -PI / 2 };
+  monk.speed = 0;
+  monk.state = 'idle';
+  monk.heading = -PI / 2;
+  if (monk.mesh) {
+    monk.mesh.rotation.y = -PI / 2;
+    monk.mesh.visible = false;
+    const bowl = monk.mesh.getObjectByName('alms-bowl');
+    if (bowl) bowl.visible = false;
+  }
+  G.watDrum = { mesh: g, drum, beater, monk, x, z, t: 0, beatT: 0 };
+}
+
+function makeBatMesh() {
+  const g = new THREE.Group();
+  g.name = 'wat-bat';
+  const hide = new THREE.MeshStandardMaterial({ color: 0x2a2218, roughness: 0.9 });
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 5), hide);
+  body.scale.set(0.7, 0.55, 1.15);
+  g.add(body);
+  const wingL = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.02, 0.16), hide);
+  wingL.name = 'bat-wing';
+  wingL.position.set(-0.22, 0, 0);
+  g.add(wingL);
+  const wingR = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.02, 0.16), hide);
+  wingR.name = 'bat-wing';
+  wingR.position.set(0.22, 0, 0);
+  g.add(wingR);
+  return g;
+}
+
+export function spawnWatBats(scene) {
+  if (!GAMEPLAY.watBats) return;
+  const temple = G.world && G.world.poi && G.world.poi.temple;
+  if (!temple) return;
+  G.watBats = [];
+  for (let i = 0; i < 6; i++) {
+    const mesh = makeBatMesh();
+    mesh.visible = false;
+    scene.add(mesh);
+    G.watBats.push({
+      mesh,
+      cx: temple.x,
+      cz: temple.z,
+      r: 4.5 + i * 0.85,
+      y: 7.2 + (i % 3) * 0.7,
+      t: i * 0.9,
+      spin: 0.55 + i * 0.08,
+    });
+  }
+}
+
+function makePigeonMesh() {
+  const g = new THREE.Group();
+  g.name = 'bts-pigeon';
+  const grey = new THREE.MeshStandardMaterial({ color: pick([0x7a7a78, 0x6a6a6c, 0x8a8480]), roughness: 0.85 });
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.055, 6, 5), grey);
+  body.scale.set(0.75, 0.55, 1.15);
+  g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.03, 5, 4), grey);
+  head.position.set(0, 0.03, 0.07);
+  g.add(head);
+  const wingL = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.015, 0.08), grey);
+  wingL.name = 'pigeon-wing';
+  wingL.position.set(-0.08, 0.01, 0);
+  g.add(wingL);
+  const wingR = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.015, 0.08), grey);
+  wingR.name = 'pigeon-wing';
+  wingR.position.set(0.08, 0.01, 0);
+  g.add(wingR);
+  return g;
+}
+
+export function spawnBtsPigeons(scene) {
+  if (!GAMEPLAY.btsPigeons) return;
+  const bts = G.world && G.world.bts;
+  const py = (bts && bts.platformY) || 13.9;
+  const stations = [
+    { sx: bts ? bts.x : -50, py: py + 0.12, n: 8, z0: -7.2, dz: 2.4, stop: 'asok' },
+    { sx: 100, py: py + 0.12, n: 6, z0: -4.2, dz: 3.2, stop: 'phrom' },
+  ];
+  G.btsPigeons = [];
+  for (const st of stations) {
+    for (let i = 0; i < st.n; i++) {
+      const side = i < st.n / 2 ? -1 : 1;
+      const k = i % (st.n / 2);
+      const home = { x: st.sx + side * 3.35, y: st.py, z: st.z0 + k * st.dz };
+      const mesh = makePigeonMesh();
+      mesh.position.set(home.x, home.y, home.z);
+      mesh.visible = false;
+      scene.add(mesh);
+      G.btsPigeons.push({
+        mesh, home, t: i * 0.4, state: 'loaf', heading: side > 0 ? -PI / 2 : PI / 2, stop: st.stop,
+      });
+    }
+  }
+}
+
+export function spawnWatRobes(scene) {
+  if (!GAMEPLAY.watRobes) return;
+  const temple = G.world && G.world.poi && G.world.poi.temple;
+  if (!temple) return;
+  const x = temple.x - 1.2, z = temple.z + 8.2;
+  const g = new THREE.Group();
+  g.name = 'wat-robes';
+  const wood = new THREE.MeshStandardMaterial({ color: 0x6a4a28, roughness: 0.85 });
+  const span = 6.4;
+  for (const sx of [-span / 2, span / 2]) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 2.6, 6), wood);
+    post.position.set(sx, 1.3, 0);
+    g.add(post);
+  }
+  const rope = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.015, 0.015, span, 4),
+    new THREE.MeshStandardMaterial({ color: 0xc8b090, roughness: 0.7 })
+  );
+  rope.position.y = 2.45;
+  rope.rotation.z = PI / 2;
+  g.add(rope);
+  const saffron = [0xe07020, 0xd45a18, 0xc44a10, 0xe88830, 0xb83a0c, 0xdc6820];
+  for (let i = 0; i < 6; i++) {
+    const robe = new THREE.Mesh(
+      new THREE.BoxGeometry(0.32, 0.85, 0.05),
+      new THREE.MeshStandardMaterial({ color: saffron[i], roughness: 0.88, side: THREE.DoubleSide })
+    );
+    robe.name = 'saffron-robe';
+    robe.position.set(-span * 0.38 + i * 0.85, 1.95, 0);
+    g.add(robe);
+  }
+  g.position.set(x, 0, z);
+  scene.add(g);
+  G.watRobes = { mesh: g, x, z, t: 0 };
+}
+
+export function spawnWatLotus(scene) {
+  if (!GAMEPLAY.watLotus) return;
+  const temple = G.world && G.world.poi && G.world.poi.temple;
+  if (!temple) return;
+  const x = temple.x + 8.4, z = temple.z + 2.2;
+  const g = new THREE.Group();
+  g.name = 'wat-lotus-stand';
+  const tub = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.42, 0.38, 0.32, 10),
+    new THREE.MeshStandardMaterial({ color: 0x4a3a28, roughness: 0.8 })
+  );
+  tub.position.y = 0.22;
+  g.add(tub);
+  const water = new THREE.Mesh(
+    new THREE.CircleGeometry(0.36, 10),
+    new THREE.MeshStandardMaterial({ color: 0x3a6a88, roughness: 0.25, metalness: 0.15, transparent: true, opacity: 0.7 })
+  );
+  water.rotation.x = -PI / 2;
+  water.position.y = 0.36;
+  g.add(water);
+  const petal = new THREE.MeshStandardMaterial({ color: 0xe878a0, roughness: 0.55 });
+  const pad = new THREE.MeshStandardMaterial({ color: 0x2a7a38, roughness: 0.8 });
+  for (let i = 0; i < 5; i++) {
+    const bloom = new THREE.Group();
+    bloom.name = 'wat-lotus';
+    const leaf = new THREE.Mesh(new THREE.CircleGeometry(0.1, 8), pad);
+    leaf.rotation.x = -PI / 2;
+    bloom.add(leaf);
+    const flower = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.12, 7), petal);
+    flower.position.y = 0.08;
+    bloom.add(flower);
+    const a = (i / 5) * TAU;
+    bloom.position.set(Math.sin(a) * 0.18, 0.38, Math.cos(a) * 0.18);
+    g.add(bloom);
+  }
+  g.position.set(x, 0, z);
+  scene.add(g);
+  const vendor = spawnPed(scene, new THREE.Vector3(x + 0.7, 0, z + 0.15), 'vendor');
+  vendor.watLotus = true;
+  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI };
+  vendor.speed = 0;
+  vendor.state = 'idle';
+  vendor.heading = PI;
+  if (vendor.mesh) vendor.mesh.rotation.y = PI;
+  G.watLotus = { mesh: g, vendor, x, z, t: 0 };
+  const packMerit = (mx, mz, facing, boxName) => {
+    const box = new THREE.Group();
+    box.name = boxName;
+    const gold = new THREE.MeshStandardMaterial({ color: 0xd9a134, roughness: 0.45, metalness: 0.55 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.7, 0.32), gold);
+    body.position.y = 0.55;
+    box.add(body);
+    const slot = new THREE.Mesh(
+      new THREE.BoxGeometry(0.16, 0.04, 0.04),
+      new THREE.MeshStandardMaterial({ color: 0x3a2a12, roughness: 0.7 })
+    );
+    slot.position.y = 0.92;
+    box.add(slot);
+    box.position.set(mx + 0.45, 0, mz - 0.15);
+    scene.add(box);
+    const attendant = spawnPed(scene, new THREE.Vector3(mx, 0, mz), 'monk');
+    attendant.watLotus = true;
+    attendant.watMerit = true;
+    attendant.speed = 0;
+    attendant.state = 'idle';
+    attendant.heading = facing;
+    attendant.anchor = { slot: new THREE.Vector3(mx, 0, mz), facing };
+    if (attendant.mesh) {
+      attendant.mesh.rotation.y = facing;
+      attendant.mesh.visible = false;
+      const bowl = attendant.mesh.getObjectByName('alms-bowl');
+      if (bowl) bowl.visible = false;
+    }
+    const tray = new THREE.Mesh(
+      new THREE.BoxGeometry(0.14, 0.02, 0.1),
+      new THREE.MeshStandardMaterial({ color: 0xffcf4a, metalness: 0.55, roughness: 0.35 })
+    );
+    tray.name = 'wat-merit-tray';
+    const parts = attendant.mesh && attendant.mesh.userData && attendant.mesh.userData.parts;
+    if (parts && parts.foreR) {
+      tray.position.set(0.02, -0.22, 0.06);
+      parts.foreR.add(tray);
+    } else if (attendant.mesh) {
+      tray.position.set(0.22, 1.05, 0.12);
+      attendant.mesh.add(tray);
+    }
+    return { ped: attendant, box, x: mx, z: mz, t: 0 };
+  };
+  G.watMerit = packMerit(temple.x + 3.4, temple.z - 11.6, PI, 'wat-merit-box');
+  G.watMeritB = packMerit(temple.x + 11.6, temple.z - 2.2, PI / 2, 'east-wat-merit-box');
+}
+
+export function spawnWatAmulet(scene) {
+  if (!GAMEPLAY.watAmulet) return;
+  const temple = G.world && G.world.poi && G.world.poi.temple;
+  if (!temple) return;
+  const x = temple.x - 8.8, z = temple.z + 1.0;
+  const g = new THREE.Group();
+  g.name = 'wat-amulet-board';
+  const board = new THREE.Mesh(
+    new THREE.BoxGeometry(0.85, 1.15, 0.08),
+    new THREE.MeshStandardMaterial({ color: 0x5a3a18, roughness: 0.8 })
+  );
+  board.position.y = 1.05;
+  g.add(board);
+  const gold = [
+    new THREE.MeshStandardMaterial({ color: 0xe8c04a, roughness: 0.35, metalness: 0.65, emissive: 0xd4a020, emissiveIntensity: 0.12 }),
+    new THREE.MeshStandardMaterial({ color: 0xb08a3a, roughness: 0.4, metalness: 0.55, emissive: 0x8a6010, emissiveIntensity: 0.1 }),
+  ];
+  for (let i = 0; i < 6; i++) {
+    const charm = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.02, 8), gold[i % 2]);
+    charm.name = 'wat-amulet';
+    charm.rotation.x = PI / 2;
+    charm.position.set(-0.22 + (i % 3) * 0.22, 0.75 + Math.floor(i / 3) * 0.38, 0.06);
+    g.add(charm);
+  }
+  g.position.set(x, 0, z);
+  scene.add(g);
+  const vendor = spawnPed(scene, new THREE.Vector3(x + 0.7, 0, z + 0.12), 'vendor');
+  vendor.watAmulet = true;
+  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI };
+  vendor.speed = 0;
+  vendor.state = 'idle';
+  vendor.heading = PI;
+  if (vendor.mesh) {
+    vendor.mesh.rotation.y = PI;
+    vendor.mesh.visible = false;
+  }
+  G.watAmulet = { mesh: g, vendor, x, z, t: 0 };
+}
+
+export function spawnWatCats(scene) {
+  if (!GAMEPLAY.watCats) return;
+  const temple = G.world && G.world.poi && G.world.poi.temple;
+  if (!temple) return;
+  const homes = [
+    { x: temple.x - 6.2, z: temple.z - 3.8 },
+    { x: temple.x - 9.4, z: temple.z - 4.2 },
+    { x: temple.x + 4.4, z: temple.z - 5.6 },
+    { x: temple.x + 7.2, z: temple.z - 8.8 },
+  ];
+  G.watCats = [];
+  for (let i = 0; i < homes.length; i++) {
+    const home = homes[i];
+    const mesh = makeCatMesh();
+    mesh.name = 'wat-cat';
+    mesh.position.set(home.x, 0, home.z);
+    scene.add(mesh);
+    G.watCats.push({
+      mesh,
+      home: { x: home.x, z: home.z },
+      heading: (i * 1.4) % TAU,
+      state: 'loaf',
+      t: i * 0.5,
+    });
+  }
+}
+
+export function spawnShrineKeep(scene) {
+  if (!GAMEPLAY.spiritWai) return;
+  const pack = (s, dx, facing) => {
+    if (!s || !s.pos) return null;
+    const x = s.pos.x + dx, z = s.pos.z + 0.2;
+    const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'local');
+    recolorTorso(ped.mesh.userData.parts, 0xe8c040, 0.7);
+    ped.spiritKeep = true;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = facing;
+    ped.anchor = { slot: new THREE.Vector3(x, 0, z), facing };
+    if (ped.mesh) {
+      ped.mesh.rotation.y = facing;
+      ped.mesh.visible = false;
+    }
+    const malai = new THREE.Mesh(
+      new THREE.TorusGeometry(0.05, 0.012, 6, 10),
+      new THREE.MeshStandardMaterial({ color: 0xe878a0, roughness: 0.55 })
+    );
+    malai.name = 'shrine-malai';
+    const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+    if (parts && parts.foreL) {
+      malai.position.set(0.02, -0.24, 0.06);
+      parts.foreL.add(malai);
+    } else if (ped.mesh) {
+      malai.position.set(-0.18, 1.0, 0.1);
+      ped.mesh.add(malai);
+    }
+    return { ped, x, z, t: 0 };
+  };
+  const list = (G.world && G.world.shrines) || [];
+  G.spiritKeep = pack(list[0], 1.35, -PI / 2);
+  G.spiritKeepB = pack(list[1], -1.35, PI / 2);
+  G.spiritKeepC = pack(list[2], 1.35, -PI / 2);
+  G.spiritKeepD = pack(list[3], -1.35, PI / 2);
+  G.spiritKeepE = pack(list[4], 1.35, -PI / 2);
+  G.spiritKeepF = pack(list[5], -1.35, PI / 2);
+}
+
+export function makeChaYenMesh() {
+  const g = new THREE.Group();
+  g.name = 'chayen-cart';
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.5, 1.15), new THREE.MeshStandardMaterial({ color: 0x7a3a18, roughness: 0.8 }));
+  box.position.y = 0.48; g.add(box);
+  const urn = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.16, 0.18, 0.42, 8),
+    new THREE.MeshStandardMaterial({ color: 0xc45a18, roughness: 0.45, metalness: 0.2, emissive: 0xa03a08, emissiveIntensity: 0.18 })
+  );
+  urn.name = 'chayen-urn';
+  urn.position.set(-0.18, 0.95, 0);
+  g.add(urn);
+  const lid = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.17, 0.17, 0.04, 8),
+    new THREE.MeshStandardMaterial({ color: 0x8a8a82, metalness: 0.4, roughness: 0.4 })
+  );
+  lid.position.set(-0.18, 1.18, 0);
+  g.add(lid);
+  const milk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.07, 0.07, 0.16, 6),
+    new THREE.MeshStandardMaterial({ color: 0xe8e0d0, roughness: 0.55 })
+  );
+  milk.position.set(0.18, 0.86, -0.12);
+  g.add(milk);
+  const ice = new THREE.Mesh(
+    new THREE.BoxGeometry(0.22, 0.12, 0.22),
+    new THREE.MeshStandardMaterial({ color: 0xc8e8f0, roughness: 0.25, transparent: true, opacity: 0.7 })
+  );
+  ice.position.set(0.2, 0.82, 0.16);
+  g.add(ice);
+  const cup = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.05, 0.045, 0.14, 6),
+    new THREE.MeshStandardMaterial({ color: 0xe8a030, roughness: 0.5 })
+  );
+  cup.name = 'chayen-cup';
+  cup.position.set(0.32, 0.84, 0.02);
+  g.add(cup);
+  const umb = new THREE.Mesh(
+    new THREE.ConeGeometry(0.68, 0.24, 8),
+    new THREE.MeshStandardMaterial({ color: 0xff6a1a, roughness: 0.7, side: THREE.DoubleSide })
+  );
+  umb.position.y = 1.88; umb.rotation.x = PI; g.add(umb);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.0, 5), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+  pole.position.y = 1.35; g.add(pole);
+  const tire = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+  for (const z of [-0.38, 0.38]) for (const x of [-0.3, 0.3]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 8), tire);
+    w.rotation.z = PI / 2; w.position.set(x, 0.12, z); g.add(w);
+  }
+  return g;
+}
+
+export function spawnChaYen(scene) {
+  if (!GAMEPLAY.chaYen) return;
+  const sois = (G.world && G.world.sois) || [];
+  G.chaYen = [];
+  if (!sois.length) return;
+  const ranked = sois.slice().sort((a, b) => {
+    const la = a.axis === 'z' ? (a.z1 - a.z0) : (a.x1 - a.x0);
+    const lb = b.axis === 'z' ? (b.z1 - b.z0) : (b.x1 - b.x0);
+    return lb - la;
+  });
+  const s = ranked[4] || ranked[ranked.length - 1] || ranked[0];
+  const alongZ = s.axis === 'z';
+  const t0 = 0.72;
+  const x = alongZ ? (s.x0 + s.x1) * 0.5 : s.x0 + (s.x1 - s.x0) * t0;
+  const z = alongZ ? s.z0 + (s.z1 - s.z0) * t0 : (s.z0 + s.z1) * 0.5;
+  const mesh = makeChaYenMesh();
+  mesh.position.set(x, 0, z);
+  scene.add(mesh);
+  const vendor = spawnPed(scene, new THREE.Vector3(x, 0, z), 'vendor');
+  vendor.chaYen = true;
+  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: alongZ ? 0 : PI / 2 };
+  vendor.speed = 0;
+  G.chaYen.push({ mesh, vendor, soi: s, alongZ, t: t0, dir: -1 });
+}
+
+export function makeRotiMesh() {
+  const g = new THREE.Group();
+  g.name = 'roti-cart';
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.48, 1.2), new THREE.MeshStandardMaterial({ color: 0xc45a18, roughness: 0.8 }));
+  box.position.y = 0.46; g.add(box);
+  const pan = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.32, 0.32, 0.04, 12),
+    new THREE.MeshStandardMaterial({ color: 0x3a3a40, roughness: 0.4, metalness: 0.45, emissive: 0x331808, emissiveIntensity: 0.2 })
+  );
+  pan.name = 'roti-pan';
+  pan.position.set(0, 0.74, 0.08);
+  g.add(pan);
+  const dough = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.22, 0.22, 0.02, 10),
+    new THREE.MeshStandardMaterial({ color: 0xe8c878, roughness: 0.7 })
+  );
+  dough.name = 'roti-dough';
+  dough.position.set(0, 0.77, 0.08);
+  g.add(dough);
+  const banana = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.035, 0.16, 4, 6),
+    new THREE.MeshStandardMaterial({ color: 0xe8c020, roughness: 0.6 })
+  );
+  banana.rotation.z = 0.6;
+  banana.position.set(0.28, 0.82, -0.22);
+  g.add(banana);
+  const spatula = new THREE.Mesh(
+    new THREE.BoxGeometry(0.06, 0.01, 0.28),
+    new THREE.MeshStandardMaterial({ color: 0x888890, metalness: 0.45, roughness: 0.4 })
+  );
+  spatula.name = 'roti-spatula';
+  spatula.position.set(0.18, 0.86, 0.12);
+  spatula.rotation.y = 0.4;
+  g.add(spatula);
+  const umb = new THREE.Mesh(
+    new THREE.ConeGeometry(0.7, 0.26, 8),
+    new THREE.MeshStandardMaterial({ color: 0x2a6aad, roughness: 0.7, side: THREE.DoubleSide })
+  );
+  umb.position.y = 1.9; umb.rotation.x = PI; g.add(umb);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.05, 5), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+  pole.position.y = 1.38; g.add(pole);
+  const tire = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+  for (const z of [-0.4, 0.4]) for (const x of [-0.32, 0.32]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 8), tire);
+    w.rotation.z = PI / 2; w.position.set(x, 0.12, z); g.add(w);
+  }
+  return g;
+}
+
+export function spawnRotiCart(scene) {
+  if (!GAMEPLAY.rotiCart) return;
+  const sois = (G.world && G.world.sois) || [];
+  G.rotiCart = [];
+  if (!sois.length) return;
+  const ranked = sois.slice().sort((a, b) => {
+    const la = a.axis === 'z' ? (a.z1 - a.z0) : (a.x1 - a.x0);
+    const lb = b.axis === 'z' ? (b.z1 - b.z0) : (b.x1 - b.x0);
+    return lb - la;
+  });
+  const s = ranked[5] || ranked[ranked.length - 1] || ranked[0];
+  const alongZ = s.axis === 'z';
+  const t0 = 0.34;
+  const x = alongZ ? (s.x0 + s.x1) * 0.5 : s.x0 + (s.x1 - s.x0) * t0;
+  const z = alongZ ? s.z0 + (s.z1 - s.z0) * t0 : (s.z0 + s.z1) * 0.5;
+  const mesh = makeRotiMesh();
+  mesh.position.set(x, 0, z);
+  scene.add(mesh);
+  const vendor = spawnPed(scene, new THREE.Vector3(x, 0, z), 'vendor');
+  vendor.roti = true;
+  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: alongZ ? 0 : PI / 2 };
+  vendor.speed = 0;
+  G.rotiCart.push({ mesh, vendor, soi: s, alongZ, t: t0, dir: 1 });
+}
+
 export function spawnCoconutCarts(scene) {
   if (!GAMEPLAY.coconutCart) return;
   const sois = (G.world && G.world.sois) || [];
@@ -2046,6 +5648,138 @@ export function spawnCoconutCarts(scene) {
   vendor.anchor = { slot: vendor.mesh.position.clone(), facing: alongZ ? 0 : PI / 2 };
   vendor.speed = 0;
   G.coconutCarts.push({ mesh, vendor, soi: s, alongZ, t: t0, dir: 1 });
+}
+
+export function makeSomTamMesh() {
+  const g = new THREE.Group();
+  g.name = 'somtam-cart';
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.5, 1.25), new THREE.MeshStandardMaterial({ color: 0x4a6a2a, roughness: 0.82 }));
+  box.position.y = 0.48; g.add(box);
+  const board = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.04, 0.7), new THREE.MeshStandardMaterial({ color: 0xc8b080, roughness: 0.7 }));
+  board.position.y = 0.76; g.add(board);
+  const mortar = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.16, 0.2, 0.28, 8),
+    new THREE.MeshStandardMaterial({ color: 0x6a5a48, roughness: 0.75 })
+  );
+  mortar.name = 'somtam-mortar';
+  mortar.position.set(-0.12, 0.94, 0.08);
+  g.add(mortar);
+  const pestle = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.035, 0.05, 0.42, 6),
+    new THREE.MeshStandardMaterial({ color: 0x8a6a40, roughness: 0.7 })
+  );
+  pestle.name = 'somtam-pestle';
+  pestle.position.set(-0.12, 1.18, 0.08);
+  pestle.rotation.z = 0.25;
+  g.add(pestle);
+  const papaya = new THREE.MeshStandardMaterial({ color: 0x7a9a2a, roughness: 0.65 });
+  for (let i = 0; i < 3; i++) {
+    const fruit = new THREE.Mesh(new THREE.SphereGeometry(0.09, 6, 5), papaya);
+    fruit.scale.set(0.7, 1.15, 0.7);
+    fruit.position.set(0.22, 0.88, -0.18 + i * 0.16);
+    g.add(fruit);
+  }
+  const chili = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.04, 0.08), new THREE.MeshStandardMaterial({ color: 0xc03020, roughness: 0.6 }));
+  chili.position.set(0.28, 0.8, 0.22);
+  g.add(chili);
+  const umb = new THREE.Mesh(
+    new THREE.ConeGeometry(0.7, 0.26, 8),
+    new THREE.MeshStandardMaterial({ color: 0xff8a2a, roughness: 0.7, side: THREE.DoubleSide })
+  );
+  umb.position.y = 1.92; umb.rotation.x = PI; g.add(umb);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.05, 5), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+  pole.position.y = 1.38; g.add(pole);
+  const tire = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+  for (const z of [-0.4, 0.4]) for (const x of [-0.32, 0.32]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 8), tire);
+    w.rotation.z = PI / 2; w.position.set(x, 0.12, z); g.add(w);
+  }
+  return g;
+}
+
+export function spawnPlaKat(scene) {
+  if (!GAMEPLAY.plaKat) return;
+  const sois = (G.world && G.world.sois) || [];
+  if (sois.length < 2) return;
+  const ranked = sois.slice().sort((a, b) => {
+    const la = a.axis === 'z' ? (a.z1 - a.z0) : (a.x1 - a.x0);
+    const lb = b.axis === 'z' ? (b.z1 - b.z0) : (b.x1 - b.x0);
+    return lb - la;
+  });
+  const s = ranked[3] || ranked[0];
+  const alongZ = s.axis === 'z';
+  const t = 0.38;
+  const x = alongZ ? (s.x0 + s.x1) * 0.5 + 1.55 : s.x0 + (s.x1 - s.x0) * t;
+  const z = alongZ ? s.z0 + (s.z1 - s.z0) * t : (s.z0 + s.z1) * 0.5 + 1.55;
+  const g = new THREE.Group();
+  g.name = 'plakat-rack';
+  const pole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.04, 0.05, 2.2, 5),
+    new THREE.MeshStandardMaterial({ color: 0x6a5a3a, roughness: 0.75 })
+  );
+  pole.position.y = 1.1;
+  g.add(pole);
+  const bar = new THREE.Mesh(
+    new THREE.BoxGeometry(1.15, 0.04, 0.04),
+    new THREE.MeshStandardMaterial({ color: 0x4a4a48, roughness: 0.55, metalness: 0.25 })
+  );
+  bar.position.y = 2.05;
+  g.add(bar);
+  const bagMat = new THREE.MeshStandardMaterial({
+    color: 0x8ec8e8, roughness: 0.2, metalness: 0.05, transparent: true, opacity: 0.35,
+  });
+  const fishColors = [0xc44a3a, 0x2a6aad, 0xc8a227, 0x6a2a8a, 0x1e9a5e, 0xd44b3b];
+  const bags = [];
+  for (let i = 0; i < 6; i++) {
+    const bag = new THREE.Group();
+    bag.name = 'plakat-bag';
+    const water = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), bagMat.clone());
+    water.scale.set(0.85, 1.15, 0.85);
+    bag.add(water);
+    const fish = new THREE.Mesh(
+      new THREE.SphereGeometry(0.035, 5, 4),
+      new THREE.MeshStandardMaterial({ color: fishColors[i], roughness: 0.45, emissive: fishColors[i], emissiveIntensity: 0.12 })
+    );
+    fish.name = 'plakat-fish';
+    fish.position.y = -0.02;
+    bag.add(fish);
+    bag.position.set(-0.45 + i * 0.18, 1.72, 0);
+    g.add(bag);
+    bags.push(bag);
+  }
+  g.position.set(x, 0, z);
+  scene.add(g);
+  const vendor = spawnPed(scene, new THREE.Vector3(x + (alongZ ? 0.7 : 0), 0, z + (alongZ ? 0 : 0.7)), 'vendor');
+  vendor.plaKat = true;
+  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: alongZ ? PI / 2 : 0 };
+  vendor.speed = 0;
+  vendor.state = 'idle';
+  G.plaKat = { mesh: g, vendor, bags, soi: s, x, z };
+}
+
+export function spawnSomTam(scene) {
+  if (!GAMEPLAY.somTam) return;
+  const sois = (G.world && G.world.sois) || [];
+  G.somTam = [];
+  if (!sois.length) return;
+  const ranked = sois.slice().sort((a, b) => {
+    const la = a.axis === 'z' ? (a.z1 - a.z0) : (a.x1 - a.x0);
+    const lb = b.axis === 'z' ? (b.z1 - b.z0) : (b.x1 - b.x0);
+    return lb - la;
+  });
+  const s = ranked[2] || ranked[0];
+  const alongZ = s.axis === 'z';
+  const t0 = 0.62;
+  const x = alongZ ? (s.x0 + s.x1) * 0.5 : s.x0 + (s.x1 - s.x0) * t0;
+  const z = alongZ ? s.z0 + (s.z1 - s.z0) * t0 : (s.z0 + s.z1) * 0.5;
+  const mesh = makeSomTamMesh();
+  mesh.position.set(x, 0, z);
+  scene.add(mesh);
+  const vendor = spawnPed(scene, new THREE.Vector3(x, 0, z), 'vendor');
+  vendor.somTam = true;
+  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: alongZ ? 0 : PI / 2 };
+  vendor.speed = 0;
+  G.somTam.push({ mesh, vendor, soi: s, alongZ, t: t0, dir: 1 });
 }
 
 export function spawnMooPing(scene) {
@@ -2108,50 +5842,412 @@ export function addHireSign(v, color = 0xffcf4a) {
   v.hireSign = sign;
 }
 
+export function spawnBtsMalai(scene) {
+  if (!GAMEPLAY.btsMalai) return;
+  const bts = G.world && G.world.bts;
+  if (!bts) return;
+  const stand = (x, z, stop) => {
+    const g = new THREE.Group();
+    g.name = 'malai-stand';
+    const crate = new THREE.Mesh(
+      new THREE.BoxGeometry(0.7, 0.38, 0.55),
+      new THREE.MeshStandardMaterial({ color: 0x8a6a3a, roughness: 0.8 })
+    );
+    crate.position.y = 0.22;
+    g.add(crate);
+    const jasmine = new THREE.MeshStandardMaterial({ color: 0xf4f0e0, roughness: 0.55 });
+    const marigold = new THREE.MeshStandardMaterial({ color: 0xff8a1a, roughness: 0.55 });
+    for (let i = 0; i < 5; i++) {
+      const strand = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.55, 5), i % 2 ? marigold : jasmine);
+      strand.name = 'malai-strand';
+      strand.position.set(-0.22 + i * 0.11, 0.72, 0.02);
+      g.add(strand);
+    }
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.02, 0.02, 1.15, 5),
+      new THREE.MeshStandardMaterial({ color: 0x333333 })
+    );
+    pole.position.set(0.28, 0.7, -0.12);
+    g.add(pole);
+    const sign = new THREE.Mesh(
+      new THREE.BoxGeometry(0.42, 0.18, 0.04),
+      new THREE.MeshStandardMaterial({ color: 0xc44a3a, roughness: 0.6, emissive: 0x802020, emissiveIntensity: 0.15 })
+    );
+    sign.name = 'malai-sign';
+    sign.position.set(0.28, 1.32, -0.12);
+    g.add(sign);
+    g.position.set(x, 0, z);
+    scene.add(g);
+    const vendor = spawnPed(scene, new THREE.Vector3(x + 0.55, 0, z + 0.35), 'vendor');
+    vendor.btsMalai = true;
+    vendor.stop = stop;
+    vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI / 2 };
+    vendor.speed = 0;
+    vendor.state = 'idle';
+    vendor.heading = PI / 2;
+    if (vendor.mesh) vendor.mesh.rotation.y = PI / 2;
+    return { mesh: g, vendor, x, z, t: 0, stop };
+  };
+  G.btsMalai = stand(bts.x - 6.4, -16.2, 'asok');
+  G.phromMalai = stand(100 - 6.4, -16.2, 'phrom');
+}
+
+export function makeMangoStickyMesh() {
+  const g = new THREE.Group();
+  g.name = 'mango-cart';
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.5, 1.2), new THREE.MeshStandardMaterial({ color: 0x2a6a38, roughness: 0.8 }));
+  box.position.y = 0.48; g.add(box);
+  const rice = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.16, 0.18, 0.16, 8),
+    new THREE.MeshStandardMaterial({ color: 0xf4eee0, roughness: 0.7 })
+  );
+  rice.name = 'sticky-rice';
+  rice.position.set(-0.18, 0.82, 0.08);
+  g.add(rice);
+  const cream = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.07, 0.08, 0.14, 6),
+    new THREE.MeshStandardMaterial({ color: 0xfff4d8, roughness: 0.45, emissive: 0xffcc88, emissiveIntensity: 0.12 })
+  );
+  cream.name = 'coconut-cream';
+  cream.position.set(0.22, 0.84, -0.12);
+  g.add(cream);
+  const mangoMat = new THREE.MeshStandardMaterial({ color: 0xffb020, roughness: 0.55 });
+  for (let i = 0; i < 3; i++) {
+    const half = new THREE.Mesh(new THREE.SphereGeometry(0.09, 7, 5, 0, TAU, 0, PI / 2), mangoMat);
+    half.name = 'mango-half';
+    half.rotation.x = PI / 2;
+    half.position.set(0.08 + i * 0.16, 0.8, 0.18);
+    g.add(half);
+  }
+  const plate = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.12, 0.12, 0.03, 8),
+    new THREE.MeshStandardMaterial({ color: 0xf0e8d8, roughness: 0.6 })
+  );
+  plate.name = 'mango-plate';
+  plate.position.set(0.28, 0.78, 0.08);
+  g.add(plate);
+  const umb = new THREE.Mesh(
+    new THREE.ConeGeometry(0.72, 0.26, 8),
+    new THREE.MeshStandardMaterial({ color: 0xffcf4a, roughness: 0.7, side: THREE.DoubleSide })
+  );
+  umb.position.y = 1.92; umb.rotation.x = PI; g.add(umb);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.05, 5), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+  pole.position.y = 1.38; g.add(pole);
+  const tire = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+  for (const z of [-0.4, 0.4]) for (const x of [-0.32, 0.32]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 8), tire);
+    w.rotation.z = PI / 2; w.position.set(x, 0.12, z); g.add(w);
+  }
+  return g;
+}
+
+export function spawnMangoSticky(scene) {
+  if (!GAMEPLAY.mangoSticky) return;
+  const bts = G.world && G.world.bts;
+  if (!bts) return;
+  const cart = (x, z, stop) => {
+    const mesh = makeMangoStickyMesh();
+    mesh.position.set(x, 0, z);
+    scene.add(mesh);
+    const vendor = spawnPed(scene, new THREE.Vector3(x + 0.7, 0, z + 0.15), 'vendor');
+    vendor.mango = true;
+    vendor.stop = stop;
+    vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI / 2 };
+    vendor.speed = 0;
+    vendor.state = 'idle';
+    vendor.heading = PI / 2;
+    if (vendor.mesh) {
+      vendor.mesh.rotation.y = PI / 2;
+      vendor.mesh.visible = false;
+    }
+    return { mesh, vendor, x, z, t: 0, stop };
+  };
+  G.mangoSticky = cart(bts.x - 8.8, -22.4, 'asok');
+  G.phromMango = cart(100 - 8.8, 8.8, 'phrom');
+}
+
+export function makePhromFruitMesh() {
+  const g = new THREE.Group();
+  g.name = 'phrom-fruit';
+  const box = new THREE.Mesh(
+    new THREE.BoxGeometry(0.95, 0.5, 1.15),
+    new THREE.MeshStandardMaterial({ color: 0x2a8a3a, roughness: 0.78 })
+  );
+  box.position.y = 0.48;
+  g.add(box);
+  const blender = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.09, 0.1, 0.28, 8),
+    new THREE.MeshStandardMaterial({
+      color: 0xffb020, roughness: 0.3, transparent: true, opacity: 0.7,
+      emissive: 0xff8800, emissiveIntensity: 0.12,
+    })
+  );
+  blender.name = 'phrom-blender';
+  blender.position.set(-0.18, 0.92, 0.05);
+  g.add(blender);
+  const base = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.11, 0.12, 0.08, 8),
+    new THREE.MeshStandardMaterial({ color: 0x2a2a30, roughness: 0.45, metalness: 0.3 })
+  );
+  base.position.set(-0.18, 0.76, 0.05);
+  g.add(base);
+  const fruitMat = [
+    new THREE.MeshStandardMaterial({ color: 0xc03030, roughness: 0.6 }),
+    new THREE.MeshStandardMaterial({ color: 0xffb020, roughness: 0.55 }),
+    new THREE.MeshStandardMaterial({ color: 0xe8d24a, roughness: 0.55 }),
+    new THREE.MeshStandardMaterial({ color: 0x2ec86a, roughness: 0.6 }),
+  ];
+  for (let i = 0; i < 4; i++) {
+    const fruit = new THREE.Mesh(new THREE.SphereGeometry(0.08, 7, 5), fruitMat[i]);
+    fruit.name = 'phrom-fruit-piece';
+    fruit.position.set(0.08 + (i % 2) * 0.18, 0.82, (i < 2 ? 0.16 : -0.1));
+    g.add(fruit);
+  }
+  const cup = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.045, 0.04, 0.12, 7),
+    new THREE.MeshStandardMaterial({ color: 0xff6a2a, roughness: 0.4, transparent: true, opacity: 0.8 })
+  );
+  cup.name = 'phrom-cup';
+  cup.position.set(0.28, 0.84, 0.18);
+  g.add(cup);
+  const umb = new THREE.Mesh(
+    new THREE.ConeGeometry(0.7, 0.24, 8),
+    new THREE.MeshStandardMaterial({ color: 0xff8a1a, roughness: 0.7, side: THREE.DoubleSide })
+  );
+  umb.position.y = 1.9;
+  umb.rotation.x = PI;
+  g.add(umb);
+  const pole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.02, 0.02, 1.02, 5),
+    new THREE.MeshStandardMaterial({ color: 0x333333 })
+  );
+  pole.position.y = 1.36;
+  g.add(pole);
+  const tire = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+  for (const z of [-0.38, 0.38]) for (const x of [-0.32, 0.32]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 8), tire);
+    w.rotation.z = PI / 2;
+    w.position.set(x, 0.12, z);
+    g.add(w);
+  }
+  return g;
+}
+
+export function spawnPhromFruit(scene) {
+  if (!GAMEPLAY.phromFruit) return;
+  const cart = (x, z, stop) => {
+    const mesh = makePhromFruitMesh();
+    mesh.position.set(x, 0, z);
+    scene.add(mesh);
+    const vendor = spawnPed(scene, new THREE.Vector3(x + 0.7, 0, z + 0.12), 'vendor');
+    vendor.phromFruit = true;
+    vendor.stop = stop;
+    vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI / 2 };
+    vendor.speed = 0;
+    vendor.state = 'idle';
+    vendor.heading = PI / 2;
+    if (vendor.mesh) {
+      vendor.mesh.rotation.y = PI / 2;
+      vendor.mesh.visible = false;
+    }
+    return { mesh, vendor, x, z, t: 0, stop };
+  };
+  G.phromFruit = cart(100 - 8.2, -24.8, 'phrom');
+  const bts = G.world && G.world.bts;
+  G.asokFruit = bts ? cart(bts.x - 8.8, 8.8, 'asok') : null;
+}
+
+export function spawnBtsGates(scene) {
+  if (!GAMEPLAY.btsGates) return;
+  const bts = G.world && G.world.bts;
+  if (!bts) return;
+  const PY = bts.platformY || 13.9;
+  const zGate = -4.85;
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xe8d24a, roughness: 0.45 });
+  const teal = new THREE.MeshStandardMaterial({ color: 0x2a7d8e, roughness: 0.5 });
+  const station = (sx, stop) => {
+    const gates = [];
+    for (let i = 0; i < 3; i++) {
+      const g = new THREE.Group();
+      g.name = 'bts-gate';
+      const x = sx - 1.2 + i * 1.2;
+      const body = new THREE.Mesh(new THREE.BoxGeometry(0.42, 1.05, 0.55), bodyMat);
+      body.position.y = 0.52;
+      g.add(body);
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.08, 0.56), teal);
+      stripe.position.y = 0.95;
+      g.add(stripe);
+      const flap = new THREE.Mesh(
+        new THREE.BoxGeometry(0.04, 0.7, 0.38),
+        new THREE.MeshStandardMaterial({ color: 0xf4f0e0, roughness: 0.4 })
+      );
+      flap.name = 'bts-flap';
+      flap.position.set(0.22, 0.55, 0);
+      g.add(flap);
+      g.position.set(x, PY, zGate);
+      scene.add(g);
+      gates.push({ mesh: g, flap, x, z: zGate });
+    }
+    const machine = new THREE.Group();
+    machine.name = 'bts-ticket-machine';
+    const kiosk = new THREE.Mesh(
+      new THREE.BoxGeometry(0.55, 1.35, 0.4),
+      new THREE.MeshStandardMaterial({ color: 0x2a7d8e, roughness: 0.5 })
+    );
+    kiosk.position.y = 0.68;
+    machine.add(kiosk);
+    const screen = new THREE.Mesh(
+      new THREE.BoxGeometry(0.36, 0.28, 0.04),
+      new THREE.MeshStandardMaterial({ color: 0x88e0ff, emissive: 0x226688, emissiveIntensity: 0.4, roughness: 0.3 })
+    );
+    screen.name = 'bts-ticket-screen';
+    screen.position.set(0, 1.15, 0.22);
+    machine.add(screen);
+    const slot = new THREE.Mesh(
+      new THREE.BoxGeometry(0.18, 0.04, 0.06),
+      new THREE.MeshStandardMaterial({ color: 0x111111 })
+    );
+    slot.position.set(0, 0.72, 0.22);
+    machine.add(slot);
+    machine.position.set(sx + 5.2, 0, -24.5);
+    scene.add(machine);
+    return { gates, machine, sx, zGate, py: PY, openT: 0, _pz: null, stop };
+  };
+  G.btsGates = station(bts.x, 'asok');
+  G.phromGates = station(100, 'phrom');
+}
+
 export function spawnBtsSongthaew(scene) {
   if (!GAMEPLAY.btsSongthaew) return;
   const bts = G.world && G.world.bts;
   if (!bts) return;
-  const x = bts.x + 11.5, z = -22, heading = PI / 2;
-  const v = makeVehicle('songthaew', scene);
-  v.pos.set(x, 0, z);
-  v.heading = heading;
-  v.mesh.position.copy(v.pos);
-  v.mesh.rotation.y = heading;
-  v.driver = null;
-  v.vel = 0;
-  v.btsSongthaew = true;
-  v._standHome = { x, z, heading };
-  addHireSign(v, 0xffcf4a);
-  const waiter = spawnPed(scene, new THREE.Vector3(x + 2.4, 0, z + 0.4), 'laborer');
-  waiter.anchor = { slot: waiter.mesh.position.clone(), facing: heading + PI };
-  waiter.btsSongthaew = true;
-  waiter.speed = 0;
-  waiter.state = 'idle';
-  G.world.btsSongthaew = { vehicle: v, waiter, x, z };
+  const rank = (x, z, stop) => {
+    const heading = PI / 2;
+    const v = makeVehicle('songthaew', scene);
+    v.pos.set(x, 0, z);
+    v.heading = heading;
+    v.mesh.position.copy(v.pos);
+    v.mesh.rotation.y = heading;
+    v.driver = null;
+    v.vel = 0;
+    v.btsSongthaew = true;
+    v._standHome = { x, z, heading };
+    addHireSign(v, 0xffcf4a);
+    const waiter = spawnPed(scene, new THREE.Vector3(x + 2.4, 0, z + 0.4), 'laborer');
+    waiter.anchor = { slot: waiter.mesh.position.clone(), facing: heading + PI };
+    waiter.btsSongthaew = true;
+    waiter.speed = 0;
+    waiter.state = 'idle';
+    waiter.stop = stop;
+    const riders = [];
+    if (GAMEPLAY.songthaewRiders) {
+      for (let i = 0; i < 3; i++) {
+        const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), i === 1 ? 'tourist' : 'local');
+        ped.songthaewRide = true;
+        ped.stop = stop;
+        ped.speed = 0;
+        ped.state = 'idle';
+        ped.heading = heading + PI;
+        if (ped.mesh) {
+          scene.remove(ped.mesh);
+          v.mesh.add(ped.mesh);
+          // sit the side benches under the canopy (standing y=1.08 clips the roof)
+          ped.mesh.position.set((i % 2 === 0 ? -0.42 : 0.42), 0.55, -0.25 - i * 0.52);
+          ped.mesh.rotation.set(0.08, PI, 0);
+          const parts = ped.mesh.userData && ped.mesh.userData.parts;
+          if (parts) {
+            if (parts.legL) parts.legL.rotation.x = 1.22;
+            if (parts.legR) parts.legR.rotation.x = 1.12;
+            if (parts.shinL) parts.shinL.rotation.x = -1.08;
+            if (parts.shinR) parts.shinR.rotation.x = -0.98;
+            if (parts.armL) parts.armL.rotation.x = -0.4;
+            if (parts.armR) parts.armR.rotation.x = -0.28;
+          }
+        }
+        riders.push(ped);
+      }
+    }
+    return { vehicle: v, waiter, riders, x, z, stop };
+  };
+  G.world.btsSongthaew = rank(bts.x + 11.5, -22, 'asok');
+  G.world.phromSongthaew = rank(100 + 11.5, -22, 'phrom');
+}
+
+function makeWatBroom() {
+  const g = new THREE.Group();
+  g.name = 'wat-broom';
+  const shaft = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.016, 0.02, 1.15, 5),
+    new THREE.MeshStandardMaterial({ color: 0x6a4a28, roughness: 0.85 })
+  );
+  shaft.position.y = 0.55;
+  g.add(shaft);
+  const head = new THREE.Mesh(
+    new THREE.BoxGeometry(0.22, 0.1, 0.08),
+    new THREE.MeshStandardMaterial({ color: 0xc8b070, roughness: 0.9 })
+  );
+  head.position.y = 0.02;
+  g.add(head);
+  return g;
+}
+
+export function spawnWatSweep(scene) {
+  if (!GAMEPLAY.watSweep) return;
+  const temple = G.world && G.world.poi && G.world.poi.temple;
+  if (!temple) return;
+  G.watSweep = [];
+  for (let i = 0; i < 2; i++) {
+    const z = temple.z - 11.2 + i * 1.2;
+    const x = temple.x - 2 + i * 3.4;
+    const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'monk');
+    ped.watSweep = true;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped._sweepT = i * 0.35;
+    ped._sweepDir = 1;
+    ped._sweepZ = z;
+    ped._sweepX0 = temple.x - 5.5;
+    ped._sweepX1 = temple.x + 6.5;
+    const broom = makeWatBroom();
+    broom.position.set(0.28, 0.12, 0.18);
+    broom.rotation.set(0.55, 0, 0.4);
+    if (ped.mesh) {
+      ped.mesh.add(broom);
+      ped.mesh.visible = false;
+      const bowl = ped.mesh.getObjectByName('alms-bowl');
+      if (bowl) bowl.visible = false;
+    }
+    ped._broom = broom;
+    G.watSweep.push(ped);
+  }
 }
 
 export function spawnBtsTuktuk(scene) {
   if (!GAMEPLAY.btsTuktuk) return;
   const bts = G.world && G.world.bts;
   if (!bts) return;
-  const x = bts.x + 11.5, z = -14.2, heading = PI / 2;
-  const v = makeVehicle('tuktuk', scene);
-  v.pos.set(x, 0, z);
-  v.heading = heading;
-  v.mesh.position.copy(v.pos);
-  v.mesh.rotation.y = heading;
-  v.driver = null;
-  v.vel = 0;
-  v.btsTuktuk = true;
-  v._standHome = { x, z, heading };
-  addHireSign(v, 0x21f0ff);
-  const waiter = spawnPed(scene, new THREE.Vector3(x + 1.8, 0, z + 0.5), 'vendor');
-  waiter.anchor = { slot: waiter.mesh.position.clone(), facing: heading + PI };
-  waiter.btsTuktuk = true;
-  waiter.speed = 0;
-  waiter.state = 'idle';
-  G.world.btsTuktuk = { vehicle: v, waiter, x, z };
+  const rank = (x, z, stop) => {
+    const heading = PI / 2;
+    const v = makeVehicle('tuktuk', scene);
+    v.pos.set(x, 0, z);
+    v.heading = heading;
+    v.mesh.position.copy(v.pos);
+    v.mesh.rotation.y = heading;
+    v.driver = null;
+    v.vel = 0;
+    v.btsTuktuk = true;
+    v._standHome = { x, z, heading };
+    addHireSign(v, 0x21f0ff);
+    const waiter = spawnPed(scene, new THREE.Vector3(x + 1.8, 0, z + 0.5), 'vendor');
+    waiter.anchor = { slot: waiter.mesh.position.clone(), facing: heading + PI };
+    waiter.btsTuktuk = true;
+    waiter.speed = 0;
+    waiter.state = 'idle';
+    waiter.stop = stop;
+    return { vehicle: v, waiter, x, z, stop };
+  };
+  G.world.btsTuktuk = rank(bts.x + 11.5, -14.2, 'asok');
+  G.world.phromTuktuk = rank(100 + 11.5, -14.2, 'phrom');
 }
 
 // A handful of parked, enterable cars at the curb so there's always a ride (and a
@@ -2174,6 +6270,181 @@ export function spawnParkedCars(scene) {
 }
 
 // One drivable longtail at the river pier gap (z=-50) — step through the embankment to board.
+export function spawnBoatNoodle(scene) {
+  if (!GAMEPLAY.boatNoodle) return;
+  const pier = G.world && G.world.poi && G.world.poi.pier;
+  const x = pier ? pier.x - 2.8 : -215;
+  const z = pier ? pier.z : -50;
+  const g = new THREE.Group();
+  g.name = 'noodle-boat';
+  const hull = new THREE.Mesh(
+    new THREE.BoxGeometry(1.35, 0.42, 4.2),
+    new THREE.MeshStandardMaterial({ color: 0x8a3a28, roughness: 0.72 })
+  );
+  hull.position.y = 0.28;
+  g.add(hull);
+  const trim = new THREE.Mesh(
+    new THREE.BoxGeometry(1.45, 0.1, 4.3),
+    new THREE.MeshStandardMaterial({ color: 0xd0b050, roughness: 0.55 })
+  );
+  trim.position.y = 0.5;
+  g.add(trim);
+  const pot = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.28, 0.32, 0.28, 8),
+    new THREE.MeshStandardMaterial({ color: 0x2a2a30, metalness: 0.45, roughness: 0.4, emissive: 0xff5510, emissiveIntensity: 0.25 })
+  );
+  pot.name = 'noodle-pot';
+  pot.position.set(0, 0.72, 0.4);
+  g.add(pot);
+  const puff = new THREE.Mesh(
+    new THREE.SphereGeometry(0.22, 6, 5),
+    new THREE.MeshBasicMaterial({ color: 0x887766, transparent: true, opacity: 0.22, depthWrite: false })
+  );
+  puff.name = 'noodle-steam';
+  puff.position.set(0, 1.05, 0.4);
+  g.add(puff);
+  const umb = new THREE.Mesh(
+    new THREE.ConeGeometry(0.85, 0.32, 8),
+    new THREE.MeshStandardMaterial({ color: 0xc44a2a, roughness: 0.7, side: THREE.DoubleSide })
+  );
+  umb.position.y = 1.85;
+  umb.rotation.x = PI;
+  g.add(umb);
+  const pole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.025, 0.025, 1.2, 5),
+    new THREE.MeshStandardMaterial({ color: 0x333333 })
+  );
+  pole.position.y = 1.25;
+  g.add(pole);
+  g.position.set(x, 0.22, z);
+  scene.add(g);
+  const vendor = spawnPed(scene, new THREE.Vector3(x, 0, z), 'vendor');
+  vendor.boatNoodle = true;
+  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI / 2 };
+  vendor.speed = 0;
+  vendor.state = 'idle';
+  G.boatNoodle = { mesh: g, vendor, x, z0: z, t: 0.5, dir: 1 };
+}
+
+export function spawnPierWait(scene) {
+  if (!GAMEPLAY.pierWait) return;
+  const pier = G.world && G.world.poi && G.world.poi.pier;
+  if (!pier) return;
+  const x = pier.x + 2.6, z = pier.z;
+  const post = new THREE.Group();
+  post.name = 'pier-wait';
+  const pole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.04, 0.045, 1.15, 6),
+    new THREE.MeshStandardMaterial({ color: 0x3a3a40, roughness: 0.55, metalness: 0.2 })
+  );
+  pole.position.y = 0.58;
+  post.add(pole);
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(0.16, 0.045, 8, 14),
+    new THREE.MeshStandardMaterial({ color: 0xe24a1a, roughness: 0.55 })
+  );
+  ring.name = 'pier-ring';
+  ring.position.set(0, 1.05, 0.08);
+  ring.rotation.x = PI / 2;
+  post.add(ring);
+  const stripe = new THREE.Mesh(
+    new THREE.TorusGeometry(0.16, 0.02, 6, 14),
+    new THREE.MeshStandardMaterial({ color: 0xf5f0e4, roughness: 0.6 })
+  );
+  stripe.position.copy(ring.position);
+  stripe.rotation.x = PI / 2;
+  post.add(stripe);
+  post.position.set(x, 0, z + 2.2);
+  scene.add(post);
+  const waiters = [];
+  for (let i = 0; i < 3; i++) {
+    const px = x + (i - 1) * 0.15, pz = z - 0.4 + i * 0.95;
+    const ped = spawnPed(scene, new THREE.Vector3(px, 0, pz), i === 1 ? 'office' : 'local');
+    ped.pierWait = true;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = -PI / 2;
+    ped.anchor = { slot: new THREE.Vector3(px, 0, pz), facing: -PI / 2 };
+    if (ped.mesh) {
+      ped.mesh.rotation.y = -PI / 2;
+      ped.mesh.visible = false;
+    }
+    const bag = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.18, 0.08),
+      new THREE.MeshStandardMaterial({ color: pick([0xff5a23, 0x2a4a8a, 0xf5f0e4]), roughness: 0.7 })
+    );
+    bag.name = 'pier-bag';
+    const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+    if (parts && parts.foreL) { bag.position.set(0.02, -0.28, 0.04); parts.foreL.add(bag); }
+    else if (ped.mesh) { bag.position.set(-0.16, 0.95, 0.08); ped.mesh.add(bag); }
+    ped._pierBag = bag;
+    waiters.push(ped);
+  }
+  G.pierWait = { mesh: post, waiters, x, z, t: 0 };
+  const packClerk = (cx, cz, facing) => {
+    const clerk = spawnPed(scene, new THREE.Vector3(cx, 0, cz), 'office');
+    recolorTorso(clerk.mesh.userData.parts, 0x1a5a8a, 0.7);
+    clerk.pierWait = true;
+    clerk.pierClerk = true;
+    clerk.speed = 0;
+    clerk.state = 'idle';
+    clerk.heading = facing;
+    clerk.anchor = { slot: new THREE.Vector3(cx, 0, cz), facing };
+    if (clerk.mesh) {
+      clerk.mesh.rotation.y = facing;
+      clerk.mesh.visible = false;
+    }
+    const ticket = new THREE.Mesh(
+      new THREE.BoxGeometry(0.08, 0.12, 0.02),
+      new THREE.MeshStandardMaterial({ color: 0xf0ead8, roughness: 0.7 })
+    );
+    ticket.name = 'pier-ticket';
+    const parts = clerk.mesh && clerk.mesh.userData && clerk.mesh.userData.parts;
+    if (parts && parts.foreR) {
+      ticket.position.set(0.02, -0.22, 0.06);
+      parts.foreR.add(ticket);
+    } else if (clerk.mesh) {
+      ticket.position.set(0.22, 1.05, 0.12);
+      clerk.mesh.add(ticket);
+    }
+    return { ped: clerk, x: cx, z: cz, t: 0 };
+  };
+  G.pierClerk = packClerk(x - 1.6, z + 2.2, PI / 2);
+  G.pierClerkB = packClerk(x - 1.6, z - 2.2, PI / 2);
+  const packFish = (fx, fz) => {
+    const fisher = spawnPed(scene, new THREE.Vector3(fx, 0, fz), 'laborer');
+    recolorTorso(fisher.mesh.userData.parts, 0x3a5a4a, 0.7);
+    fisher.pierWait = true;
+    fisher.pierFish = true;
+    fisher.speed = 0;
+    fisher.state = 'idle';
+    fisher.heading = -PI / 2;
+    fisher.anchor = { slot: new THREE.Vector3(fx, 0, fz), facing: -PI / 2 };
+    if (fisher.mesh) {
+      fisher.mesh.rotation.y = -PI / 2;
+      fisher.mesh.visible = false;
+    }
+    const rod = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.012, 0.018, 1.35, 5),
+      new THREE.MeshStandardMaterial({ color: 0x4a3a22, roughness: 0.7 })
+    );
+    rod.name = 'pier-rod';
+    const fp = fisher.mesh && fisher.mesh.userData && fisher.mesh.userData.parts;
+    if (fp && fp.foreR) {
+      rod.position.set(0.02, -0.55, 0.08);
+      rod.rotation.z = 0.85;
+      fp.foreR.add(rod);
+    } else if (fisher.mesh) {
+      rod.position.set(0.22, 1.15, 0.12);
+      rod.rotation.z = 0.85;
+      fisher.mesh.add(rod);
+    }
+    return { ped: fisher, x: fx, z: fz, t: 0 };
+  };
+  G.pierFish = packFish(pier.x + 5.2, pier.z + 9.4);
+  G.pierFishB = packFish(pier.x + 5.2, pier.z - 9.4);
+}
+
 export function spawnBoat(scene) {
   // A small fleet of driveable longtails along the channel (the one by the pier
   // at z=-50 plus two more) so the river is a real traversal option, not a

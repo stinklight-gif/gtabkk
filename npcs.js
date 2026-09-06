@@ -187,6 +187,62 @@ export function updateYaowaratNight(dt) {
   }
 }
 
+export function updateYaoPhotos(dt) {
+  if (!GAMEPLAY.yaoPhotos) return;
+  const poi = G.world && G.world.poi && G.world.poi.yaowarat;
+  if (!poi) return;
+  const open = yaowaratNightOpen();
+  if (open) {
+    G._yaoPhotos = G._yaoPhotos || [];
+    const slots = [
+      { x: poi.x + 2.4, z: poi.z - 16, facing: -PI / 2 },
+      { x: poi.x - 2.4, z: poi.z - 6, facing: PI / 2 },
+      { x: poi.x + 2.4, z: poi.z + 6, facing: -PI / 2 },
+      { x: poi.x - 2.4, z: poi.z + 16, facing: PI / 2 },
+    ];
+    while (G._yaoPhotos.length < slots.length) {
+      const slot = slots[G._yaoPhotos.length];
+      const ped = spawnPed(G.scene, new THREE.Vector3(slot.x, 0, slot.z), 'tourist');
+      ped.yaoPhoto = true;
+      ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
+      ped.speed = 0;
+      ped.state = 'idle';
+      ped.heading = slot.facing;
+      if (ped.mesh) ped.mesh.rotation.y = slot.facing;
+      const phone = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05, 0.1, 0.016),
+        new THREE.MeshStandardMaterial({ color: 0x0b0d12, roughness: 0.4, metalness: 0.3, emissive: 0xffffff, emissiveIntensity: 0.15 })
+      );
+      phone.name = 'yao-phone';
+      const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+      if (parts && parts.foreL) { phone.position.set(0.02, -0.26, 0.08); parts.foreL.add(phone); }
+      else if (ped.mesh) { phone.position.set(0.18, 1.15, 0.16); ped.mesh.add(phone); }
+      ped._yaoPhone = phone;
+      G._yaoPhotos.push(ped);
+    }
+    G._yaoPhotoT = (G._yaoPhotoT || 0) + dt;
+    const flash = 0.12 + Math.max(0, Math.sin(G._yaoPhotoT * 7)) * 0.85;
+    for (const ped of G._yaoPhotos) {
+      if (!ped || ped.dead || !ped.mesh) continue;
+      ped.yaoPhoto = true;
+      ped.speed = 0;
+      if (ped.anchor && ped.anchor.slot) {
+        ped.mesh.position.set(ped.anchor.slot.x, 0, ped.anchor.slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      if (ped._yaoPhone && ped._yaoPhone.material) ped._yaoPhone.material.emissiveIntensity = flash;
+    }
+  } else if (G._yaoPhotos && G._yaoPhotos.length) {
+    for (const ped of G._yaoPhotos) {
+      if (!ped || ped.dead) continue;
+      ped.yaoPhoto = false;
+      ped.anchor = null;
+    }
+    G._yaoPhotos = [];
+  }
+}
+
 // Snap the live crowd to the current time-of-day target immediately (spawn the
 // shortfall near the player, cull the farthest excess). Used by the headless
 // harness so a screenshot reflects the hour without waiting for the slow ramp;
@@ -197,14 +253,14 @@ export function resyncCrowd() {
   // pull stray wanderers onto nearby sidewalks so the count near the camera
   // reflects the hour immediately (harness-only; gameplay distributes gradually)
   for (const ped of G.peds) {
-    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic) continue;
+    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.yaoPhoto || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.homeAuntie || ped.stationPorter || ped.garageMech || ped.klongDock || ped.sengClerk || ped.airportCrew || ped.airportCargo || ped.airportTower || ped.airportTaxi || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.watBell || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.soiBarber) continue;
     if (dist2(ped.mesh.position, pp) > 95 * 95) ped.mesh.position.copy(sidewalkPos(pp.x, pp.z, 88));
   }
   for (let guard = 0; G.peds.length > target && guard < 500; guard++) {
     let fi = -1, fd = -1;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.yaoPhoto || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.homeAuntie || ped.stationPorter || ped.garageMech || ped.klongDock || ped.sengClerk || ped.airportCrew || ped.airportCargo || ped.airportTower || ped.airportTaxi || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.watBell || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.soiBarber) continue;
       const d = dist2(ped.mesh.position, pp);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -224,7 +280,7 @@ export function updatePeds(dt) {
     const ped = G.peds[pedIdx];
     if (ped.dead) continue;
     if (ped.pillion) continue;
-    if (ped.btsSit || ped.sevenGuard || ped.soiDrink) {
+    if (ped.btsSit || ped.sevenGuard || ped.mallGuard || ped.bankGuard || ped.mallFood || ped.mallManga || ped.homeAuntie || ped.soiDrink || ped.stationSit) {
       const slot = ped.anchor && ped.anchor.slot;
       if (slot) {
         ped.mesh.position.x = slot.x;
@@ -244,6 +300,240 @@ export function updatePeds(dt) {
         if (p.armL) p.armL.rotation.x = -0.55;
         if (p.armR) p.armR.rotation.x = -0.4;
       }
+      continue;
+    }
+    if (ped.alms && ped._almsSoi) {
+      ped.mesh.rotation.y = ped.heading;
+      updatePedRainProp(ped);
+      animateWalk(ped.mesh, ped.speed, dt, ped.speed > 0.05);
+      continue;
+    }
+    if (ped.cowboy) {
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        ped.mesh.position.set(slot.x, 0, slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+      continue;
+    }
+    if (ped.cowboyClose) {
+      ped.mesh.position.x += Math.sin(ped.heading) * ped.speed * dt;
+      ped.mesh.position.z += Math.cos(ped.heading) * ped.speed * dt;
+      ped.mesh.rotation.y = ped.heading;
+      updatePedRainProp(ped);
+      animateWalk(ped.mesh, ped.speed, dt, ped.speed > 0.05);
+      continue;
+    }
+    if (ped.songthaewRide) {
+      ped.speed = 0;
+      ped.state = 'idle';
+      const p = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+      if (p) {
+        if (p.legL) p.legL.rotation.x = 1.22;
+        if (p.legR) p.legR.rotation.x = 1.12;
+        if (p.shinL) p.shinL.rotation.x = -1.08;
+        if (p.shinR) p.shinR.rotation.x = -0.98;
+        if (p.armL) p.armL.rotation.x = -0.4;
+        if (p.armR) p.armR.rotation.x = -0.28;
+      }
+      continue;
+    }
+    if (ped.watSweep) {
+      continue;
+    }
+    if (ped.yaoGold) {
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        ped.mesh.position.set(slot.x, 0, slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+      continue;
+    }
+    if (ped.yaoDuck) {
+      continue;
+    }
+    if (ped.yaoFortune) {
+      continue;
+    }
+    if (ped.sevenAtm) {
+      continue;
+    }
+    if (ped.btsBusker) {
+      continue;
+    }
+    if (ped.watLotus) {
+      continue;
+    }
+    if (ped.watAmulet) {
+      continue;
+    }
+    if (ped.watDrum) {
+      continue;
+    }
+    if (ped.watBell) {
+      continue;
+    }
+    if (ped.sevenShop) {
+      continue;
+    }
+    if (ped.sevenSlush) {
+      continue;
+    }
+    if (ped.phromFruit) {
+      continue;
+    }
+    if (ped.btsPaper) {
+      continue;
+    }
+    if (ped.btsShine) {
+      continue;
+    }
+    if (ped.mallDir) {
+      continue;
+    }
+    if (ped.gunClerk) {
+      continue;
+    }
+    if (ped.starterClerk) {
+      continue;
+    }
+    if (ped.homeAuntie) {
+      continue;
+    }
+    if (ped.stationPorter) {
+      continue;
+    }
+    if (ped.garageMech) {
+      continue;
+    }
+    if (ped.klongDock) {
+      continue;
+    }
+    if (ped.sengClerk) {
+      continue;
+    }
+    if (ped.airportCrew) {
+      continue;
+    }
+    if (ped.airportCargo) {
+      continue;
+    }
+    if (ped.airportTower) {
+      continue;
+    }
+    if (ped.airportTaxi) {
+      continue;
+    }
+    if (ped.officeSmoke) {
+      continue;
+    }
+    if (ped.bankQueue) {
+      continue;
+    }
+    if (ped.bankTeller) {
+      continue;
+    }
+    if (ped.mallFood) {
+      continue;
+    }
+    if (ped.mallTech) {
+      continue;
+    }
+    if (ped.mallPharm) {
+      continue;
+    }
+    if (ped.mallRoma) {
+      continue;
+    }
+    if (ped.mallWatch) {
+      continue;
+    }
+    if (ped.mallManga) {
+      continue;
+    }
+    if (ped.mallSushi) {
+      continue;
+    }
+    if (ped.mallCafe) {
+      continue;
+    }
+    if (ped.mallThreads) {
+      continue;
+    }
+    if (ped.mallSeven) {
+      continue;
+    }
+    if (ped.mallArcade) {
+      continue;
+    }
+    if (ped.gymBag) {
+      continue;
+    }
+    if (ped.yaoPhoto) {
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        ped.mesh.position.set(slot.x, 0, slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+      continue;
+    }
+    if (ped.soiBarber) {
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        ped.mesh.position.set(slot.x, 0, slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+      continue;
+    }
+    if (ped.spiritKeep) {
+      continue;
+    }
+    if (ped.plaKat) {
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        ped.mesh.position.set(slot.x, 0, slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+      continue;
+    }
+    if (ped.btsMalai) {
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        ped.mesh.position.set(slot.x, 0, slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+      continue;
+    }
+    if (ped.boatNoodle) {
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        ped.mesh.position.set(slot.x, slot.y || 0.42, slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+      continue;
+    }
+    if (ped.pierWait) {
       continue;
     }
     if (ped.btsWait) {
@@ -490,7 +780,7 @@ export function updatePeds(dt) {
     let fi = -1, fd = 60 * 60;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.yaoPhoto || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.homeAuntie || ped.stationPorter || ped.garageMech || ped.klongDock || ped.sengClerk || ped.airportCrew || ped.airportCargo || ped.airportTower || ped.airportTaxi || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.watBell || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.soiBarber) continue;
       const d = dist2(ped.mesh.position, playerPos);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -653,6 +943,31 @@ export function updateFoodStalls(dt) {
 }
 
 export function updateShrines(dt) {
+  if (GAMEPLAY.spiritWai) {
+    const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+    const open = h >= 6 && h < 20;
+    for (const keep of [G.spiritKeep, G.spiritKeepB, G.spiritKeepC, G.spiritKeepD, G.spiritKeepE, G.spiritKeepF]) {
+      if (!keep) continue;
+      keep.t = (keep.t || 0) + dt;
+      const ped = keep.ped;
+      if (!ped || !ped.mesh) continue;
+      ped.spiritKeep = true;
+      ped.mesh.visible = open;
+      if (open) {
+        const slot = ped.anchor && ped.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(keep.t * 2.2) * 0.05;
+          ped.mesh.position.set(slot.x, 0, slot.z + bob);
+          ped.heading = ped.anchor.facing;
+          ped.mesh.rotation.y = ped.heading;
+        }
+        const malai = ped.mesh.getObjectByName('shrine-malai');
+        if (malai) malai.rotation.z = Math.sin(keep.t * 4.2) * 0.35;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+    }
+  }
   const list = G.world && G.world.shrines;
   if (!list || !list.length) return;
   for (const s of list) {
@@ -677,8 +992,25 @@ export function updateShrines(dt) {
       s.readyAt = now + 16000;
       s.incenseT = 8;
       G.wanted.lastSeenAt = Math.max(0, (G.wanted.lastSeenAt || now) - 16000);
+      if (GAMEPLAY.btsMalai && G._malai) {
+        G.wanted.lastSeenAt = Math.max(0, G.wanted.lastSeenAt - 10000);
+        G._malai = false;
+        G._malaiOffered = (G._malaiOffered || 0) + 1;
+        G.hud.showNotif('The spirit house accepts your malai');
+      } else if (GAMEPLAY.watLotus && G._lotus) {
+        G.wanted.lastSeenAt = Math.max(0, G.wanted.lastSeenAt - 10000);
+        G._lotus = false;
+        G._lotusOffered = (G._lotusOffered || 0) + 1;
+        G.hud.showNotif('The spirit house accepts your lotus');
+      } else if (GAMEPLAY.watAmulet && G._amulet) {
+        G.wanted.lastSeenAt = Math.max(0, G.wanted.lastSeenAt - 10000);
+        G._amulet = false;
+        G._amuletOffered = (G._amuletOffered || 0) + 1;
+        G.hud.showNotif('The spirit house accepts your amulet');
+      } else {
+        G.hud.showNotif('The spirit house accepts your wai');
+      }
       G._waiCount = (G._waiCount || 0) + 1;
-      G.hud.showNotif('The spirit house accepts your wai');
       if (G.audio && G.audio.bell) G.audio.bell();
     }
     return;
@@ -911,31 +1243,92 @@ export function updateVigilante(dt) {
 }
 
 export function updateAlms(dt) {
+  if (!GAMEPLAY.dawnAlms) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const sois = (G.world && G.world.sois) || [];
   const temple = G.world && G.world.poi && G.world.poi.temple;
-  if (!temple) return;
   if (h >= 5 && h < 7) {
     G._alms = G._alms || [];
-    const ways = (G.world.walkways || []).filter(w => {
-      const mx = (w.x0 + w.x1) / 2, mz = (w.z0 + w.z1) / 2;
-      return dist2({ x: mx, z: mz }, temple) < 80 * 80;
-    });
+    // soi[2] sits on the wat's north–south column (i=2); tak bat walks the alley, not the wat lawn.
+    const s = sois[2] || sois[0] || null;
+    const alongZ = !!(s && s.axis === 'z');
     while (G._alms.length < 3) {
-      const w = ways[G._alms.length] || ways[0] || null;
-      const pos = w
-        ? new THREE.Vector3((w.x0 + w.x1) / 2, 0, (w.z0 + w.z1) / 2)
-        : new THREE.Vector3(temple.x + rand(-12, 12), 0, temple.z + rand(-12, 12));
-      const ped = spawnPed(G.scene, pos);
-      ped.kind = 'monk'; ped.mesh.userData.kind = 'monk';
-      ped.anchor = null; ped.state = 'walking'; ped.alms = true;
-      ped.heading = Math.atan2(temple.x - pos.x, temple.z - pos.z);
+      const i = G._alms.length;
+      const t = 0.18 + i * 0.16;
+      let pos;
+      if (s) {
+        pos = new THREE.Vector3(
+          alongZ ? (s.x0 + s.x1) * 0.5 : s.x0 + (s.x1 - s.x0) * t,
+          0,
+          alongZ ? s.z0 + (s.z1 - s.z0) * t : (s.z0 + s.z1) * 0.5,
+        );
+      } else if (temple) {
+        pos = new THREE.Vector3(temple.x + rand(-12, 12), 0, temple.z + rand(-12, 12));
+      } else return;
+      const ped = spawnPed(G.scene, pos, 'monk');
+      ped.kind = 'monk';
+      if (ped.mesh) ped.mesh.userData.kind = 'monk';
+      ped.anchor = null;
+      ped.state = 'walking';
+      ped.alms = true;
+      ped._almsT = t;
+      ped._almsDir = 1;
+      ped._almsSoi = s;
+      ped._almsGiven = false;
+      ped.heading = alongZ ? 0 : PI / 2;
+      ped.speed = 0.85;
       G._alms.push(ped);
     }
+    const pp = G.player && G.player.group && G.player.group.position;
+    const onFoot = !!(pp && !G.player.inVehicle && !G._eating);
     for (const ped of G._alms) {
-      if (!ped || ped.dead) continue;
-      const dx = temple.x - ped.mesh.position.x, dz = temple.z - ped.mesh.position.z;
-      if (Math.hypot(dx, dz) > 6) { ped.heading = Math.atan2(dx, dz); ped.speed = 0.85; }
-      else ped.speed = 0.4;
+      if (!ped || ped.dead || !ped.mesh) continue;
+      ped.alms = true;
+      const soi = ped._almsSoi || s;
+      const near = onFoot && dist2(ped.mesh.position, pp) < 2.2 * 2.2;
+      if (soi) {
+        const az = soi.axis === 'z';
+        if (!near) {
+          ped._almsT += (ped._almsDir || 1) * dt * 0.028;
+          if (ped._almsT > 0.88) { ped._almsT = 0.88; ped._almsDir = -1; }
+          if (ped._almsT < 0.12) { ped._almsT = 0.12; ped._almsDir = 1; }
+        }
+        const t = ped._almsT;
+        const x = az ? (soi.x0 + soi.x1) * 0.5 : soi.x0 + (soi.x1 - soi.x0) * t;
+        const z = az ? soi.z0 + (soi.z1 - soi.z0) * t : (soi.z0 + soi.z1) * 0.5;
+        ped.mesh.position.set(x, 0, z);
+        ped.heading = az ? ((ped._almsDir || 1) > 0 ? 0 : PI) : ((ped._almsDir || 1) > 0 ? PI / 2 : -PI / 2);
+        ped.mesh.rotation.y = ped.heading;
+        ped.speed = near ? 0 : 0.85;
+        ped.state = near ? 'idle' : 'walking';
+      } else if (temple) {
+        const dx = temple.x - ped.mesh.position.x, dz = temple.z - ped.mesh.position.z;
+        if (Math.hypot(dx, dz) > 6) { ped.heading = Math.atan2(dx, dz); ped.speed = near ? 0 : 0.85; }
+        else ped.speed = near ? 0 : 0.4;
+        ped.mesh.rotation.y = ped.heading;
+      }
+    }
+    if (!onFoot) return;
+    for (const ped of G._alms) {
+      if (!ped || ped.dead || !ped.mesh) continue;
+      if (dist2(ped.mesh.position, pp) > 2.2 * 2.2) continue;
+      if (ped._almsGiven) {
+        G.hud.showPrompt('The monk has already received', 0.35);
+        return;
+      }
+      G.hud.showPrompt('Press <b>E</b> to offer alms · ฿20', 0.4);
+      if (G.input.pressed('KeyE')) {
+        if (G.cash < 20) { G.hud.showNotif('Need ฿20 for alms'); return; }
+        G.cash -= 20;
+        if (G.hud.setCash) G.hud.setCash(G.cash);
+        ped._almsGiven = true;
+        G.wanted.lastSeenAt = Math.max(0, (G.wanted.lastSeenAt || performance.now()) - 14000);
+        G._almsOffered = (G._almsOffered || 0) + 1;
+        G.hud.showNotif('Alms offered — ทำบุญ');
+        if (G.audio && G.audio.bell) G.audio.bell();
+        else if (G.audio && G.audio.chime) G.audio.chime();
+      }
+      return;
     }
   } else if (G._alms && G._alms.length) {
     for (const ped of G._alms) {
@@ -1059,6 +1452,7 @@ function dressCrossingGuard(ped, slot) {
     ped.mesh.add(paddle);
   }
   ped.crossingGuard = true;
+  ped.stop = slot.stop;
   ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
   ped.speed = 0;
   ped.state = 'idle';
@@ -1076,8 +1470,10 @@ export function updateCrossingGuards(dt) {
   if ((h >= 6.2 && h < 8.7) || (h >= 15 && h < 16.5)) {
     G._crossingGuards = G._crossingGuards || [];
     const slots = [
-      { x: cx + kerb, z: cz - kerb, facing: PI / 2 },
-      { x: cx - kerb, z: cz + kerb, facing: -PI / 2 },
+      { x: cx + kerb, z: cz - kerb, facing: PI / 2, stop: 'asok' },
+      { x: cx - kerb, z: cz + kerb, facing: -PI / 2, stop: 'asok' },
+      { x: 100 + kerb, z: cz - kerb, facing: PI / 2, stop: 'phrom' },
+      { x: 100 - kerb, z: cz + kerb, facing: -PI / 2, stop: 'phrom' },
     ];
     while (G._crossingGuards.length < slots.length) {
       const slot = slots[G._crossingGuards.length];
@@ -1124,6 +1520,256 @@ export function updateSoiChairs(dt) {
   }
 }
 
+export function updateSoiCowboy(dt) {
+  if (!GAMEPLAY.soiCowboy || !G.soiCowboy) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const night = h >= 20 || h < 4;
+  G._cowboyTouts = (G._cowboyTouts || []).filter(p => p && !p.dead);
+  const signs = G.soiCowboy.signs || [];
+  if (night) {
+    while (G._cowboyTouts.length < 3) {
+      const s = signs[G._cowboyTouts.length] || signs[0];
+      const ox = (s && s.x != null) ? s.x : (G.soiCowboy.origin && G.soiCowboy.origin.x) || 44;
+      const oz = (s && s.z != null) ? s.z : (G.soiCowboy.origin && G.soiCowboy.origin.z) || 90;
+      const pos = new THREE.Vector3(ox + 1.35, 0, oz);
+      const ped = spawnPed(G.scene, pos, 'tourist');
+      ped.cowboy = true;
+      ped.anchor = { slot: pos.clone(), facing: PI / 2 };
+      ped.speed = 0;
+      ped.state = 'idle';
+      ped.heading = PI / 2;
+      if (ped.mesh) ped.mesh.rotation.y = ped.heading;
+      G._cowboyTouts.push(ped);
+    }
+    for (const ped of G._cowboyTouts) {
+      if (!ped || !ped.mesh) continue;
+      ped.cowboy = true;
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        ped.mesh.position.set(slot.x, 0, slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+        ped.speed = 0;
+        ped.state = 'idle';
+      }
+    }
+  } else if (G._cowboyTouts.length) {
+    for (const ped of G._cowboyTouts) {
+      if (!ped || ped.dead) continue;
+      ped.cowboy = false;
+      ped.anchor = null;
+    }
+    G._cowboyTouts = [];
+  }
+}
+
+export function updateCowboyClose(dt) {
+  if (!GAMEPLAY.cowboyClose || !G.soiCowboy) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const closing = h >= 4 && h < 5.6;
+  const origin = G.soiCowboy.origin || { x: 44, z: 90 };
+  const bts = G.world && G.world.bts;
+  const dest = { x: bts ? bts.x : -50, z: (bts && bts.z) || 0 };
+  if (closing) {
+    G._cowboyClose = (G._cowboyClose || []).filter(p => p && !p.dead);
+    while (G._cowboyClose.length < 3) {
+      const i = G._cowboyClose.length;
+      const pos = new THREE.Vector3(origin.x + (i - 1) * 1.15, 0, origin.z + 1.4);
+      const ped = spawnPed(G.scene, pos, 'tourist');
+      ped.cowboyClose = true;
+      ped.anchor = null;
+      ped.state = 'walking';
+      ped.speed = 0.75;
+      ped.heading = Math.atan2(dest.x - pos.x, dest.z - pos.z);
+      if (ped.mesh) ped.mesh.rotation.y = ped.heading;
+      G._cowboyClose.push(ped);
+    }
+    for (const ped of G._cowboyClose) {
+      if (!ped || !ped.mesh) continue;
+      ped.cowboyClose = true;
+      const dx = dest.x - ped.mesh.position.x, dz = dest.z - ped.mesh.position.z;
+      const d = Math.hypot(dx, dz);
+      if (d > 8) {
+        ped.heading = Math.atan2(dx, dz);
+        ped.speed = 0.75;
+        ped.state = 'walking';
+      } else {
+        ped.speed = 0.12;
+        ped.state = 'idle';
+      }
+    }
+  } else if (G._cowboyClose && G._cowboyClose.length) {
+    for (const ped of G._cowboyClose) {
+      if (!ped || ped.dead) continue;
+      ped.cowboyClose = false;
+    }
+    G._cowboyClose = [];
+  }
+}
+
+export function updateSoiBarber(dt) {
+  if (!GAMEPLAY.soiBarber || !G.soiBarber) return;
+  const shop = G.soiBarber;
+  const ped = shop.ped;
+  if (ped && ped.mesh && ped.anchor && ped.anchor.slot) {
+    ped.soiBarber = true;
+    ped.mesh.position.set(ped.anchor.slot.x, 0, ped.anchor.slot.z);
+    ped.heading = ped.anchor.facing;
+    ped.mesh.rotation.y = ped.heading;
+    ped.speed = 0;
+    ped.state = 'idle';
+  }
+  shop.t = (shop.t || 0) + dt;
+  if (shop.pole) shop.pole.rotation.y += dt * 2.4;
+  if (shop.clip) shop.clip.rotation.z += dt * (G._barberCut ? 28 : 6);
+  if (G._barberCut) {
+    G._barberCut.t -= dt;
+    if (G.player && G.player.group) {
+      G.player.group.position.set(shop.x, 0.42, shop.z);
+      if (G.player.velocity) G.player.velocity.set(0, 0, 0);
+      if (shop.facing != null) G.player.group.rotation.y = shop.facing;
+    }
+    if (shop.cape) shop.cape.position.y = 0.92;
+    if (G._barberCut.t <= 0) {
+      G._barberCut = null;
+      G._haircut = true;
+      if (G.player && G.player.hair) G.player.hair.scale.set(0.88, 0.28, 0.78);
+      const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0;
+      G.wanted.lastSeenAt = Math.max(0, (G.wanted.lastSeenAt || now) - 18000);
+      if (shop.cape) shop.cape.position.y = 0.46;
+      if (G.hud && G.hud.showNotif) G.hud.showNotif('Fresh fade — ตัดผม');
+    }
+    return;
+  }
+  if (shop.cape && shop.cape.position.y > 0.5) shop.cape.position.y = 0.46;
+  if (G.player.inVehicle || G._eating) return;
+  const pp = G.player.group.position;
+  if (dist2({ x: shop.x, z: shop.z }, pp) > 2.6 * 2.6) return;
+  G.hud.showPrompt(G._haircut ? 'Press <b>E</b> for a tidy-up · ฿80' : 'Press <b>E</b> for a haircut · ฿80', 0.4);
+  if (!G.input.pressed('KeyE')) return;
+  if (G.cash < 80) { G.hud.showNotif('Need ฿80 for a cut'); return; }
+  G.cash -= 80;
+  if (G.hud.setCash) G.hud.setCash(G.cash);
+  G._barberCut = { t: 1.6 };
+  G.hud.showNotif('Sit down — clippers on');
+  if (G.audio && G.audio.blip) G.audio.blip({ freq: 180, dur: 0.08, type: 'square', gain: 0.08 });
+}
+
+export function updateSoiCctv(dt) {
+  if (!GAMEPLAY.soiCctv || !G.soiCctv) return;
+  const night = (G.nightK || 0) > 0.45;
+  const pp = G.player && G.player.group ? G.player.group.position : null;
+  const shooting = !!(G.bullets && G.bullets.length);
+  for (const cam of G.soiCctv) {
+    if (cam.led && cam.led.material) {
+      cam.led.material.emissiveIntensity = night ? 0.95 : 0.12;
+    }
+    if (!pp || !shooting || G.player.inVehicle) continue;
+    if (dist2({ x: cam.x, z: cam.z }, pp) > 22 * 22) continue;
+    G.wanted.lastSeenAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0;
+    G._cctvPing = (G._cctvPing || 0) + 1;
+    if (!cam._flagged) {
+      cam._flagged = true;
+      raiseWanted(1, 2);
+      if (G.hud) G.hud.showNotif('CCTV — กล้องวงจรปิด');
+    }
+  }
+  if (!shooting) {
+    for (const cam of G.soiCctv) cam._flagged = false;
+  }
+}
+
+export function updateRainFrogs(dt) {
+  if (!GAMEPLAY.rainFrogs || !G.rainFrogs) return;
+  const rain = (G.time && G.time.rainStrength) || 0;
+  const wet = rain > 0.35;
+  for (const f of G.rainFrogs) {
+    if (!f.mesh) continue;
+    f.mesh.visible = wet;
+    if (!wet) {
+      f.mesh.position.y = 0;
+      continue;
+    }
+    f.t = (f.t || 0) + dt;
+    const bounce = Math.sin(f.t * (f.hop || 8));
+    const air = Math.max(0, bounce);
+    f.mesh.position.y = air * 0.22;
+    if (air > 0.08) {
+      f.x += Math.sin(f.heading) * 0.55 * dt;
+      f.z += Math.cos(f.heading) * 0.55 * dt;
+    } else if (bounce < -0.6) {
+      f.heading += dt * 1.6;
+    }
+    const p = f.patch;
+    if (p) {
+      f.x = clamp(f.x, p.x0 + 0.4, p.x1 - 0.4);
+      f.z = clamp(f.z, p.z0 + 0.4, p.z1 - 0.4);
+    }
+    f.mesh.position.x = f.x;
+    f.mesh.position.z = f.z;
+    f.mesh.rotation.y = f.heading;
+  }
+}
+
+export function updateSoiWires(dt) {
+  if (!GAMEPLAY.soiWires || !G.soiWires) return;
+  const st = G.soiWires;
+  st.t = (st.t || 0) + dt;
+  const rain = (G.time && G.time.rainStrength) || 0;
+  const wet = rain > 0.45;
+  for (const spark of st.sparks || []) {
+    if (!spark || !spark.material) continue;
+    spark.material.emissiveIntensity = wet ? 0.35 + 0.85 * Math.max(0, Math.sin(st.t * 22)) : 0;
+    spark.visible = wet ? spark.material.emissiveIntensity > 0.2 : false;
+  }
+}
+
+export function updateBtsGates(dt) {
+  if (!GAMEPLAY.btsGates) return;
+  const stations = [G.btsGates, G.phromGates];
+  const riding = !!(G._btsRide || (G.player && G.player.inVehicle));
+  const pp = G.player && G.player.group && G.player.group.position;
+  for (const st of stations) {
+    if (!st) continue;
+    if (riding || !pp) {
+      if (st.openT > 0) st.openT = Math.max(0, st.openT - dt);
+      continue;
+    }
+    const prev = st._pz;
+    st._pz = pp.z;
+    const onPlat = pp.y > 12 && Math.abs(pp.x - st.sx) < 7;
+    if (onPlat && prev != null && prev < st.zGate && pp.z >= st.zGate) {
+      if (G._btsTicket) {
+        st.openT = 1.4;
+        G._btsTapped = (G._btsTapped || 0) + 1;
+        if (G.audio && G.audio.btsChime) G.audio.btsChime();
+        else if (G.hud) G.hud.showNotif('Tap in — แรบบิท');
+      } else {
+        st.openT = 0.35;
+        G._btsHopped = (G._btsHopped || 0) + 1;
+        raiseWanted(1, 2);
+        if (G.hud) G.hud.showNotif('Jumped the gate');
+      }
+    }
+    const open = st.openT > 0;
+    for (const g of st.gates || []) {
+      if (g.flap) g.flap.rotation.y = open ? 1.15 : 0;
+    }
+    if (st.openT > 0) st.openT = Math.max(0, st.openT - dt);
+    if (G._eating || G._barberCut) continue;
+    if (st.machine && dist2(st.machine.position, pp) < 2.4 * 2.4) {
+      G.hud.showPrompt(G._btsTicket ? 'Rabbit card ready' : 'Press <b>E</b> for a Rabbit card · ฿50', 0.4);
+      if (G._btsTicket || !G.input.pressed('KeyE')) continue;
+      if (G.cash < 50) { G.hud.showNotif('Need ฿50 for a Rabbit'); continue; }
+      G.cash -= 50;
+      if (G.hud.setCash) G.hud.setCash(G.cash);
+      G._btsTicket = true;
+      G.hud.showNotif('Rabbit card — แรบบิท');
+      if (G.audio && G.audio.chime) G.audio.chime();
+    }
+  }
+}
+
 export function updateSoiMechanic(dt) {
   if (!GAMEPLAY.soiMechanic || !G.soiMechanic) return;
   const shop = G.soiMechanic;
@@ -1156,21 +1802,1173 @@ export function updateSoiMechanic(dt) {
 }
 
 export function updateSevenGuard(dt) {
-  if (!GAMEPLAY.sevenGuard || !G.sevenGuard) return;
+  if (!GAMEPLAY.sevenGuard) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const night = h >= 19 || h < 6;
-  const g = G.sevenGuard;
-  if (g.light) g.light.intensity = night ? 1.1 : 0;
-  if (g.beam) g.beam.visible = night;
-  const ped = g.ped;
+  for (const g of [G.sevenGuard, G.southSevenGuard, G.westSevenGuard, G.eastSevenGuard]) {
+    if (!g) continue;
+    if (g.light) g.light.intensity = night ? 1.1 : 0;
+    if (g.beam) g.beam.visible = night;
+    const ped = g.ped;
+    if (ped && ped.mesh) {
+      ped.sevenGuard = true;
+      ped.mesh.visible = true;
+      if (ped.anchor && ped.anchor.slot) {
+        ped.mesh.position.set(ped.anchor.slot.x, ped.anchor.slot.y || 0.42, ped.anchor.slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+        ped.speed = 0;
+      }
+    }
+  }
+}
+
+export function updateMallGuard(dt) {
+  if (!GAMEPLAY.mallGuard) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const night = h >= 19 || h < 6;
+  for (const g of [G.mallGuard, G.mallGuardB]) {
+    if (!g) continue;
+    if (g.light) g.light.intensity = night ? 1.1 : 0;
+    if (g.beam) g.beam.visible = night;
+    const ped = g.ped;
+    if (ped && ped.mesh) {
+      ped.mallGuard = true;
+      ped.mesh.visible = true;
+      if (ped.anchor && ped.anchor.slot) {
+        ped.mesh.position.set(ped.anchor.slot.x, ped.anchor.slot.y || 0.42, ped.anchor.slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+        ped.speed = 0;
+      }
+    }
+  }
+}
+
+export function updateBankGuard(dt) {
+  if (!GAMEPLAY.bankGuard) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const night = h >= 19 || h < 6;
+  for (const g of [G.bankGuard, G.bankGuardB]) {
+    if (!g) continue;
+    if (g.light) g.light.intensity = night ? 1.1 : 0;
+    if (g.beam) g.beam.visible = night;
+    const ped = g.ped;
+    if (ped && ped.mesh) {
+      ped.bankGuard = true;
+      ped.mesh.visible = true;
+      if (ped.anchor && ped.anchor.slot) {
+        ped.mesh.position.set(ped.anchor.slot.x, ped.anchor.slot.y || 0.42, ped.anchor.slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+        ped.speed = 0;
+      }
+    }
+  }
+}
+
+export function updateMallDirectory(dt) {
+  if (!GAMEPLAY.mallDir) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 10 && h < 22;
+  const pp = G.player.group.position;
+  for (const c of [G.mallDir, G.mallDirB]) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    if (c.screen && c.screen.material) {
+      c.screen.material.emissiveIntensity = open ? 0.35 + 0.28 * Math.max(0, Math.sin(c.t * 3.2)) : 0.05;
+    }
+    const ped = c.clerk;
+    if (ped && ped.mesh) {
+      ped.mallDir = true;
+      ped.mesh.visible = open;
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        ped.mesh.position.set(slot.x, 0, slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+    }
+    if (!open || G.player.inVehicle || G._eating) continue;
+    if (!c.mesh || dist2(c.mesh.position, pp) > 2.8 * 2.8) continue;
+    if (Math.abs((pp.y || 0) - (c.mesh.position.y || 0)) > 2.2) continue;
+    G.hud.showPrompt('Press <b>E</b> to ask the directory', 0.4);
+    if (!G.input.pressed('KeyE')) continue;
+    const shops = (G.world.mall && G.world.mall.shops) || [];
+    if (!shops.length) continue;
+    c.idx = ((c.idx || 0) + 1) % shops.length;
+    const s = shops[c.idx];
+    const floor = !s || s.pos.y < 1 ? 'G' : s.pos.y < 8 ? '1' : '2';
+    G._mallDir = (G._mallDir || 0) + 1;
+    G._mallDirShop = s && s.name;
+    if (G.hud.showNotif) G.hud.showNotif(`${s.name} — floor ${floor}`);
+    if (G.audio && G.audio.chime) G.audio.chime();
+  }
+  for (const ask of [G.mallDirAsk, G.mallDirAskB]) {
+    if (!ask) continue;
+    ask.t = (ask.t || 0) + dt;
+    const ped = ask.ped;
+    if (ped && ped.mesh) {
+      ped.mallDir = true;
+      ped.mallDirAsk = true;
+      ped.mesh.visible = open;
+      if (!open) {
+        ped.speed = 0;
+        ped.state = 'idle';
+      } else {
+        const slot = ped.anchor && ped.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(ask.t * 2.2) * 0.05;
+          ped.mesh.position.set(slot.x, 0, slot.z + bob);
+          ped.heading = ped.anchor.facing;
+          ped.mesh.rotation.y = ped.heading;
+        }
+        ped.speed = 0;
+        ped.state = 'idle';
+        const map = ped.mesh.getObjectByName('mall-dir-map');
+        if (map) map.rotation.z = Math.sin(ask.t * 4.2) * 0.35;
+      }
+    }
+  }
+}
+
+export function updateOfficeSmoke(dt) {
+  if (!GAMEPLAY.officeSmoke) return;
+  const packs = [G.officeSmoke, G.phromSmoke];
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 11.8 && h < 13.6;
+  for (const c of packs) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    for (let i = 0; i < (c.smokers || []).length; i++) {
+      const ped = c.smokers[i];
+      if (!ped || ped.dead || !ped.mesh) continue;
+      ped.officeSmoke = true;
+      ped.mesh.visible = open;
+      if (!open) {
+        ped.speed = 0;
+        ped.state = 'idle';
+        continue;
+      }
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        const bob = Math.sin(c.t * 2.2 + i) * 0.05;
+        ped.mesh.position.set(slot.x, 0, slot.z + bob);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+      const parts = ped.mesh.userData && ped.mesh.userData.parts;
+      if (parts && parts.armR) parts.armR.rotation.x = -0.9 + Math.sin(c.t * 2.8 + i) * 0.1;
+      if (ped._ember && ped._ember.material) {
+        ped._ember.material.emissiveIntensity = 0.4 + 0.45 * Math.max(0, Math.sin(c.t * 5.5 + i));
+      }
+    }
+  }
+}
+
+export function updateBankQueue(dt) {
+  if (!GAMEPLAY.bankQueue) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  for (const c of [G.bankQueue, G.bankAtm, G.bankQueueB, G.bankAtmB]) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    const hours = c.hours || [9, 16];
+    const open = h >= hours[0] && h < hours[1];
+    for (let i = 0; i < (c.queue || []).length; i++) {
+      const ped = c.queue[i];
+      if (!ped || ped.dead || !ped.mesh) continue;
+      ped.bankQueue = true;
+      ped.mesh.visible = open;
+      if (!open) {
+        ped.speed = 0;
+        ped.state = 'idle';
+        continue;
+      }
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        const bob = i === 0 ? Math.sin(c.t * 2.4) * 0.06 : 0;
+        ped.mesh.position.set(slot.x, 0, slot.z + bob);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+      const parts = ped.mesh.userData && ped.mesh.userData.parts;
+      if (i === 0 && parts && parts.armR) parts.armR.rotation.x = -0.85 + Math.sin(c.t * 3.1) * 0.12;
+      const phone = ped.mesh.getObjectByName('bank-queue-phone') || ped.mesh.getObjectByName('bank-atm-phone');
+      if (phone && phone.material) phone.material.emissiveIntensity = 0.28 + Math.sin(c.t * 3.4) * 0.18;
+    }
+  }
+  for (const teller of [G.bankTeller, G.bankTellerB]) {
+    if (!teller) continue;
+    teller.t = (teller.t || 0) + dt;
+    const open = h >= 9 && h < 16;
+    const ped = teller.ped;
+    if (ped && ped.mesh) {
+      ped.bankQueue = true;
+      ped.bankTeller = true;
+      ped.mesh.visible = open;
+      if (open) {
+        const slot = ped.anchor && ped.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(teller.t * 2.2) * 0.05;
+          ped.mesh.position.set(slot.x, 0, slot.z + bob);
+          ped.heading = ped.anchor.facing;
+          ped.mesh.rotation.y = ped.heading;
+        }
+        const stamp = ped.mesh.getObjectByName('bank-stamp');
+        if (stamp) stamp.rotation.z = Math.sin(teller.t * 4.2) * 0.35;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+    }
+  }
+}
+
+export function updateGunClerk(dt) {
+  if (!GAMEPLAY.gunClerk || !G.gunClerk) return;
+  const c = G.gunClerk;
+  c.t = (c.t || 0) + dt;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 10 && h < 21;
+  const ped = c.ped;
   if (ped && ped.mesh) {
-    ped.sevenGuard = true;
-    ped.mesh.visible = true;
-    if (ped.anchor && ped.anchor.slot) {
-      ped.mesh.position.set(ped.anchor.slot.x, ped.anchor.slot.y || 0.42, ped.anchor.slot.z);
+    ped.gunClerk = true;
+    ped.mesh.visible = open;
+    const slot = ped.anchor && ped.anchor.slot;
+    if (slot) {
+      ped.mesh.position.set(slot.x, 0, slot.z);
       ped.heading = ped.anchor.facing;
       ped.mesh.rotation.y = ped.heading;
+    }
+    ped.speed = 0;
+    ped.state = 'idle';
+    const parts = ped.mesh.userData && ped.mesh.userData.parts;
+    if (open && parts && parts.armR) parts.armR.rotation.x = -0.7 + Math.sin(c.t * 4.2) * 0.22;
+    if (c.cloth) c.cloth.rotation.z = open ? Math.sin(c.t * 4.2) * 0.35 : 0;
+  }
+  for (const shop of [G.gunShopper, G.gunShopperB]) {
+    if (!shop) continue;
+    shop.t = (shop.t || 0) + dt;
+    const sp = shop.ped;
+    if (sp && sp.mesh) {
+      sp.gunClerk = true;
+      sp.gunShop = true;
+      sp.mesh.visible = open;
+      if (!open) {
+        sp.speed = 0;
+        sp.state = 'idle';
+      } else {
+        const slot = sp.anchor && sp.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(shop.t * 2.2) * 0.05;
+          sp.mesh.position.set(slot.x, 0, slot.z + bob);
+          sp.heading = sp.anchor.facing;
+          sp.mesh.rotation.y = sp.heading;
+        }
+        sp.speed = 0;
+        sp.state = 'idle';
+        const cse = sp.mesh.getObjectByName('gun-case');
+        if (cse) cse.rotation.z = Math.sin(shop.t * 4.2) * 0.35;
+      }
+    }
+  }
+}
+
+export function updateStarterClerk(dt) {
+  if (!GAMEPLAY.starterClerk || !G.starterClerk) return;
+  const c = G.starterClerk;
+  c.t = (c.t || 0) + dt;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 10 && h < 21;
+  const ped = c.ped;
+  if (ped && ped.mesh) {
+    ped.starterClerk = true;
+    ped.mesh.visible = open;
+    const slot = ped.anchor && ped.anchor.slot;
+    if (slot) {
+      ped.mesh.position.set(slot.x, 0, slot.z);
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+    }
+    ped.speed = 0;
+    ped.state = 'idle';
+    const parts = ped.mesh.userData && ped.mesh.userData.parts;
+    if (open && parts && parts.armR) parts.armR.rotation.x = -0.7 + Math.sin(c.t * 4.2) * 0.22;
+    if (c.cloth) c.cloth.rotation.z = open ? Math.sin(c.t * 4.2) * 0.35 : 0;
+  }
+  for (const shop of [G.starterShopper, G.starterShopperB]) {
+    if (!shop) continue;
+    shop.t = (shop.t || 0) + dt;
+    const sp = shop.ped;
+    if (sp && sp.mesh) {
+      sp.starterClerk = true;
+      sp.starterShop = true;
+      sp.mesh.visible = open;
+      if (!open) {
+        sp.speed = 0;
+        sp.state = 'idle';
+      } else {
+        const slot = sp.anchor && sp.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(shop.t * 2.2) * 0.05;
+          sp.mesh.position.set(slot.x, 0, slot.z + bob);
+          sp.heading = sp.anchor.facing;
+          sp.mesh.rotation.y = sp.heading;
+        }
+        sp.speed = 0;
+        sp.state = 'idle';
+        const cse = sp.mesh.getObjectByName('starter-case');
+        if (cse) cse.rotation.z = Math.sin(shop.t * 4.2) * 0.35;
+      }
+    }
+  }
+}
+
+export function updateHomeAuntie(dt) {
+  if (!GAMEPLAY.homeAuntie) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 8 && h < 22;
+  for (const c of [G.homeAuntie, G.homeAuntieB]) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    const ped = c.ped;
+    if (ped && ped.mesh) {
+      ped.homeAuntie = true;
+      ped.mesh.visible = open;
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        ped.mesh.position.set(slot.x, slot.y || 0.42, slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
       ped.speed = 0;
+      ped.state = 'idle';
+      const page = ped.mesh.getObjectByName('home-paper-page');
+      if (page && open) page.rotation.x = Math.sin(c.t * 2.8) * 0.18;
+    }
+  }
+}
+
+export function updateStationPorter(dt) {
+  if (!GAMEPLAY.stationPorter) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 6 && h < 22;
+  for (const c of [G.stationPorter, G.northStationPorter]) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    for (let i = 0; i < (c.porters || []).length; i++) {
+      const ped = c.porters[i];
+      if (!ped || ped.dead || !ped.mesh) continue;
+      ped.stationPorter = true;
+      ped.mesh.visible = open;
+      if (!open) {
+        ped.speed = 0;
+        ped.state = 'idle';
+        continue;
+      }
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        const bob = Math.sin(c.t * 2.2 + i) * 0.05;
+        ped.mesh.position.set(slot.x + (i === 0 ? bob : 0), 0, slot.z + (i === 1 ? bob : 0));
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+      const bag = ped.mesh.getObjectByName('station-bag');
+      if (bag) bag.rotation.z = Math.sin(c.t * 3.2 + i) * 0.22;
+    }
+  }
+  for (const sit of [G.stationSit, G.southStationSit]) {
+    if (!sit) continue;
+    sit.t = (sit.t || 0) + dt;
+    for (const ped of sit.sitters || []) {
+      if (!ped || ped.dead || !ped.mesh) continue;
+      ped.stationPorter = true;
+      ped.stationSit = true;
+      ped.mesh.visible = open;
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        ped.mesh.position.set(slot.x, slot.y || 0.42, slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+      const phone = ped.mesh.getObjectByName('station-phone');
+      if (phone && phone.material && open) {
+        phone.material.emissiveIntensity = 0.22 + Math.sin(sit.t * 3.4) * 0.12;
+      }
+    }
+  }
+}
+
+export function updateGarageMech(dt) {
+  if (!GAMEPLAY.garageMech) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 8 && h < 19;
+  for (const c of [G.garageMech, G.garageMechB]) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    const ped = c.ped;
+    if (ped && ped.mesh) {
+      ped.garageMech = true;
+      ped.mesh.visible = open;
+      if (!open) {
+        ped.speed = 0;
+        ped.state = 'idle';
+      } else {
+        const slot = ped.anchor && ped.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(c.t * 2.2) * 0.05;
+          ped.mesh.position.set(slot.x, 0, slot.z + bob);
+          ped.heading = ped.anchor.facing;
+          ped.mesh.rotation.y = ped.heading;
+        }
+        ped.speed = 0;
+        ped.state = 'idle';
+        const wrench = ped.mesh.getObjectByName('garage-wrench');
+        if (wrench) wrench.rotation.z = Math.sin(c.t * 4.2) * 0.35;
+      }
+    }
+  }
+  for (const wait of [G.garageWait, G.garageWaitB]) {
+    if (!wait) continue;
+    wait.t = (wait.t || 0) + dt;
+    const wp = wait.ped;
+    if (wp && wp.mesh) {
+      wp.garageMech = true;
+      wp.garageWait = true;
+      wp.mesh.visible = open;
+      if (!open) {
+        wp.speed = 0;
+        wp.state = 'idle';
+      } else {
+        const slot = wp.anchor && wp.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(wait.t * 2.2) * 0.05;
+          wp.mesh.position.set(slot.x, 0, slot.z + bob);
+          wp.heading = wp.anchor.facing;
+          wp.mesh.rotation.y = wp.heading;
+        }
+        wp.speed = 0;
+        wp.state = 'idle';
+        const helm = wp.mesh.getObjectByName('garage-helmet');
+        if (helm) helm.rotation.z = Math.sin(wait.t * 4.2) * 0.35;
+      }
+    }
+  }
+}
+
+export function updateKlongDock(dt) {
+  if (!GAMEPLAY.klongDock) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 6 && h < 19;
+  for (const c of [G.klongDock, G.klongDockB]) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    for (let i = 0; i < (c.hands || []).length; i++) {
+      const ped = c.hands[i];
+      if (!ped || ped.dead || !ped.mesh) continue;
+      ped.klongDock = true;
+      ped.mesh.visible = open;
+      if (!open) {
+        ped.speed = 0;
+        ped.state = 'idle';
+        continue;
+      }
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        const bob = Math.sin(c.t * 2.2 + i) * 0.05;
+        ped.mesh.position.set(slot.x + (i === 0 ? bob : 0), 0, slot.z + (i === 1 ? bob : 0));
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+      const crate = ped.mesh.getObjectByName('dock-crate');
+      if (crate) crate.rotation.z = Math.sin(c.t * 3.4 + i) * 0.22;
+    }
+  }
+  for (const check of [G.klongCheck, G.klongCheckB]) {
+    if (!check) continue;
+    check.t = (check.t || 0) + dt;
+    const ped = check.ped;
+    if (ped && ped.mesh) {
+      ped.klongDock = true;
+      ped.klongCheck = true;
+      ped.mesh.visible = open;
+      if (!open) {
+        ped.speed = 0;
+        ped.state = 'idle';
+      } else {
+        const slot = ped.anchor && ped.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(check.t * 2.2) * 0.05;
+          ped.mesh.position.set(slot.x, 0, slot.z + bob);
+          ped.heading = ped.anchor.facing;
+          ped.mesh.rotation.y = ped.heading;
+        }
+        ped.speed = 0;
+        ped.state = 'idle';
+        const clip = ped.mesh.getObjectByName('klong-clip');
+        if (clip) clip.rotation.z = Math.sin(check.t * 4.2) * 0.35;
+      }
+    }
+  }
+}
+
+export function updateSengClerk(dt) {
+  if (!GAMEPLAY.sengClerk || !G.sengClerk) return;
+  const c = G.sengClerk;
+  c.t = (c.t || 0) + dt;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 10 && h < 20;
+  const ped = c.ped;
+  if (ped && ped.mesh) {
+    ped.sengClerk = true;
+    ped.mesh.visible = open;
+    if (!open) {
+      ped.speed = 0;
+      ped.state = 'idle';
+    } else {
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        const bob = Math.sin(c.t * 2.2) * 0.05;
+        ped.mesh.position.set(slot.x, 0, slot.z + bob);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+      const tray = ped.mesh.getObjectByName('seng-tray');
+      if (tray) tray.rotation.z = Math.sin(c.t * 4.2) * 0.35;
+    }
+  }
+  for (const shop of [G.sengShopper, G.sengShopperB]) {
+    if (!shop) continue;
+    shop.t = (shop.t || 0) + dt;
+    const sp = shop.ped;
+    if (sp && sp.mesh) {
+      sp.sengClerk = true;
+      sp.sengShop = true;
+      sp.mesh.visible = open;
+      if (!open) {
+        sp.speed = 0;
+        sp.state = 'idle';
+      } else {
+        const slot = sp.anchor && sp.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(shop.t * 2.2) * 0.05;
+          sp.mesh.position.set(slot.x, 0, slot.z + bob);
+          sp.heading = sp.anchor.facing;
+          sp.mesh.rotation.y = sp.heading;
+        }
+        sp.speed = 0;
+        sp.state = 'idle';
+        const chain = sp.mesh.getObjectByName('seng-chain');
+        if (chain) chain.rotation.z = Math.sin(shop.t * 4.2) * 0.35;
+      }
+    }
+  }
+}
+
+export function updateAirportCrew(dt) {
+  if (!GAMEPLAY.airportCrew) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 6 && h < 21;
+  for (const c of [G.airportCrew, G.eastAirportCrew]) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    for (let i = 0; i < (c.hands || []).length; i++) {
+      const ped = c.hands[i];
+      if (!ped || ped.dead || !ped.mesh) continue;
+      ped.airportCrew = true;
+      ped.mesh.visible = open;
+      if (!open) {
+        ped.speed = 0;
+        ped.state = 'idle';
+        continue;
+      }
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        const bob = Math.sin(c.t * 2.2 + i) * 0.05;
+        ped.mesh.position.set(slot.x + (i === 0 ? bob : 0), 0, slot.z + (i === 1 ? bob : 0));
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+      const paddle = ped.mesh.getObjectByName('marshal-paddle');
+      if (paddle) paddle.rotation.z = Math.sin(c.t * 3.6 + i) * 0.45;
+    }
+  }
+}
+
+export function updateAirportCargo(dt) {
+  if (!GAMEPLAY.airportCargo) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 6 && h < 19;
+  for (const c of [G.airportCargo, G.westAirportCargo]) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    for (let i = 0; i < (c.hands || []).length; i++) {
+      const ped = c.hands[i];
+      if (!ped || ped.dead || !ped.mesh) continue;
+      ped.airportCargo = true;
+      ped.mesh.visible = open;
+      if (!open) {
+        ped.speed = 0;
+        ped.state = 'idle';
+        continue;
+      }
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        const bob = Math.sin(c.t * 2.2 + i) * 0.05;
+        ped.mesh.position.set(slot.x + (i === 0 ? bob : 0), 0, slot.z + (i === 1 ? bob : 0));
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+      const crate = ped.mesh.getObjectByName('cargo-crate');
+      if (crate) crate.rotation.z = Math.sin(c.t * 3.4 + i) * 0.22;
+    }
+  }
+}
+
+export function updateAirportTower(dt) {
+  if (!GAMEPLAY.airportTower) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 6 && h < 22;
+  for (const c of [G.towerCtl, G.towerCtlB]) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    const ped = c.ped;
+    if (ped && ped.mesh) {
+      ped.airportTower = true;
+      ped.mesh.visible = open;
+      if (!open) {
+        ped.speed = 0;
+        ped.state = 'idle';
+      } else {
+        const slot = ped.anchor && ped.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(c.t * 2.2) * 0.05;
+          ped.mesh.position.set(slot.x, 0, slot.z + bob);
+          ped.heading = ped.anchor.facing;
+          ped.mesh.rotation.y = ped.heading;
+        }
+        ped.speed = 0;
+        ped.state = 'idle';
+        const binocs = ped.mesh.getObjectByName('tower-binocs');
+        if (binocs) binocs.rotation.x = Math.sin(c.t * 3.2) * 0.22;
+      }
+    }
+  }
+}
+
+export function updateAirportTaxi(dt) {
+  if (!GAMEPLAY.airportTaxi) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 6 && h < 22;
+  for (const c of [G.airportTaxi, G.southAirportTaxi]) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    for (let i = 0; i < (c.touts || []).length; i++) {
+      const ped = c.touts[i];
+      if (!ped || ped.dead || !ped.mesh) continue;
+      ped.airportTaxi = true;
+      ped.mesh.visible = open;
+      if (!open) {
+        ped.speed = 0;
+        ped.state = 'idle';
+        continue;
+      }
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        const bob = Math.sin(c.t * 2.2 + i) * 0.05;
+        ped.mesh.position.set(slot.x + (i === 0 ? bob : 0), 0, slot.z + (i === 1 ? bob : 0));
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+      const slate = ped.mesh.getObjectByName('taxi-slate');
+      if (slate) slate.rotation.z = Math.sin(c.t * 3.4 + i) * 0.22;
+    }
+  }
+  for (const bags of [G.airportBags, G.southAirportBags, G.northAirportBags]) {
+    if (!bags) continue;
+    bags.t = (bags.t || 0) + dt;
+    for (let i = 0; i < (bags.hands || []).length; i++) {
+      const ped = bags.hands[i];
+      if (!ped || ped.dead || !ped.mesh) continue;
+      ped.airportTaxi = true;
+      ped.airportBags = true;
+      ped.mesh.visible = open;
+      if (!open) {
+        ped.speed = 0;
+        ped.state = 'idle';
+        continue;
+      }
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        const bob = Math.sin(bags.t * 2.2 + i) * 0.05;
+        ped.mesh.position.set(slot.x + (i === 0 ? bob : 0), 0, slot.z + (i === 1 ? bob : 0));
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+      const cse = ped.mesh.getObjectByName('bag-case');
+      if (cse) cse.rotation.z = Math.sin(bags.t * 3.4 + i) * 0.22;
+    }
+  }
+}
+
+export function updateWindsock(dt) {
+  if (!GAMEPLAY.airport || !G.windsock) return;
+  const c = G.windsock;
+  c.t = (c.t || 0) + dt;
+  const sock = c.sock;
+  if (!sock) return;
+  const rain = G.time.rainStrength || 0;
+  const amp = 0.16 + rain * 0.28;
+  sock.rotation.z = PI / 2;
+  sock.rotation.y = Math.sin(c.t * 2.4) * amp;
+  sock.rotation.x = Math.sin(c.t * 3.6) * amp * 0.35;
+}
+
+export function updateRunwayLights(dt) {
+  if (!GAMEPLAY.airport || !G.runwayLights) return;
+  const c = G.runwayLights;
+  c.t = (c.t || 0) + dt;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const night = h >= 18.5 || h < 6.2;
+  const pulse = night ? 0.85 + Math.sin(c.t * 6.2) * 0.25 : 0.12;
+  if (c.mat) c.mat.emissiveIntensity = pulse;
+  for (const m of c.lights || []) {
+    if (m) m.visible = true;
+  }
+}
+
+export function updateTowerBeacon(dt) {
+  if (!GAMEPLAY.airport || !G.towerBeacon) return;
+  const c = G.towerBeacon;
+  c.t = (c.t || 0) + dt;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const night = h >= 18.5 || h < 6.2;
+  const mesh = c.mesh;
+  if (!mesh) return;
+  mesh.visible = true;
+  mesh.rotation.y = c.t * 1.8;
+  if (mesh.material) mesh.material.emissiveIntensity = night ? 0.7 + Math.sin(c.t * 8.4) * 0.45 : 0.12;
+}
+
+export function updateMallFood(dt) {
+  if (!GAMEPLAY.mallFood || !G.mallFood) return;
+  const c = G.mallFood;
+  c.t = (c.t || 0) + dt;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 11 && h < 21;
+  if (c.table) c.table.visible = true;
+  for (const ped of c.eaters || []) {
+    if (!ped || ped.dead || !ped.mesh) continue;
+    ped.mallFood = true;
+    ped.mesh.visible = open;
+    if (!open) {
+      ped.speed = 0;
+      ped.state = 'idle';
+      continue;
+    }
+    const slot = ped.anchor && ped.anchor.slot;
+    if (slot) {
+      ped.mesh.position.set(slot.x, slot.y || 0.42, slot.z);
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+    }
+    ped.speed = 0;
+    ped.state = 'idle';
+  }
+}
+
+export function updateMallTech(dt) {
+  if (!GAMEPLAY.mallTech || !G.mallTech) return;
+  const c = G.mallTech;
+  c.t = (c.t || 0) + dt;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 10 && h < 21;
+  for (let i = 0; i < (c.lookers || []).length; i++) {
+    const ped = c.lookers[i];
+    if (!ped || ped.dead || !ped.mesh) continue;
+    ped.mallTech = true;
+    ped.mesh.visible = open;
+    if (!open) {
+      ped.speed = 0;
+      ped.state = 'idle';
+      continue;
+    }
+    const slot = ped.anchor && ped.anchor.slot;
+    if (slot) {
+      const bob = Math.sin(c.t * 2.1 + i) * 0.05;
+      ped.mesh.position.set(slot.x, 0, slot.z + bob);
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+    }
+    ped.speed = 0;
+    ped.state = 'idle';
+    const phone = ped._phone || (ped.mesh && ped.mesh.getObjectByName('mall-tech-phone'));
+    if (phone && phone.material) {
+      phone.material.emissiveIntensity = 0.25 + 0.4 * Math.max(0, Math.sin(c.t * 4.4 + i));
+    }
+  }
+}
+
+export function updateMallPharm(dt) {
+  if (!GAMEPLAY.mallPharm || !G.mallPharm) return;
+  const c = G.mallPharm;
+  c.t = (c.t || 0) + dt;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 10 && h < 21;
+  const peds = [c.clerk, c.customer];
+  for (let i = 0; i < peds.length; i++) {
+    const ped = peds[i];
+    if (!ped || ped.dead || !ped.mesh) continue;
+    ped.mallPharm = true;
+    ped.mesh.visible = open;
+    if (!open) {
+      ped.speed = 0;
+      ped.state = 'idle';
+      continue;
+    }
+    const slot = ped.anchor && ped.anchor.slot;
+    if (slot) {
+      const bob = Math.sin(c.t * 2.2 + i) * 0.05;
+      ped.mesh.position.set(slot.x + (i === 0 ? bob : 0), 0, slot.z + (i === 1 ? bob : 0));
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+    }
+    ped.speed = 0;
+    ped.state = 'idle';
+    const parts = ped.mesh.userData && ped.mesh.userData.parts;
+    if (i === 0 && parts && parts.armR) parts.armR.rotation.x = -0.7 + Math.sin(c.t * 3.6) * 0.18;
+    if (i === 1 && c.customer && c.customer._bag) {
+      c.customer._bag.rotation.z = Math.sin(c.t * 3.6) * 0.22;
+    }
+  }
+}
+
+export function updateMallRoma(dt) {
+  if (!GAMEPLAY.mallRoma || !G.mallRoma) return;
+  const c = G.mallRoma;
+  c.t = (c.t || 0) + dt;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 10 && h < 21;
+  const peds = [c.clerk, c.customer];
+  for (let i = 0; i < peds.length; i++) {
+    const ped = peds[i];
+    if (!ped || ped.dead || !ped.mesh) continue;
+    ped.mallRoma = true;
+    ped.mesh.visible = open;
+    if (!open) {
+      ped.speed = 0;
+      ped.state = 'idle';
+      continue;
+    }
+    const slot = ped.anchor && ped.anchor.slot;
+    if (slot) {
+      const bob = Math.sin(c.t * 2.2 + i) * 0.05;
+      ped.mesh.position.set(slot.x + (i === 0 ? bob : 0), 0, slot.z + (i === 1 ? bob : 0));
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+    }
+    ped.speed = 0;
+    ped.state = 'idle';
+    const parts = ped.mesh.userData && ped.mesh.userData.parts;
+    if (i === 0 && parts && parts.armR) parts.armR.rotation.x = -0.7 + Math.sin(c.t * 3.6) * 0.18;
+    if (i === 1 && c.customer && c.customer._bag) {
+      c.customer._bag.rotation.z = Math.sin(c.t * 3.6) * 0.22;
+    }
+  }
+}
+
+export function updateMallWatch(dt) {
+  if (!GAMEPLAY.mallWatch || !G.mallWatch) return;
+  const c = G.mallWatch;
+  c.t = (c.t || 0) + dt;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 10 && h < 21;
+  const peds = [c.clerk, c.customer];
+  for (let i = 0; i < peds.length; i++) {
+    const ped = peds[i];
+    if (!ped || ped.dead || !ped.mesh) continue;
+    ped.mallWatch = true;
+    ped.mesh.visible = open;
+    if (!open) {
+      ped.speed = 0;
+      ped.state = 'idle';
+      continue;
+    }
+    const slot = ped.anchor && ped.anchor.slot;
+    if (slot) {
+      const bob = Math.sin(c.t * 2.2 + i) * 0.05;
+      ped.mesh.position.set(slot.x + (i === 0 ? bob : 0), slot.y || c.y || 10, slot.z + (i === 1 ? bob : 0));
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+    }
+    ped.speed = 0;
+    ped.state = 'idle';
+    const face = ped.mesh.getObjectByName('mall-watch-face');
+    if (face) face.rotation.z = c.t * 1.8;
+  }
+}
+
+export function updateMallManga(dt) {
+  if (!GAMEPLAY.mallManga || !G.mallManga) return;
+  const c = G.mallManga;
+  c.t = (c.t || 0) + dt;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 10 && h < 21;
+  for (let i = 0; i < (c.readers || []).length; i++) {
+    const ped = c.readers[i];
+    if (!ped || ped.dead || !ped.mesh) continue;
+    ped.mallManga = true;
+    ped.mesh.visible = open;
+    if (!open) {
+      ped.speed = 0;
+      ped.state = 'idle';
+      continue;
+    }
+    const slot = ped.anchor && ped.anchor.slot;
+    if (slot) {
+      ped.mesh.position.set(slot.x, slot.y || c.y || 5.42, slot.z);
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+    }
+    ped.speed = 0;
+    ped.state = 'idle';
+    const page = ped.mesh.getObjectByName('mall-manga-page');
+    if (page) page.rotation.x = Math.sin(c.t * 2.8 + i) * 0.18;
+  }
+}
+
+export function updateMallSushi(dt) {
+  if (!GAMEPLAY.mallSushi || !G.mallSushi) return;
+  const c = G.mallSushi;
+  c.t = (c.t || 0) + dt;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 10 && h < 21;
+  const peds = [c.chef, c.customer];
+  for (let i = 0; i < peds.length; i++) {
+    const ped = peds[i];
+    if (!ped || ped.dead || !ped.mesh) continue;
+    ped.mallSushi = true;
+    ped.mesh.visible = open;
+    if (!open) {
+      ped.speed = 0;
+      ped.state = 'idle';
+      continue;
+    }
+    const slot = ped.anchor && ped.anchor.slot;
+    if (slot) {
+      const bob = Math.sin(c.t * 2.2 + i) * 0.05;
+      ped.mesh.position.set(slot.x + (i === 0 ? bob : 0), slot.y || c.y || 5, slot.z + (i === 1 ? bob : 0));
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+    }
+    ped.speed = 0;
+    ped.state = 'idle';
+    const fish = ped.mesh.getObjectByName('mall-sushi-fish');
+    if (fish) fish.rotation.y = c.t * 2.4;
+  }
+}
+
+export function updateMallCafe(dt) {
+  if (!GAMEPLAY.mallCafe || !G.mallCafe) return;
+  const c = G.mallCafe;
+  c.t = (c.t || 0) + dt;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 10 && h < 21;
+  const peds = [c.clerk, c.customer];
+  for (let i = 0; i < peds.length; i++) {
+    const ped = peds[i];
+    if (!ped || ped.dead || !ped.mesh) continue;
+    ped.mallCafe = true;
+    ped.mesh.visible = open;
+    if (!open) {
+      ped.speed = 0;
+      ped.state = 'idle';
+      continue;
+    }
+    const slot = ped.anchor && ped.anchor.slot;
+    if (slot) {
+      const bob = Math.sin(c.t * 2.2 + i) * 0.05;
+      ped.mesh.position.set(slot.x + (i === 0 ? bob : 0), slot.y || c.y || 10, slot.z + (i === 1 ? bob : 0));
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+    }
+    ped.speed = 0;
+    ped.state = 'idle';
+    const steam = ped.mesh.getObjectByName('mall-cafe-steam');
+    if (steam) steam.scale.y = 1 + Math.sin(c.t * 3.2) * 0.45;
+  }
+}
+
+export function updateMallThreads(dt) {
+  if (!GAMEPLAY.mallThreads || !G.mallThreads) return;
+  const c = G.mallThreads;
+  c.t = (c.t || 0) + dt;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 10 && h < 21;
+  const peds = [c.clerk, c.customer];
+  for (let i = 0; i < peds.length; i++) {
+    const ped = peds[i];
+    if (!ped || ped.dead || !ped.mesh) continue;
+    ped.mallThreads = true;
+    ped.mesh.visible = open;
+    if (!open) {
+      ped.speed = 0;
+      ped.state = 'idle';
+      continue;
+    }
+    const slot = ped.anchor && ped.anchor.slot;
+    if (slot) {
+      const bob = Math.sin(c.t * 2.2 + i) * 0.05;
+      ped.mesh.position.set(slot.x + (i === 1 ? bob : 0), slot.y || c.y || 10, slot.z + (i === 0 ? bob : 0));
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+    }
+    ped.speed = 0;
+    ped.state = 'idle';
+    const shirt = ped.mesh.getObjectByName('mall-threads-shirt');
+    if (shirt) shirt.rotation.z = Math.sin(c.t * 2.6) * 0.28;
+  }
+}
+
+export function updateMallSeven(dt) {
+  if (!GAMEPLAY.mallSeven || !G.mallSeven) return;
+  const c = G.mallSeven;
+  c.t = (c.t || 0) + dt;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 10 && h < 21;
+  const peds = [c.clerk, c.customer];
+  for (let i = 0; i < peds.length; i++) {
+    const ped = peds[i];
+    if (!ped || ped.dead || !ped.mesh) continue;
+    ped.mallSeven = true;
+    ped.mesh.visible = open;
+    if (!open) {
+      ped.speed = 0;
+      ped.state = 'idle';
+      continue;
+    }
+    const slot = ped.anchor && ped.anchor.slot;
+    if (slot) {
+      const bob = Math.sin(c.t * 2.2 + i) * 0.05;
+      ped.mesh.position.set(slot.x + (i === 0 ? bob : 0), slot.y || c.y || 0, slot.z + (i === 1 ? bob : 0));
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+    }
+    ped.speed = 0;
+    ped.state = 'idle';
+    const scan = ped.mesh.getObjectByName('mall-seven-scan');
+    if (scan && scan.material) scan.material.emissiveIntensity = 0.25 + Math.sin(c.t * 4.4) * 0.35;
+  }
+}
+
+export function updateMallArcade(dt) {
+  if (!GAMEPLAY.mallArcade || !G.mallArcade) return;
+  const c = G.mallArcade;
+  c.t = (c.t || 0) + dt;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 10 && h < 21;
+  for (let i = 0; i < (c.players || []).length; i++) {
+    const ped = c.players[i];
+    if (!ped || ped.dead || !ped.mesh) continue;
+    ped.mallArcade = true;
+    ped.mesh.visible = open;
+    if (!open) {
+      ped.speed = 0;
+      ped.state = 'idle';
+      continue;
+    }
+    const slot = ped.anchor && ped.anchor.slot;
+    if (slot) {
+      const bob = Math.sin(c.t * 2.2 + i) * 0.05;
+      ped.mesh.position.set(slot.x, slot.y || c.y || 5, slot.z + bob);
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+    }
+    ped.speed = 0;
+    ped.state = 'idle';
+    const ball = ped.mesh.getObjectByName('mall-arcade-ball');
+    if (ball && ball.material) ball.material.emissiveIntensity = 0.3 + Math.sin(c.t * 4.4 + i) * 0.35;
+  }
+}
+
+export function updateGymBag(dt) {
+  if (!GAMEPLAY.gymBag || !G.gymBag) return;
+  const c = G.gymBag;
+  c.t = (c.t || 0) + dt;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 7 && h < 21;
+  const peds = [c.fighter, c.trainer];
+  for (let i = 0; i < peds.length; i++) {
+    const ped = peds[i];
+    if (!ped || ped.dead || !ped.mesh) continue;
+    ped.gymBag = true;
+    ped.mesh.visible = open;
+    if (!open) {
+      ped.speed = 0;
+      ped.state = 'idle';
+      continue;
+    }
+    const slot = ped.anchor && ped.anchor.slot;
+    if (slot) {
+      const bob = Math.sin(c.t * 2.2 + i) * 0.05;
+      ped.mesh.position.set(slot.x + (i === 1 ? bob : 0), 0, slot.z + (i === 0 ? bob : 0));
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+    }
+    ped.speed = 0;
+    ped.state = 'idle';
+    const parts = ped.mesh.userData && ped.mesh.userData.parts;
+    if (i === 0 && parts && parts.armR) parts.armR.rotation.x = -0.9 + Math.sin(c.t * 6.2) * 0.45;
+  }
+  if (c.bag) {
+    c.bag.visible = true;
+    c.bag.rotation.z = Math.sin(c.t * 3.4) * 0.22;
+  }
+  for (const wait of [G.gymWait, G.gymWaitB]) {
+    if (!wait) continue;
+    wait.t = (wait.t || 0) + dt;
+    const ped = wait.ped;
+    if (ped && ped.mesh) {
+      ped.gymBag = true;
+      ped.gymWait = true;
+      ped.mesh.visible = open;
+      if (!open) {
+        ped.speed = 0;
+        ped.state = 'idle';
+      } else {
+        const slot = ped.anchor && ped.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(wait.t * 2.2) * 0.05;
+          ped.mesh.position.set(slot.x, 0, slot.z + bob);
+          ped.heading = ped.anchor.facing;
+          ped.mesh.rotation.y = ped.heading;
+        }
+        ped.speed = 0;
+        ped.state = 'idle';
+        const wrap = ped.mesh.getObjectByName('gym-wrap');
+        if (wrap) wrap.rotation.z = Math.sin(wait.t * 4.2) * 0.35;
+      }
     }
   }
 }
@@ -1179,8 +2977,10 @@ export function updateCheckpoint(dt) {
   if (!GAMEPLAY.nightCheckpoint || !G.checkpoint) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const night = h >= 21 || h < 5.2;
+  const late = !!(GAMEPLAY.twoAmCheckpoint && night && h >= 1.5 && h < 3.8);
   const cp = G.checkpoint;
   cp.active = night;
+  cp.late = late;
   const cop = cp.cop;
   if (cop && cop.mesh) {
     cop.mesh.visible = night;
@@ -1193,56 +2993,70 @@ export function updateCheckpoint(dt) {
       cop.state = 'idle';
     }
   }
-  if (cp.light) cp.light.intensity = night ? 1.6 : 0;
+  if (cp.spikes) cp.spikes.visible = late;
+  if (cp.light) cp.light.intensity = night ? (late ? 2.2 : 1.6) : 0;
   if (cp.beam) cp.beam.visible = night;
   if (!night) { cp.flagged = false; return; }
   const p = G.player;
   const v = p && p.inVehicle;
   if (v && v.driver === 'player' && !cp.flagged) {
-    if (dist2(v.pos, cp) < 9 * 9 && Math.abs(v.vel || 0) > 8) {
+    const speed = Math.abs(v.vel || 0);
+    const near = dist2(v.pos, cp) < 9 * 9;
+    const hitStrip = late && near && speed > 6;
+    const blow = near && speed > 8;
+    if (hitStrip || blow) {
       cp.flagged = true;
-      raiseWanted(1, 2);
-      if (G.hud && G.hud.showNotif) G.hud.showNotif('Ran the checkpoint');
+      if (hitStrip) v.tiresBlown = true;
+      raiseWanted(late ? 2 : 1, late ? 4 : 2);
+      if (G.hud && G.hud.showNotif) {
+        G.hud.showNotif(late
+          ? (hitStrip ? 'Spike strip — ด่านตีสอง' : 'Ran the 2 AM checkpoint')
+          : 'Ran the checkpoint');
+      }
     }
   } else if (!v && p && p.group && dist2(p.group.position, cp) < 7 * 7) {
-    if (G.hud && G.hud.showPrompt) G.hud.showPrompt('Checkpoint — slow down', 0.35);
+    if (G.hud && G.hud.showPrompt) G.hud.showPrompt(late ? '2 AM checkpoint — crawl' : 'Checkpoint — slow down', 0.35);
   }
 }
 
 export function updateLottery(dt) {
-  if (!GAMEPLAY.lottery || !G.lottery) return;
+  if (!GAMEPLAY.lottery) return;
   if (G.player.inVehicle || G._eating) return;
   const pp = G.player.group.position;
-  if (dist2(G.lottery.pos, pp) > 2.4 * 2.4) return;
   const now = performance.now();
-  if (G.lottery.readyAt && now < G.lottery.readyAt) {
-    G.hud.showPrompt('Counting out tickets…', 0.35);
+  for (const L of [G.lottery, G.southLottery, G.westLottery, G.eastLottery]) {
+    if (!L || !L.pos) continue;
+    if (dist2(L.pos, pp) > 2.4 * 2.4) continue;
+    if (L.readyAt && now < L.readyAt) {
+      G.hud.showPrompt('Counting out tickets…', 0.35);
+      return;
+    }
+    G.hud.showPrompt('Press <b>E</b> for a lottery ticket · ฿80', 0.4);
+    if (!G.input.pressed('KeyE')) return;
+    if (G.cash < 80) { G.hud.showNotif('Need ฿80 for a ticket'); return; }
+    G.cash -= 80;
+    if (G.hud.setCash) G.hud.setCash(G.cash);
+    L.readyAt = now + 1800;
+    const forced = G._lotteryForce;
+    G._lotteryForce = null;
+    const roll = forced != null ? 0 : Math.random();
+    let win = forced != null ? forced : 0;
+    if (forced == null) {
+      if (roll < 0.08) win = 1200;
+      else if (roll < 0.32) win = 240;
+    }
+    if (win) {
+      G.cash += win;
+      if (G.hud.setCash) G.hud.setCash(G.cash);
+      G.hud.showNotif(`Lottery +฿${win}`);
+      if (G.audio && G.audio.chime) G.audio.chime();
+    } else {
+      G.hud.showNotif('Not this time');
+      if (G.audio && G.audio.blip) G.audio.blip({ freq: 220, dur: 0.12, gain: 0.08 });
+    }
+    G._lotteryLast = { spent: 80, win };
     return;
   }
-  G.hud.showPrompt('Press <b>E</b> for a lottery ticket · ฿80', 0.4);
-  if (!G.input.pressed('KeyE')) return;
-  if (G.cash < 80) { G.hud.showNotif('Need ฿80 for a ticket'); return; }
-  G.cash -= 80;
-  if (G.hud.setCash) G.hud.setCash(G.cash);
-  G.lottery.readyAt = now + 1800;
-  const forced = G._lotteryForce;
-  G._lotteryForce = null;
-  const roll = forced != null ? 0 : Math.random();
-  let win = forced != null ? forced : 0;
-  if (forced == null) {
-    if (roll < 0.08) win = 1200;
-    else if (roll < 0.32) win = 240;
-  }
-  if (win) {
-    G.cash += win;
-    if (G.hud.setCash) G.hud.setCash(G.cash);
-    G.hud.showNotif(`Lottery +฿${win}`);
-    if (G.audio && G.audio.chime) G.audio.chime();
-  } else {
-    G.hud.showNotif('Not this time');
-    if (G.audio && G.audio.blip) G.audio.blip({ freq: 220, dur: 0.12, gain: 0.08 });
-  }
-  G._lotteryLast = { spent: 80, win };
 }
 
 export function updateMallShoppers(dt) {
@@ -1371,12 +3185,131 @@ export function updateSeekShade(dt) {
   let n = 0;
   for (const ped of G.peds) {
     if (n >= 22) break;
-    if (!ped || ped.dead || ped.anchor || ped.gang || ped.pillion || ped.alms || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.checkpoint || ped.btsSit || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.panicT > 0) continue;
+    if (!ped || ped.dead || ped.anchor || ped.gang || ped.pillion || ped.alms || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.checkpoint || ped.btsSit || ped.sevenGuard || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.homeAuntie || ped.stationPorter || ped.garageMech || ped.klongDock || ped.sengClerk || ped.airportCrew || ped.airportCargo || ped.airportTower || ped.airportTaxi || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.watBell || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.soiBarber || ped.yaoPhoto || ped.panicT > 0) continue;
     if (ped.social || ped.isMugger || ped.isTarget || ped.motosaiRider || ped.motosaiWait) continue;
     const w = nearestWalkway(ped.mesh.position.x, ped.mesh.position.z);
     if (!w) continue;
     ped.shade = { x: clamp(ped.mesh.position.x, w.x0, w.x1), z: clamp(ped.mesh.position.z, w.z0, w.z1) };
     n++;
+  }
+}
+
+export function updateWatBell(dt) {
+  if (!GAMEPLAY.watBell || !G.watBell) return;
+  const b = G.watBell;
+  if (b.ringT > 0) {
+    b.ringT = Math.max(0, b.ringT - dt);
+    const swing = Math.sin(b.ringT * 14) * Math.min(1, b.ringT) * 0.28;
+    if (b.bell) b.bell.rotation.z = swing;
+    if (b.striker) b.striker.rotation.z = 0.35 - swing * 0.8;
+  } else {
+    if (b.bell) b.bell.rotation.z = 0;
+    if (b.striker) b.striker.rotation.z = 0.35;
+  }
+  const keep = G.watBellMonk;
+  if (keep) {
+    keep.t = (keep.t || 0) + dt;
+    const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+    const shift = (h >= 6 && h < 8.5) || (h >= 17 && h < 19.5);
+    const ped = keep.ped;
+    if (ped && ped.mesh) {
+      ped.watBell = true;
+      ped.mesh.visible = shift;
+      if (shift) {
+        const slot = ped.anchor && ped.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(keep.t * 2.2) * 0.05;
+          ped.mesh.position.set(slot.x, 0, slot.z + bob);
+          ped.heading = ped.anchor.facing;
+          ped.mesh.rotation.y = ped.heading;
+        }
+        const mallet = ped.mesh.getObjectByName('wat-bell-mallet');
+        if (mallet) mallet.rotation.z = 0.55 + Math.sin(keep.t * 4.2) * 0.35;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+    }
+  }
+  if (G.player.inVehicle || G._eating || G._barberCut) return;
+  const pp = G.player.group.position;
+  if (dist2({ x: b.x, z: b.z }, pp) > 2.8 * 2.8) return;
+  G.hud.showPrompt('Press <b>E</b> to ring the bell', 0.4);
+  if (!G.input.pressed('KeyE')) return;
+  const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0;
+  if (b.readyAt && now < b.readyAt) { G.hud.showNotif('The bell is still ringing'); return; }
+  b.readyAt = now + 9000;
+  b.ringT = 1.8;
+  G._bellRung = (G._bellRung || 0) + 1;
+  G.wanted.lastSeenAt = Math.max(0, (G.wanted.lastSeenAt || now) - 12000);
+  G.hud.showNotif('The bell carries — ระฆังวัด');
+  if (G.audio && G.audio.bell) G.audio.bell();
+  else if (G.audio && G.audio.chime) G.audio.chime();
+}
+
+export function updateWatDrum(dt) {
+  if (!GAMEPLAY.watDrum || !G.watDrum) return;
+  const c = G.watDrum;
+  c.t = (c.t || 0) + dt;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const shift = (h >= 6 && h < 8.5) || (h >= 17 && h < 19.5);
+  if (c.beatT > 0) {
+    c.beatT = Math.max(0, c.beatT - dt);
+    const swing = Math.sin(c.beatT * 12) * Math.min(1, c.beatT) * 0.45;
+    if (c.beater) c.beater.rotation.z = 0.55 - swing;
+    if (c.drum) c.drum.rotation.x = swing * 0.12;
+  } else {
+    if (c.beater) c.beater.rotation.z = 0.55;
+    if (c.drum) c.drum.rotation.x = 0;
+    if (shift && Math.sin(c.t * 2.2) > 0.92) c.beatT = 0.55;
+  }
+  const ped = c.monk;
+  if (ped && ped.mesh) {
+    ped.watDrum = true;
+    ped.mesh.visible = shift;
+    const slot = ped.anchor && ped.anchor.slot;
+    if (slot) {
+      ped.mesh.position.set(slot.x, 0, slot.z);
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+    }
+    ped.speed = 0;
+    ped.state = 'idle';
+  }
+  if (G.player.inVehicle || G._eating || G._barberCut) return;
+  const pp = G.player.group.position;
+  if (dist2({ x: c.x, z: c.z }, pp) > 2.8 * 2.8) return;
+  G.hud.showPrompt('Press <b>E</b> to beat the drum', 0.4);
+  if (!G.input.pressed('KeyE')) return;
+  const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0;
+  if (c.readyAt && now < c.readyAt) { G.hud.showNotif('The drum is still sounding'); return; }
+  c.readyAt = now + 8000;
+  c.beatT = 1.4;
+  G._watDrum = (G._watDrum || 0) + 1;
+  G.wanted.lastSeenAt = Math.max(0, (G.wanted.lastSeenAt || now) - 10000);
+  G.hud.showNotif('The drum carries — กลองวัด');
+  if (G.audio && G.audio.chime) G.audio.chime();
+}
+
+export function updateBikeSeatCover(dt) {
+  if (!GAMEPLAY.bikeSeatCover) return;
+  const wet = (G.time.rainStrength || 0) > 0.4;
+  for (const bike of [...(G.sevenBikes || []), ...(G.southSevenBikes || []), ...(G.westSevenBikes || []), ...(G.eastSevenBikes || [])]) {
+    const cover = bike && (bike.seatCover || (bike.mesh && bike.mesh.getObjectByName('seat-cover')));
+    if (!cover) continue;
+    cover.visible = !!(wet && bike.driver !== 'player' && !bike.dead);
+  }
+}
+
+export function updateRainPoncho(dt) {
+  if (!GAMEPLAY.rainPoncho) return;
+  const wet = (G.time.rainStrength || 0) > 0.4;
+  for (const v of G.vehicles || []) {
+    if (!v || v.dead || !v.spec || v.spec.kind !== 'bike') continue;
+    const cape = v.bikeRider && v.bikeRider.getObjectByName('rain-poncho');
+    if (cape) cape.visible = !!(wet && v.bikeRider.visible);
+    const p = v.pillionPed;
+    const pc = p && p.mesh && p.mesh.getObjectByName('rain-poncho');
+    if (pc) pc.visible = wet;
   }
 }
 
@@ -1397,6 +3330,217 @@ export function updateRainPack(dt) {
       if (parasol) parasol.rotation.x = 0;
       if (f.mesh) f.mesh.traverse(o => { if (o.name === 'stool') o.visible = true; });
     }
+  }
+}
+
+export function updateBoatNoodle(dt) {
+  if (!GAMEPLAY.boatNoodle || !G.boatNoodle) return;
+  const c = G.boatNoodle;
+  if (!c.mesh) return;
+  c.t += (c.dir || 1) * dt * 0.018;
+  if (c.t > 0.85) { c.t = 0.85; c.dir = -1; }
+  if (c.t < 0.15) { c.t = 0.15; c.dir = 1; }
+  const z = (c.z0 || -50) + (c.t - 0.5) * 18;
+  const x = c.x;
+  const swell = 0.22 + Math.sin(performance.now() * 0.002 + z * 0.15) * 0.05;
+  c.mesh.position.set(x, swell, z);
+  c.mesh.rotation.y = (c.dir || 1) > 0 ? 0 : PI;
+  c.mesh.rotation.z = Math.sin(performance.now() * 0.0016 + z * 0.1) * 0.03;
+  const steam = c.mesh.getObjectByName('noodle-steam');
+  if (steam) {
+    steam.position.y = 1.05 + Math.sin(performance.now() * 0.003) * 0.08;
+    steam.scale.setScalar(0.9 + Math.sin(performance.now() * 0.002) * 0.12);
+  }
+  const pot = c.mesh.getObjectByName('noodle-pot');
+  if (pot && pot.material) pot.material.emissiveIntensity = 0.2 + Math.sin(performance.now() * 0.004) * 0.08;
+  if (c.vendor && c.vendor.mesh && !c.vendor.dead) {
+    c.vendor.boatNoodle = true;
+    c.vendor.mesh.position.set(x, swell + 0.2, z);
+    c.vendor.heading = c.mesh.rotation.y;
+    c.vendor.mesh.rotation.y = c.vendor.heading;
+    c.vendor.speed = 0;
+    if (c.vendor.anchor && c.vendor.anchor.slot) c.vendor.anchor.slot.set(x, swell + 0.2, z);
+  }
+  if (G.player.inVehicle || G._eating) return;
+  const pp = G.player.group.position;
+  if (dist2(c.mesh.position, pp) > 3.6 * 3.6) return;
+  G.hud.showPrompt('Press <b>E</b> for boat noodles · ฿50', 0.4);
+  if (!G.input.pressed('KeyE')) return;
+  if (G.cash < 50) { G.hud.showNotif('Need ฿50 for boat noodles'); return; }
+  G.cash -= 50;
+  G.player.hp = Math.min(G.player.hpMax, G.player.hp + 28);
+  if (G.hud.setCash) G.hud.setCash(G.cash);
+  G.hud.showNotif('Boat noodles — ก๋วยเตี๋ยวเรือ');
+  if (G.audio && G.audio.chime) G.audio.chime();
+}
+
+export function updatePierWait(dt) {
+  if (!GAMEPLAY.pierWait || !G.pierWait) return;
+  const c = G.pierWait;
+  c.t = (c.t || 0) + dt;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 6 && h < 21;
+  const ring = c.mesh && c.mesh.getObjectByName('pier-ring');
+  if (ring) ring.rotation.z = Math.sin(c.t * 1.8) * 0.12;
+  for (let i = 0; i < (c.waiters || []).length; i++) {
+    const ped = c.waiters[i];
+    if (!ped || ped.dead || !ped.mesh) continue;
+    ped.pierWait = true;
+    ped.mesh.visible = open;
+    const slot = ped.anchor && ped.anchor.slot;
+    if (slot) {
+      ped.mesh.position.set(slot.x, 0, slot.z + Math.sin(c.t * 2.2 + i) * 0.08);
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+    }
+    ped.speed = 0;
+    ped.state = 'idle';
+  }
+  for (const clerk of [G.pierClerk, G.pierClerkB]) {
+    if (!clerk) continue;
+    clerk.t = (clerk.t || 0) + dt;
+    const ped = clerk.ped;
+    if (ped && ped.mesh) {
+      ped.pierWait = true;
+      ped.pierClerk = true;
+      ped.mesh.visible = open;
+      if (open) {
+        const slot = ped.anchor && ped.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(clerk.t * 2.2) * 0.05;
+          ped.mesh.position.set(slot.x, 0, slot.z + bob);
+          ped.heading = ped.anchor.facing;
+          ped.mesh.rotation.y = ped.heading;
+        }
+        const ticket = ped.mesh.getObjectByName('pier-ticket');
+        if (ticket) ticket.rotation.z = Math.sin(clerk.t * 4.2) * 0.35;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+    }
+  }
+  for (const fish of [G.pierFish, G.pierFishB]) {
+    if (!fish) continue;
+    fish.t = (fish.t || 0) + dt;
+    const ped = fish.ped;
+    if (ped && ped.mesh) {
+      ped.pierWait = true;
+      ped.pierFish = true;
+      ped.mesh.visible = open;
+      if (open) {
+        const slot = ped.anchor && ped.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(fish.t * 2.2) * 0.05;
+          ped.mesh.position.set(slot.x, 0, slot.z + bob);
+          ped.heading = ped.anchor.facing;
+          ped.mesh.rotation.y = ped.heading;
+        }
+        const rod = ped.mesh.getObjectByName('pier-rod');
+        if (rod) rod.rotation.z = 0.85 + Math.sin(fish.t * 3.4) * 0.22;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+    }
+  }
+  if (!open || G.player.inVehicle || G._eating) return;
+  const pp = G.player.group.position;
+  if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) return;
+  G.hud.showPrompt('Press <b>E</b> for an express boat · ฿15', 0.4);
+  if (!G.input.pressed('KeyE')) return;
+  if (G.cash < 15) { G.hud.showNotif('Need ฿15 for the boat'); return; }
+  G.cash -= 15;
+  if (G.hud.setCash) G.hud.setCash(G.cash);
+  G._pierWait = (G._pierWait || 0) + 1;
+  G.hud.showNotif('Express boat — เรือด่วน');
+  if (G.audio && G.audio.chime) G.audio.chime();
+}
+
+export function updateRotiCart(dt) {
+  if (!GAMEPLAY.rotiCart || !G.rotiCart) return;
+  for (const c of G.rotiCart) {
+    if (!c.mesh || !c.soi) continue;
+    c.t += c.dir * dt * 0.034;
+    if (c.t > 0.9) { c.t = 0.9; c.dir = -1; }
+    if (c.t < 0.1) { c.t = 0.1; c.dir = 1; }
+    const s = c.soi;
+    const x = c.alongZ ? (s.x0 + s.x1) * 0.5 : s.x0 + (s.x1 - s.x0) * c.t;
+    const z = c.alongZ ? s.z0 + (s.z1 - s.z0) * c.t : (s.z0 + s.z1) * 0.5;
+    const yaw = c.alongZ ? (c.dir > 0 ? 0 : PI) : (c.dir > 0 ? PI / 2 : -PI / 2);
+    c.mesh.position.set(x, 0, z);
+    c.mesh.rotation.y = yaw;
+    const spat = c.mesh.getObjectByName('roti-spatula');
+    if (spat) {
+      const flip = Math.sin(c.t * 36);
+      spat.rotation.z = 0.2 + flip * 0.55;
+      spat.position.y = 0.86 + Math.max(0, flip) * 0.12;
+    }
+    const pan = c.mesh.getObjectByName('roti-pan');
+    if (pan && pan.material) pan.material.emissiveIntensity = 0.18 + Math.sin(c.t * 14) * 0.08;
+    if (c.vendor && c.vendor.mesh && !c.vendor.dead) {
+      c.vendor.roti = true;
+      c.vendor.mesh.position.set(x, 0, z);
+      c.vendor.heading = yaw;
+      c.vendor.mesh.rotation.y = yaw;
+      if (c.vendor.anchor && c.vendor.anchor.slot) c.vendor.anchor.slot.set(x, 0, z);
+      c.vendor.speed = 0.5;
+    }
+  }
+  if (G.player.inVehicle || G._eating) return;
+  const pp = G.player.group.position;
+  for (const c of G.rotiCart) {
+    if (!c.mesh || dist2(c.mesh.position, pp) > 2.2 * 2.2) continue;
+    G.hud.showPrompt('Press <b>E</b> for banana roti · ฿35', 0.4);
+    if (G.input.pressed('KeyE')) {
+      if (G.cash < 35) { G.hud.showNotif('Need ฿35 for roti'); return; }
+      G.cash -= 35;
+      G.player.hp = Math.min(G.player.hpMax, G.player.hp + 20);
+      G.player.stam = G.player.stamMax;
+      if (G.hud.setCash) G.hud.setCash(G.cash);
+      G.hud.showNotif('Roti — โรตี');
+      if (G.audio && G.audio.chime) G.audio.chime();
+    }
+    return;
+  }
+}
+
+export function updateChaYen(dt) {
+  if (!GAMEPLAY.chaYen || !G.chaYen) return;
+  for (const c of G.chaYen) {
+    if (!c.mesh || !c.soi) continue;
+    c.t += c.dir * dt * 0.033;
+    if (c.t > 0.9) { c.t = 0.9; c.dir = -1; }
+    if (c.t < 0.1) { c.t = 0.1; c.dir = 1; }
+    const s = c.soi;
+    const x = c.alongZ ? (s.x0 + s.x1) * 0.5 : s.x0 + (s.x1 - s.x0) * c.t;
+    const z = c.alongZ ? s.z0 + (s.z1 - s.z0) * c.t : (s.z0 + s.z1) * 0.5;
+    const yaw = c.alongZ ? (c.dir > 0 ? 0 : PI) : (c.dir > 0 ? PI / 2 : -PI / 2);
+    c.mesh.position.set(x, 0, z);
+    c.mesh.rotation.y = yaw;
+    const urn = c.mesh.getObjectByName('chayen-urn');
+    if (urn && urn.material) urn.material.emissiveIntensity = 0.14 + Math.sin(c.t * 18) * 0.06;
+    if (c.vendor && c.vendor.mesh && !c.vendor.dead) {
+      c.vendor.chaYen = true;
+      c.vendor.mesh.position.set(x, 0, z);
+      c.vendor.heading = yaw;
+      c.vendor.mesh.rotation.y = yaw;
+      if (c.vendor.anchor && c.vendor.anchor.slot) c.vendor.anchor.slot.set(x, 0, z);
+      c.vendor.speed = 0.5;
+    }
+  }
+  if (G.player.inVehicle || G._eating) return;
+  const pp = G.player.group.position;
+  for (const c of G.chaYen) {
+    if (!c.mesh || dist2(c.mesh.position, pp) > 2.2 * 2.2) continue;
+    G.hud.showPrompt('Press <b>E</b> for cha yen · ฿25', 0.4);
+    if (G.input.pressed('KeyE')) {
+      if (G.cash < 25) { G.hud.showNotif('Need ฿25 for cha yen'); return; }
+      G.cash -= 25;
+      G.player.stam = G.player.stamMax;
+      if (G.hud.setCash) G.hud.setCash(G.cash);
+      G.hud.showNotif('Cha yen — ชาเย็น');
+      if (G.audio && G.audio.chime) G.audio.chime();
+    }
+    return;
   }
 }
 
@@ -1434,6 +3578,650 @@ export function updateCoconutCarts(dt) {
       G.player.stam = G.player.stamMax;
       if (G.hud.setCash) G.hud.setCash(G.cash);
       G.hud.showNotif('Coconut water — มะพร้าว');
+      if (G.audio && G.audio.chime) G.audio.chime();
+    }
+    return;
+  }
+}
+
+export function updatePlaKat(dt) {
+  if (!GAMEPLAY.plaKat || !G.plaKat) return;
+  const stand = G.plaKat;
+  stand.t = (stand.t || 0) + dt;
+  const t = stand.t * 3;
+  if (stand.bags) {
+    for (let i = 0; i < stand.bags.length; i++) {
+      const bag = stand.bags[i];
+      if (!bag) continue;
+      bag.position.y = 1.72 + Math.sin(t + i * 0.9) * 0.04;
+      const fish = bag.getObjectByName('plakat-fish');
+      if (fish) {
+        fish.position.x = Math.sin(t * 1.4 + i) * 0.03;
+        fish.position.z = Math.cos(t * 1.1 + i * 0.7) * 0.025;
+      }
+    }
+  }
+  const ped = stand.vendor;
+  if (ped && ped.mesh && ped.anchor && ped.anchor.slot) {
+    ped.plaKat = true;
+    ped.mesh.position.set(ped.anchor.slot.x, 0, ped.anchor.slot.z);
+    ped.heading = ped.anchor.facing;
+    ped.mesh.rotation.y = ped.heading;
+    ped.speed = 0;
+    ped.state = 'idle';
+  }
+  if (G.player.inVehicle || G._eating) return;
+  const pp = G.player.group.position;
+  if (!stand.mesh || dist2(stand.mesh.position, pp) > 2.4 * 2.4) return;
+  G.hud.showPrompt('Press <b>E</b> for a fighting fish · ฿40', 0.4);
+  if (!G.input.pressed('KeyE')) return;
+  if (G.cash < 40) { G.hud.showNotif('Need ฿40 for a pla kat'); return; }
+  G.cash -= 40;
+  G._plaKat = (G._plaKat || 0) + 1;
+  if (G.hud.setCash) G.hud.setCash(G.cash);
+  G.hud.showNotif('Pla kat — ปลากัด');
+  if (G.audio && G.audio.chime) G.audio.chime();
+}
+
+export function updateSongthaewRiders(dt) {
+  if (!GAMEPLAY.songthaewRiders) return;
+  const stands = [G.world && G.world.btsSongthaew, G.world && G.world.phromSongthaew];
+  for (const stand of stands) {
+    if (!stand || !stand.vehicle) continue;
+    const v = stand.vehicle;
+    const riders = stand.riders || [];
+    if (v.driver === 'player') {
+      if (!stand._dumped) {
+        for (const ped of riders) {
+          if (!ped || ped.dead || !ped.mesh) continue;
+          const wp = ped.mesh.getWorldPosition(new THREE.Vector3());
+          if (ped.mesh.parent) ped.mesh.parent.remove(ped.mesh);
+          G.scene.add(ped.mesh);
+          // hop to the curb on the BTS side of the rank, not along the chassis
+          const side = 1.7;
+          ped.mesh.position.set(wp.x - Math.cos(v.heading) * side, 0, wp.z + Math.sin(v.heading) * side);
+          ped.mesh.rotation.set(0, v.heading + PI / 2, 0);
+          ped.songthaewRide = false;
+          ped.heading = v.heading + PI / 2;
+          ped.speed = 1.2;
+          ped.state = 'walking';
+        }
+        stand._dumped = true;
+        if (G.hud) G.hud.showNotif('Passengers hop off');
+      }
+      continue;
+    }
+    if (stand._dumped) continue;
+    for (const ped of riders) {
+      if (!ped || ped.dead || !ped.mesh) continue;
+      ped.songthaewRide = true;
+      ped.speed = 0;
+      ped.state = 'idle';
+    }
+  }
+}
+
+export function updateBtsPaper(dt) {
+  if (!GAMEPLAY.btsPaper) return;
+  const racks = [G.btsPaper, G.phromPaper];
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 6 && h < 18;
+  const pp = G.player && G.player.group && G.player.group.position;
+  for (const c of racks) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    const papers = c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'bts-paper') : [];
+    for (let i = 0; i < papers.length; i++) {
+      papers[i].rotation.z = Math.sin(c.t * 2.6 + i) * 0.08;
+    }
+    const ped = c.vendor;
+    if (ped && ped.mesh) {
+      ped.btsPaper = true;
+      ped.mesh.visible = open;
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        ped.mesh.position.set(slot.x, 0, slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+    }
+    if (!open || G.player.inVehicle || G._eating || !pp) continue;
+    if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) continue;
+    G.hud.showPrompt('Press <b>E</b> for a paper · ฿15', 0.4);
+    if (!G.input.pressed('KeyE')) continue;
+    if (G.cash < 15) { G.hud.showNotif('Need ฿15 for a paper'); continue; }
+    G.cash -= 15;
+    G._btsPaper = (G._btsPaper || 0) + 1;
+    if (G.hud.setCash) G.hud.setCash(G.cash);
+    G.hud.showNotif('Thai Rath — ไทยรัฐ');
+    if (G.audio && G.audio.chime) G.audio.chime();
+  }
+}
+
+export function updateBtsShine(dt) {
+  if (!GAMEPLAY.btsShine) return;
+  const stands = [G.btsShine, G.phromShine];
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 8 && h < 18;
+  const pp = G.player && G.player.group && G.player.group.position;
+  for (const c of stands) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    const cloth = c.mesh && c.mesh.getObjectByName('shine-cloth');
+    if (cloth) {
+      cloth.rotation.z = open ? Math.sin(c.t * 9) * 0.45 : 0;
+      cloth.position.y = 0.42 + (open ? Math.abs(Math.sin(c.t * 9)) * 0.04 : 0);
+    }
+    const ped = c.vendor;
+    if (ped && ped.mesh) {
+      ped.btsShine = true;
+      ped.mesh.visible = open;
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        ped.mesh.position.set(slot.x, slot.y || 0.38, slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+    }
+    if (!open || G.player.inVehicle || G._eating || !pp) continue;
+    if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) continue;
+    G.hud.showPrompt('Press <b>E</b> for a shoe shine · ฿30', 0.4);
+    if (!G.input.pressed('KeyE')) continue;
+    if (G.cash < 30) { G.hud.showNotif('Need ฿30 for a shine'); continue; }
+    G.cash -= 30;
+    if (G.hud.setCash) G.hud.setCash(G.cash);
+    G._btsShine = (G._btsShine || 0) + 1;
+    G.hud.showNotif('Shoe shine — ขัดรองเท้า');
+    if (G.audio && G.audio.chime) G.audio.chime();
+  }
+}
+
+export function updateBtsBusker(dt) {
+  if (!GAMEPLAY.btsBusker) return;
+  const stands = [G.btsBusker, G.phromBusker];
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 16 && h < 21.5;
+  const pp = G.player && G.player.group && G.player.group.position;
+  for (const c of stands) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    const ped = c.ped;
+    if (ped && ped.mesh) {
+      ped.btsBusker = true;
+      ped.mesh.visible = open;
+      if (c.hat) c.hat.visible = open;
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        ped.mesh.position.set(slot.x, 0, slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+      const parts = ped.mesh.userData && ped.mesh.userData.parts;
+      if (open && parts && parts.armR) parts.armR.rotation.x = -0.35 + Math.sin(c.t * 10) * 0.45;
+      if (open && c.guitar) c.guitar.rotation.z = 0.9 + Math.sin(c.t * 10) * 0.18;
+    }
+    if (!open || G.player.inVehicle || G._eating || !pp) continue;
+    if (dist2({ x: c.x, z: c.z }, pp) > 2.4 * 2.4) continue;
+    G.hud.showPrompt('Press <b>E</b> to tip the busker · ฿20', 0.4);
+    if (!G.input.pressed('KeyE')) continue;
+    if (G.cash < 20) { G.hud.showNotif('Need ฿20 for a tip'); continue; }
+    G.cash -= 20;
+    if (G.hud.setCash) G.hud.setCash(G.cash);
+    G._btsBusker = (G._btsBusker || 0) + 1;
+    G.hud.showNotif('The busker nods — ขอบคุณ');
+    if (G.audio && G.audio.chime) G.audio.chime();
+  }
+}
+
+export function updateSevenShoppers(dt) {
+  if (!GAMEPLAY.sevenShoppers) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 7 && h < 22;
+  for (const rec of [G.sevenShoppers, G.southSevenShoppers, G.westSevenShoppers, G.eastSevenShoppers]) {
+    if (!rec) continue;
+    for (const ped of rec.shoppers || []) {
+      if (!ped || ped.dead || !ped.mesh) continue;
+      ped.sevenShop = true;
+      ped.mesh.visible = open;
+      if (!open) {
+        ped.speed = 0;
+        ped.state = 'idle';
+        continue;
+      }
+      ped._shopT = (ped._shopT || 0) + dt * 0.16 * (ped._shopDir || 1);
+      if (ped._shopT > 1) { ped._shopT = 1; ped._shopDir = -1; }
+      if (ped._shopT < 0) { ped._shopT = 0; ped._shopDir = 1; }
+      const t = ped._shopT;
+      const z = rec.curbZ + (rec.doorZ - rec.curbZ) * t;
+      ped.mesh.position.set(ped._shopX != null ? ped._shopX : rec.x, 0, z);
+      ped.heading = (ped._shopDir || 1) > 0 ? PI : 0;
+      ped.mesh.rotation.y = ped.heading;
+      ped.speed = 1.15;
+      ped.state = 'walking';
+      animateWalk(ped.mesh, ped.speed, dt, true);
+      const bag = ped._sevenBag || ped.mesh.getObjectByName('seven-bag');
+      if (bag) bag.visible = (ped._shopDir || 1) < 0;
+    }
+  }
+}
+
+export function updateSevenSlush(dt) {
+  if (!GAMEPLAY.sevenSlush) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 6 && h < 22;
+  const pp = G.player.group.position;
+  for (const c of [G.sevenSlush, G.southSevenSlush, G.westSevenSlush, G.eastSevenSlush]) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    const tanks = c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'seven-slush-tank') : [];
+    for (let i = 0; i < tanks.length; i++) {
+      tanks[i].rotation.y = c.t * 2.8 + i;
+      if (tanks[i].material) tanks[i].material.emissiveIntensity = open ? 0.28 + Math.sin(c.t * 3.2 + i) * 0.1 : 0.08;
+    }
+    const ped = c.customer;
+    if (ped && ped.mesh) {
+      ped.sevenSlush = true;
+      ped.mesh.visible = open;
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        ped.mesh.position.set(slot.x, 0, slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+    }
+    if (!open || G.player.inVehicle || G._eating) continue;
+    if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) continue;
+    G.hud.showPrompt('Press <b>E</b> for a slushie · ฿25', 0.4);
+    if (!G.input.pressed('KeyE')) continue;
+    if (G.cash < 25) { G.hud.showNotif('Need ฿25 for a slushie'); continue; }
+    G.cash -= 25;
+    G.player.stam = G.player.stamMax;
+    if (G.hud.setCash) G.hud.setCash(G.cash);
+    G._sevenSlush = (G._sevenSlush || 0) + 1;
+    G.hud.showNotif('Slushie — สเลอปี้');
+    if (G.audio && G.audio.chime) G.audio.chime();
+  }
+}
+
+export function updateSevenAtm(dt) {
+  if (!GAMEPLAY.sevenAtm) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 6 && h < 22;
+  for (const c of [G.sevenAtm, G.southSevenAtm, G.westSevenAtm, G.eastSevenAtm, G.southSevenAtmB, G.westSevenAtmB, G.eastSevenAtmB, G.sevenAtmB]) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    for (let i = 0; i < (c.queue || []).length; i++) {
+      const ped = c.queue[i];
+      if (!ped || ped.dead || !ped.mesh) continue;
+      ped.sevenAtm = true;
+      ped.mesh.visible = open;
+      if (!open) {
+        ped.speed = 0;
+        ped.state = 'idle';
+        continue;
+      }
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        const bob = i === 0 ? Math.sin(c.t * 2.4) * 0.06 : 0;
+        ped.mesh.position.set(slot.x, 0, slot.z + bob);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+      const parts = ped.mesh.userData && ped.mesh.userData.parts;
+      if (i === 0 && parts && parts.armR) parts.armR.rotation.x = -0.85 + Math.sin(c.t * 3.1) * 0.12;
+      const phone = ped.mesh.getObjectByName('south-seven-atm-phone') || ped.mesh.getObjectByName('west-seven-atm-phone') || ped.mesh.getObjectByName('east-seven-atm-phone') || ped.mesh.getObjectByName('seven-atm-phone');
+      if (phone && phone.material) phone.material.emissiveIntensity = 0.28 + Math.sin(c.t * 3.4) * 0.18;
+    }
+  }
+}
+
+export function updateYaoDuck(dt) {
+  if (!GAMEPLAY.yaoDuck || !G.yaoDuck) return;
+  const c = G.yaoDuck;
+  c.t = (c.t || 0) + dt;
+  const open = yaowaratNightOpen();
+  if (c.duckMat) c.duckMat.emissiveIntensity = open ? 0.42 + Math.sin(c.t * 3.4) * 0.16 : 0.1;
+  if (c.lampMat) c.lampMat.emissiveIntensity = open ? 0.7 + Math.sin(c.t * 2.6) * 0.18 : 0.12;
+  if (c.signMat) c.signMat.emissiveIntensity = open ? 0.55 + Math.sin(c.t * 2.1) * 0.2 : 0.12;
+  const ducks = c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'yao-duck-body') : [];
+  for (let i = 0; i < ducks.length; i++) {
+    ducks[i].rotation.z = Math.sin(c.t * 2.4 + i) * 0.12;
+  }
+  for (const ped of c.shoppers || []) {
+    if (!ped || ped.dead || !ped.mesh) continue;
+    ped.yaoDuck = true;
+    ped.mesh.visible = open;
+    ped.speed = 0;
+    ped.state = 'idle';
+    const slot = ped.anchor && ped.anchor.slot;
+    if (slot) {
+      ped.mesh.position.set(slot.x, 0, slot.z);
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+    }
+  }
+  if (!open || G.player.inVehicle || G._eating) return;
+  const pp = G.player.group.position;
+  if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) return;
+  G.hud.showPrompt('Press <b>E</b> for roast duck · ฿80', 0.4);
+  if (!G.input.pressed('KeyE')) return;
+  if (G.cash < 80) { G.hud.showNotif('Need ฿80 for roast duck'); return; }
+  G.cash -= 80;
+  G.player.hp = Math.min(G.player.hpMax, G.player.hp + 26);
+  if (G.hud.setCash) G.hud.setCash(G.cash);
+  G._yaoDuck = (G._yaoDuck || 0) + 1;
+  G.hud.showNotif('Roast duck — เป็ดย่าง');
+  if (G.audio && G.audio.chime) G.audio.chime();
+}
+
+export function updateYaoFortune(dt) {
+  if (!GAMEPLAY.yaoFortune || !G.yaoFortune) return;
+  const c = G.yaoFortune;
+  c.t = (c.t || 0) + dt;
+  const open = yaowaratNightOpen();
+  if (c.lampMat) c.lampMat.emissiveIntensity = open ? 0.65 + Math.sin(c.t * 3.1) * 0.2 : 0.1;
+  const cards = c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'yao-card') : [];
+  for (let i = 0; i < cards.length; i++) {
+    cards[i].rotation.z = Math.sin(c.t * 3.6 + i) * 0.22;
+  }
+  const ped = c.vendor;
+  if (ped && ped.mesh) {
+    ped.yaoFortune = true;
+    ped.mesh.visible = open;
+    const slot = ped.anchor && ped.anchor.slot;
+    if (slot) {
+      ped.mesh.position.set(slot.x, 0, slot.z);
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+    }
+    ped.speed = 0;
+    ped.state = 'idle';
+  }
+  if (!open || G.player.inVehicle || G._eating) return;
+  const pp = G.player.group.position;
+  if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) return;
+  G.hud.showPrompt('Press <b>E</b> for a reading · ฿60', 0.4);
+  if (!G.input.pressed('KeyE')) return;
+  if (G.cash < 60) { G.hud.showNotif('Need ฿60 for a reading'); return; }
+  const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0;
+  if (c.readyAt && now < c.readyAt) { G.hud.showNotif('The cards are still turning'); return; }
+  c.readyAt = now + 8000;
+  G.cash -= 60;
+  G.wanted.lastSeenAt = Math.max(0, (G.wanted.lastSeenAt || now) - 10000);
+  if (G.hud.setCash) G.hud.setCash(G.cash);
+  G._yaoFortune = (G._yaoFortune || 0) + 1;
+  G.hud.showNotif('The cards say luck — ดูดวง');
+  if (G.audio && G.audio.chime) G.audio.chime();
+}
+
+export function updateYaoGold(dt) {
+  if (!GAMEPLAY.yaoGold || !G.yaoGold) return;
+  const c = G.yaoGold;
+  c.t = (c.t || 0) + dt;
+  const open = yaowaratNightOpen();
+  if (c.goldMat) c.goldMat.emissiveIntensity = open ? 0.65 + Math.sin(c.t * 3.2) * 0.22 : 0.12;
+  if (c.signMat) c.signMat.emissiveIntensity = open ? 0.55 + Math.sin(c.t * 2.1) * 0.2 : 0.12;
+  for (const ped of c.shoppers || []) {
+    if (!ped || ped.dead || !ped.mesh) continue;
+    ped.yaoGold = true;
+    ped.mesh.visible = open;
+    ped.speed = 0;
+    ped.state = 'idle';
+    const slot = ped.anchor && ped.anchor.slot;
+    if (slot) {
+      ped.mesh.position.set(slot.x, 0, slot.z);
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+    }
+  }
+}
+
+export function updateSquidGrill(dt) {
+  if (!GAMEPLAY.squidGrill || !G.squidGrill) return;
+  const c = G.squidGrill;
+  c.t = (c.t || 0) + dt;
+  const open = yaowaratNightOpen();
+  if (c.coalMat) c.coalMat.emissiveIntensity = open ? 0.7 + Math.sin(c.t * 9) * 0.25 : 0.12;
+  const smoke = c.mesh && c.mesh.getObjectByName('squid-smoke');
+  if (smoke && smoke.material) {
+    smoke.visible = open;
+    smoke.position.y = 1.12 + Math.sin(c.t * 3) * 0.06;
+    smoke.material.opacity = open ? 0.16 + Math.sin(c.t * 2.4) * 0.08 : 0;
+  }
+  const sticks = c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'squid-stick') : [];
+  for (let i = 0; i < sticks.length; i++) {
+    sticks[i].rotation.z = Math.sin(c.t * 5 + i) * 0.08;
+  }
+  const ped = c.vendor;
+  if (ped && ped.mesh && ped.anchor && ped.anchor.slot) {
+    ped.squid = true;
+    ped.mesh.visible = open;
+    ped.mesh.position.set(ped.anchor.slot.x, 0, ped.anchor.slot.z);
+    ped.heading = ped.anchor.facing;
+    ped.mesh.rotation.y = ped.heading;
+    ped.speed = 0;
+    ped.state = 'idle';
+  }
+  if (!open || G.player.inVehicle || G._eating) return;
+  const pp = G.player.group.position;
+  if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) return;
+  G.hud.showPrompt('Press <b>E</b> for grilled squid · ฿50', 0.4);
+  if (!G.input.pressed('KeyE')) return;
+  if (G.cash < 50) { G.hud.showNotif('Need ฿50 for squid'); return; }
+  G.cash -= 50;
+  G.player.hp = Math.min(G.player.hpMax, G.player.hp + 22);
+  if (G.hud.setCash) G.hud.setCash(G.cash);
+  G._squidGrill = (G._squidGrill || 0) + 1;
+  G.hud.showNotif('Grilled squid — ปลาหมึกย่าง');
+  if (G.audio && G.audio.chime) G.audio.chime();
+}
+
+export function updateKanomKrok(dt) {
+  if (!GAMEPLAY.kanomKrok) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 15 && h < 21.5;
+  const pp = G.player && G.player.group && G.player.group.position;
+  for (const c of [G.kanomKrok, G.southKanomKrok, G.westKanomKrok, G.eastKanomKrok]) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    const pan = c.mesh && c.mesh.getObjectByName('kanom-pan');
+    if (pan && pan.material) pan.material.emissiveIntensity = open ? 0.22 + Math.sin(c.t * 10) * 0.1 : 0.06;
+    const ladle = c.mesh && c.mesh.getObjectByName('kanom-ladle');
+    if (ladle) {
+      const scoop = Math.sin(c.t * 28);
+      ladle.rotation.z = 0.15 + scoop * 0.45;
+      ladle.position.y = 0.88 + Math.max(0, scoop) * 0.08;
+    }
+    const ped = c.vendor;
+    if (ped && ped.mesh && ped.anchor && ped.anchor.slot) {
+      ped.kanom = true;
+      ped.mesh.visible = open;
+      ped.mesh.position.set(ped.anchor.slot.x, 0, ped.anchor.slot.z);
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+      ped.speed = 0;
+      ped.state = 'idle';
+    }
+    if (!open || G.player.inVehicle || G._eating || !pp) continue;
+    if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) continue;
+    G.hud.showPrompt('Press <b>E</b> for kanom krok · ฿25', 0.4);
+    if (!G.input.pressed('KeyE')) continue;
+    if (G.cash < 25) { G.hud.showNotif('Need ฿25 for kanom krok'); continue; }
+    G.cash -= 25;
+    G.player.hp = Math.min(G.player.hpMax, G.player.hp + 16);
+    G.player.stam = G.player.stamMax;
+    if (G.hud.setCash) G.hud.setCash(G.cash);
+    G._kanomKrok = (G._kanomKrok || 0) + 1;
+    G.hud.showNotif('Kanom krok — ขนมครก');
+    if (G.audio && G.audio.chime) G.audio.chime();
+  }
+}
+
+export function updateMangoSticky(dt) {
+  if (!GAMEPLAY.mangoSticky) return;
+  const carts = [G.mangoSticky, G.phromMango];
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 16 && h < 22.5;
+  const pp = G.player && G.player.group && G.player.group.position;
+  for (const c of carts) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    const cream = c.mesh && c.mesh.getObjectByName('coconut-cream');
+    if (cream && cream.material) cream.material.emissiveIntensity = open ? 0.18 + Math.sin(c.t * 8) * 0.08 : 0.04;
+    if (c.mesh) c.mesh.visible = true;
+    const ped = c.vendor;
+    if (ped && ped.mesh && ped.anchor && ped.anchor.slot) {
+      ped.mango = true;
+      ped.mesh.visible = open;
+      ped.mesh.position.set(ped.anchor.slot.x, 0, ped.anchor.slot.z);
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+      ped.speed = 0;
+      ped.state = 'idle';
+    }
+    if (!open || G.player.inVehicle || G._eating || !pp) continue;
+    if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) continue;
+    G.hud.showPrompt('Press <b>E</b> for mango sticky rice · ฿60', 0.4);
+    if (!G.input.pressed('KeyE')) continue;
+    if (G.cash < 60) { G.hud.showNotif('Need ฿60 for mango sticky rice'); continue; }
+    G.cash -= 60;
+    G.player.hp = Math.min(G.player.hpMax, G.player.hp + 30);
+    G.player.stam = G.player.stamMax;
+    if (G.hud.setCash) G.hud.setCash(G.cash);
+    G._mangoSticky = (G._mangoSticky || 0) + 1;
+    G.hud.showNotif('Mango sticky rice — ข้าวเหนียวมะม่วง');
+    if (G.audio && G.audio.chime) G.audio.chime();
+  }
+}
+
+export function updatePhromFruit(dt) {
+  if (!GAMEPLAY.phromFruit) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 10 && h < 20;
+  const pp = G.player && G.player.group && G.player.group.position;
+  for (const c of [G.phromFruit, G.asokFruit]) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    const blender = c.mesh && c.mesh.getObjectByName('phrom-blender');
+    if (blender) {
+      blender.rotation.y = open ? c.t * 8.5 : blender.rotation.y;
+      if (blender.material) blender.material.emissiveIntensity = open ? 0.22 + Math.sin(c.t * 10) * 0.1 : 0.06;
+    }
+    const fruits = c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'phrom-fruit-piece') : [];
+    for (let i = 0; i < fruits.length; i++) {
+      fruits[i].position.y = 0.82 + (open ? Math.sin(c.t * 3.2 + i) * 0.02 : 0);
+    }
+    const ped = c.vendor;
+    if (ped && ped.mesh && ped.anchor && ped.anchor.slot) {
+      ped.phromFruit = true;
+      ped.mesh.visible = open;
+      ped.mesh.position.set(ped.anchor.slot.x, 0, ped.anchor.slot.z);
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+      ped.speed = 0;
+      ped.state = 'idle';
+    }
+    if (!open || G.player.inVehicle || G._eating || !pp) continue;
+    if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) continue;
+    G.hud.showPrompt('Press <b>E</b> for a fruit smoothie · ฿40', 0.4);
+    if (!G.input.pressed('KeyE')) continue;
+    if (G.cash < 40) { G.hud.showNotif('Need ฿40 for a smoothie'); continue; }
+    G.cash -= 40;
+    G.player.hp = Math.min(G.player.hpMax, G.player.hp + 18);
+    G.player.stam = G.player.stamMax;
+    if (G.hud.setCash) G.hud.setCash(G.cash);
+    G._phromFruit = (G._phromFruit || 0) + 1;
+    G.hud.showNotif('Fruit smoothie — น้ำปั่น');
+    if (G.audio && G.audio.chime) G.audio.chime();
+  }
+}
+
+export function updateBtsMalai(dt) {
+  if (!GAMEPLAY.btsMalai) return;
+  const stands = [G.btsMalai, G.phromMalai];
+  const pp = G.player && G.player.group && G.player.group.position;
+  for (const stand of stands) {
+    if (!stand) continue;
+    stand.t = (stand.t || 0) + dt;
+    const strands = stand.mesh ? stand.mesh.children.filter(ch => ch && ch.name === 'malai-strand') : [];
+    for (let i = 0; i < strands.length; i++) {
+      strands[i].rotation.z = Math.sin(stand.t * 2.8 + i) * 0.12;
+    }
+    const ped = stand.vendor;
+    if (ped && ped.mesh && ped.anchor && ped.anchor.slot) {
+      ped.btsMalai = true;
+      ped.mesh.position.set(ped.anchor.slot.x, 0, ped.anchor.slot.z);
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+      ped.speed = 0;
+      ped.state = 'idle';
+    }
+    if (G.player.inVehicle || G._eating || !pp) continue;
+    if (!stand.mesh || dist2(stand.mesh.position, pp) > 2.4 * 2.4) continue;
+    if (G._malai) {
+      G.hud.showPrompt('You already have a malai', 0.35);
+      continue;
+    }
+    G.hud.showPrompt('Press <b>E</b> for a malai · ฿20', 0.4);
+    if (!G.input.pressed('KeyE')) continue;
+    if (G.cash < 20) { G.hud.showNotif('Need ฿20 for a malai'); continue; }
+    G.cash -= 20;
+    G._malai = true;
+    if (G.hud.setCash) G.hud.setCash(G.cash);
+    G.hud.showNotif('Phuang malai — พวงมาลัย');
+    if (G.audio && G.audio.chime) G.audio.chime();
+  }
+}
+
+export function updateSomTam(dt) {
+  if (!GAMEPLAY.somTam || !G.somTam) return;
+  for (const c of G.somTam) {
+    if (!c.mesh || !c.soi) continue;
+    c.t += c.dir * dt * 0.032;
+    if (c.t > 0.9) { c.t = 0.9; c.dir = -1; }
+    if (c.t < 0.1) { c.t = 0.1; c.dir = 1; }
+    const s = c.soi;
+    const x = c.alongZ ? (s.x0 + s.x1) * 0.5 : s.x0 + (s.x1 - s.x0) * c.t;
+    const z = c.alongZ ? s.z0 + (s.z1 - s.z0) * c.t : (s.z0 + s.z1) * 0.5;
+    const yaw = c.alongZ ? (c.dir > 0 ? 0 : PI) : (c.dir > 0 ? PI / 2 : -PI / 2);
+    c.mesh.position.set(x, 0, z);
+    c.mesh.rotation.y = yaw;
+    const pestle = c.mesh.getObjectByName('somtam-pestle');
+    if (pestle) {
+      const pound = Math.sin(c.t * 42);
+      pestle.position.y = 1.18 + Math.max(0, pound) * 0.12;
+      pestle.rotation.z = 0.25 + pound * 0.2;
+    }
+    if (c.vendor && c.vendor.mesh && !c.vendor.dead) {
+      c.vendor.somTam = true;
+      c.vendor.mesh.position.set(x, 0, z);
+      c.vendor.heading = yaw;
+      c.vendor.mesh.rotation.y = yaw;
+      if (c.vendor.anchor && c.vendor.anchor.slot) c.vendor.anchor.slot.set(x, 0, z);
+      c.vendor.speed = 0.5;
+    }
+  }
+  if (G.player.inVehicle || G._eating) return;
+  const pp = G.player.group.position;
+  for (const c of G.somTam) {
+    if (!c.mesh || dist2(c.mesh.position, pp) > 2.2 * 2.2) continue;
+    G.hud.showPrompt('Press <b>E</b> for som tam · ฿45', 0.4);
+    if (G.input.pressed('KeyE')) {
+      if (G.cash < 45) { G.hud.showNotif('Need ฿45 for som tam'); return; }
+      G.cash -= 45;
+      G.player.hp = Math.min(G.player.hpMax, G.player.hp + 24);
+      if (G.hud.setCash) G.hud.setCash(G.cash);
+      G.hud.showNotif('Som tam — ส้มตำ');
       if (G.audio && G.audio.chime) G.audio.chime();
     }
     return;
@@ -1596,6 +4384,26 @@ export function updateSoiFootball(dt) {
   }
 }
 
+export function updateStallIncense(dt) {
+  if (!GAMEPLAY.stallIncense || !G.stallIncense) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const dusk = h >= 17.5 || h < 6;
+  for (const c of G.stallIncense) {
+    c.t = (c.t || 0) + dt;
+    if (c.glow && c.glow.material) {
+      c.glow.material.emissiveIntensity = dusk ? 0.55 + Math.sin(c.t * 6) * 0.25 : 0.12;
+    }
+    if (c.coil && c.coil.material) {
+      c.coil.material.emissiveIntensity = dusk ? 0.28 : 0.08;
+    }
+    if (c.smoke && c.smoke.material) {
+      c.smoke.material.opacity = dusk ? 0.16 + Math.sin(c.t * 2.2) * 0.08 : 0.06;
+      c.smoke.position.y = 0.12 + Math.sin(c.t * 1.6) * 0.04;
+      c.smoke.visible = dusk;
+    }
+  }
+}
+
 export function updateGeckos(dt) {
   if (!GAMEPLAY.stallGecko || !G.geckos) return;
   const night = (G.nightK || 0) > 0.45;
@@ -1652,16 +4460,283 @@ export function updateMonitors(dt) {
   }
 }
 
+export function updateWatSweep(dt) {
+  if (!GAMEPLAY.watSweep || !G.watSweep) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const morning = h >= 6 && h < 10.5;
+  for (const ped of G.watSweep) {
+    if (!ped || ped.dead || !ped.mesh) continue;
+    ped.watSweep = true;
+    ped.mesh.visible = morning;
+    if (!morning) {
+      ped.speed = 0;
+      ped.state = 'idle';
+      continue;
+    }
+    ped._sweepT = (ped._sweepT || 0) + dt * 0.14 * (ped._sweepDir || 1);
+    if (ped._sweepT > 1) { ped._sweepT = 1; ped._sweepDir = -1; }
+    if (ped._sweepT < 0) { ped._sweepT = 0; ped._sweepDir = 1; }
+    const t = ped._sweepT;
+    const x = (ped._sweepX0 || 0) + ((ped._sweepX1 || 0) - (ped._sweepX0 || 0)) * t;
+    ped.mesh.position.set(x, 0, ped._sweepZ != null ? ped._sweepZ : ped.mesh.position.z);
+    ped.heading = (ped._sweepDir || 1) > 0 ? PI / 2 : -PI / 2;
+    ped.mesh.rotation.y = ped.heading;
+    ped.speed = 0.7;
+    ped.state = 'walking';
+    animateWalk(ped.mesh, ped.speed, dt, true);
+    const broom = ped._broom || ped.mesh.getObjectByName('wat-broom');
+    if (broom) broom.rotation.x = 0.55 + Math.sin((ped._sweepT || 0) * 18) * 0.5;
+  }
+}
+
+export function updateWatCats(dt) {
+  if (!GAMEPLAY.watCats || !G.watCats) return;
+  const temple = G.world && G.world.poi && G.world.poi.temple;
+  const pp = G.player.inVehicle ? G.player.inVehicle.pos : G.player.group.position;
+  for (const c of G.watCats) {
+    if (!c.mesh) continue;
+    c.t = (c.t || 0) + dt;
+    const d = Math.hypot(c.mesh.position.x - pp.x, c.mesh.position.z - pp.z);
+    if (d < 3.2) c.state = 'bolt';
+    else if (c.state === 'bolt' && d > 7) c.state = 'return';
+    if (c.state === 'loaf') {
+      c.heading += Math.sin(c.t * 0.7) * dt * 0.4;
+      c.mesh.position.x += Math.sin(c.heading) * 0.22 * dt;
+      c.mesh.position.z += Math.cos(c.heading) * 0.22 * dt;
+    } else if (c.state === 'bolt') {
+      const dx = c.mesh.position.x - pp.x, dz = c.mesh.position.z - pp.z;
+      const len = Math.hypot(dx, dz) || 1;
+      c.heading = Math.atan2(dx, dz);
+      c.mesh.position.x += dx / len * 3.2 * dt;
+      c.mesh.position.z += dz / len * 3.2 * dt;
+    } else {
+      const dx = c.home.x - c.mesh.position.x, dz = c.home.z - c.mesh.position.z;
+      const len = Math.hypot(dx, dz) || 1;
+      if (len < 0.45) c.state = 'loaf';
+      else {
+        c.heading = Math.atan2(dx, dz);
+        c.mesh.position.x += dx / len * 1.3 * dt;
+        c.mesh.position.z += dz / len * 1.3 * dt;
+      }
+    }
+    if (temple) {
+      c.mesh.position.x = clamp(c.mesh.position.x, temple.x - 12, temple.x + 12);
+      c.mesh.position.z = clamp(c.mesh.position.z, temple.z - 12, temple.z + 12);
+    }
+    c.mesh.rotation.y = c.heading;
+  }
+}
+
+export function updateWatLotus(dt) {
+  if (!GAMEPLAY.watLotus || !G.watLotus) return;
+  const c = G.watLotus;
+  c.t = (c.t || 0) + dt;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 6 && h < 18;
+  const blooms = c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'wat-lotus') : [];
+  for (let i = 0; i < blooms.length; i++) {
+    blooms[i].position.y = 0.38 + Math.sin(c.t * 2.2 + i) * 0.03;
+  }
+  const ped = c.vendor;
+  if (ped && ped.mesh) {
+    ped.watLotus = true;
+    ped.mesh.visible = open;
+    const slot = ped.anchor && ped.anchor.slot;
+    if (slot) {
+      ped.mesh.position.set(slot.x, 0, slot.z);
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+    }
+    ped.speed = 0;
+    ped.state = 'idle';
+  }
+  for (const merit of [G.watMerit, G.watMeritB]) {
+    if (!merit) continue;
+    merit.t = (merit.t || 0) + dt;
+    const mp = merit.ped;
+    if (mp && mp.mesh) {
+      mp.watLotus = true;
+      mp.watMerit = true;
+      mp.mesh.visible = open;
+      if (open) {
+        const slot = mp.anchor && mp.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(merit.t * 2.2) * 0.05;
+          mp.mesh.position.set(slot.x, 0, slot.z + bob);
+          mp.heading = mp.anchor.facing;
+          mp.mesh.rotation.y = mp.heading;
+        }
+        const tray = mp.mesh.getObjectByName('wat-merit-tray');
+        if (tray) tray.rotation.z = Math.sin(merit.t * 4.2) * 0.35;
+      }
+      mp.speed = 0;
+      mp.state = 'idle';
+    }
+    if (merit.box) merit.box.visible = true;
+  }
+  if (!open || G.player.inVehicle || G._eating) return;
+  const pp = G.player.group.position;
+  if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) return;
+  if (G._lotus) {
+    G.hud.showPrompt('You already have a lotus', 0.35);
+    return;
+  }
+  G.hud.showPrompt('Press <b>E</b> for a lotus · ฿30', 0.4);
+  if (!G.input.pressed('KeyE')) return;
+  if (G.cash < 30) { G.hud.showNotif('Need ฿30 for a lotus'); return; }
+  G.cash -= 30;
+  G._lotus = true;
+  if (G.hud.setCash) G.hud.setCash(G.cash);
+  G.hud.showNotif('Lotus — ดอกบัว');
+  if (G.audio && G.audio.chime) G.audio.chime();
+}
+
+export function updateWatAmulet(dt) {
+  if (!GAMEPLAY.watAmulet || !G.watAmulet) return;
+  const c = G.watAmulet;
+  c.t = (c.t || 0) + dt;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 6 && h < 18;
+  const charms = c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'wat-amulet') : [];
+  for (let i = 0; i < charms.length; i++) {
+    charms[i].rotation.z = Math.sin(c.t * 2.4 + i) * 0.18;
+  }
+  const ped = c.vendor;
+  if (ped && ped.mesh) {
+    ped.watAmulet = true;
+    ped.mesh.visible = open;
+    const slot = ped.anchor && ped.anchor.slot;
+    if (slot) {
+      ped.mesh.position.set(slot.x, 0, slot.z);
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+    }
+    ped.speed = 0;
+    ped.state = 'idle';
+  }
+  if (!open || G.player.inVehicle || G._eating) return;
+  const pp = G.player.group.position;
+  if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) return;
+  if (G._amulet) {
+    G.hud.showPrompt('You already have an amulet', 0.35);
+    return;
+  }
+  G.hud.showPrompt('Press <b>E</b> for an amulet · ฿50', 0.4);
+  if (!G.input.pressed('KeyE')) return;
+  if (G.cash < 50) { G.hud.showNotif('Need ฿50 for an amulet'); return; }
+  G.cash -= 50;
+  G._amulet = true;
+  if (G.hud.setCash) G.hud.setCash(G.cash);
+  G.hud.showNotif('Amulet — พระเครื่อง');
+  if (G.audio && G.audio.chime) G.audio.chime();
+}
+
+export function updateBtsPigeons(dt) {
+  if (!GAMEPLAY.btsPigeons || !G.btsPigeons) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const day = h >= 6 && h < 18.5;
+  const pp = G.player.group.position;
+  for (const p of G.btsPigeons) {
+    if (!p.mesh) continue;
+    p.t = (p.t || 0) + dt;
+    p.mesh.visible = day;
+    if (!day) continue;
+    const dx = p.mesh.position.x - pp.x, dy = p.mesh.position.y - pp.y, dz = p.mesh.position.z - pp.z;
+    const d3 = Math.hypot(dx, dy, dz);
+    if (d3 < 4.2) p.state = 'bolt';
+    else if (p.state === 'bolt' && d3 > 9) p.state = 'return';
+    if (p.state === 'loaf') {
+      p.mesh.position.set(p.home.x, p.home.y + Math.sin(p.t * 2.2) * 0.02, p.home.z);
+    } else if (p.state === 'bolt') {
+      const len = Math.hypot(dx, dz) || 1;
+      p.mesh.position.x += dx / len * 4.2 * dt;
+      p.mesh.position.z += dz / len * 4.2 * dt;
+      p.mesh.position.y = Math.min(p.home.y + 4.2, p.mesh.position.y + 3.6 * dt);
+      p.heading = Math.atan2(dx, dz);
+    } else {
+      const hx = p.home.x - p.mesh.position.x, hz = p.home.z - p.mesh.position.z;
+      const len = Math.hypot(hx, hz) || 1;
+      p.mesh.position.x += hx / len * 2.2 * dt;
+      p.mesh.position.z += hz / len * 2.2 * dt;
+      p.mesh.position.y += (p.home.y - p.mesh.position.y) * Math.min(1, dt * 2.4);
+      if (len < 0.35 && Math.abs(p.mesh.position.y - p.home.y) < 0.2) p.state = 'loaf';
+    }
+    p.mesh.rotation.y = p.heading || 0;
+    const flap = (p.state === 'loaf' ? 0.12 : 0.55) * Math.sin(p.t * (p.state === 'loaf' ? 6 : 16));
+    const wings = p.mesh.children.filter(ch => ch && ch.name === 'pigeon-wing');
+    if (wings[0]) wings[0].rotation.z = flap;
+    if (wings[1]) wings[1].rotation.z = -flap;
+  }
+}
+
+export function updateWatRobes(dt) {
+  if (!GAMEPLAY.watRobes || !G.watRobes) return;
+  const c = G.watRobes;
+  c.t = (c.t || 0) + dt;
+  const wet = (G.time.rainStrength || 0) > 0.4;
+  if (c.mesh) c.mesh.visible = !wet;
+  if (wet || !c.mesh) return;
+  const robes = c.mesh.children.filter(ch => ch && ch.name === 'saffron-robe');
+  for (let i = 0; i < robes.length; i++) {
+    robes[i].rotation.z = Math.sin(c.t * 3.4 + i * 0.7) * 0.22;
+  }
+}
+
+export function updateWatBats(dt) {
+  if (!GAMEPLAY.watBats || !G.watBats) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const night = h >= 18.2 || h < 5.6;
+  for (const b of G.watBats) {
+    if (!b.mesh) continue;
+    b.mesh.visible = night;
+    if (!night) continue;
+    b.t = (b.t || 0) + dt * (b.spin || 0.6);
+    const x = b.cx + Math.sin(b.t) * b.r;
+    const z = b.cz + Math.cos(b.t) * b.r;
+    const y = b.y + Math.sin(b.t * 2.4) * 0.35;
+    b.mesh.position.set(x, y, z);
+    b.mesh.rotation.y = b.t + PI / 2;
+    const flap = Math.sin(b.t * 18) * 0.45;
+    const wings = b.mesh.children.filter(ch => ch && ch.name === 'bat-wing');
+    if (wings[0]) wings[0].rotation.z = flap;
+    if (wings[1]) wings[1].rotation.z = -flap;
+  }
+}
+
 export function updateWatTurtles(dt) {
   if (!GAMEPLAY.watTurtles || !G.watTurtles) return;
+  const feed = GAMEPLAY.watFeed && G.watFeed && G.watFeed.feedT > 0;
+  const k = feed ? Math.min(1, G.watFeed.feedT / 4) : 0;
+  const fx = feed ? G.watFeed.x : 0, fz = feed ? G.watFeed.z : 0;
   for (const t of G.watTurtles) {
     if (!t.mesh) continue;
-    t.ang += t.spin * dt;
-    t.mesh.position.x = t.cx + Math.sin(t.ang) * t.r;
-    t.mesh.position.z = t.cz + Math.cos(t.ang) * t.r;
+    t.ang += t.spin * dt * (feed ? 1.8 : 1);
+    const r = feed ? Math.max(0.28, t.r * (1 - 0.65 * k)) : t.r;
+    const ox = feed ? t.cx + (fx - t.cx) * 0.5 * k : t.cx;
+    const oz = feed ? t.cz + (fz - t.cz) * 0.5 * k : t.cz;
+    t.mesh.position.x = ox + Math.sin(t.ang) * r;
+    t.mesh.position.z = oz + Math.cos(t.ang) * r;
     t.mesh.position.y = 0.12 + Math.sin(t.ang * 3) * 0.02;
     t.mesh.rotation.y = t.ang + PI / 2;
   }
+}
+
+export function updateWatFeed(dt) {
+  if (!GAMEPLAY.watFeed || !G.watFeed) return;
+  const f = G.watFeed;
+  if (f.feedT > 0) f.feedT = Math.max(0, f.feedT - dt);
+  if (G.player.inVehicle || G._eating) return;
+  const pp = G.player.group.position;
+  if (dist2({ x: f.x, z: f.z }, pp) > 2.4 * 2.4) return;
+  G.hud.showPrompt('Press <b>E</b> to feed the turtles · ฿10', 0.4);
+  if (!G.input.pressed('KeyE')) return;
+  if (G.cash < 10) { G.hud.showNotif('Need ฿10 for turtle pellets'); return; }
+  G.cash -= 10;
+  f.feedT = 5;
+  G._turtleFeed = (G._turtleFeed || 0) + 1;
+  if (G.hud.setCash) G.hud.setCash(G.cash);
+  G.hud.showNotif('The turtles swarm — ให้อาหารเต่า');
+  if (G.audio && G.audio.chime) G.audio.chime();
 }
 
 export function updateHyacinth(dt) {

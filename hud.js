@@ -188,15 +188,87 @@ export function bindHud() {
     const m = G.mission && G.mission.active;
     const nextJob = !G._welcomeDone ? 'welcome' : !G._soiRunWon ? 'soiRun' : !G._hitDone ? 'hit' : !G._deliveryDone ? 'delivery' : !G._mallJobDone ? 'mallJob' : !G._getawayDone ? 'getaway' : !G._repoRunDone ? 'repoRun' : !G._courierDone ? 'courier' : !G._holdYardDone ? 'holdYard' : !G._boutDone ? 'bout' : 'monsoon';
     out.push({ name: 'Jobs · Uncle Seng', status: (m && m.markerPos) ? `active: ${m.name}` : 'available', dist: d(poi.goldShop), job: nextJob });
-    if (G._welcomeDone) out.push({ name: 'Soi Run', status: G._soiRunWon ? 'done · replay' : 'available', job: 'soiRun', dist: null });
+    const soi0 = (G.world && G.world.sois && G.world.sois[0]) || null;
+    const soiMid = soi0 ? { x: (soi0.x0 + soi0.x1) * 0.5, z: (soi0.z0 + soi0.z1) * 0.5 } : { x: -150, z: -150 };
+    const soiRunStart = (G.mission && G.mission.missions && G.mission.missions.soiRun && G.mission.missions.soiRun.startLine) || soiMid;
+    const nearestVeh = pred => {
+      let best = null, bd = 1e9;
+      for (const v of G.vehicles || []) {
+        if (!v || v.dead || !v.pos || v.driver === 'player') continue;
+        if (!pred(v)) continue;
+        const dd = Math.hypot(v.pos.x - p.x, v.pos.z - p.z);
+        if (dd < bd) { bd = dd; best = v.pos; }
+      }
+      return best;
+    };
+    let bizLoc = null, bizD = 1e9;
+    for (const b of BUSINESSES) {
+      if (!b.pos) continue;
+      const dd = Math.hypot(b.pos.x - p.x, b.pos.z - p.z);
+      if (dd < bizD) { bizD = dd; bizLoc = b.pos; }
+    }
+    if (G._welcomeDone) out.push({ name: 'Soi Run', status: G._soiRunWon ? 'done · replay' : 'available', job: 'soiRun', dist: GAMEPLAY.phonePlaces ? d(soiRunStart) : null });
     if (G._holdYardDone) out.push({ name: 'Lumpinee Bout', status: G._boutDone ? 'done · replay' : 'available', job: 'bout', dist: d(poi.temple) });
     if (G._boutDone) out.push({ name: 'Monsoon', status: G._monsoonDone ? 'done · replay' : 'available', job: 'monsoon', dist: d(poi.pier) });
     if (G._monsoonDone) out.push({ name: 'Customs Issue', status: G._customsDone ? 'done · replay' : 'available', job: 'customs', dist: d(poi.klongToey) });
-    out.push({ name: '2 AM Soi Race', status: G._nightSoiDone ? 'done · replay' : 'bikes · night', job: 'nightSoi', dist: null });
+    out.push({ name: '2 AM Soi Race', status: G._nightSoiDone ? 'done · replay' : 'bikes · night', job: 'nightSoi', dist: GAMEPLAY.phonePlaces ? d(soiMid) : null });
+    if (G.checkpoint) {
+      const hh = ((G.time.dayT % 1) + 1) % 1 * 24;
+      const nightCp = hh >= 21 || hh < 5.2;
+      const lateCp = GAMEPLAY.twoAmCheckpoint && hh >= 1.5 && hh < 3.8;
+      out.push({
+        name: '2 AM checkpoint',
+        status: lateCp ? 'spike strip · slow' : nightCp ? 'cones out' : 'day shift',
+        dist: d(G.checkpoint),
+      });
+    }
     if (poi.gym) out.push({ name: 'Muay Thai gym', status: `melee ${((G.econ.upgrades && G.econ.upgrades.melee) || 0)}/3`, dist: d(poi.gym) });
+    if (G.watBell) out.push({ name: 'Wat bell', status: G._bellRung ? 'rang' : 'ระฆังวัด', dist: d(G.watBell) });
     if (poi.suvarnabhumi) out.push({ name: 'Suvarnabhumi', status: 'taxi an airliner', dist: d(poi.suvarnabhumi) });
     if (G.world && G.world.bts) out.push({ name: 'BTS Asok', status: 'ride the skytrain', dist: d({ x: G.world.bts.x, z: G.world.bts.z || 0 }) });
+    if (G.btsGates && G.btsGates.machine) {
+      out.push({
+        name: 'BTS ticket',
+        status: G._btsTicket ? 'rabbit in wallet' : (G._btsHopped ? 'hopped the gate' : 'แรบบิท · ฿50'),
+        dist: d(G.btsGates.machine.position),
+      });
+    }
+    if (G.phromGates && G.phromGates.machine) {
+      out.push({
+        name: 'BTS ticket (Phrom Phong)',
+        status: G._btsTicket ? 'rabbit in wallet' : (G._btsHopped ? 'hopped the gate' : 'แรบบิท · ฿50'),
+        dist: d(G.phromGates.machine.position),
+      });
+    }
+    if (G.btsMalai && G.btsMalai.mesh) {
+      out.push({ name: 'Malai at Asok', status: G._malai ? 'garland in hand' : 'พวงมาลัย · ฿20', dist: d(G.btsMalai.mesh.position) });
+    }
+    if (G.phromMalai && G.phromMalai.mesh) {
+      out.push({ name: 'Malai at Phrom Phong', status: G._malai ? 'garland in hand' : 'พวงมาลัย · ฿20', dist: d(G.phromMalai.mesh.position) });
+    }
+    if (G.mangoSticky && G.mangoSticky.mesh) {
+      const hh = ((G.time.dayT % 1) + 1) % 1 * 24;
+      const open = hh >= 16 && hh < 22.5;
+      out.push({ name: 'Mango sticky rice', status: open ? 'ข้าวเหนียวมะม่วง · ฿60' : 'opens 16:00', dist: d(G.mangoSticky.mesh.position) });
+    }
+    if (G.phromMango && G.phromMango.mesh) {
+      const hh = ((G.time.dayT % 1) + 1) % 1 * 24;
+      const open = hh >= 16 && hh < 22.5;
+      out.push({ name: 'Mango sticky rice (Phrom Phong)', status: open ? 'ข้าวเหนียวมะม่วง · ฿60' : 'opens 16:00', dist: d(G.phromMango.mesh.position) });
+    }
     if (poi.yaowarat) out.push({ name: 'Yaowarat', status: 'night market', dist: d(poi.yaowarat) });
+    if (G.squidGrill && G.squidGrill.mesh) {
+      const hh = ((G.time.dayT % 1) + 1) % 1 * 24;
+      const night = hh >= 18 || hh < 2;
+      out.push({ name: 'Grilled squid', status: night ? 'ปลาหมึกย่าง · ฿50' : 'after 18:00', dist: d(G.squidGrill.mesh.position) });
+    }
+    if (poi.cowboy || (G.soiCowboy && G.soiCowboy.origin)) {
+      const loc = poi.cowboy || G.soiCowboy.origin;
+      const hh = ((G.time.dayT % 1) + 1) % 1 * 24;
+      const open = hh >= 20 || hh < 4;
+      const closing = GAMEPLAY.cowboyClose && hh >= 4 && hh < 5.6;
+      out.push({ name: 'Soi Cowboy', status: closing ? 'kicking out · walk it off' : open ? 'neon · open' : 'closed till 20:00', dist: d(loc) });
+    }
     if (G.world && G.world.bank) {
       const h = G.heist;
       const st = (h && h.active) ? 'in progress' : (h && performance.now() < h.cooldownUntil) ? `cooldown ${Math.ceil((h.cooldownUntil - performance.now()) / 1000)}s` : 'ready';
@@ -205,20 +277,43 @@ export function bindHud() {
     }
     let owned = 0, rate = 0;
     for (const b of BUSINESSES) { const s = G.econ.businesses[b.id]; if (s && s.owned) { owned++; rate += bizRate(b, s); } }
-    out.push({ name: 'Properties', status: `${owned}/${BUSINESSES.length} · ฿${rate}/s`, dist: null });
+    out.push({ name: 'Properties', status: `${owned}/${BUSINESSES.length} · ฿${rate}/s`, dist: GAMEPLAY.phonePlaces ? d(bizLoc) : null });
     let held = 0; for (const t of TURFS) if (G.turfs && G.turfs[t.id] && G.turfs[t.id].owned) held++;
     const nt = TURFS.map(t => d(t.center)).filter(x => x != null).sort((a, b) => a - b)[0];
     out.push({ name: 'Gang turf', status: `${held}/${TURFS.length} held`, dist: nt == null ? null : nt });
     out.push({ name: 'Arcade · Tuk-Tuk Dash', status: 'mall floor 1', dist: d(poi.terminal) });
     out.push({ name: 'Riverside boats', status: 'longtails', dist: d(poi.pier) });
-    out.push({ name: 'Taxi · press J', status: (G.taxi && G.taxi.stage && G.taxi.stage !== 'idle') ? 'fare active' : 'available', dist: null });
+    if (G.boatNoodle && G.boatNoodle.mesh) {
+      out.push({ name: 'Boat noodles', status: 'ก๋วยเตี๋ยวเรือ · ฿50', dist: d(G.boatNoodle.mesh.position) });
+    }
+    if (G.somTam && G.somTam[0] && G.somTam[0].mesh) {
+      out.push({ name: 'Som tam cart', status: 'ส้มตำ · ฿45', dist: d(G.somTam[0].mesh.position) });
+    }
+    if (G.plaKat && G.plaKat.mesh) {
+      out.push({ name: 'Pla kat bags', status: 'ปลากัด · ฿40', dist: d(G.plaKat.mesh.position) });
+    }
+    if (G.chaYen && G.chaYen[0] && G.chaYen[0].mesh) {
+      out.push({ name: 'Cha yen cart', status: 'ชาเย็น · ฿25', dist: d(G.chaYen[0].mesh.position) });
+    }
+    if (G.rotiCart && G.rotiCart[0] && G.rotiCart[0].mesh) {
+      out.push({ name: 'Roti cart', status: 'โรตี · ฿35', dist: d(G.rotiCart[0].mesh.position) });
+    }
+    if (G.kanomKrok && G.kanomKrok.mesh) {
+      const hh = ((G.time.dayT % 1) + 1) % 1 * 24;
+      const open = hh >= 15 && hh < 21.5;
+      out.push({ name: 'Kanom krok', status: open ? 'ขนมครก · ฿25' : 'opens 15:00', dist: d(G.kanomKrok.mesh.position) });
+    }
+    if (G.soiBarber) {
+      out.push({ name: 'Soi barber', status: G._haircut ? 'fresh fade' : 'ตัดผม · ฿80', dist: d(G.soiBarber) });
+    }
+    out.push({ name: 'Taxi · press J', status: (G.taxi && G.taxi.stage && G.taxi.stage !== 'idle') ? 'fare active' : 'available', dist: GAMEPLAY.phonePlaces ? d(nearestVeh(v => v.kind === 'songthaew')) : null });
     const stand = G.world && G.world.motosaiStands && G.world.motosaiStands.find(s => s.bike && !s.bike.driver);
     out.push({ name: 'Motosai · press J', status: (G.motosai && G.motosai.stage && G.motosai.stage !== 'idle') ? 'fare active' : 'bike · sois', dist: stand && stand.bike ? d(stand.bike.pos) : null });
     const qd = G.quickDrop;
     const qdStatus = qd && qd.stage !== 'idle'
       ? (qd.stage === 'toPickup' ? 'pickup' : `drop-off · streak ${qd.streak || 0}`)
       : 'bike/tuk delivery';
-    out.push({ name: 'Moto Drop · Y/J', status: qdStatus, dist: null });
+    out.push({ name: 'Moto Drop · Y/J', status: qdStatus, dist: GAMEPLAY.phonePlaces ? d(nearestVeh(v => v.kind === 'bike' || v.kind === 'tuktuk')) : null });
     out.sort((a, b) => (a.dist == null ? 1e9 : a.dist) - (b.dist == null ? 1e9 : b.dist));
     return out;
   }
