@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.yaowaratNight || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.yaowaratNight || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -2083,6 +2083,83 @@ export function spawnWatTurtles(scene) {
     G.watTurtles.push({ mesh, cx, cz, ang, r, spin: 0.35 + i * 0.08 });
   }
   G.watPond = pond;
+}
+
+export function makeChaYenMesh() {
+  const g = new THREE.Group();
+  g.name = 'chayen-cart';
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.5, 1.15), new THREE.MeshStandardMaterial({ color: 0x7a3a18, roughness: 0.8 }));
+  box.position.y = 0.48; g.add(box);
+  const urn = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.16, 0.18, 0.42, 8),
+    new THREE.MeshStandardMaterial({ color: 0xc45a18, roughness: 0.45, metalness: 0.2, emissive: 0xa03a08, emissiveIntensity: 0.18 })
+  );
+  urn.name = 'chayen-urn';
+  urn.position.set(-0.18, 0.95, 0);
+  g.add(urn);
+  const lid = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.17, 0.17, 0.04, 8),
+    new THREE.MeshStandardMaterial({ color: 0x8a8a82, metalness: 0.4, roughness: 0.4 })
+  );
+  lid.position.set(-0.18, 1.18, 0);
+  g.add(lid);
+  const milk = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.07, 0.07, 0.16, 6),
+    new THREE.MeshStandardMaterial({ color: 0xe8e0d0, roughness: 0.55 })
+  );
+  milk.position.set(0.18, 0.86, -0.12);
+  g.add(milk);
+  const ice = new THREE.Mesh(
+    new THREE.BoxGeometry(0.22, 0.12, 0.22),
+    new THREE.MeshStandardMaterial({ color: 0xc8e8f0, roughness: 0.25, transparent: true, opacity: 0.7 })
+  );
+  ice.position.set(0.2, 0.82, 0.16);
+  g.add(ice);
+  const cup = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.05, 0.045, 0.14, 6),
+    new THREE.MeshStandardMaterial({ color: 0xe8a030, roughness: 0.5 })
+  );
+  cup.name = 'chayen-cup';
+  cup.position.set(0.32, 0.84, 0.02);
+  g.add(cup);
+  const umb = new THREE.Mesh(
+    new THREE.ConeGeometry(0.68, 0.24, 8),
+    new THREE.MeshStandardMaterial({ color: 0xff6a1a, roughness: 0.7, side: THREE.DoubleSide })
+  );
+  umb.position.y = 1.88; umb.rotation.x = PI; g.add(umb);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.0, 5), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+  pole.position.y = 1.35; g.add(pole);
+  const tire = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+  for (const z of [-0.38, 0.38]) for (const x of [-0.3, 0.3]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 8), tire);
+    w.rotation.z = PI / 2; w.position.set(x, 0.12, z); g.add(w);
+  }
+  return g;
+}
+
+export function spawnChaYen(scene) {
+  if (!GAMEPLAY.chaYen) return;
+  const sois = (G.world && G.world.sois) || [];
+  G.chaYen = [];
+  if (!sois.length) return;
+  const ranked = sois.slice().sort((a, b) => {
+    const la = a.axis === 'z' ? (a.z1 - a.z0) : (a.x1 - a.x0);
+    const lb = b.axis === 'z' ? (b.z1 - b.z0) : (b.x1 - b.x0);
+    return lb - la;
+  });
+  const s = ranked[4] || ranked[ranked.length - 1] || ranked[0];
+  const alongZ = s.axis === 'z';
+  const t0 = 0.72;
+  const x = alongZ ? (s.x0 + s.x1) * 0.5 : s.x0 + (s.x1 - s.x0) * t0;
+  const z = alongZ ? s.z0 + (s.z1 - s.z0) * t0 : (s.z0 + s.z1) * 0.5;
+  const mesh = makeChaYenMesh();
+  mesh.position.set(x, 0, z);
+  scene.add(mesh);
+  const vendor = spawnPed(scene, new THREE.Vector3(x, 0, z), 'vendor');
+  vendor.chaYen = true;
+  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: alongZ ? 0 : PI / 2 };
+  vendor.speed = 0;
+  G.chaYen.push({ mesh, vendor, soi: s, alongZ, t: t0, dir: -1 });
 }
 
 export function spawnCoconutCarts(scene) {
