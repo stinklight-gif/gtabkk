@@ -340,6 +340,7 @@ export const GAMEPLAY = {
   mallGuard: true,        // plastic-chair security at the Terminal 21 entrance; torch after dark
   bankGuard: true,        // plastic-chair security at Krung Thep Bank; torch after dark
   mallDir: true,          // directory clerk at the Terminal 21 desk; E names a shop and floor
+  officeSmoke: true,      // office smokers on the north-west Asok sidewalk at lunch; ember tips
 };
 G.gameplay = GAMEPLAY;
 

@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.officeSmoke || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -3051,6 +3051,53 @@ export function spawnBtsShine(scene) {
     vendor.mesh.visible = false;
   }
   G.btsShine = { mesh: g, vendor, x, z, t: 0 };
+}
+
+export function spawnOfficeSmoke(scene) {
+  if (!GAMEPLAY.officeSmoke) return;
+  const bts = G.world && G.world.bts;
+  const sx = bts ? bts.x : -50;
+  const slots = [
+    { x: sx - 9.2, z: 12.4, facing: PI / 2 },
+    { x: sx - 10.0, z: 13.1, facing: 0 },
+    { x: sx - 8.4, z: 12.8, facing: -PI / 2 },
+  ];
+  const smokers = [];
+  for (let i = 0; i < slots.length; i++) {
+    const slot = slots[i];
+    const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), 'office');
+    ped.officeSmoke = true;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = slot.facing;
+    ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
+    if (ped.mesh) {
+      ped.mesh.rotation.y = slot.facing;
+      ped.mesh.visible = false;
+    }
+    const cig = new THREE.Group();
+    cig.name = 'office-cig';
+    const stick = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.01, 0.01, 0.07, 6),
+      new THREE.MeshStandardMaterial({ color: 0xf0ead8, roughness: 0.7 })
+    );
+    stick.rotation.x = PI / 2;
+    cig.add(stick);
+    const ember = new THREE.Mesh(
+      new THREE.SphereGeometry(0.012, 6, 5),
+      new THREE.MeshStandardMaterial({ color: 0xff6a18, emissive: 0xff4a10, emissiveIntensity: 0.5, roughness: 0.4 })
+    );
+    ember.name = 'office-cig-ember';
+    ember.position.z = 0.04;
+    cig.add(ember);
+    const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+    if (parts && parts.foreR) { cig.position.set(0.02, -0.28, 0.06); parts.foreR.add(cig); }
+    else if (ped.mesh) { cig.position.set(0.22, 1.05, 0.12); ped.mesh.add(cig); }
+    ped._cig = cig;
+    ped._ember = ember;
+    smokers.push(ped);
+  }
+  G.officeSmoke = { smokers, x: sx - 9.2, z: 12.8, t: 0 };
 }
 
 export function spawnBtsSitters(scene) {

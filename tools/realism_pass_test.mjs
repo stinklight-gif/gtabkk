@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes','btsPigeons','watLotus','watCats','sevenShoppers','watFeed','btsPaper','yaoDuck','sevenSlush','phromFruit','pierWait','btsShine','watAmulet','yaoFortune','watDrum','mallGuard','bankGuard','mallDir']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes','btsPigeons','watLotus','watCats','sevenShoppers','watFeed','btsPaper','yaoDuck','sevenSlush','phromFruit','pierWait','btsShine','watAmulet','yaoFortune','watDrum','mallGuard','bankGuard','mallDir','officeSmoke']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -462,7 +462,7 @@ async function main() {
     const peds = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
       const ways = (G.world.walkways || []).length;
-      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart && !p.songthaewRide && !p.watSweep && !p.yaoGold && !p.yaoDuck && !p.yaoFortune && !p.sevenAtm && !p.btsBusker && !p.watLotus && !p.watAmulet && !p.watDrum && !p.sevenShop && !p.sevenSlush && !p.btsPaper && !p.phromFruit && !p.pierWait && !p.btsShine && !p.mallGuard && !p.bankGuard && !p.mallDir);
+      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart && !p.songthaewRide && !p.watSweep && !p.yaoGold && !p.yaoDuck && !p.yaoFortune && !p.sevenAtm && !p.btsBusker && !p.watLotus && !p.watAmulet && !p.watDrum && !p.sevenShop && !p.sevenSlush && !p.btsPaper && !p.phromFruit && !p.pierWait && !p.btsShine && !p.mallGuard && !p.bankGuard && !p.mallDir && !p.officeSmoke);
       const b = G.world.buildings.find(x => x.size.y > 8 && x.size.x > 4 && x.size.z > 4) || G.world.buildings[0];
       const insideBefore = wanderer && b && Math.abs(wanderer.mesh.position.x - b.pos.x) < b.size.x / 2 && Math.abs(wanderer.mesh.position.z - b.pos.z) < b.size.z / 2;
       if (wanderer && b) {
@@ -4012,6 +4012,7 @@ async function main() {
       main.updateMallDirectory(0.05);
       const night = !!(c && c.clerk && c.clerk.mesh && c.clerk.mesh.visible === false);
       G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
       main.updateMallDirectory(0.05);
       const day = !!(c && c.clerk && c.clerk.mallDir && c.clerk.mesh && c.clerk.mesh.visible);
       const glow0 = c && c.screen && c.screen.material ? c.screen.material.emissiveIntensity : 0;
@@ -4040,6 +4041,42 @@ async function main() {
     });
     assert(dir.flag && dir.named && dir.screen && dir.near, 'a directory board waits at Terminal 21');
     assert(dir.night && dir.day && dir.glowed && dir.asked, 'the clerk works the desk and E names a shop');
+
+    console.log('\n[117] office smokers at Asok north-west');
+    const smokeBreak = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.officeSmoke;
+      const list = (c && c.smokers) || [];
+      const n = list.filter(p => p && p.officeSmoke && p.mesh).length;
+      const cigs = list.filter(p => p && p.mesh && p.mesh.getObjectByName('office-cig')).length;
+      const embers = list.filter(p => p && p.mesh && p.mesh.getObjectByName('office-cig-ember')).length;
+      const bts = G.world && G.world.bts;
+      const sx = bts ? bts.x : -50;
+      const near = list.filter(p => p && p.mesh && Math.hypot(p.mesh.position.x - (c ? c.x : sx - 9.2), p.mesh.position.z - (c ? c.z : 12.8)) < 4).length;
+      G.time.dayT = 9 / 24;
+      main.updateOfficeSmoke(0.05);
+      const morning = list.filter(p => p && p.mesh && p.mesh.visible === false).length;
+      G.time.dayT = 12.4 / 24;
+      if (c) c.t = 0.2;
+      main.updateOfficeSmoke(0.05);
+      const lunch = list.filter(p => p && p.officeSmoke && p.mesh && p.mesh.visible).length;
+      const p0 = list[0];
+      const z0 = p0 && p0.mesh ? p0.mesh.position.z : 0;
+      const e0 = p0 && p0._ember && p0._ember.material ? p0._ember.material.emissiveIntensity : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateOfficeSmoke(0.05);
+      const shifted = !!(p0 && p0.mesh && Math.abs(p0.mesh.position.z - z0) > 0.02);
+      const glowed = !!(p0 && p0._ember && Math.abs(p0._ember.material.emissiveIntensity - e0) > 0.04);
+      G.time.dayT = 16 / 24;
+      main.updateOfficeSmoke(0.05);
+      const afternoon = list.filter(p => p && p.mesh && p.mesh.visible === false).length;
+      return {
+        flag: !!(G.gameplay && G.gameplay.officeSmoke),
+        n, cigs, embers, near, morning, lunch, shifted, glowed, afternoon,
+      };
+    });
+    assert(smokeBreak.flag && smokeBreak.n >= 3 && smokeBreak.cigs >= 3 && smokeBreak.embers >= 3 && smokeBreak.near >= 3, `office smokers wait north-west of Asok (${smokeBreak.n})`);
+    assert(smokeBreak.morning >= 3 && smokeBreak.lunch >= 3 && smokeBreak.afternoon >= 3 && smokeBreak.shifted && smokeBreak.glowed, 'they only come out at lunch and the embers glow');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
