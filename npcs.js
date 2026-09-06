@@ -2244,6 +2244,19 @@ export function updateAirportTaxi(dt) {
   }
 }
 
+export function updateWindsock(dt) {
+  if (!GAMEPLAY.airport || !G.windsock) return;
+  const c = G.windsock;
+  c.t = (c.t || 0) + dt;
+  const sock = c.sock;
+  if (!sock) return;
+  const rain = G.time.rainStrength || 0;
+  const amp = 0.16 + rain * 0.28;
+  sock.rotation.z = PI / 2;
+  sock.rotation.y = Math.sin(c.t * 2.4) * amp;
+  sock.rotation.x = Math.sin(c.t * 3.6) * amp * 0.35;
+}
+
 export function updateMallFood(dt) {
   if (!GAMEPLAY.mallFood || !G.mallFood) return;
   const c = G.mallFood;

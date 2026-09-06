@@ -93,9 +93,12 @@ export function buildAirport(scene, world) {
 
   // Windsock
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 8, 6), new THREE.MeshStandardMaterial({ color: 0x888 }));
+  pole.name = 'windsock-pole';
   pole.position.set(230, 4, -170); scene.add(pole);
   const sock = new THREE.Mesh(new THREE.ConeGeometry(0.7, 2.4, 6, 1, true), new THREE.MeshStandardMaterial({ color: 0xc45a1a, side: THREE.DoubleSide }));
+  sock.name = 'windsock';
   sock.rotation.z = PI / 2; sock.position.set(231.4, 7.6, -170); scene.add(sock);
+  G.windsock = { pole, sock, x: 230, z: -170, t: 0 };
 
   world.poi.suvarnabhumi = new THREE.Vector3(220, 0, 0);
   world.poi.airportTower = new THREE.Vector3(212, 0, 96);

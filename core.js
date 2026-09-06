@@ -247,7 +247,7 @@ export const GAMEPLAY = {
   btsHijack: true,
   fireAtTen: true,
   allRed: true,
-  airport: true,
+  airport: true,          // Suvarnabhumi pocket; windsock on the south apron fills with the breeze
   btsRide: true,
   talkChase: true,
   yaowaratNight: true,

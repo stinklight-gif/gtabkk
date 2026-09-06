@@ -5964,6 +5964,33 @@ async function main() {
     assert(eastKrok.flag && eastKrok.named && eastKrok.pan && eastKrok.cakes >= 6 && eastKrok.near && eastKrok.farWalk, 'a kanom krok pan waits outside the east 7-Eleven');
     assert(eastKrok.dayVendor && eastKrok.eveVendor && eastKrok.scooped, 'the east vendor works afternoons and the ladle scoops');
     assert(eastKrok.paid && eastKrok.hp > 40 && eastKrok.stam > 10, 'E buys kanom krok at the east pan for ฿25');
+
+    console.log('\n[168] Suvarnabhumi windsock');
+    const sock = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.windsock;
+      const named = !!(c && c.sock && c.sock.name === 'windsock' && c.pole && c.pole.name === 'windsock-pole');
+      const near = !!(c && Math.hypot((c.x || 0) - 230, (c.z || 0) + 170) < 4);
+      G.time.weather = 'clear';
+      G.time.rainStrength = 0;
+      if (c) c.t = 0.2;
+      main.updateWindsock(0.05);
+      const y0 = c && c.sock ? c.sock.rotation.y : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.4;
+      main.updateWindsock(0.05);
+      const fluttered = !!(c && c.sock && Math.abs(c.sock.rotation.y - y0) > 0.04);
+      const dryAmp = c && c.sock ? Math.abs(c.sock.rotation.y) : 0;
+      G.time.rainStrength = 0.85;
+      if (c) c.t = 0.2 + Math.PI / 2.4;
+      main.updateWindsock(0.05);
+      const wetAmp = c && c.sock ? Math.abs(c.sock.rotation.y) : 0;
+      return {
+        flag: !!(G.gameplay && G.gameplay.airport),
+        named, near, fluttered, stronger: wetAmp > dryAmp + 0.02,
+      };
+    });
+    assert(sock.flag && sock.named && sock.near, 'a windsock stands on the south Suvarnabhumi apron');
+    assert(sock.fluttered && sock.stronger, 'it fills with the breeze and leans harder in the rain');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
