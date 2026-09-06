@@ -359,6 +359,7 @@ export const GAMEPLAY = {
   homeAuntie: true,       // neighbor sits a plastic chair beside the safehouse door; they hide after 22:00
   stationPorter: true,    // red-vest porters with bags under the Hua Lamphong canopy; they hide after 22:00
   garageMech: true,       // mechanic at the U-Spray bay mouth; they hide after 19:00
+  klongDock: true,        // dockhands at the Klong Toey container yard; they hide after 19:00
 };
 G.gameplay = GAMEPLAY;
 
