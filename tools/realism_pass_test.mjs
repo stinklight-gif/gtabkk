@@ -4458,6 +4458,41 @@ async function main() {
     });
     assert(phromShine.flag && phromShine.named && phromShine.box && phromShine.n >= 2 && phromShine.cloth && phromShine.stop === 'phrom' && phromShine.near, 'a shoe-shine box waits north of Phrom Phong');
     assert(phromShine.night && phromShine.day && phromShine.wiped && phromShine.paid, 'the rag wipes by day and E buys a shine for ฿30');
+
+    console.log('\n[128] office smokers at Phrom Phong north-west');
+    const phromSmoke = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.phromSmoke;
+      const list = (c && c.smokers) || [];
+      const n = list.filter(p => p && p.officeSmoke && p.mesh).length;
+      const cigs = list.filter(p => p && p.mesh && p.mesh.getObjectByName('office-cig')).length;
+      const embers = list.filter(p => p && p.mesh && p.mesh.getObjectByName('office-cig-ember')).length;
+      const near = list.filter(p => p && p.mesh && Math.hypot(p.mesh.position.x - 100, p.mesh.position.z) < 18).length;
+      G.time.dayT = 9 / 24;
+      main.updateOfficeSmoke(0.05);
+      const morning = list.filter(p => p && p.mesh && p.mesh.visible === false).length;
+      G.time.dayT = 12.4 / 24;
+      if (c) c.t = 0.2;
+      main.updateOfficeSmoke(0.05);
+      const lunch = list.filter(p => p && p.officeSmoke && p.stop === 'phrom' && p.mesh && p.mesh.visible).length;
+      const p0 = list[0];
+      const z0 = p0 && p0.mesh ? p0.mesh.position.z : 0;
+      const e0 = p0 && p0._ember && p0._ember.material ? p0._ember.material.emissiveIntensity : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateOfficeSmoke(0.05);
+      const shifted = !!(p0 && p0.mesh && Math.abs(p0.mesh.position.z - z0) > 0.02);
+      const glowed = !!(p0 && p0._ember && Math.abs(p0._ember.material.emissiveIntensity - e0) > 0.04);
+      G.time.dayT = 16 / 24;
+      main.updateOfficeSmoke(0.05);
+      const afternoon = list.filter(p => p && p.mesh && p.mesh.visible === false).length;
+      return {
+        flag: !!(G.gameplay && G.gameplay.officeSmoke),
+        n, cigs, embers, near, morning, lunch, shifted, glowed, afternoon,
+        stop: c && c.stop,
+      };
+    });
+    assert(phromSmoke.flag && phromSmoke.stop === 'phrom' && phromSmoke.n >= 3 && phromSmoke.cigs >= 3 && phromSmoke.embers >= 3 && phromSmoke.near >= 3, `office smokers wait north-west of Phrom Phong (${phromSmoke.n})`);
+    assert(phromSmoke.morning >= 3 && phromSmoke.lunch >= 3 && phromSmoke.afternoon >= 3 && phromSmoke.shifted && phromSmoke.glowed, 'they only come out at lunch and the embers glow');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

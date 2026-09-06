@@ -1804,34 +1804,37 @@ export function updateMallDirectory(dt) {
 }
 
 export function updateOfficeSmoke(dt) {
-  if (!GAMEPLAY.officeSmoke || !G.officeSmoke) return;
-  const c = G.officeSmoke;
-  c.t = (c.t || 0) + dt;
+  if (!GAMEPLAY.officeSmoke) return;
+  const packs = [G.officeSmoke, G.phromSmoke];
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const open = h >= 11.8 && h < 13.6;
-  for (let i = 0; i < (c.smokers || []).length; i++) {
-    const ped = c.smokers[i];
-    if (!ped || ped.dead || !ped.mesh) continue;
-    ped.officeSmoke = true;
-    ped.mesh.visible = open;
-    if (!open) {
+  for (const c of packs) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    for (let i = 0; i < (c.smokers || []).length; i++) {
+      const ped = c.smokers[i];
+      if (!ped || ped.dead || !ped.mesh) continue;
+      ped.officeSmoke = true;
+      ped.mesh.visible = open;
+      if (!open) {
+        ped.speed = 0;
+        ped.state = 'idle';
+        continue;
+      }
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        const bob = Math.sin(c.t * 2.2 + i) * 0.05;
+        ped.mesh.position.set(slot.x, 0, slot.z + bob);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
       ped.speed = 0;
       ped.state = 'idle';
-      continue;
-    }
-    const slot = ped.anchor && ped.anchor.slot;
-    if (slot) {
-      const bob = Math.sin(c.t * 2.2 + i) * 0.05;
-      ped.mesh.position.set(slot.x, 0, slot.z + bob);
-      ped.heading = ped.anchor.facing;
-      ped.mesh.rotation.y = ped.heading;
-    }
-    ped.speed = 0;
-    ped.state = 'idle';
-    const parts = ped.mesh.userData && ped.mesh.userData.parts;
-    if (parts && parts.armR) parts.armR.rotation.x = -0.9 + Math.sin(c.t * 2.8 + i) * 0.1;
-    if (ped._ember && ped._ember.material) {
-      ped._ember.material.emissiveIntensity = 0.4 + 0.45 * Math.max(0, Math.sin(c.t * 5.5 + i));
+      const parts = ped.mesh.userData && ped.mesh.userData.parts;
+      if (parts && parts.armR) parts.armR.rotation.x = -0.9 + Math.sin(c.t * 2.8 + i) * 0.1;
+      if (ped._ember && ped._ember.material) {
+        ped._ember.material.emissiveIntensity = 0.4 + 0.45 * Math.max(0, Math.sin(c.t * 5.5 + i));
+      }
     }
   }
 }
