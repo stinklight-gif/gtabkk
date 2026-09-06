@@ -5499,6 +5499,42 @@ async function main() {
     });
     assert(southRack.flag && southRack.n >= 4 && southRack.near >= 4 && southRack.farWalk >= 4, `bikes cluster outside the south 7-Eleven (${southRack.n})`);
     assert(southRack.pinned >= 4 && southRack.open >= 4 && southRack.covers >= 4 && southRack.dry && southRack.wet && southRack.taken, 'the south rack is pinned, enterable, and the covers come out in the rain');
+
+    console.log('\n[156] west 7-Eleven parked bikes');
+    const westRack = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const walk = G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0]));
+      const west = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x < -50 && s.pos.z > 0 && s.pos.z < 60);
+      const list = G.westSevenBikes || [];
+      const n = list.filter(v => v && v.spec && v.spec.kind === 'bike' && v.sevenParked).length;
+      const pinned = list.filter(v => v && v._standHome && v.driver !== 'player').length;
+      let near = 0, farWalk = 0;
+      for (const v of list) {
+        if (!v || !v.pos) continue;
+        if (west && west.pos && Math.hypot(v.pos.x - west.pos.x, v.pos.z - west.pos.z) < 12) near++;
+        if (walk && walk.pos && Math.hypot(v.pos.x - walk.pos.x, v.pos.z - walk.pos.z) > 80) farWalk++;
+      }
+      const open = list.filter(v => v && v.driver == null).length;
+      const covers = list.filter(b => b && b.mesh && b.mesh.getObjectByName('seat-cover'));
+      const cover = covers[0] && covers[0].mesh.getObjectByName('seat-cover');
+      if (covers[0]) covers[0].driver = null;
+      G.time.rainStrength = 0;
+      main.updateBikeSeatCover(0.05);
+      const dry = !!(cover && cover.visible === false);
+      G.time.rainStrength = 0.85;
+      main.updateBikeSeatCover(0.05);
+      const wet = !!(cover && cover.visible === true);
+      if (covers[0]) covers[0].driver = 'player';
+      main.updateBikeSeatCover(0.05);
+      const taken = !!(cover && cover.visible === false);
+      if (covers[0]) covers[0].driver = null;
+      return {
+        flag: !!(G.gameplay && G.gameplay.sevenBikes),
+        n, pinned, near, farWalk, open, covers: covers.length, dry, wet, taken,
+      };
+    });
+    assert(westRack.flag && westRack.n >= 4 && westRack.near >= 4 && westRack.farWalk >= 4, `bikes cluster outside the west 7-Eleven (${westRack.n})`);
+    assert(westRack.pinned >= 4 && westRack.open >= 4 && westRack.covers >= 4 && westRack.dry && westRack.wet && westRack.taken, 'the west rack is pinned, enterable, and the covers come out in the rain');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
