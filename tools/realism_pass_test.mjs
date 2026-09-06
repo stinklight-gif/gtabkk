@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -2740,6 +2740,34 @@ async function main() {
     });
     assert(cape.flag && cape.rider && cape.named, 'bike riders wear a plastic poncho mesh');
     assert(cape.dry && cape.wet, 'the poncho only comes out in the rain');
+
+    console.log('\n[83] 7-Eleven bike seat covers');
+    const seat = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = G.sevenBikes || [];
+      const covers = list.filter(b => b && b.mesh && b.mesh.getObjectByName('seat-cover'));
+      const b0 = covers[0];
+      const cover = b0 && b0.mesh.getObjectByName('seat-cover');
+      if (b0) b0.driver = null;
+      G.time.rainStrength = 0;
+      main.updateBikeSeatCover(0.05);
+      const dry = !!(cover && cover.visible === false);
+      G.time.rainStrength = 0.85;
+      main.updateBikeSeatCover(0.05);
+      const wet = !!(cover && cover.visible === true);
+      if (b0) b0.driver = 'player';
+      main.updateBikeSeatCover(0.05);
+      const taken = !!(cover && cover.visible === false);
+      if (b0) b0.driver = null;
+      return {
+        flag: !!(G.gameplay && G.gameplay.bikeSeatCover),
+        n: covers.length,
+        named: !!(cover && cover.name === 'seat-cover'),
+        dry, wet, taken,
+      };
+    });
+    assert(seat.flag && seat.n >= 4 && seat.named, `parked 7-Eleven bikes wear seat covers (${seat.n})`);
+    assert(seat.dry && seat.wet && seat.taken, 'covers come out in the rain and come off when you take the bike');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

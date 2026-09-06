@@ -309,6 +309,7 @@ export const GAMEPLAY = {
   soiCctv: true,          // soi pole cameras; a shot in view is a ping and 1★
   rotiCart: true,         // banana roti cart on a soi; E for a fold
   rainPoncho: true,       // plastic rain capes on motorbike riders when it pours
+  bikeSeatCover: true,    // plastic seat covers on parked 7-Eleven bikes in the rain
 };
 G.gameplay = GAMEPLAY;
 

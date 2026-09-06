@@ -2205,6 +2205,22 @@ export function spawnSevenBikes(scene) {
     bike.vel = 0;
     bike.sevenParked = true;
     bike._standHome = { x, z, heading };
+    if (GAMEPLAY.bikeSeatCover) {
+      const cover = new THREE.Mesh(
+        new THREE.BoxGeometry(0.28, 0.04, 0.42),
+        new THREE.MeshStandardMaterial({
+          color: pick([0xc8d8e0, 0xe8e0c8, 0xb0c8d8]),
+          roughness: 0.35,
+          transparent: true,
+          opacity: 0.72,
+        })
+      );
+      cover.name = 'seat-cover';
+      cover.visible = false;
+      cover.position.set(0, 0.78, -0.08);
+      bike.mesh.add(cover);
+      bike.seatCover = cover;
+    }
     G.sevenBikes.push(bike);
   }
 }
