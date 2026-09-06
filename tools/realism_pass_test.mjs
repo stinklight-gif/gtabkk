@@ -6191,6 +6191,35 @@ async function main() {
     });
     assert(asokSmoothie.flag && asokSmoothie.named && asokSmoothie.n >= 4 && asokSmoothie.blender && asokSmoothie.near && asokSmoothie.farPhrom, `a fruit smoothie cart waits at Asok (${asokSmoothie.n})`);
     assert(asokSmoothie.night && asokSmoothie.day && asokSmoothie.spun && asokSmoothie.paid, 'the Asok blender spins by day and E buys a smoothie for ฿40');
+
+    console.log('\n[175] ATM queue at Krung Thep Bank');
+    const bankAtm = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.bankAtm;
+      const door = G.world && G.world.poi && G.world.poi.bank;
+      const n = (c && c.queue || []).filter(p => p && p.bankQueue && p.mesh).length;
+      const card = (c && c.queue || []).some(p => p && p.mesh && p.mesh.getObjectByName('bank-atm-card'));
+      const named = !!(c && c.machine && c.machine.name === 'bank-atm');
+      const near = !!(c && door && Math.hypot(c.x - door.x, c.z - door.z) < 12);
+      G.time.dayT = 3 / 24;
+      main.updateBankQueue(0.05);
+      const late = (c && c.queue || []).filter(p => p && p.mesh && p.mesh.visible === false).length;
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updateBankQueue(0.05);
+      const day = (c && c.queue || []).filter(p => p && p.bankQueue && p.mesh && p.mesh.visible).length;
+      const p0 = c && c.queue && c.queue[0];
+      const z0 = p0 && p0.mesh ? p0.mesh.position.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.4;
+      main.updateBankQueue(0.05);
+      const shifted = !!(p0 && p0.mesh && Math.abs(p0.mesh.position.z - z0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.bankQueue),
+        n, card, named, near, late, day, shifted,
+      };
+    });
+    assert(bankAtm.flag && bankAtm.n >= 2 && bankAtm.card && bankAtm.named && bankAtm.near, `a queue waits at the Krung Thep Bank ATM (${bankAtm.n})`);
+    assert(bankAtm.late >= 2 && bankAtm.day >= 2 && bankAtm.shifted, 'they hide late and shift weight at the bank machine');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
