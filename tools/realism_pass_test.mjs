@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -2447,6 +2447,54 @@ async function main() {
     assert(tea.flag && tea.n >= 1 && tea.onSoi && tea.urn && tea.cup && tea.vendor, `a cha yen cart works a soi (${tea.n})`);
     assert(tea.moved && tea.glowed, 'the cart rolls the soi and the urn stays warm');
     assert(tea.paid && tea.stam > 10, 'E buys cha yen for ฿25 and fills stamina');
+
+    console.log('\n[76] soi barber');
+    const fade = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const shop = G.soiBarber;
+      const chair = !!(shop && shop.chair && shop.chair.name === 'barber-chair');
+      const pole = !!(shop && shop.pole && shop.pole.name === 'barber-pole');
+      const cape = !!(shop && shop.cape && shop.cape.name === 'barber-cape');
+      const clip = !!(shop && shop.clip && shop.clip.name === 'clippers');
+      const y0 = shop && shop.pole ? shop.pole.rotation.y : 0;
+      const clip0 = shop && shop.clip ? shop.clip.rotation.z : 0;
+      for (let i = 0; i < 20; i++) main.updateSoiBarber(0.05);
+      const spun = !!(shop && shop.pole && Math.abs(shop.pole.rotation.y - y0) > 0.1);
+      const buzzed = !!(shop && shop.clip && Math.abs(shop.clip.rotation.z - clip0) > 0.1);
+      G.player.inVehicle = null;
+      G._eating = null;
+      G._barberCut = null;
+      G._haircut = false;
+      if (G.player.hair) G.player.hair.scale.set(0.95, 0.58, 0.88);
+      if (shop) G.player.group.position.set(shop.x, 0, shop.z);
+      G.cash = 100;
+      const seen0 = performance.now() + 30000;
+      G.wanted.lastSeenAt = seen0;
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let paid = false;
+      for (let i = 0; i < 4 && !paid; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateSoiBarber(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        paid = G.cash === 20 && !!G._barberCut;
+      }
+      for (let i = 0; i < 12; i++) main.updateSoiBarber(0.2);
+      const hairY = G.player.hair ? G.player.hair.scale.y : 1;
+      return {
+        flag: !!(G.gameplay && G.gameplay.soiBarber),
+        chair, pole, cape, clip, spun, buzzed, paid,
+        onSoi: !!(shop && shop.soi),
+        vendor: !!(shop && shop.ped && shop.ped.soiBarber),
+        cut: !!G._haircut && !G._barberCut,
+        hairY,
+        cooled: G.wanted.lastSeenAt <= seen0 - 10000,
+      };
+    });
+    assert(fade.flag && fade.chair && fade.pole && fade.cape && fade.clip && fade.onSoi && fade.vendor, 'a plastic-chair barber works a soi');
+    assert(fade.spun && fade.buzzed, 'the pole spins and the clippers buzz');
+    assert(fade.paid && fade.cut && fade.hairY < 0.4 && fade.cooled, 'E buys a ฿80 fade and cools last-seen');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

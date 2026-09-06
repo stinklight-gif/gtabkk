@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.yaowaratNight || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.soiBarber || ped.yaowaratNight || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -1739,6 +1739,66 @@ export function spawnSoiMechanic(scene) {
   if (pp && pp.foreR) { wrench.position.set(0.02, -0.22, 0.08); pp.foreR.add(wrench); }
   else { wrench.position.set(0.22, 1.05, 0.12); ped.mesh.add(wrench); }
   G.soiMechanic = { ped, bike, stand, soi: s, x, z };
+}
+
+export function spawnSoiBarber(scene) {
+  if (!GAMEPLAY.soiBarber) return;
+  const sois = (G.world && G.world.sois) || [];
+  if (sois.length < 5) return;
+  const s = sois[4];
+  const alongZ = s.axis === 'z';
+  const t = 0.48;
+  const x = alongZ ? (s.x0 + s.x1) * 0.5 + 1.7 : s.x0 + (s.x1 - s.x0) * t;
+  const z = alongZ ? s.z0 + (s.z1 - s.z0) * t : (s.z0 + s.z1) * 0.5 + 1.7;
+  const facing = alongZ ? -PI / 2 : 0;
+  const chair = makePlasticChair();
+  chair.name = 'barber-chair';
+  chair.position.set(x, 0, z);
+  chair.rotation.y = facing;
+  scene.add(chair);
+  const cape = new THREE.Mesh(
+    new THREE.BoxGeometry(0.55, 0.02, 0.7),
+    new THREE.MeshStandardMaterial({ color: 0x1a3a6a, roughness: 0.7 })
+  );
+  cape.name = 'barber-cape';
+  cape.position.set(x, 0.46, z + (alongZ ? 0.02 : 0.02));
+  scene.add(cape);
+  const pole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.04, 0.05, 1.8, 6),
+    new THREE.MeshStandardMaterial({ color: 0x8a8a82, roughness: 0.55, metalness: 0.25 })
+  );
+  pole.position.set(x + (alongZ ? 0.55 : 0), 0.9, z + (alongZ ? 0 : 0.55));
+  scene.add(pole);
+  const stripe = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.06, 0.06, 0.45, 8),
+    new THREE.MeshStandardMaterial({ color: 0xc03030, roughness: 0.45, emissive: 0x801010, emissiveIntensity: 0.2 })
+  );
+  stripe.name = 'barber-pole';
+  stripe.position.set(pole.position.x, 1.85, pole.position.z);
+  scene.add(stripe);
+  const mirror = new THREE.Mesh(
+    new THREE.BoxGeometry(0.35, 0.42, 0.03),
+    new THREE.MeshStandardMaterial({ color: 0xa8c8d8, roughness: 0.15, metalness: 0.4 })
+  );
+  mirror.name = 'barber-mirror';
+  mirror.position.set(pole.position.x, 1.35, pole.position.z);
+  scene.add(mirror);
+  const ped = spawnPed(scene, new THREE.Vector3(x + (alongZ ? 0 : 0.85), 0, z + (alongZ ? 0.85 : 0)), 'laborer');
+  ped.soiBarber = true;
+  ped.anchor = { slot: ped.mesh.position.clone(), facing: facing + PI };
+  ped.speed = 0;
+  ped.state = 'idle';
+  ped.heading = facing + PI;
+  if (ped.mesh) ped.mesh.rotation.y = ped.heading;
+  const clip = new THREE.Mesh(
+    new THREE.BoxGeometry(0.05, 0.04, 0.16),
+    new THREE.MeshStandardMaterial({ color: 0x888890, metalness: 0.5, roughness: 0.35 })
+  );
+  clip.name = 'clippers';
+  const pp = ped.mesh.userData.parts;
+  if (pp && pp.foreR) { clip.position.set(0.02, -0.2, 0.08); pp.foreR.add(clip); }
+  else { clip.position.set(0.22, 1.05, 0.12); ped.mesh.add(clip); }
+  G.soiBarber = { ped, chair, cape, pole: stripe, mirror, clip, soi: s, x, z, facing };
 }
 
 export function spawnSoiCowboy(scene) {

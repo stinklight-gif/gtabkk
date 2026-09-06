@@ -11,7 +11,7 @@ export function updatePlayer(dt) {
   const p = G.player;
   if (p.inVehicle) { updatePlayerInVehicle(dt); return; }
   if (G._btsRide) return;
-  if (G._eating) {
+  if (G._eating || G._barberCut) {
     p.velocity.x = 0; p.velocity.z = 0;
     return;
   }
@@ -364,7 +364,7 @@ export function updateCollectibles(dt) {
 
 export function updateInteraction(dt) {
   const p = G.player;
-  if (p.inVehicle || G._btsRide || G._eating) return;
+  if (p.inVehicle || G._btsRide || G._eating || G._barberCut) return;
   const pp0 = p.group.position;
   if (GAMEPLAY.stallSit && G.world.foodStalls) {
     for (const f of G.world.foodStalls) if (dist2(f.pos, pp0) < 2.4 * 2.4) return;
@@ -390,6 +390,7 @@ export function updateInteraction(dt) {
   if (GAMEPLAY.chaYen && G.chaYen) {
     for (const c of G.chaYen) if (c.mesh && dist2(c.mesh.position, pp0) < 2.2 * 2.2) return;
   }
+  if (GAMEPLAY.soiBarber && G.soiBarber && dist2({ x: G.soiBarber.x, z: G.soiBarber.z }, pp0) < 2.6 * 2.6) return;
   if (GAMEPLAY.dawnAlms && G._alms) {
     for (const ped of G._alms) {
       if (ped && ped.mesh && !ped.dead && dist2(ped.mesh.position, pp0) < 2.2 * 2.2) return;
