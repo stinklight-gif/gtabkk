@@ -341,7 +341,7 @@ export const GAMEPLAY = {
   bankGuard: true,        // plastic-chair security at Krung Thep Bank; torch after dark
   mallDir: true,          // directory clerk at the Terminal 21 desk; E names a shop and floor
   officeSmoke: true,      // office smokers on the north-west Asok and Phrom Phong sidewalks at lunch; ember tips
-  bankQueue: true,        // teller queue inside Krung Thep Bank, plus an outdoor ATM and a teller behind the counter; they hide after hours
+  bankQueue: true,        // teller queue inside Krung Thep Bank, plus an outdoor ATM and two tellers behind the counter; they hide after hours
   mallFood: true,         // eaters sit Pier 21 Food Court at Terminal 21; trays, they hide after 21:00
   gunClerk: true,         // clerk and a customer at the Sukhumvit Gun Shop counter; they hide after hours
   mallTech: true,         // window shoppers at Tokyo Tech in Terminal 21; phones, they hide after 21:00

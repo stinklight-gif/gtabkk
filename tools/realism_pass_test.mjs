@@ -6946,6 +6946,43 @@ async function main() {
     });
     assert(pierFishB.flag && pierFishB.rec && pierFishB.rod && pierFishB.near && pierFishB.other, 'a second fisherman waits on the south pier bank');
     assert(pierFishB.night && pierFishB.day && pierFishB.shifted && pierFishB.swung, 'they hide after 21:00 and the rod dips');
+
+    console.log('\n[196] second bank teller behind the counter');
+    const bankTellerB = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.bankTellerB;
+      const ped = c && c.ped;
+      const stamp = !!(ped && ped.mesh && ped.mesh.getObjectByName('bank-stamp'));
+      const teller = G.world && G.world.bank && G.world.bank.teller;
+      const first = G.bankTeller;
+      const near = !!(c && teller && Math.hypot(c.x - teller.x, c.z - teller.z) < 8);
+      const other = !!(c && first && Math.hypot(c.x - first.x, c.z - first.z) > 2);
+      G.time.dayT = 18 / 24;
+      main.updateBankQueue(0.05);
+      const night = !!(ped && ped.mesh && ped.mesh.visible === false);
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updateBankQueue(0.05);
+      const day = !!(ped && ped.bankTeller && ped.mesh && ped.mesh.visible);
+      const z0 = ped && ped.mesh ? ped.mesh.position.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateBankQueue(0.05);
+      const shifted = !!(ped && ped.mesh && Math.abs(ped.mesh.position.z - z0) > 0.02);
+      const tool = ped && ped.mesh && ped.mesh.getObjectByName('bank-stamp');
+      if (c) c.t = 0.2;
+      main.updateBankQueue(0.05);
+      const r0 = tool ? tool.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 4.2;
+      main.updateBankQueue(0.05);
+      const swung = !!(tool && Math.abs(tool.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.bankQueue),
+        rec: !!(ped && ped.bankTeller),
+        stamp, near, other, night, day, shifted, swung,
+      };
+    });
+    assert(bankTellerB.flag && bankTellerB.rec && bankTellerB.stamp && bankTellerB.near && bankTellerB.other, 'a second teller works behind the Krung Thep Bank counter');
+    assert(bankTellerB.night && bankTellerB.day && bankTellerB.shifted && bankTellerB.swung, 'they hide after hours and the stamp turns');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

@@ -1969,8 +1969,8 @@ export function updateBankQueue(dt) {
       if (i === 0 && parts && parts.armR) parts.armR.rotation.x = -0.85 + Math.sin(c.t * 3.1) * 0.12;
     }
   }
-  const teller = G.bankTeller;
-  if (teller) {
+  for (const teller of [G.bankTeller, G.bankTellerB]) {
+    if (!teller) continue;
     teller.t = (teller.t || 0) + dt;
     const open = h >= 9 && h < 16;
     const ped = teller.ped;

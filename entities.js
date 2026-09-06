@@ -2858,33 +2858,36 @@ export function spawnBankQueue(scene) {
     }
     G.bankAtm = { queue: atmQueue, machine, x: ax, z: az, t: 0, hours: [6, 22] };
   }
-  const sx = tx, sz = tz - 4.6;
-  const tellerPed = spawnPed(scene, new THREE.Vector3(sx, 0, sz), 'office');
-  recolorTorso(tellerPed.mesh.userData.parts, 0x1a3a6a, 0.7);
-  tellerPed.bankQueue = true;
-  tellerPed.bankTeller = true;
-  tellerPed.speed = 0;
-  tellerPed.state = 'idle';
-  tellerPed.heading = 0;
-  tellerPed.anchor = { slot: new THREE.Vector3(sx, 0, sz), facing: 0 };
-  if (tellerPed.mesh) {
-    tellerPed.mesh.rotation.y = 0;
-    tellerPed.mesh.visible = false;
-  }
-  const stamp = new THREE.Mesh(
-    new THREE.BoxGeometry(0.06, 0.04, 0.08),
-    new THREE.MeshStandardMaterial({ color: 0xc45a18, roughness: 0.45, metalness: 0.2 })
-  );
-  stamp.name = 'bank-stamp';
-  const tp = tellerPed.mesh && tellerPed.mesh.userData && tellerPed.mesh.userData.parts;
-  if (tp && tp.foreR) {
-    stamp.position.set(0.02, -0.22, 0.06);
-    tp.foreR.add(stamp);
-  } else if (tellerPed.mesh) {
-    stamp.position.set(0.22, 1.05, 0.12);
-    tellerPed.mesh.add(stamp);
-  }
-  G.bankTeller = { ped: tellerPed, x: sx, z: sz, t: 0 };
+  const packTeller = (sx, sz) => {
+    const tellerPed = spawnPed(scene, new THREE.Vector3(sx, 0, sz), 'office');
+    recolorTorso(tellerPed.mesh.userData.parts, 0x1a3a6a, 0.7);
+    tellerPed.bankQueue = true;
+    tellerPed.bankTeller = true;
+    tellerPed.speed = 0;
+    tellerPed.state = 'idle';
+    tellerPed.heading = 0;
+    tellerPed.anchor = { slot: new THREE.Vector3(sx, 0, sz), facing: 0 };
+    if (tellerPed.mesh) {
+      tellerPed.mesh.rotation.y = 0;
+      tellerPed.mesh.visible = false;
+    }
+    const stamp = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.04, 0.08),
+      new THREE.MeshStandardMaterial({ color: 0xc45a18, roughness: 0.45, metalness: 0.2 })
+    );
+    stamp.name = 'bank-stamp';
+    const tp = tellerPed.mesh && tellerPed.mesh.userData && tellerPed.mesh.userData.parts;
+    if (tp && tp.foreR) {
+      stamp.position.set(0.02, -0.22, 0.06);
+      tp.foreR.add(stamp);
+    } else if (tellerPed.mesh) {
+      stamp.position.set(0.22, 1.05, 0.12);
+      tellerPed.mesh.add(stamp);
+    }
+    return { ped: tellerPed, x: sx, z: sz, t: 0 };
+  };
+  G.bankTeller = packTeller(tx, tz - 4.6);
+  G.bankTellerB = packTeller(tx + 4.2, tz - 4.6);
 }
 
 export function spawnGunClerk(scene) {
