@@ -1041,6 +1041,42 @@ export function spawnGeckos(scene) {
   }
 }
 
+export function spawnStallIncense(scene) {
+  if (!GAMEPLAY.stallIncense) return;
+  const stalls = (G.world && G.world.foodStalls) || [];
+  G.stallIncense = [];
+  const n = Math.min(4, stalls.length);
+  for (let i = 0; i < n; i++) {
+    const f = stalls[i];
+    const g = new THREE.Group();
+    g.name = 'stall-incense';
+    const coil = new THREE.Mesh(
+      new THREE.TorusGeometry(0.09, 0.018, 6, 10),
+      new THREE.MeshStandardMaterial({ color: 0x4a3a22, roughness: 0.85, emissive: 0xff5510, emissiveIntensity: 0.15 })
+    );
+    coil.name = 'incense-coil';
+    coil.rotation.x = PI / 2;
+    g.add(coil);
+    const glow = new THREE.Mesh(
+      new THREE.SphereGeometry(0.025, 6, 5),
+      new THREE.MeshStandardMaterial({ color: 0xff6622, emissive: 0xff3300, emissiveIntensity: 0.4, roughness: 0.4 })
+    );
+    glow.name = 'incense-ember';
+    glow.position.set(0.09, 0, 0);
+    g.add(glow);
+    const smoke = new THREE.Mesh(
+      new THREE.SphereGeometry(0.08, 6, 5),
+      new THREE.MeshBasicMaterial({ color: 0x887766, transparent: true, opacity: 0.18, depthWrite: false })
+    );
+    smoke.name = 'incense-smoke';
+    smoke.position.set(0.04, 0.12, 0);
+    g.add(smoke);
+    g.position.set(f.pos.x + 0.35, 1.55, f.pos.z + 0.2);
+    scene.add(g);
+    G.stallIncense.push({ mesh: g, coil, glow, smoke, t: i * 0.7, stall: f });
+  }
+}
+
 export function spawnMonitors(scene) {
   if (!GAMEPLAY.khlongMonitor) return;
   G.monitors = [];

@@ -311,6 +311,7 @@ export const GAMEPLAY = {
   rainPoncho: true,       // plastic rain capes on motorbike riders when it pours
   bikeSeatCover: true,    // plastic seat covers on parked 7-Eleven bikes in the rain
   watBell: true,          // temple bell at the wat; E rings it and cools last-seen
+  stallIncense: true,     // mosquito coils hang under stall parasols; glow after dusk
 };
 G.gameplay = GAMEPLAY;
 

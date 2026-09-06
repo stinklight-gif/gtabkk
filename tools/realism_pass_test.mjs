@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -2809,6 +2809,32 @@ async function main() {
     });
     assert(gong.flag && gong.named && gong.frame && gong.nearWat, 'a bronze bell hangs at the wat');
     assert(gong.rang && gong.swung && gong.cooled, 'E rings the bell and cools last-seen');
+
+    console.log('\n[85] stall incense coils');
+    const coil = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = G.stallIncense || [];
+      const n = list.filter(c => c && c.mesh && c.mesh.name === 'stall-incense').length;
+      const c0 = list[0];
+      const named = !!(c0 && c0.coil && c0.coil.name === 'incense-coil' && c0.glow && c0.glow.name === 'incense-ember');
+      G.time.dayT = 12 / 24;
+      if (c0) c0.t = 0.4;
+      main.updateStallIncense(0.05);
+      const dayGlow = c0 && c0.glow ? c0.glow.material.emissiveIntensity : 9;
+      const daySmoke = !!(c0 && c0.smoke && c0.smoke.visible === false);
+      G.time.dayT = 19.2 / 24;
+      if (c0) c0.t = Math.PI / 12;
+      main.updateStallIncense(0.05);
+      const nightGlow = c0 && c0.glow ? c0.glow.material.emissiveIntensity : 0;
+      const nightSmoke = !!(c0 && c0.smoke && c0.smoke.visible);
+      const atStall = !!(c0 && c0.stall && c0.stall.pos && Math.hypot(c0.mesh.position.x - c0.stall.pos.x, c0.mesh.position.z - c0.stall.pos.z) < 2);
+      return {
+        flag: !!(G.gameplay && G.gameplay.stallIncense),
+        n, named, dayGlow, nightGlow, daySmoke, nightSmoke, atStall,
+      };
+    });
+    assert(coil.flag && coil.n >= 3 && coil.named && coil.atStall, `mosquito coils hang under stall parasols (${coil.n})`);
+    assert(coil.dayGlow < 0.3 && coil.nightGlow > 0.4 && coil.daySmoke && coil.nightSmoke, 'the coils glow and smoke after dusk');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

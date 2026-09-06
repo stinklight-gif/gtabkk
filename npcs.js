@@ -2285,6 +2285,26 @@ export function updateSoiFootball(dt) {
   }
 }
 
+export function updateStallIncense(dt) {
+  if (!GAMEPLAY.stallIncense || !G.stallIncense) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const dusk = h >= 17.5 || h < 6;
+  for (const c of G.stallIncense) {
+    c.t = (c.t || 0) + dt;
+    if (c.glow && c.glow.material) {
+      c.glow.material.emissiveIntensity = dusk ? 0.55 + Math.sin(c.t * 6) * 0.25 : 0.12;
+    }
+    if (c.coil && c.coil.material) {
+      c.coil.material.emissiveIntensity = dusk ? 0.28 : 0.08;
+    }
+    if (c.smoke && c.smoke.material) {
+      c.smoke.material.opacity = dusk ? 0.16 + Math.sin(c.t * 2.2) * 0.08 : 0.06;
+      c.smoke.position.y = 0.12 + Math.sin(c.t * 1.6) * 0.04;
+      c.smoke.visible = dusk;
+    }
+  }
+}
+
 export function updateGeckos(dt) {
   if (!GAMEPLAY.stallGecko || !G.geckos) return;
   const night = (G.nightK || 0) > 0.45;
