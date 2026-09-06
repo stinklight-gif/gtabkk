@@ -6112,6 +6112,37 @@ async function main() {
     });
     assert(westAtm.flag && westAtm.n >= 2 && westAtm.card && westAtm.named && westAtm.near && westAtm.farWalk, `a queue waits at the west 7-Eleven ATM (${westAtm.n})`);
     assert(westAtm.late >= 2 && westAtm.day >= 2 && westAtm.shifted, 'they hide late and shift weight at the west machine');
+
+    console.log('\n[173] ATM queue at the east 7-Eleven');
+    const eastAtm = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.eastSevenAtm;
+      const east = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x > 100 && s.pos.z < 0 && s.pos.z > -80);
+      const walk = G.world && G.world.sevenWalkIn;
+      const n = (c && c.queue || []).filter(p => p && p.sevenAtm && p.mesh).length;
+      const card = (c && c.queue || []).some(p => p && p.mesh && p.mesh.getObjectByName('seven-atm-card'));
+      const named = !!(c && c.machine && c.machine.name === 'east-seven-atm');
+      const near = !!(c && east && east.pos && Math.hypot(c.ax - east.pos.x, c.az - east.pos.z) < 12);
+      const farWalk = !!(c && walk && walk.pos && Math.hypot(c.ax - walk.pos.x, c.az - walk.pos.z) > 80);
+      G.time.dayT = 3 / 24;
+      main.updateSevenAtm(0.05);
+      const late = (c && c.queue || []).filter(p => p && p.mesh && p.mesh.visible === false).length;
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updateSevenAtm(0.05);
+      const day = (c && c.queue || []).filter(p => p && p.sevenAtm && p.mesh && p.mesh.visible).length;
+      const p0 = c && c.queue && c.queue[0];
+      const z0 = p0 && p0.mesh ? p0.mesh.position.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.4;
+      main.updateSevenAtm(0.05);
+      const shifted = !!(p0 && p0.mesh && Math.abs(p0.mesh.position.z - z0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.sevenAtm),
+        n, card, named, near, farWalk, late, day, shifted,
+      };
+    });
+    assert(eastAtm.flag && eastAtm.n >= 2 && eastAtm.card && eastAtm.named && eastAtm.near && eastAtm.farWalk, `a queue waits at the east 7-Eleven ATM (${eastAtm.n})`);
+    assert(eastAtm.late >= 2 && eastAtm.day >= 2 && eastAtm.shifted, 'they hide late and shift weight at the east machine');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
