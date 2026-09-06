@@ -5864,6 +5864,56 @@ async function main() {
     assert(southKrok.flag && southKrok.named && southKrok.pan && southKrok.cakes >= 6 && southKrok.near && southKrok.farWalk, 'a kanom krok pan waits outside the south 7-Eleven');
     assert(southKrok.dayVendor && southKrok.eveVendor && southKrok.scooped, 'the south vendor works afternoons and the ladle scoops');
     assert(southKrok.paid && southKrok.hp > 40 && southKrok.stam > 10, 'E buys kanom krok at the south pan for ฿25');
+
+    console.log('\n[166] kanom krok at the west 7-Eleven');
+    const westKrok = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.westKanomKrok;
+      const named = !!(c && c.mesh && c.mesh.name === 'kanomkrok-cart');
+      const pan = !!(c && c.mesh && c.mesh.getObjectByName('kanom-pan'));
+      const cakes = c && c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'kanom-cake').length : 0;
+      const ladle = c && c.mesh && c.mesh.getObjectByName('kanom-ladle');
+      const west = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x < -50 && s.pos.z > 0 && s.pos.z < 60);
+      const walk = G.world && G.world.sevenWalkIn;
+      const near = !!(c && west && west.pos && Math.hypot(c.x - west.pos.x, c.z - west.pos.z) < 12);
+      const farWalk = !!(c && walk && walk.pos && Math.hypot(c.x - walk.pos.x, c.z - walk.pos.z) > 80);
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.12;
+      main.updateKanomKrok(0.05);
+      const dayVendor = !!(c && c.vendor && c.vendor.mesh && c.vendor.mesh.visible === false);
+      const z0 = ladle ? ladle.rotation.z : 0;
+      if (c) c.t = 0.18;
+      main.updateKanomKrok(0.05);
+      const scooped = !!(ladle && Math.abs(ladle.rotation.z - z0) > 0.05);
+      G.time.dayT = 17.2 / 24;
+      main.updateKanomKrok(0.05);
+      const eveVendor = !!(c && c.vendor && c.vendor.kanom && c.vendor.mesh && c.vendor.mesh.visible);
+      G.player.inVehicle = null;
+      G._eating = null;
+      if (c && c.mesh) G.player.group.position.copy(c.mesh.position);
+      G.cash = 75;
+      G.player.hp = 40;
+      G.player.stam = 10;
+      G._kanomKrok = 0;
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let paid = false;
+      for (let i = 0; i < 4 && !paid; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateKanomKrok(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        paid = G.cash === 50 && (G._kanomKrok || 0) >= 1;
+      }
+      return {
+        flag: !!(G.gameplay && G.gameplay.kanomKrok),
+        named, pan, cakes, near, farWalk, dayVendor, eveVendor, scooped, paid,
+        hp: G.player.hp, stam: G.player.stam,
+      };
+    });
+    assert(westKrok.flag && westKrok.named && westKrok.pan && westKrok.cakes >= 6 && westKrok.near && westKrok.farWalk, 'a kanom krok pan waits outside the west 7-Eleven');
+    assert(westKrok.dayVendor && westKrok.eveVendor && westKrok.scooped, 'the west vendor works afternoons and the ladle scoops');
+    assert(westKrok.paid && westKrok.hp > 40 && westKrok.stam > 10, 'E buys kanom krok at the west pan for ฿25');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

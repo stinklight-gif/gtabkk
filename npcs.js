@@ -3602,7 +3602,7 @@ export function updateKanomKrok(dt) {
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const open = h >= 15 && h < 21.5;
   const pp = G.player && G.player.group && G.player.group.position;
-  for (const c of [G.kanomKrok, G.southKanomKrok]) {
+  for (const c of [G.kanomKrok, G.southKanomKrok, G.westKanomKrok]) {
     if (!c) continue;
     c.t = (c.t || 0) + dt;
     const pan = c.mesh && c.mesh.getObjectByName('kanom-pan');

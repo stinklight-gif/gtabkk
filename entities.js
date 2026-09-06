@@ -1642,6 +1642,8 @@ export function spawnKanomKrok(scene) {
   G.kanomKrok = pack(G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0])));
   const south = (G.world.sevenElevens || []).find(s => s && s.pos && Math.abs(s.pos.x) < 8 && s.pos.z < -80);
   G.southKanomKrok = pack(south);
+  const west = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x < -50 && s.pos.z > 0 && s.pos.z < 60);
+  G.westKanomKrok = pack(west);
 }
 
 export function makeSquidGrillMesh() {
