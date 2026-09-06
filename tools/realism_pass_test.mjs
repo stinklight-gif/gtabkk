@@ -6394,6 +6394,41 @@ async function main() {
     });
     assert(gunShopper.flag && gunShopper.rec && gunShopper.cse && gunShopper.near, 'a customer waits at the Sukhumvit Gun Shop counter');
     assert(gunShopper.night && gunShopper.day && gunShopper.shifted && gunShopper.swung, 'they hide after hours and the gun case turns');
+
+    console.log('\n[181] Hua Lamphong starter gun customer');
+    const starterShopper = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.starterShopper;
+      const ped = c && c.ped;
+      const cse = !!(ped && ped.mesh && ped.mesh.getObjectByName('starter-case'));
+      const clerk = G.starterClerk;
+      const near = !!(c && clerk && Math.hypot(c.x - clerk.x, c.z - clerk.z) < 4);
+      G.time.dayT = 22 / 24;
+      main.updateStarterClerk(0.05);
+      const night = !!(ped && ped.mesh && ped.mesh.visible === false);
+      G.time.dayT = 12.5 / 24;
+      if (c) c.t = 0.2;
+      main.updateStarterClerk(0.05);
+      const day = !!(ped && ped.starterClerk && ped.starterShop && ped.mesh && ped.mesh.visible);
+      const z0 = ped && ped.mesh ? ped.mesh.position.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateStarterClerk(0.05);
+      const shifted = !!(ped && ped.mesh && Math.abs(ped.mesh.position.z - z0) > 0.02);
+      const tool = ped && ped.mesh && ped.mesh.getObjectByName('starter-case');
+      if (c) c.t = 0.2;
+      main.updateStarterClerk(0.05);
+      const r0 = tool ? tool.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 4.2;
+      main.updateStarterClerk(0.05);
+      const swung = !!(tool && Math.abs(tool.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.starterClerk),
+        rec: !!(ped && ped.starterClerk && ped.starterShop),
+        cse, near, night, day, shifted, swung,
+      };
+    });
+    assert(starterShopper.flag && starterShopper.rec && starterShopper.cse && starterShopper.near, 'a customer waits at the Hua Lamphong starter gun counter');
+    assert(starterShopper.night && starterShopper.day && starterShopper.shifted && starterShopper.swung, 'they hide after hours and the gun case turns');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
