@@ -358,6 +358,7 @@ export const GAMEPLAY = {
   starterClerk: true,     // clerk behind the Hua Lamphong starter gun counter; they hide after 21:00
   homeAuntie: true,       // neighbor sits a plastic chair beside the safehouse door; they hide after 22:00
   stationPorter: true,    // red-vest porters with bags under the Hua Lamphong canopy; they hide after 22:00
+  garageMech: true,       // mechanic at the U-Spray bay mouth; they hide after 19:00
 };
 G.gameplay = GAMEPLAY;
 

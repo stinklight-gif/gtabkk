@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.homeAuntie || ped.stationPorter || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.homeAuntie || ped.stationPorter || ped.garageMech || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -2952,6 +2952,38 @@ export function spawnStationPorter(scene) {
     porters.push(ped);
   }
   G.stationPorter = { porters, x: spawn.x, z: spawn.z, t: 0 };
+}
+
+export function spawnGarageMech(scene) {
+  if (!GAMEPLAY.garageMech) return;
+  const g = G.world && G.world.garages && G.world.garages[0];
+  if (!g || !g.pos) return;
+  const x = g.pos.x + 5.4, z = g.pos.z - 4.8;
+  const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'laborer');
+  recolorTorso(ped.mesh.userData.parts, 0xc45a18, 0.7);
+  ped.garageMech = true;
+  ped.speed = 0;
+  ped.state = 'idle';
+  ped.heading = -PI / 2;
+  ped.anchor = { slot: new THREE.Vector3(x, 0, z), facing: -PI / 2 };
+  if (ped.mesh) {
+    ped.mesh.rotation.y = -PI / 2;
+    ped.mesh.visible = false;
+  }
+  const wrench = new THREE.Mesh(
+    new THREE.BoxGeometry(0.04, 0.04, 0.28),
+    new THREE.MeshStandardMaterial({ color: 0x888890, metalness: 0.5, roughness: 0.35 })
+  );
+  wrench.name = 'garage-wrench';
+  const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+  if (parts && parts.foreR) {
+    wrench.position.set(0.02, -0.22, 0.08);
+    parts.foreR.add(wrench);
+  } else if (ped.mesh) {
+    wrench.position.set(0.22, 1.05, 0.12);
+    ped.mesh.add(wrench);
+  }
+  G.garageMech = { ped, x, z, t: 0 };
 }
 
 export function spawnMallDirectory(scene) {
