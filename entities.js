@@ -3363,40 +3363,44 @@ export function spawnAirportCrew(scene) {
   if (!GAMEPLAY.airportCrew) return;
   const poi = G.world && G.world.poi && G.world.poi.suvarnabhumi;
   if (!poi) return;
-  const hands = [];
-  const slots = [
-    { x: poi.x - 3.5, z: poi.z - 6.2, facing: PI / 2, kind: 'laborer' },
-    { x: poi.x - 3.5, z: poi.z + 7.4, facing: PI / 2, kind: 'laborer' },
-  ];
-  for (let i = 0; i < slots.length; i++) {
-    const slot = slots[i];
-    const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
-    recolorTorso(ped.mesh.userData.parts, 0xff6a00, 0.7);
-    ped.airportCrew = true;
-    ped.speed = 0;
-    ped.state = 'idle';
-    ped.heading = slot.facing;
-    ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
-    if (ped.mesh) {
-      ped.mesh.rotation.y = slot.facing;
-      ped.mesh.visible = false;
+  const packCrew = (hx, facing) => {
+    const hands = [];
+    const slots = [
+      { x: hx, z: poi.z - 6.2, facing, kind: 'laborer' },
+      { x: hx, z: poi.z + 7.4, facing, kind: 'laborer' },
+    ];
+    for (let i = 0; i < slots.length; i++) {
+      const slot = slots[i];
+      const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
+      recolorTorso(ped.mesh.userData.parts, 0xff6a00, 0.7);
+      ped.airportCrew = true;
+      ped.speed = 0;
+      ped.state = 'idle';
+      ped.heading = slot.facing;
+      ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
+      if (ped.mesh) {
+        ped.mesh.rotation.y = slot.facing;
+        ped.mesh.visible = false;
+      }
+      const paddle = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05, 0.28, 0.08),
+        new THREE.MeshStandardMaterial({ color: 0xff6a00, roughness: 0.55, emissive: 0x401000, emissiveIntensity: 0.25 })
+      );
+      paddle.name = 'marshal-paddle';
+      const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+      if (parts && parts.foreR) {
+        paddle.position.set(0.02, -0.28, 0.08);
+        parts.foreR.add(paddle);
+      } else if (ped.mesh) {
+        paddle.position.set(0.22, 1.15, 0.12);
+        ped.mesh.add(paddle);
+      }
+      hands.push(ped);
     }
-    const paddle = new THREE.Mesh(
-      new THREE.BoxGeometry(0.05, 0.28, 0.08),
-      new THREE.MeshStandardMaterial({ color: 0xff6a00, roughness: 0.55, emissive: 0x401000, emissiveIntensity: 0.25 })
-    );
-    paddle.name = 'marshal-paddle';
-    const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
-    if (parts && parts.foreR) {
-      paddle.position.set(0.02, -0.28, 0.08);
-      parts.foreR.add(paddle);
-    } else if (ped.mesh) {
-      paddle.position.set(0.22, 1.15, 0.12);
-      ped.mesh.add(paddle);
-    }
-    hands.push(ped);
-  }
-  G.airportCrew = { hands, x: poi.x, z: poi.z, t: 0 };
+    return { hands, x: poi.x, z: poi.z, hx, t: 0 };
+  };
+  G.airportCrew = packCrew(poi.x - 3.5, PI / 2);
+  G.eastAirportCrew = packCrew(poi.x + 3.5, -PI / 2);
 }
 
 export function spawnAirportCargo(scene) {

@@ -2343,32 +2343,34 @@ export function updateSengClerk(dt) {
 }
 
 export function updateAirportCrew(dt) {
-  if (!GAMEPLAY.airportCrew || !G.airportCrew) return;
-  const c = G.airportCrew;
-  c.t = (c.t || 0) + dt;
+  if (!GAMEPLAY.airportCrew) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const open = h >= 6 && h < 21;
-  for (let i = 0; i < (c.hands || []).length; i++) {
-    const ped = c.hands[i];
-    if (!ped || ped.dead || !ped.mesh) continue;
-    ped.airportCrew = true;
-    ped.mesh.visible = open;
-    if (!open) {
+  for (const c of [G.airportCrew, G.eastAirportCrew]) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    for (let i = 0; i < (c.hands || []).length; i++) {
+      const ped = c.hands[i];
+      if (!ped || ped.dead || !ped.mesh) continue;
+      ped.airportCrew = true;
+      ped.mesh.visible = open;
+      if (!open) {
+        ped.speed = 0;
+        ped.state = 'idle';
+        continue;
+      }
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        const bob = Math.sin(c.t * 2.2 + i) * 0.05;
+        ped.mesh.position.set(slot.x + (i === 0 ? bob : 0), 0, slot.z + (i === 1 ? bob : 0));
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
       ped.speed = 0;
       ped.state = 'idle';
-      continue;
+      const paddle = ped.mesh.getObjectByName('marshal-paddle');
+      if (paddle) paddle.rotation.z = Math.sin(c.t * 3.6 + i) * 0.45;
     }
-    const slot = ped.anchor && ped.anchor.slot;
-    if (slot) {
-      const bob = Math.sin(c.t * 2.2 + i) * 0.05;
-      ped.mesh.position.set(slot.x + (i === 0 ? bob : 0), 0, slot.z + (i === 1 ? bob : 0));
-      ped.heading = ped.anchor.facing;
-      ped.mesh.rotation.y = ped.heading;
-    }
-    ped.speed = 0;
-    ped.state = 'idle';
-    const paddle = ped.mesh.getObjectByName('marshal-paddle');
-    if (paddle) paddle.rotation.z = Math.sin(c.t * 3.6 + i) * 0.45;
   }
 }
 

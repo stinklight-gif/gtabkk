@@ -7460,6 +7460,44 @@ async function main() {
     });
     assert(westCargo.flag && westCargo.n >= 2 && westCargo.crates >= 2 && westCargo.near && westCargo.other, `cargo hands wait at the west Suvarnabhumi shed (${westCargo.n})`);
     assert(westCargo.night >= 2 && westCargo.day >= 2 && westCargo.shifted && westCargo.swung, 'they hide after 19:00 and the crates tilt');
+
+    console.log('\n[210] east Suvarnabhumi apron marshallers');
+    const eastCrew = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.eastAirportCrew;
+      const list = (c && c.hands) || [];
+      const n = list.filter(p => p && p.airportCrew && p.mesh).length;
+      const paddles = list.filter(p => p && p.mesh && p.mesh.getObjectByName('marshal-paddle')).length;
+      const first = G.airportCrew;
+      const poi = G.world && G.world.poi && G.world.poi.suvarnabhumi;
+      const near = !!(c && poi && Math.hypot(c.x - poi.x, c.z - poi.z) < 8);
+      const other = !!(c && first && Math.abs((c.hx || 0) - (first.hx || 0)) > 2);
+      G.time.dayT = 22 / 24;
+      main.updateAirportCrew(0.05);
+      const night = list.filter(p => p && p.mesh && p.mesh.visible === false).length;
+      G.time.dayT = 12.5 / 24;
+      if (c) c.t = 0.2;
+      main.updateAirportCrew(0.05);
+      const day = list.filter(p => p && p.airportCrew && p.mesh && p.mesh.visible).length;
+      const p0 = list[0];
+      const x0 = p0 && p0.mesh ? p0.mesh.position.x : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateAirportCrew(0.05);
+      const shifted = !!(p0 && p0.mesh && Math.abs(p0.mesh.position.x - x0) > 0.02);
+      const paddle = p0 && p0.mesh && p0.mesh.getObjectByName('marshal-paddle');
+      if (c) c.t = 0.2;
+      main.updateAirportCrew(0.05);
+      const r0 = paddle ? paddle.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 3.6;
+      main.updateAirportCrew(0.05);
+      const swung = !!(paddle && Math.abs(paddle.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.airportCrew),
+        n, paddles, near, other, night, day, shifted, swung,
+      };
+    });
+    assert(eastCrew.flag && eastCrew.n >= 2 && eastCrew.paddles >= 2 && eastCrew.near && eastCrew.other, `marshallers wait on the east Suvarnabhumi apron (${eastCrew.n})`);
+    assert(eastCrew.night >= 2 && eastCrew.day >= 2 && eastCrew.shifted && eastCrew.swung, 'they hide after 21:00 and the paddles wave');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
