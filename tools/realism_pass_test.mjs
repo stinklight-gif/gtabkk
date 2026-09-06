@@ -7578,6 +7578,43 @@ async function main() {
     });
     assert(westDock.flag && westDock.n >= 2 && westDock.crates >= 2 && westDock.near && westDock.other, `dockhands wait west of the Klong Toey yard (${westDock.n})`);
     assert(westDock.night >= 2 && westDock.day >= 2 && westDock.shifted && westDock.swung, 'they hide after 19:00 and the crates tilt');
+
+    console.log('\n[213] second neighbor at the safehouse');
+    const auntieB = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.homeAuntieB;
+      const ped = c && c.ped;
+      const paper = !!(ped && ped.mesh && ped.mesh.getObjectByName('home-paper'));
+      const chair = !!(c && c.chair && c.chair.name === 'east-home-chair');
+      const first = G.homeAuntie;
+      const door = G.world && G.world.poi && G.world.poi.safehouse;
+      const near = !!(c && door && Math.hypot(c.x - door.x, c.z - door.z) < 5);
+      const other = !!(c && first && Math.hypot(c.x - first.x, c.z - first.z) > 2);
+      G.time.dayT = 23 / 24;
+      main.updateHomeAuntie(0.05);
+      const night = !!(ped && ped.mesh && ped.mesh.visible === false);
+      G.time.dayT = 12.5 / 24;
+      if (c) c.t = 0.2;
+      main.updateHomeAuntie(0.05);
+      main.updatePeds(0.05);
+      const day = !!(ped && ped.homeAuntie && ped.mesh && ped.mesh.visible && ped.mesh.position.y >= 0.3);
+      const parts = ped && ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+      const folded = !!(parts && parts.legL && parts.legL.rotation.x > 0.8);
+      const page = ped && ped.mesh && ped.mesh.getObjectByName('home-paper-page');
+      if (c) c.t = 0.2;
+      main.updateHomeAuntie(0.05);
+      const r0 = page ? page.rotation.x : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.8;
+      main.updateHomeAuntie(0.05);
+      const flipped = !!(page && Math.abs(page.rotation.x - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.homeAuntie),
+        rec: !!(ped && ped.homeAuntie),
+        paper, chair, near, other, night, day, folded, flipped,
+      };
+    });
+    assert(auntieB.flag && auntieB.rec && auntieB.paper && auntieB.chair && auntieB.near && auntieB.other, 'a second neighbor sits beside the safehouse');
+    assert(auntieB.night && auntieB.day && auntieB.folded && auntieB.flipped, 'they hide after 22:00 and turn pages on the plastic chair');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

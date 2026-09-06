@@ -2100,25 +2100,27 @@ export function updateStarterClerk(dt) {
 }
 
 export function updateHomeAuntie(dt) {
-  if (!GAMEPLAY.homeAuntie || !G.homeAuntie) return;
-  const c = G.homeAuntie;
-  c.t = (c.t || 0) + dt;
+  if (!GAMEPLAY.homeAuntie) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const open = h >= 8 && h < 22;
-  const ped = c.ped;
-  if (ped && ped.mesh) {
-    ped.homeAuntie = true;
-    ped.mesh.visible = open;
-    const slot = ped.anchor && ped.anchor.slot;
-    if (slot) {
-      ped.mesh.position.set(slot.x, slot.y || 0.42, slot.z);
-      ped.heading = ped.anchor.facing;
-      ped.mesh.rotation.y = ped.heading;
+  for (const c of [G.homeAuntie, G.homeAuntieB]) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    const ped = c.ped;
+    if (ped && ped.mesh) {
+      ped.homeAuntie = true;
+      ped.mesh.visible = open;
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        ped.mesh.position.set(slot.x, slot.y || 0.42, slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+      const page = ped.mesh.getObjectByName('home-paper-page');
+      if (page && open) page.rotation.x = Math.sin(c.t * 2.8) * 0.18;
     }
-    ped.speed = 0;
-    ped.state = 'idle';
-    const page = ped.mesh.getObjectByName('home-paper-page');
-    if (page && open) page.rotation.x = Math.sin(c.t * 2.8) * 0.18;
   }
 }
 

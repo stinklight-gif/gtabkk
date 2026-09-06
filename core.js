@@ -356,7 +356,7 @@ export const GAMEPLAY = {
   mallArcade: true,       // two players at Akihabara Arcade cabinets on Terminal 21 floor 1; they hide after 21:00
   gymBag: true,           // a pad man hits the heavy bag at the Muay Thai gym, plus waiting fighters; they hide after 21:00
   starterClerk: true,     // clerk and a customer at the Hua Lamphong starter gun counter; they hide after 21:00
-  homeAuntie: true,       // neighbor sits a plastic chair beside the safehouse door; they hide after 22:00
+  homeAuntie: true,       // neighbors sit plastic chairs beside the safehouse door; they hide after 22:00
   stationPorter: true,    // red-vest porters on both sides of the canopy and seated passengers under Hua Lamphong; they hide after 22:00
   garageMech: true,       // mechanics on both sides of the U-Spray bay mouth, plus waiting customers; they hide after 19:00
   klongDock: true,        // dockhands on both sides of the Klong Toey yard and checkers; they hide after 19:00
