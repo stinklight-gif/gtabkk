@@ -2577,43 +2577,49 @@ export function spawnCheckpoint(scene) {
 
 export function spawnSevenBikes(scene) {
   if (!GAMEPLAY.sevenBikes) return;
-  const seven = G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0]));
-  if (!seven || !seven.pos) return;
-  const hx = seven.hx || 5;
-  const px = seven.pos.x - hx - 1.55;
-  const heading = PI / 2;
-  G.sevenBikes = [];
-  const n = 5;
-  for (let i = 0; i < n; i++) {
-    const z = seven.pos.z - 2.2 + i * 1.15;
-    const x = px + (i % 2) * 0.18;
-    const bike = makeVehicle('bike', scene);
-    bike.pos.set(x, 0, z);
-    bike.heading = heading;
-    bike.mesh.position.copy(bike.pos);
-    bike.mesh.rotation.y = heading;
-    bike.driver = null;
-    bike.vel = 0;
-    bike.sevenParked = true;
-    bike._standHome = { x, z, heading };
-    if (GAMEPLAY.bikeSeatCover) {
-      const cover = new THREE.Mesh(
-        new THREE.BoxGeometry(0.28, 0.04, 0.42),
-        new THREE.MeshStandardMaterial({
-          color: pick([0xc8d8e0, 0xe8e0c8, 0xb0c8d8]),
-          roughness: 0.35,
-          transparent: true,
-          opacity: 0.72,
-        })
-      );
-      cover.name = 'seat-cover';
-      cover.visible = false;
-      cover.position.set(0, 0.78, -0.08);
-      bike.mesh.add(cover);
-      bike.seatCover = cover;
+  const rack = (seven) => {
+    if (!seven || !seven.pos) return [];
+    const hx = seven.hx || 5;
+    const px = seven.pos.x - hx - 1.55;
+    const heading = PI / 2;
+    const list = [];
+    const n = 5;
+    for (let i = 0; i < n; i++) {
+      const z = seven.pos.z - 2.2 + i * 1.15;
+      const x = px + (i % 2) * 0.18;
+      const bike = makeVehicle('bike', scene);
+      bike.pos.set(x, 0, z);
+      bike.heading = heading;
+      bike.mesh.position.copy(bike.pos);
+      bike.mesh.rotation.y = heading;
+      bike.driver = null;
+      bike.vel = 0;
+      bike.sevenParked = true;
+      bike._standHome = { x, z, heading };
+      if (GAMEPLAY.bikeSeatCover) {
+        const cover = new THREE.Mesh(
+          new THREE.BoxGeometry(0.28, 0.04, 0.42),
+          new THREE.MeshStandardMaterial({
+            color: pick([0xc8d8e0, 0xe8e0c8, 0xb0c8d8]),
+            roughness: 0.35,
+            transparent: true,
+            opacity: 0.72,
+          })
+        );
+        cover.name = 'seat-cover';
+        cover.visible = false;
+        cover.position.set(0, 0.78, -0.08);
+        bike.mesh.add(cover);
+        bike.seatCover = cover;
+      }
+      list.push(bike);
     }
-    G.sevenBikes.push(bike);
-  }
+    return list;
+  };
+  const walk = G.world && (G.world.sevenWalkIn || (G.world.sevenElevens && G.world.sevenElevens[0]));
+  G.sevenBikes = rack(walk);
+  const south = (G.world.sevenElevens || []).find(s => s && s.pos && Math.abs(s.pos.x) < 8 && s.pos.z < -80);
+  G.southSevenBikes = rack(south);
 }
 
 export function spawnSevenGuard(scene) {
