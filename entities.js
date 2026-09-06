@@ -6132,35 +6132,38 @@ export function spawnPierWait(scene) {
     clerk.mesh.add(ticket);
   }
   G.pierClerk = { ped: clerk, x: cx, z: cz, t: 0 };
-  const fx = pier.x + 5.2, fz = pier.z + 9.4;
-  const fisher = spawnPed(scene, new THREE.Vector3(fx, 0, fz), 'laborer');
-  recolorTorso(fisher.mesh.userData.parts, 0x3a5a4a, 0.7);
-  fisher.pierWait = true;
-  fisher.pierFish = true;
-  fisher.speed = 0;
-  fisher.state = 'idle';
-  fisher.heading = -PI / 2;
-  fisher.anchor = { slot: new THREE.Vector3(fx, 0, fz), facing: -PI / 2 };
-  if (fisher.mesh) {
-    fisher.mesh.rotation.y = -PI / 2;
-    fisher.mesh.visible = false;
-  }
-  const rod = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.012, 0.018, 1.35, 5),
-    new THREE.MeshStandardMaterial({ color: 0x4a3a22, roughness: 0.7 })
-  );
-  rod.name = 'pier-rod';
-  const fp = fisher.mesh && fisher.mesh.userData && fisher.mesh.userData.parts;
-  if (fp && fp.foreR) {
-    rod.position.set(0.02, -0.55, 0.08);
-    rod.rotation.z = 0.85;
-    fp.foreR.add(rod);
-  } else if (fisher.mesh) {
-    rod.position.set(0.22, 1.15, 0.12);
-    rod.rotation.z = 0.85;
-    fisher.mesh.add(rod);
-  }
-  G.pierFish = { ped: fisher, x: fx, z: fz, t: 0 };
+  const packFish = (fx, fz) => {
+    const fisher = spawnPed(scene, new THREE.Vector3(fx, 0, fz), 'laborer');
+    recolorTorso(fisher.mesh.userData.parts, 0x3a5a4a, 0.7);
+    fisher.pierWait = true;
+    fisher.pierFish = true;
+    fisher.speed = 0;
+    fisher.state = 'idle';
+    fisher.heading = -PI / 2;
+    fisher.anchor = { slot: new THREE.Vector3(fx, 0, fz), facing: -PI / 2 };
+    if (fisher.mesh) {
+      fisher.mesh.rotation.y = -PI / 2;
+      fisher.mesh.visible = false;
+    }
+    const rod = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.012, 0.018, 1.35, 5),
+      new THREE.MeshStandardMaterial({ color: 0x4a3a22, roughness: 0.7 })
+    );
+    rod.name = 'pier-rod';
+    const fp = fisher.mesh && fisher.mesh.userData && fisher.mesh.userData.parts;
+    if (fp && fp.foreR) {
+      rod.position.set(0.02, -0.55, 0.08);
+      rod.rotation.z = 0.85;
+      fp.foreR.add(rod);
+    } else if (fisher.mesh) {
+      rod.position.set(0.22, 1.15, 0.12);
+      rod.rotation.z = 0.85;
+      fisher.mesh.add(rod);
+    }
+    return { ped: fisher, x: fx, z: fz, t: 0 };
+  };
+  G.pierFish = packFish(pier.x + 5.2, pier.z + 9.4);
+  G.pierFishB = packFish(pier.x + 5.2, pier.z - 9.4);
 }
 
 export function spawnBoat(scene) {

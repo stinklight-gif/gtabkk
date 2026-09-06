@@ -3371,8 +3371,8 @@ export function updatePierWait(dt) {
       ped.state = 'idle';
     }
   }
-  const fish = G.pierFish;
-  if (fish) {
+  for (const fish of [G.pierFish, G.pierFishB]) {
+    if (!fish) continue;
     fish.t = (fish.t || 0) + dt;
     const ped = fish.ped;
     if (ped && ped.mesh) {

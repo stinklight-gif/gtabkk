@@ -6909,6 +6909,43 @@ async function main() {
     });
     assert(bellMonk.flag && bellMonk.rec && bellMonk.mallet && bellMonk.near && bellMonk.other, 'a monk tends the wat bell');
     assert(bellMonk.noon && bellMonk.dawn && bellMonk.shifted && bellMonk.swung, 'they hide at noon and the mallet turns');
+
+    console.log('\n[195] south pier bank fisherman');
+    const pierFishB = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.pierFishB;
+      const ped = c && c.ped;
+      const rod = !!(ped && ped.mesh && ped.mesh.getObjectByName('pier-rod'));
+      const wait = G.pierWait;
+      const first = G.pierFish;
+      const near = !!(c && wait && Math.hypot(c.x - wait.x, c.z - wait.z) < 12);
+      const other = !!(c && first && Math.hypot(c.x - first.x, c.z - first.z) > 2);
+      G.time.dayT = 22 / 24;
+      main.updatePierWait(0.05);
+      const night = !!(ped && ped.mesh && ped.mesh.visible === false);
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updatePierWait(0.05);
+      const day = !!(ped && ped.pierWait && ped.pierFish && ped.mesh && ped.mesh.visible);
+      const z0 = ped && ped.mesh ? ped.mesh.position.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updatePierWait(0.05);
+      const shifted = !!(ped && ped.mesh && Math.abs(ped.mesh.position.z - z0) > 0.02);
+      const tool = ped && ped.mesh && ped.mesh.getObjectByName('pier-rod');
+      if (c) c.t = 0.2;
+      main.updatePierWait(0.05);
+      const r0 = tool ? tool.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 3.4;
+      main.updatePierWait(0.05);
+      const swung = !!(tool && Math.abs(tool.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.pierWait),
+        rec: !!(ped && ped.pierWait && ped.pierFish),
+        rod, near, other, night, day, shifted, swung,
+      };
+    });
+    assert(pierFishB.flag && pierFishB.rec && pierFishB.rod && pierFishB.near && pierFishB.other, 'a second fisherman waits on the south pier bank');
+    assert(pierFishB.night && pierFishB.day && pierFishB.shifted && pierFishB.swung, 'they hide after 21:00 and the rod dips');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
