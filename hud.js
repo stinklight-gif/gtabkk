@@ -233,7 +233,8 @@ export function bindHud() {
       const loc = poi.cowboy || G.soiCowboy.origin;
       const hh = ((G.time.dayT % 1) + 1) % 1 * 24;
       const open = hh >= 20 || hh < 4;
-      out.push({ name: 'Soi Cowboy', status: open ? 'neon · open' : 'closed till 20:00', dist: d(loc) });
+      const closing = GAMEPLAY.cowboyClose && hh >= 4 && hh < 5.6;
+      out.push({ name: 'Soi Cowboy', status: closing ? 'kicking out · walk it off' : open ? 'neon · open' : 'closed till 20:00', dist: d(loc) });
     }
     if (G.world && G.world.bank) {
       const h = G.heist;

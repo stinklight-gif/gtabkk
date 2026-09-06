@@ -299,6 +299,7 @@ export const GAMEPLAY = {
   twoAmCheckpoint: true,  // 1:30–3:40 ด่าน: spike strip across the lane; blow through is 2★
   somTam: true,           // som tam cart on a soi; pestle, E for a plate
   btsMalai: true,         // phuang malai vendor at Asok BTS; E buys a garland
+  cowboyClose: true,      // 4–5:30h drunks walk from Soi Cowboy toward the BTS
 };
 G.gameplay = GAMEPLAY;
 

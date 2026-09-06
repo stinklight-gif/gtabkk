@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -2331,6 +2331,43 @@ async function main() {
     });
     assert(malai.flag && malai.named && malai.strands >= 4 && malai.near && malai.vendor, `a malai stand waits at Asok (${malai.strands} strands)`);
     assert(malai.paid && malai.offered && malai.cooled, 'E buys a malai and the shrine takes it for extra heat cool');
+
+    console.log('\n[73] Cowboy closing-time stagger');
+    const kickout = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const origin = G.soiCowboy && G.soiCowboy.origin;
+      const bts = G.world && G.world.bts;
+      G.time.dayT = 21.5 / 24;
+      main.updateSoiCowboy(0.05);
+      const nightTouts = (G._cowboyTouts || []).filter(p => p && p.cowboy).length;
+      G.time.dayT = 4.4 / 24;
+      main.updateSoiCowboy(0.05);
+      main.updateCowboyClose(0.05);
+      const drunks = (G._cowboyClose || []).filter(p => p && p.cowboyClose && p.mesh);
+      const n = drunks.length;
+      const nearBar = drunks.filter(p => origin && Math.hypot(p.mesh.position.x - origin.x, p.mesh.position.z - origin.z) < 12).length;
+      const p0 = drunks[0];
+      const start = p0 && p0.mesh ? { x: p0.mesh.position.x, z: p0.mesh.position.z } : null;
+      const dest = { x: bts ? bts.x : -50, z: (bts && bts.z) || 0 };
+      const d0 = p0 && start ? Math.hypot(start.x - dest.x, start.z - dest.z) : 0;
+      for (let i = 0; i < 40; i++) {
+        main.updateCowboyClose(0.25);
+        main.updatePeds(0.25);
+      }
+      const d1 = p0 && p0.mesh ? Math.hypot(p0.mesh.position.x - dest.x, p0.mesh.position.z - dest.z) : d0;
+      const moved = !!(p0 && start && Math.hypot(p0.mesh.position.x - start.x, p0.mesh.position.z - start.z) > 0.8);
+      const toward = d1 < d0 - 0.5;
+      G.time.dayT = 12 / 24;
+      main.updateCowboyClose(0.05);
+      const gone = !(G._cowboyClose && G._cowboyClose.length);
+      return {
+        flag: !!(G.gameplay && G.gameplay.cowboyClose),
+        nightTouts, n, nearBar, moved, toward, gone,
+      };
+    });
+    assert(kickout.flag && kickout.nightTouts >= 3, 'touts work Cowboy before close');
+    assert(kickout.n >= 3 && kickout.nearBar >= 2 && kickout.moved && kickout.toward, 'after 4 AM the crowd walks it off toward the BTS');
+    assert(kickout.gone, 'the stagger clears by morning');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
