@@ -937,13 +937,14 @@ export function updateFoodStalls(dt) {
 }
 
 export function updateShrines(dt) {
-  const keep = G.spiritKeep;
-  if (GAMEPLAY.spiritWai && keep) {
-    keep.t = (keep.t || 0) + dt;
+  if (GAMEPLAY.spiritWai) {
     const h = ((G.time.dayT % 1) + 1) % 1 * 24;
     const open = h >= 6 && h < 20;
-    const ped = keep.ped;
-    if (ped && ped.mesh) {
+    for (const keep of [G.spiritKeep, G.spiritKeepB]) {
+      if (!keep) continue;
+      keep.t = (keep.t || 0) + dt;
+      const ped = keep.ped;
+      if (!ped || !ped.mesh) continue;
       ped.spiritKeep = true;
       ped.mesh.visible = open;
       if (open) {

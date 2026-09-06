@@ -6640,6 +6640,43 @@ async function main() {
     });
     assert(shrineKeep.flag && shrineKeep.rec && shrineKeep.malai && shrineKeep.near, 'a keeper tends a spirit house');
     assert(shrineKeep.night && shrineKeep.day && shrineKeep.shifted && shrineKeep.swung, 'they hide after 20:00 and the malai turns');
+
+    console.log('\n[188] second spirit-house keeper');
+    const shrineKeepB = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.spiritKeepB;
+      const ped = c && c.ped;
+      const malai = !!(ped && ped.mesh && ped.mesh.getObjectByName('shrine-malai'));
+      const s = (G.world.shrines || [])[1];
+      const first = G.spiritKeep;
+      const near = !!(c && s && s.pos && Math.hypot(c.x - s.pos.x, c.z - s.pos.z) < 4);
+      const other = !!(c && first && Math.hypot(c.x - first.x, c.z - first.z) > 2);
+      G.time.dayT = 21 / 24;
+      main.updateShrines(0.05);
+      const night = !!(ped && ped.mesh && ped.mesh.visible === false);
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updateShrines(0.05);
+      const day = !!(ped && ped.spiritKeep && ped.mesh && ped.mesh.visible);
+      const z0 = ped && ped.mesh ? ped.mesh.position.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateShrines(0.05);
+      const shifted = !!(ped && ped.mesh && Math.abs(ped.mesh.position.z - z0) > 0.02);
+      const tool = ped && ped.mesh && ped.mesh.getObjectByName('shrine-malai');
+      if (c) c.t = 0.2;
+      main.updateShrines(0.05);
+      const r0 = tool ? tool.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 4.2;
+      main.updateShrines(0.05);
+      const swung = !!(tool && Math.abs(tool.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.spiritWai),
+        rec: !!(ped && ped.spiritKeep),
+        malai, near, other, night, day, shifted, swung,
+      };
+    });
+    assert(shrineKeepB.flag && shrineKeepB.rec && shrineKeepB.malai && shrineKeepB.near && shrineKeepB.other, 'a second keeper tends another spirit house');
+    assert(shrineKeepB.night && shrineKeepB.day && shrineKeepB.shifted && shrineKeepB.swung, 'they hide after 20:00 and the malai turns');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
