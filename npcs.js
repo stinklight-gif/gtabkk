@@ -2213,32 +2213,34 @@ export function updateAirportTower(dt) {
 }
 
 export function updateAirportTaxi(dt) {
-  if (!GAMEPLAY.airportTaxi || !G.airportTaxi) return;
-  const c = G.airportTaxi;
-  c.t = (c.t || 0) + dt;
+  if (!GAMEPLAY.airportTaxi) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const open = h >= 6 && h < 22;
-  for (let i = 0; i < (c.touts || []).length; i++) {
-    const ped = c.touts[i];
-    if (!ped || ped.dead || !ped.mesh) continue;
-    ped.airportTaxi = true;
-    ped.mesh.visible = open;
-    if (!open) {
+  for (const c of [G.airportTaxi, G.southAirportTaxi]) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    for (let i = 0; i < (c.touts || []).length; i++) {
+      const ped = c.touts[i];
+      if (!ped || ped.dead || !ped.mesh) continue;
+      ped.airportTaxi = true;
+      ped.mesh.visible = open;
+      if (!open) {
+        ped.speed = 0;
+        ped.state = 'idle';
+        continue;
+      }
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        const bob = Math.sin(c.t * 2.2 + i) * 0.05;
+        ped.mesh.position.set(slot.x + (i === 0 ? bob : 0), 0, slot.z + (i === 1 ? bob : 0));
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
       ped.speed = 0;
       ped.state = 'idle';
-      continue;
+      const slate = ped.mesh.getObjectByName('taxi-slate');
+      if (slate) slate.rotation.z = Math.sin(c.t * 3.4 + i) * 0.22;
     }
-    const slot = ped.anchor && ped.anchor.slot;
-    if (slot) {
-      const bob = Math.sin(c.t * 2.2 + i) * 0.05;
-      ped.mesh.position.set(slot.x + (i === 0 ? bob : 0), 0, slot.z + (i === 1 ? bob : 0));
-      ped.heading = ped.anchor.facing;
-      ped.mesh.rotation.y = ped.heading;
-    }
-    ped.speed = 0;
-    ped.state = 'idle';
-    const slate = ped.mesh.getObjectByName('taxi-slate');
-    if (slate) slate.rotation.z = Math.sin(c.t * 3.4 + i) * 0.22;
   }
 }
 

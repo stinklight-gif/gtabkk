@@ -5571,6 +5571,42 @@ async function main() {
     });
     assert(eastRack.flag && eastRack.n >= 4 && eastRack.near >= 4 && eastRack.farWalk >= 4, `bikes cluster outside the east 7-Eleven (${eastRack.n})`);
     assert(eastRack.pinned >= 4 && eastRack.open >= 4 && eastRack.covers >= 4 && eastRack.dry && eastRack.wet && eastRack.taken, 'the east rack is pinned, enterable, and the covers come out in the rain');
+
+    console.log('\n[158] south Suvarnabhumi taxi touts');
+    const southTaxi = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.southAirportTaxi;
+      const list = (c && c.touts) || [];
+      const n = list.filter(p => p && p.airportTaxi && p.mesh).length;
+      const slates = list.filter(p => p && p.mesh && p.mesh.getObjectByName('taxi-slate')).length;
+      const near = !!(c && Math.hypot(c.x - 209, c.z + 50) < 8);
+      const farNorth = !!(c && Math.hypot(c.x - 209, c.z - 50) > 80);
+      G.time.dayT = 23 / 24;
+      main.updateAirportTaxi(0.05);
+      const night = list.filter(p => p && p.mesh && p.mesh.visible === false).length;
+      G.time.dayT = 12.5 / 24;
+      if (c) c.t = 0.2;
+      main.updateAirportTaxi(0.05);
+      const day = list.filter(p => p && p.airportTaxi && p.mesh && p.mesh.visible).length;
+      const p0 = list[0];
+      const x0 = p0 && p0.mesh ? p0.mesh.position.x : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateAirportTaxi(0.05);
+      const shifted = !!(p0 && p0.mesh && Math.abs(p0.mesh.position.x - x0) > 0.02);
+      const slate = p0 && p0.mesh && p0.mesh.getObjectByName('taxi-slate');
+      if (c) c.t = 0.2;
+      main.updateAirportTaxi(0.05);
+      const r0 = slate ? slate.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 3.4;
+      main.updateAirportTaxi(0.05);
+      const swung = !!(slate && Math.abs(slate.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.airportTaxi),
+        n, slates, near, farNorth, night, day, shifted, swung,
+      };
+    });
+    assert(southTaxi.flag && southTaxi.n >= 2 && southTaxi.slates >= 2 && southTaxi.near && southTaxi.farNorth, `taxi touts wait at the south Suvarnabhumi curb (${southTaxi.n})`);
+    assert(southTaxi.night >= 2 && southTaxi.day >= 2 && southTaxi.shifted && southTaxi.swung, 'they hide after 22:00 and the slates tilt');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

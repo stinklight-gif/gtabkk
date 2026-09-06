@@ -3198,41 +3198,44 @@ export function spawnAirportTower(scene) {
 export function spawnAirportTaxi(scene) {
   if (!GAMEPLAY.airportTaxi) return;
   if (!G.world || !G.world.airport) return;
-  const nx = 209, nz = 50;
-  const touts = [];
-  const slots = [
-    { x: nx + 6.4, z: nz - 2.2, facing: PI / 2, kind: 'laborer' },
-    { x: nx + 6.4, z: nz + 2.4, facing: PI / 2, kind: 'laborer' },
-  ];
-  for (let i = 0; i < slots.length; i++) {
-    const slot = slots[i];
-    const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
-    recolorTorso(ped.mesh.userData.parts, 0xe8c020, 0.7);
-    ped.airportTaxi = true;
-    ped.speed = 0;
-    ped.state = 'idle';
-    ped.heading = slot.facing;
-    ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
-    if (ped.mesh) {
-      ped.mesh.rotation.y = slot.facing;
-      ped.mesh.visible = false;
+  const pack = (cx, cz) => {
+    const touts = [];
+    const slots = [
+      { x: cx + 6.4, z: cz - 2.2, facing: PI / 2, kind: 'laborer' },
+      { x: cx + 6.4, z: cz + 2.4, facing: PI / 2, kind: 'laborer' },
+    ];
+    for (let i = 0; i < slots.length; i++) {
+      const slot = slots[i];
+      const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
+      recolorTorso(ped.mesh.userData.parts, 0xe8c020, 0.7);
+      ped.airportTaxi = true;
+      ped.speed = 0;
+      ped.state = 'idle';
+      ped.heading = slot.facing;
+      ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
+      if (ped.mesh) {
+        ped.mesh.rotation.y = slot.facing;
+        ped.mesh.visible = false;
+      }
+      const slate = new THREE.Mesh(
+        new THREE.BoxGeometry(0.12, 0.16, 0.02),
+        new THREE.MeshStandardMaterial({ color: 0xf0ead8, roughness: 0.7 })
+      );
+      slate.name = 'taxi-slate';
+      const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+      if (parts && parts.foreR) {
+        slate.position.set(0.02, -0.22, 0.08);
+        parts.foreR.add(slate);
+      } else if (ped.mesh) {
+        slate.position.set(0.22, 1.05, 0.12);
+        ped.mesh.add(slate);
+      }
+      touts.push(ped);
     }
-    const slate = new THREE.Mesh(
-      new THREE.BoxGeometry(0.12, 0.16, 0.02),
-      new THREE.MeshStandardMaterial({ color: 0xf0ead8, roughness: 0.7 })
-    );
-    slate.name = 'taxi-slate';
-    const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
-    if (parts && parts.foreR) {
-      slate.position.set(0.02, -0.22, 0.08);
-      parts.foreR.add(slate);
-    } else if (ped.mesh) {
-      slate.position.set(0.22, 1.05, 0.12);
-      ped.mesh.add(slate);
-    }
-    touts.push(ped);
-  }
-  G.airportTaxi = { touts, x: nx, z: nz, t: 0 };
+    return { touts, x: cx, z: cz, t: 0 };
+  };
+  G.airportTaxi = pack(209, 50);
+  G.southAirportTaxi = pack(209, -50);
 }
 
 export function spawnMallDirectory(scene) {
