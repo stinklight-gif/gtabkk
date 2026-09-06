@@ -1396,6 +1396,38 @@ export function updateSoiBarber(dt) {
   if (G.audio && G.audio.blip) G.audio.blip({ freq: 180, dur: 0.08, type: 'square', gain: 0.08 });
 }
 
+export function updateRainFrogs(dt) {
+  if (!GAMEPLAY.rainFrogs || !G.rainFrogs) return;
+  const rain = (G.time && G.time.rainStrength) || 0;
+  const wet = rain > 0.35;
+  for (const f of G.rainFrogs) {
+    if (!f.mesh) continue;
+    f.mesh.visible = wet;
+    if (!wet) {
+      f.mesh.position.y = 0;
+      continue;
+    }
+    f.t = (f.t || 0) + dt;
+    const bounce = Math.sin(f.t * (f.hop || 8));
+    const air = Math.max(0, bounce);
+    f.mesh.position.y = air * 0.22;
+    if (air > 0.08) {
+      f.x += Math.sin(f.heading) * 0.55 * dt;
+      f.z += Math.cos(f.heading) * 0.55 * dt;
+    } else if (bounce < -0.6) {
+      f.heading += dt * 1.6;
+    }
+    const p = f.patch;
+    if (p) {
+      f.x = clamp(f.x, p.x0 + 0.4, p.x1 - 0.4);
+      f.z = clamp(f.z, p.z0 + 0.4, p.z1 - 0.4);
+    }
+    f.mesh.position.x = f.x;
+    f.mesh.position.z = f.z;
+    f.mesh.rotation.y = f.heading;
+  }
+}
+
 export function updateSoiWires(dt) {
   if (!GAMEPLAY.soiWires || !G.soiWires) return;
   const st = G.soiWires;

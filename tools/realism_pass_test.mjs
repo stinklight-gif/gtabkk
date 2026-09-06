@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -2601,6 +2601,32 @@ async function main() {
     });
     assert(tangle.flag && tangle.n >= 4 && tangle.xfmr && tangle.sparks >= 1 && tangle.poles >= 2, `tangled cables on the soi poles (${tangle.n})`);
     assert(tangle.dry && tangle.wet, 'the wires only spark in the rain');
+
+    console.log('\n[79] rain frogs on flooded sois');
+    const frogs = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = G.rainFrogs || [];
+      const n = list.filter(f => f && f.mesh && f.mesh.name === 'rain-frog').length;
+      const f0 = list[0];
+      G.time.rainStrength = 0;
+      if (f0) f0.t = 0.12;
+      main.updateRainFrogs(0.05);
+      const dry = !!(f0 && f0.mesh && f0.mesh.visible === false);
+      G.time.rainStrength = 0.8;
+      if (f0) { f0.t = 0.12; f0.heading = 0.4; }
+      main.updateRainFrogs(0.05);
+      const start = f0 && f0.mesh ? { x: f0.mesh.position.x, z: f0.mesh.position.z, y: f0.mesh.position.y } : null;
+      for (let i = 0; i < 40; i++) main.updateRainFrogs(0.08);
+      const moved = !!(f0 && start && (Math.hypot(f0.mesh.position.x - start.x, f0.mesh.position.z - start.z) > 0.08 || Math.abs(f0.mesh.position.y - start.y) > 0.04));
+      const wet = !!(f0 && f0.mesh && f0.mesh.visible);
+      const onSoi = !!(f0 && f0.patch && f0.patch.soi);
+      return {
+        flag: !!(G.gameplay && G.gameplay.rainFrogs),
+        n, dry, wet, moved, onSoi,
+      };
+    });
+    assert(frogs.flag && frogs.n >= 5 && frogs.onSoi, `frogs wait on flooded sois (${frogs.n})`);
+    assert(frogs.dry && frogs.wet && frogs.moved, 'they only hop while it rains');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

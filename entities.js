@@ -1712,6 +1712,45 @@ export function spawnSoiWires(scene) {
   }
 }
 
+function makeFrogMesh() {
+  const g = new THREE.Group();
+  g.name = 'rain-frog';
+  const skin = new THREE.MeshStandardMaterial({ color: pick([0x3a7a32, 0x4a6a28, 0x2a5a30]), roughness: 0.8 });
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.09, 7, 6), skin);
+  body.scale.set(1.15, 0.7, 1.35);
+  body.position.y = 0.07;
+  g.add(body);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.055, 6, 5), skin);
+  head.position.set(0, 0.1, 0.08);
+  g.add(head);
+  const eyeMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.4 });
+  for (const s of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.018, 5, 4), eyeMat);
+    eye.position.set(s * 0.035, 0.13, 0.11);
+    g.add(eye);
+  }
+  return g;
+}
+
+export function spawnRainFrogs(scene) {
+  if (!GAMEPLAY.rainFrogs) return;
+  const floods = ((G.world && G.world.flood) || []).filter(f => f && f.soi);
+  const sois = (G.world && G.world.sois) || [];
+  const patches = floods.length ? floods : sois.map(s => ({ x0: s.x0, x1: s.x1, z0: s.z0, z1: s.z1, soi: true }));
+  G.rainFrogs = [];
+  if (!patches.length) return;
+  for (let i = 0; i < 6; i++) {
+    const p = patches[i % patches.length];
+    const x = p.x0 + (p.x1 - p.x0) * (0.18 + (i % 3) * 0.28);
+    const z = p.z0 + (p.z1 - p.z0) * (0.22 + Math.floor(i / 3) * 0.4);
+    const mesh = makeFrogMesh();
+    mesh.position.set(x, 0, z);
+    mesh.visible = false;
+    scene.add(mesh);
+    G.rainFrogs.push({ mesh, patch: p, x, z, t: i * 0.37, heading: i * 1.1, hop: 8 + i * 0.7 });
+  }
+}
+
 function makePlasticChair() {
   const g = new THREE.Group();
   g.name = 'plastic-chair';
