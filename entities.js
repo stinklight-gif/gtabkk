@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.sevenAtm || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.sevenAtm || ped.btsBusker || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -2533,6 +2533,48 @@ export function spawnSevenAtm(scene) {
     queue.push(ped);
   }
   G.sevenAtm = { queue, ax, az, t: 0 };
+}
+
+export function spawnBtsBusker(scene) {
+  if (!GAMEPLAY.btsBusker) return;
+  const bts = G.world && G.world.bts;
+  if (!bts) return;
+  const x = bts.x + 4.6, z = -26.6;
+  const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'local');
+  ped.btsBusker = true;
+  ped.speed = 0;
+  ped.state = 'idle';
+  ped.heading = 0;
+  ped.anchor = { slot: new THREE.Vector3(x, 0, z), facing: 0 };
+  if (ped.mesh) {
+    ped.mesh.rotation.y = 0;
+    ped.mesh.visible = false;
+  }
+  const guitar = new THREE.Group();
+  guitar.name = 'bts-guitar';
+  const wood = new THREE.MeshStandardMaterial({ color: 0x8a5a28, roughness: 0.65 });
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.07, 0.34), wood);
+  guitar.add(body);
+  const neck = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.035, 0.4), wood);
+  neck.position.z = 0.34;
+  guitar.add(neck);
+  const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+  if (parts && parts.foreL) {
+    guitar.position.set(0.02, -0.18, 0.12);
+    guitar.rotation.set(-0.4, 0.6, 0.9);
+    parts.foreL.add(guitar);
+  } else if (ped.mesh) {
+    guitar.position.set(-0.18, 0.95, 0.18);
+    ped.mesh.add(guitar);
+  }
+  const hat = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.16, 0.2, 0.06, 10),
+    new THREE.MeshStandardMaterial({ color: 0x3a2a18, roughness: 0.85 })
+  );
+  hat.name = 'bts-busker-hat';
+  hat.position.set(x + 0.45, 0.04, z + 0.35);
+  scene.add(hat);
+  G.btsBusker = { ped, guitar, hat, x, z, t: 0 };
 }
 
 export function spawnBtsSitters(scene) {

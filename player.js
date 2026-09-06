@@ -410,6 +410,7 @@ export function updateInteraction(dt) {
   }
   if (GAMEPLAY.boatNoodle && G.boatNoodle && G.boatNoodle.mesh && dist2(G.boatNoodle.mesh.position, pp0) < 3.6 * 3.6) return;
   if (GAMEPLAY.watBell && G.watBell && dist2({ x: G.watBell.x, z: G.watBell.z }, pp0) < 2.8 * 2.8) return;
+  if (GAMEPLAY.btsBusker && G.btsBusker && dist2({ x: G.btsBusker.x, z: G.btsBusker.z }, pp0) < 2.4 * 2.4) return;
 
   const crate = G.world.yaowaratCrate;
   if (crate && !crate.taken && dist2(p.group.position, crate.pos) < 2.6 * 2.6) {
