@@ -253,14 +253,14 @@ export function resyncCrowd() {
   // pull stray wanderers onto nearby sidewalks so the count near the camera
   // reflects the hour immediately (harness-only; gameplay distributes gradually)
   for (const ped of G.peds) {
-    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.yaoPhoto || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.soiBarber) continue;
+    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.yaoPhoto || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.soiBarber) continue;
     if (dist2(ped.mesh.position, pp) > 95 * 95) ped.mesh.position.copy(sidewalkPos(pp.x, pp.z, 88));
   }
   for (let guard = 0; G.peds.length > target && guard < 500; guard++) {
     let fi = -1, fd = -1;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.yaoPhoto || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.soiBarber) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.yaoPhoto || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.soiBarber) continue;
       const d = dist2(ped.mesh.position, pp);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -371,6 +371,9 @@ export function updatePeds(dt) {
       continue;
     }
     if (ped.sevenSlush) {
+      continue;
+    }
+    if (ped.phromFruit) {
       continue;
     }
     if (ped.btsPaper) {
@@ -675,7 +678,7 @@ export function updatePeds(dt) {
     let fi = -1, fd = 60 * 60;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.yaoPhoto || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.soiBarber) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.yaoPhoto || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.soiBarber) continue;
       const d = dist2(ped.mesh.position, playerPos);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -1887,7 +1890,7 @@ export function updateSeekShade(dt) {
   let n = 0;
   for (const ped of G.peds) {
     if (n >= 22) break;
-    if (!ped || ped.dead || ped.anchor || ped.gang || ped.pillion || ped.alms || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.checkpoint || ped.btsSit || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.soiBarber || ped.yaoPhoto || ped.panicT > 0) continue;
+    if (!ped || ped.dead || ped.anchor || ped.gang || ped.pillion || ped.alms || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.checkpoint || ped.btsSit || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.soiBarber || ped.yaoPhoto || ped.panicT > 0) continue;
     if (ped.social || ped.isMugger || ped.isTarget || ped.motosaiRider || ped.motosaiWait) continue;
     const w = nearestWalkway(ped.mesh.position.x, ped.mesh.position.z);
     if (!w) continue;
@@ -2553,6 +2556,46 @@ export function updateMangoSticky(dt) {
   if (G.hud.setCash) G.hud.setCash(G.cash);
   G._mangoSticky = (G._mangoSticky || 0) + 1;
   G.hud.showNotif('Mango sticky rice — ข้าวเหนียวมะม่วง');
+  if (G.audio && G.audio.chime) G.audio.chime();
+}
+
+export function updatePhromFruit(dt) {
+  if (!GAMEPLAY.phromFruit || !G.phromFruit) return;
+  const c = G.phromFruit;
+  c.t = (c.t || 0) + dt;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const open = h >= 10 && h < 20;
+  const blender = c.mesh && c.mesh.getObjectByName('phrom-blender');
+  if (blender) {
+    blender.rotation.y = open ? c.t * 8.5 : blender.rotation.y;
+    if (blender.material) blender.material.emissiveIntensity = open ? 0.22 + Math.sin(c.t * 10) * 0.1 : 0.06;
+  }
+  const fruits = c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'phrom-fruit-piece') : [];
+  for (let i = 0; i < fruits.length; i++) {
+    fruits[i].position.y = 0.82 + (open ? Math.sin(c.t * 3.2 + i) * 0.02 : 0);
+  }
+  const ped = c.vendor;
+  if (ped && ped.mesh && ped.anchor && ped.anchor.slot) {
+    ped.phromFruit = true;
+    ped.mesh.visible = open;
+    ped.mesh.position.set(ped.anchor.slot.x, 0, ped.anchor.slot.z);
+    ped.heading = ped.anchor.facing;
+    ped.mesh.rotation.y = ped.heading;
+    ped.speed = 0;
+    ped.state = 'idle';
+  }
+  if (!open || G.player.inVehicle || G._eating) return;
+  const pp = G.player.group.position;
+  if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) return;
+  G.hud.showPrompt('Press <b>E</b> for a fruit smoothie · ฿40', 0.4);
+  if (!G.input.pressed('KeyE')) return;
+  if (G.cash < 40) { G.hud.showNotif('Need ฿40 for a smoothie'); return; }
+  G.cash -= 40;
+  G.player.hp = Math.min(G.player.hpMax, G.player.hp + 18);
+  G.player.stam = G.player.stamMax;
+  if (G.hud.setCash) G.hud.setCash(G.cash);
+  G._phromFruit = (G._phromFruit || 0) + 1;
+  G.hud.showNotif('Fruit smoothie — น้ำปั่น');
   if (G.audio && G.audio.chime) G.audio.chime();
 }
 

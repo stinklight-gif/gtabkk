@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -3621,6 +3621,92 @@ export function spawnMangoSticky(scene) {
   vendor.heading = PI / 2;
   if (vendor.mesh) vendor.mesh.rotation.y = PI / 2;
   G.mangoSticky = { mesh, vendor, x, z, t: 0 };
+}
+
+export function makePhromFruitMesh() {
+  const g = new THREE.Group();
+  g.name = 'phrom-fruit';
+  const box = new THREE.Mesh(
+    new THREE.BoxGeometry(0.95, 0.5, 1.15),
+    new THREE.MeshStandardMaterial({ color: 0x2a8a3a, roughness: 0.78 })
+  );
+  box.position.y = 0.48;
+  g.add(box);
+  const blender = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.09, 0.1, 0.28, 8),
+    new THREE.MeshStandardMaterial({
+      color: 0xffb020, roughness: 0.3, transparent: true, opacity: 0.7,
+      emissive: 0xff8800, emissiveIntensity: 0.12,
+    })
+  );
+  blender.name = 'phrom-blender';
+  blender.position.set(-0.18, 0.92, 0.05);
+  g.add(blender);
+  const base = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.11, 0.12, 0.08, 8),
+    new THREE.MeshStandardMaterial({ color: 0x2a2a30, roughness: 0.45, metalness: 0.3 })
+  );
+  base.position.set(-0.18, 0.76, 0.05);
+  g.add(base);
+  const fruitMat = [
+    new THREE.MeshStandardMaterial({ color: 0xc03030, roughness: 0.6 }),
+    new THREE.MeshStandardMaterial({ color: 0xffb020, roughness: 0.55 }),
+    new THREE.MeshStandardMaterial({ color: 0xe8d24a, roughness: 0.55 }),
+    new THREE.MeshStandardMaterial({ color: 0x2ec86a, roughness: 0.6 }),
+  ];
+  for (let i = 0; i < 4; i++) {
+    const fruit = new THREE.Mesh(new THREE.SphereGeometry(0.08, 7, 5), fruitMat[i]);
+    fruit.name = 'phrom-fruit-piece';
+    fruit.position.set(0.08 + (i % 2) * 0.18, 0.82, (i < 2 ? 0.16 : -0.1));
+    g.add(fruit);
+  }
+  const cup = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.045, 0.04, 0.12, 7),
+    new THREE.MeshStandardMaterial({ color: 0xff6a2a, roughness: 0.4, transparent: true, opacity: 0.8 })
+  );
+  cup.name = 'phrom-cup';
+  cup.position.set(0.28, 0.84, 0.18);
+  g.add(cup);
+  const umb = new THREE.Mesh(
+    new THREE.ConeGeometry(0.7, 0.24, 8),
+    new THREE.MeshStandardMaterial({ color: 0xff8a1a, roughness: 0.7, side: THREE.DoubleSide })
+  );
+  umb.position.y = 1.9;
+  umb.rotation.x = PI;
+  g.add(umb);
+  const pole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.02, 0.02, 1.02, 5),
+    new THREE.MeshStandardMaterial({ color: 0x333333 })
+  );
+  pole.position.y = 1.36;
+  g.add(pole);
+  const tire = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+  for (const z of [-0.38, 0.38]) for (const x of [-0.32, 0.32]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 8), tire);
+    w.rotation.z = PI / 2;
+    w.position.set(x, 0.12, z);
+    g.add(w);
+  }
+  return g;
+}
+
+export function spawnPhromFruit(scene) {
+  if (!GAMEPLAY.phromFruit) return;
+  const x = 100 - 8.2, z = -24.8;
+  const mesh = makePhromFruitMesh();
+  mesh.position.set(x, 0, z);
+  scene.add(mesh);
+  const vendor = spawnPed(scene, new THREE.Vector3(x + 0.7, 0, z + 0.12), 'vendor');
+  vendor.phromFruit = true;
+  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI / 2 };
+  vendor.speed = 0;
+  vendor.state = 'idle';
+  vendor.heading = PI / 2;
+  if (vendor.mesh) {
+    vendor.mesh.rotation.y = PI / 2;
+    vendor.mesh.visible = false;
+  }
+  G.phromFruit = { mesh, vendor, x, z, t: 0 };
 }
 
 export function spawnBtsGates(scene) {
