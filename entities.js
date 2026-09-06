@@ -1646,6 +1646,57 @@ export function spawnSoiPa(scene) {
   }
 }
 
+export function spawnSoiCctv(scene) {
+  if (!GAMEPLAY.soiCctv) return;
+  const sois = (G.world && G.world.sois) || [];
+  G.soiCctv = [];
+  const n = Math.min(3, sois.length);
+  for (let i = 0; i < n; i++) {
+    const s = sois[i];
+    const alongZ = s.axis === 'z';
+    const t = 0.18 + i * 0.12;
+    const x = alongZ ? (s.x0 + s.x1) * 0.5 + 1.55 : s.x0 + (s.x1 - s.x0) * t;
+    const z = alongZ ? s.z0 + (s.z1 - s.z0) * t : (s.z0 + s.z1) * 0.5 + 1.55;
+    const g = new THREE.Group();
+    g.name = 'soi-cctv';
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.045, 0.055, 3.4, 5),
+      new THREE.MeshStandardMaterial({ color: 0x6a6a68, roughness: 0.65, metalness: 0.25 })
+    );
+    pole.position.y = 1.7;
+    g.add(pole);
+    const arm = new THREE.Mesh(
+      new THREE.BoxGeometry(0.06, 0.05, 0.55),
+      new THREE.MeshStandardMaterial({ color: 0x4a4a48, roughness: 0.5, metalness: 0.3 })
+    );
+    arm.position.set(alongZ ? 0.22 : 0, 3.25, alongZ ? 0 : 0.22);
+    g.add(arm);
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(0.16, 0.12, 0.22),
+      new THREE.MeshStandardMaterial({ color: 0x2a2a2c, roughness: 0.45 })
+    );
+    body.position.set(alongZ ? 0.42 : 0, 3.18, alongZ ? 0 : 0.42);
+    g.add(body);
+    const lens = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.045, 0.05, 0.06, 8),
+      new THREE.MeshStandardMaterial({ color: 0x111118, roughness: 0.25, metalness: 0.4 })
+    );
+    lens.rotation.x = PI / 2;
+    lens.position.set(alongZ ? 0.42 : 0, 3.18, alongZ ? 0.14 : 0.42);
+    g.add(lens);
+    const led = new THREE.Mesh(
+      new THREE.SphereGeometry(0.025, 6, 5),
+      new THREE.MeshStandardMaterial({ color: 0xff2020, emissive: 0xff1010, emissiveIntensity: 0.15, roughness: 0.4 })
+    );
+    led.name = 'soi-cctv-led';
+    led.position.set(alongZ ? 0.5 : 0, 3.26, alongZ ? 0 : 0.5);
+    g.add(led);
+    g.position.set(x, 0, z);
+    scene.add(g);
+    G.soiCctv.push({ mesh: g, led, soi: s, x, z });
+  }
+}
+
 function addSagWire(scene, ax, ay, az, bx, by, bz, sag, mat) {
   const g = new THREE.Group();
   g.name = 'soi-wire';

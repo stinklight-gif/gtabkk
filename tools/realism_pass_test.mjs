@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -2627,6 +2627,45 @@ async function main() {
     });
     assert(frogs.flag && frogs.n >= 5 && frogs.onSoi, `frogs wait on flooded sois (${frogs.n})`);
     assert(frogs.dry && frogs.wet && frogs.moved, 'they only hop while it rains');
+
+    console.log('\n[80] soi CCTV');
+    const cams = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = G.soiCctv || [];
+      const n = list.filter(c => c && c.mesh && c.mesh.name === 'soi-cctv').length;
+      const leds = list.filter(c => c && c.led && c.led.name === 'soi-cctv-led').length;
+      const c0 = list[0];
+      G.bullets = [];
+      G.player.inVehicle = null;
+      G._btsRide = null;
+      main.updateSoiCctv(0.05);
+      G.nightK = 0;
+      main.updateSoiCctv(0.05);
+      const dayLed = c0 && c0.led ? c0.led.material.emissiveIntensity : 9;
+      G.nightK = 0.8;
+      main.updateSoiCctv(0.05);
+      const nightLed = c0 && c0.led ? c0.led.material.emissiveIntensity : 0;
+      G.policeOff = false;
+      G.wanted.stars = 0;
+      G.wanted.crime = 0;
+      G._cctvPing = 0;
+      if (c0) {
+        c0._flagged = false;
+        G.player.group.position.set(c0.x, 0, c0.z);
+      }
+      G.bullets = [{ mesh: { position: G.player.group.position } }];
+      main.updateSoiCctv(0.016);
+      const pinged = (G._cctvPing || 0) >= 1 && G.wanted.stars >= 1;
+      G.bullets = [];
+      main.updateSoiCctv(0.016);
+      return {
+        flag: !!(G.gameplay && G.gameplay.soiCctv),
+        n, leds, dayLed, nightLed, pinged, onSoi: !!(c0 && c0.soi),
+      };
+    });
+    assert(cams.flag && cams.n >= 3 && cams.leds >= 3 && cams.onSoi, `soi CCTV poles (${cams.n})`);
+    assert(cams.dayLed < 0.4 && cams.nightLed > 0.6, 'the red LED wakes up at night');
+    assert(cams.pinged, 'a shot in view of a soi camera is a star');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

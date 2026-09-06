@@ -1396,6 +1396,30 @@ export function updateSoiBarber(dt) {
   if (G.audio && G.audio.blip) G.audio.blip({ freq: 180, dur: 0.08, type: 'square', gain: 0.08 });
 }
 
+export function updateSoiCctv(dt) {
+  if (!GAMEPLAY.soiCctv || !G.soiCctv) return;
+  const night = (G.nightK || 0) > 0.45;
+  const pp = G.player && G.player.group ? G.player.group.position : null;
+  const shooting = !!(G.bullets && G.bullets.length);
+  for (const cam of G.soiCctv) {
+    if (cam.led && cam.led.material) {
+      cam.led.material.emissiveIntensity = night ? 0.95 : 0.12;
+    }
+    if (!pp || !shooting || G.player.inVehicle) continue;
+    if (dist2({ x: cam.x, z: cam.z }, pp) > 22 * 22) continue;
+    G.wanted.lastSeenAt = (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0;
+    G._cctvPing = (G._cctvPing || 0) + 1;
+    if (!cam._flagged) {
+      cam._flagged = true;
+      raiseWanted(1, 2);
+      if (G.hud) G.hud.showNotif('CCTV — กล้องวงจรปิด');
+    }
+  }
+  if (!shooting) {
+    for (const cam of G.soiCctv) cam._flagged = false;
+  }
+}
+
 export function updateRainFrogs(dt) {
   if (!GAMEPLAY.rainFrogs || !G.rainFrogs) return;
   const rain = (G.time && G.time.rainStrength) || 0;

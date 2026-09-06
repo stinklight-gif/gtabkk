@@ -306,6 +306,7 @@ export const GAMEPLAY = {
   btsGates: true,         // Asok ticket gates + Rabbit machine; hop is 1★
   soiWires: true,         // tangled cables between soi PA poles; sparks in the rain
   rainFrogs: true,        // frogs hop flooded sois while it rains
+  soiCctv: true,          // soi pole cameras; a shot in view is a ping and 1★
 };
 G.gameplay = GAMEPLAY;
 
