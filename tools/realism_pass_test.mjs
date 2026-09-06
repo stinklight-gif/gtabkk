@@ -8025,6 +8025,39 @@ async function main() {
     });
     assert(dirAskB.flag && dirAskB.rec && dirAskB.map && dirAskB.near && dirAskB.other, 'a visitor asks at the north Terminal 21 directory');
     assert(dirAskB.night && dirAskB.day && dirAskB.shifted && dirAskB.swung, 'they hide after 22:00 and the floor map turns');
+
+    console.log('\n[224] third customer at the Krung Thep Bank ATM');
+    const bankAtmB = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.bankAtmB;
+      const first = G.bankAtm;
+      const door = G.world && G.world.poi && G.world.poi.bank;
+      const n = (c && c.queue || []).filter(p => p && p.bankQueue && p.mesh).length;
+      const phone = (c && c.queue || []).some(p => p && p.mesh && p.mesh.getObjectByName('bank-atm-phone'));
+      const near = !!(c && door && Math.hypot(c.x - door.x, c.z - door.z) < 12);
+      const other = !!(c && first && Math.hypot(c.x - first.x, c.z - first.z) > 1.2);
+      G.time.dayT = 3 / 24;
+      main.updateBankQueue(0.05);
+      const late = (c && c.queue || []).filter(p => p && p.mesh && p.mesh.visible === false).length;
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updateBankQueue(0.05);
+      const day = (c && c.queue || []).filter(p => p && p.bankQueue && p.mesh && p.mesh.visible).length;
+      const p0 = c && c.queue && c.queue[0];
+      const z0 = p0 && p0.mesh ? p0.mesh.position.z : 0;
+      const tool = p0 && p0.mesh && p0.mesh.getObjectByName('bank-atm-phone');
+      const e0 = tool && tool.material ? tool.material.emissiveIntensity : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.4;
+      main.updateBankQueue(0.05);
+      const shifted = !!(p0 && p0.mesh && Math.abs(p0.mesh.position.z - z0) > 0.04);
+      const glowed = !!(tool && tool.material && Math.abs(tool.material.emissiveIntensity - e0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.bankQueue),
+        n, phone, near, other, late, day, shifted, glowed,
+      };
+    });
+    assert(bankAtmB.flag && bankAtmB.n >= 1 && bankAtmB.phone && bankAtmB.near && bankAtmB.other, `a third customer waits at the Krung Thep Bank ATM (${bankAtmB.n})`);
+    assert(bankAtmB.late >= 1 && bankAtmB.day >= 1 && bankAtmB.shifted && bankAtmB.glowed, 'they hide late and the phone glows');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

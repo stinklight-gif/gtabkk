@@ -2889,6 +2889,32 @@ export function spawnBankQueue(scene) {
       atmQueue.push(ped);
     }
     G.bankAtm = { queue: atmQueue, machine, x: ax, z: az, t: 0, hours: [6, 22] };
+    const tx3 = ax + 2.65, tz3 = az + 0.36;
+    const extraAtm = spawnPed(scene, new THREE.Vector3(tx3, 0, tz3), 'office');
+    extraAtm.bankQueue = true;
+    extraAtm.speed = 0;
+    extraAtm.state = 'idle';
+    extraAtm.heading = -PI / 2;
+    extraAtm.anchor = { slot: new THREE.Vector3(tx3, 0, tz3), facing: -PI / 2 };
+    if (extraAtm.mesh) {
+      extraAtm.mesh.rotation.y = -PI / 2;
+      extraAtm.mesh.visible = false;
+    }
+    const phoneAtm = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.09, 0.012),
+      new THREE.MeshStandardMaterial({ color: 0x1a1a22, emissive: 0x226688, emissiveIntensity: 0.35, roughness: 0.35 })
+    );
+    phoneAtm.name = 'bank-atm-phone';
+    const ap = extraAtm.mesh && extraAtm.mesh.userData && extraAtm.mesh.userData.parts;
+    if (ap && ap.foreR) {
+      phoneAtm.position.set(0.02, -0.28, 0.06);
+      ap.foreR.add(phoneAtm);
+    } else if (extraAtm.mesh) {
+      phoneAtm.position.set(0.22, 1.05, 0.12);
+      extraAtm.mesh.add(phoneAtm);
+    }
+    extraAtm._phone = phoneAtm;
+    G.bankAtmB = { queue: [extraAtm], x: tx3, z: tz3, t: 0, hours: [6, 22] };
   }
   const packTeller = (sx, sz) => {
     const tellerPed = spawnPed(scene, new THREE.Vector3(sx, 0, sz), 'office');
