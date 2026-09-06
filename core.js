@@ -344,6 +344,7 @@ export const GAMEPLAY = {
   bankQueue: true,        // two customers wait at the Krung Thep Bank teller with a passbook; they hide after hours
   mallFood: true,         // eaters sit Pier 21 Food Court at Terminal 21; trays, they hide after 21:00
   gunClerk: true,         // clerk behind the Sukhumvit Gun Shop counter; they hide after hours
+  mallTech: true,         // window shoppers at Tokyo Tech in Terminal 21; phones, they hide after 21:00
 };
 G.gameplay = GAMEPLAY;
 
