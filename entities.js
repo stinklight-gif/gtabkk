@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.squid || ped.songthaewRide || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -3177,6 +3177,55 @@ export function spawnBtsSongthaew(scene) {
     }
   }
   G.world.btsSongthaew = { vehicle: v, waiter, riders, x, z };
+}
+
+function makeWatBroom() {
+  const g = new THREE.Group();
+  g.name = 'wat-broom';
+  const shaft = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.016, 0.02, 1.15, 5),
+    new THREE.MeshStandardMaterial({ color: 0x6a4a28, roughness: 0.85 })
+  );
+  shaft.position.y = 0.55;
+  g.add(shaft);
+  const head = new THREE.Mesh(
+    new THREE.BoxGeometry(0.22, 0.1, 0.08),
+    new THREE.MeshStandardMaterial({ color: 0xc8b070, roughness: 0.9 })
+  );
+  head.position.y = 0.02;
+  g.add(head);
+  return g;
+}
+
+export function spawnWatSweep(scene) {
+  if (!GAMEPLAY.watSweep) return;
+  const temple = G.world && G.world.poi && G.world.poi.temple;
+  if (!temple) return;
+  G.watSweep = [];
+  for (let i = 0; i < 2; i++) {
+    const z = temple.z - 11.2 + i * 1.2;
+    const x = temple.x - 2 + i * 3.4;
+    const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'monk');
+    ped.watSweep = true;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped._sweepT = i * 0.35;
+    ped._sweepDir = 1;
+    ped._sweepZ = z;
+    ped._sweepX0 = temple.x - 5.5;
+    ped._sweepX1 = temple.x + 6.5;
+    const broom = makeWatBroom();
+    broom.position.set(0.28, 0.12, 0.18);
+    broom.rotation.set(0.55, 0, 0.4);
+    if (ped.mesh) {
+      ped.mesh.add(broom);
+      ped.mesh.visible = false;
+      const bowl = ped.mesh.getObjectByName('alms-bowl');
+      if (bowl) bowl.visible = false;
+    }
+    ped._broom = broom;
+    G.watSweep.push(ped);
+  }
 }
 
 export function spawnBtsTuktuk(scene) {

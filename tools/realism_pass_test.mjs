@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -462,7 +462,7 @@ async function main() {
     const peds = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
       const ways = (G.world.walkways || []).length;
-      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart && !p.songthaewRide);
+      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart && !p.songthaewRide && !p.watSweep);
       const b = G.world.buildings.find(x => x.size.y > 8 && x.size.x > 4 && x.size.z > 4) || G.world.buildings[0];
       const insideBefore = wanderer && b && Math.abs(wanderer.mesh.position.x - b.pos.x) < b.size.x / 2 && Math.abs(wanderer.mesh.position.z - b.pos.z) < b.size.z / 2;
       if (wanderer && b) {
@@ -3071,6 +3071,42 @@ async function main() {
     });
     assert(bench.flag && bench.vehicle && bench.n >= 3 && bench.seated >= 3 && bench.yao >= 3, `passengers sit the BTS songthaew (${bench.n})`);
     assert(bench.parked >= 3 && bench.dumped && bench.off >= 3 && bench.grounded >= 3, 'they hop off onto the pavement when you take the ride');
+
+    console.log('\n[92] wat courtyard sweepers');
+    const sweep = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = G.watSweep || [];
+      const n = list.filter(p => p && p.watSweep && p.mesh).length;
+      const brooms = list.filter(p => p && p.mesh && p.mesh.getObjectByName('wat-broom')).length;
+      const temple = G.world && G.world.poi && G.world.poi.temple;
+      const nearWat = list.filter(p => p && p.mesh && temple && Math.hypot((p._sweepX0 + p._sweepX1) * 0.5 - temple.x, (p._sweepZ || 0) - temple.z) < 16).length;
+      G.time.dayT = 12 / 24;
+      main.updateWatSweep(0.05);
+      const day = list.filter(p => p && p.mesh && p.mesh.visible === false).length;
+      G.time.dayT = 7.2 / 24;
+      const p0 = list[0];
+      if (p0) { p0._sweepT = 0.2; p0._sweepDir = 1; }
+      main.updateWatSweep(0.05);
+      const start = p0 && p0.mesh ? { x: p0.mesh.position.x, z: p0.mesh.position.z } : null;
+      const broom = p0 && p0.mesh && p0.mesh.getObjectByName('wat-broom');
+      const r0 = broom ? broom.rotation.x : 0;
+      if (p0) p0._sweepT = 0.2 + Math.PI / 18;
+      main.updateWatSweep(0.05);
+      const swung = !!(broom && Math.abs(broom.rotation.x - r0) > 0.05);
+      if (p0) { p0._sweepT = 0.2; p0._sweepDir = 1; }
+      main.updateWatSweep(0.05);
+      const sx = p0 && p0.mesh ? p0.mesh.position.x : 0;
+      const sz = p0 && p0.mesh ? p0.mesh.position.z : 0;
+      for (let i = 0; i < 20; i++) main.updateWatSweep(0.1);
+      const morning = list.filter(p => p && p.watSweep && p.mesh && p.mesh.visible).length;
+      const walked = !!(p0 && p0.mesh && Math.hypot(p0.mesh.position.x - sx, p0.mesh.position.z - sz) > 0.4);
+      return {
+        flag: !!(G.gameplay && G.gameplay.watSweep),
+        n, brooms, nearWat, day, morning, walked, swung,
+      };
+    });
+    assert(sweep.flag && sweep.n >= 2 && sweep.brooms >= 2 && sweep.nearWat >= 2, `monks sweep the wat courtyard (${sweep.n})`);
+    assert(sweep.day >= 2 && sweep.morning >= 2 && sweep.walked && sweep.swung, 'they hide by day and sweep at dawn');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

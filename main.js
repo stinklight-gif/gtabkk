@@ -22,7 +22,7 @@ export * from './traffic.js';
 import { buildTrafficLights, updateTrafficLights } from './traffic.js';
 export * from './entities.js';
 import {
-  animateWalk, makeCamera, makeCatMesh, makeDogMesh, makePedMesh, makePlayer, makeRain, makeVehicle, makeVehicleMesh, sidewalkPos, spawnBoat, spawnBoatNoodle, spawnCats, spawnDog, spawnDogs, spawnMotosaiStands, spawnBtsSongthaew, spawnBtsTuktuk, spawnBtsMalai, spawnMangoSticky, spawnBtsGates, spawnIceCarts, spawnCoconutCarts, spawnChaYen, spawnRotiCart, spawnMooPing, spawnSomTam, spawnPlaKat, spawnLaundry, spawnSoiPa, spawnSoiCctv, spawnSoiWires, spawnRainFrogs, spawnSoiChairs, spawnSoiMechanic, spawnSoiBarber, spawnSoiCowboy, spawnCheckpoint, spawnSevenBikes, spawnSevenGuard, spawnBtsSitters, spawnWatTurtles, spawnWatBell, spawnWatBats, spawnMonitors, spawnHyacinth, spawnGeckos, spawnStallIncense, spawnLottery, spawnKanomKrok, spawnSquidGrill, spawnParkedCars, spawnPed, spawnPeds, spawnTraffic, updateEntityLod, wearBikeHelmet
+  animateWalk, makeCamera, makeCatMesh, makeDogMesh, makePedMesh, makePlayer, makeRain, makeVehicle, makeVehicleMesh, sidewalkPos, spawnBoat, spawnBoatNoodle, spawnCats, spawnDog, spawnDogs, spawnMotosaiStands, spawnBtsSongthaew, spawnBtsTuktuk, spawnBtsMalai, spawnMangoSticky, spawnBtsGates, spawnIceCarts, spawnCoconutCarts, spawnChaYen, spawnRotiCart, spawnMooPing, spawnSomTam, spawnPlaKat, spawnLaundry, spawnSoiPa, spawnSoiCctv, spawnSoiWires, spawnRainFrogs, spawnSoiChairs, spawnSoiMechanic, spawnSoiBarber, spawnSoiCowboy, spawnCheckpoint, spawnSevenBikes, spawnSevenGuard, spawnBtsSitters, spawnWatTurtles, spawnWatBell, spawnWatBats, spawnWatSweep, spawnMonitors, spawnHyacinth, spawnGeckos, spawnStallIncense, spawnLottery, spawnKanomKrok, spawnSquidGrill, spawnParkedCars, spawnPed, spawnPeds, spawnTraffic, updateEntityLod, wearBikeHelmet
 } from './entities.js';
 import { spawnAirportPlanes } from './airport.js';
 export * from './wanted.js';
@@ -35,7 +35,7 @@ import {
 } from './physics.js';
 export * from './npcs.js';
 import {
-  CROWD_CURVE, buildClusterAnchors, crowdFactor, crowdTarget, makeBarkSprite, resyncCrowd, spawnAnchoredPed, spawnBark, spawnSpikeStrip, updateAlms, updateArmorPickups, updateBarks, updateCats, updateClusters, updateDogs, updateFoodStalls, updateMuggings, updatePeds, updateSchoolKids, updateSeekShade, updateShrines, updateSpikes, updateTurf, updateVigilante, updateYaowaratNight, updateYaoPhotos, updateBtsPlatform, updateBtsGates, updateOfficeCommute, updateCrossingGuards, updateCheckpoint, updateSevenGuard, updateSoiChairs, updateSoiCowboy, updateCowboyClose, updateSoiMechanic, updateSoiBarber, updateRainPack, updateRainPoncho, updateBikeSeatCover, updateIceCarts, updateCoconutCarts, updateChaYen, updateRotiCart, updateMooPing, updateSomTam, updateBtsMalai, updateMangoSticky, updateKanomKrok, updateSquidGrill, updateSongthaewRiders, updatePlaKat, updateBoatNoodle, updateMonitors, updateHyacinth, updateWatTurtles, updateWatBell, updateWatBats, updateGeckos, updateStallIncense, updateSoiFootball, updateMallShoppers, updateLottery, updateSoiWires, updateRainFrogs, updateSoiCctv, vigilanteEnd, vigilanteSpawnTarget
+  CROWD_CURVE, buildClusterAnchors, crowdFactor, crowdTarget, makeBarkSprite, resyncCrowd, spawnAnchoredPed, spawnBark, spawnSpikeStrip, updateAlms, updateArmorPickups, updateBarks, updateCats, updateClusters, updateDogs, updateFoodStalls, updateMuggings, updatePeds, updateSchoolKids, updateSeekShade, updateShrines, updateSpikes, updateTurf, updateVigilante, updateYaowaratNight, updateYaoPhotos, updateBtsPlatform, updateBtsGates, updateOfficeCommute, updateCrossingGuards, updateCheckpoint, updateSevenGuard, updateSoiChairs, updateSoiCowboy, updateCowboyClose, updateSoiMechanic, updateSoiBarber, updateRainPack, updateRainPoncho, updateBikeSeatCover, updateIceCarts, updateCoconutCarts, updateChaYen, updateRotiCart, updateMooPing, updateSomTam, updateBtsMalai, updateMangoSticky, updateKanomKrok, updateSquidGrill, updateSongthaewRiders, updatePlaKat, updateBoatNoodle, updateMonitors, updateHyacinth, updateWatTurtles, updateWatBell, updateWatBats, updateWatSweep, updateGeckos, updateStallIncense, updateSoiFootball, updateMallShoppers, updateLottery, updateSoiWires, updateRainFrogs, updateSoiCctv, vigilanteEnd, vigilanteSpawnTarget
 } from './npcs.js';
 export * from './combat.js';
 import {
@@ -539,6 +539,7 @@ async function init() {
   spawnWatTurtles(scene);
   spawnWatBell(scene);
   spawnWatBats(scene);
+  spawnWatSweep(scene);
   spawnLottery(scene);
   spawnKanomKrok(scene);
   spawnSquidGrill(scene);
@@ -1755,6 +1756,7 @@ export function loop() {
     updateWatTurtles(dt);
     updateWatBell(dt);
     updateWatBats(dt);
+    updateWatSweep(dt);
     updateGeckos(dt);
     updateStallIncense(dt);
     updateSoiFootball(dt);

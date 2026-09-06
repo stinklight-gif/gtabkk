@@ -318,6 +318,7 @@ export const GAMEPLAY = {
   kanomKrok: true,        // coconut pancake pan outside 7-Eleven; afternoon, E for a bag
   squidGrill: true,       // grilled-squid cart on Yaowarat after dark; E for a stick
   songthaewRiders: true,  // passengers sit the BTS songthaew bench; hop off when you take it
+  watSweep: true,         // monks sweep the wat courtyard at dawn
 };
 G.gameplay = GAMEPLAY;
 
