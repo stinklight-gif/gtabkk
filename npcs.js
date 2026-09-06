@@ -187,6 +187,62 @@ export function updateYaowaratNight(dt) {
   }
 }
 
+export function updateYaoPhotos(dt) {
+  if (!GAMEPLAY.yaoPhotos) return;
+  const poi = G.world && G.world.poi && G.world.poi.yaowarat;
+  if (!poi) return;
+  const open = yaowaratNightOpen();
+  if (open) {
+    G._yaoPhotos = G._yaoPhotos || [];
+    const slots = [
+      { x: poi.x + 2.4, z: poi.z - 16, facing: -PI / 2 },
+      { x: poi.x - 2.4, z: poi.z - 6, facing: PI / 2 },
+      { x: poi.x + 2.4, z: poi.z + 6, facing: -PI / 2 },
+      { x: poi.x - 2.4, z: poi.z + 16, facing: PI / 2 },
+    ];
+    while (G._yaoPhotos.length < slots.length) {
+      const slot = slots[G._yaoPhotos.length];
+      const ped = spawnPed(G.scene, new THREE.Vector3(slot.x, 0, slot.z), 'tourist');
+      ped.yaoPhoto = true;
+      ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
+      ped.speed = 0;
+      ped.state = 'idle';
+      ped.heading = slot.facing;
+      if (ped.mesh) ped.mesh.rotation.y = slot.facing;
+      const phone = new THREE.Mesh(
+        new THREE.BoxGeometry(0.05, 0.1, 0.016),
+        new THREE.MeshStandardMaterial({ color: 0x0b0d12, roughness: 0.4, metalness: 0.3, emissive: 0xffffff, emissiveIntensity: 0.15 })
+      );
+      phone.name = 'yao-phone';
+      const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+      if (parts && parts.foreL) { phone.position.set(0.02, -0.26, 0.08); parts.foreL.add(phone); }
+      else if (ped.mesh) { phone.position.set(0.18, 1.15, 0.16); ped.mesh.add(phone); }
+      ped._yaoPhone = phone;
+      G._yaoPhotos.push(ped);
+    }
+    G._yaoPhotoT = (G._yaoPhotoT || 0) + dt;
+    const flash = 0.12 + Math.max(0, Math.sin(G._yaoPhotoT * 7)) * 0.85;
+    for (const ped of G._yaoPhotos) {
+      if (!ped || ped.dead || !ped.mesh) continue;
+      ped.yaoPhoto = true;
+      ped.speed = 0;
+      if (ped.anchor && ped.anchor.slot) {
+        ped.mesh.position.set(ped.anchor.slot.x, 0, ped.anchor.slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      if (ped._yaoPhone && ped._yaoPhone.material) ped._yaoPhone.material.emissiveIntensity = flash;
+    }
+  } else if (G._yaoPhotos && G._yaoPhotos.length) {
+    for (const ped of G._yaoPhotos) {
+      if (!ped || ped.dead) continue;
+      ped.yaoPhoto = false;
+      ped.anchor = null;
+    }
+    G._yaoPhotos = [];
+  }
+}
+
 // Snap the live crowd to the current time-of-day target immediately (spawn the
 // shortfall near the player, cull the farthest excess). Used by the headless
 // harness so a screenshot reflects the hour without waiting for the slow ramp;
@@ -197,14 +253,14 @@ export function resyncCrowd() {
   // pull stray wanderers onto nearby sidewalks so the count near the camera
   // reflects the hour immediately (harness-only; gameplay distributes gradually)
   for (const ped of G.peds) {
-    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.soiBarber) continue;
+    if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.yaoPhoto || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.soiBarber) continue;
     if (dist2(ped.mesh.position, pp) > 95 * 95) ped.mesh.position.copy(sidewalkPos(pp.x, pp.z, 88));
   }
   for (let guard = 0; G.peds.length > target && guard < 500; guard++) {
     let fi = -1, fd = -1;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.soiBarber) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.yaoPhoto || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.soiBarber) continue;
       const d = dist2(ped.mesh.position, pp);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -269,6 +325,17 @@ export function updatePeds(dt) {
       ped.mesh.rotation.y = ped.heading;
       updatePedRainProp(ped);
       animateWalk(ped.mesh, ped.speed, dt, ped.speed > 0.05);
+      continue;
+    }
+    if (ped.yaoPhoto) {
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        ped.mesh.position.set(slot.x, 0, slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
       continue;
     }
     if (ped.soiBarber) {
@@ -559,7 +626,7 @@ export function updatePeds(dt) {
     let fi = -1, fd = 60 * 60;
     for (let i = 0; i < G.peds.length; i++) {
       const ped = G.peds[i];
-      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.soiBarber) continue;
+      if (ped.isMugger || ped.isTarget || ped.anchor || ped.gang || ped.alms || ped.yaowaratNight || ped.yaoPhoto || ped.pillion || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.iceCart || ped.football || ped.mallShop || ped.lottery || ped.coconutCart || ped.checkpoint || ped.btsSit || ped.mooPing || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.soiBarber) continue;
       const d = dist2(ped.mesh.position, playerPos);
       if (d > fd) { fd = d; fi = i; }
     }
@@ -1766,7 +1833,7 @@ export function updateSeekShade(dt) {
   let n = 0;
   for (const ped of G.peds) {
     if (n >= 22) break;
-    if (!ped || ped.dead || ped.anchor || ped.gang || ped.pillion || ped.alms || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.checkpoint || ped.btsSit || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.soiBarber || ped.panicT > 0) continue;
+    if (!ped || ped.dead || ped.anchor || ped.gang || ped.pillion || ped.alms || ped.school || ped.btsWait || ped.commute || ped.crossingGuard || ped.checkpoint || ped.btsSit || ped.sevenGuard || ped.soiDrink || ped.soiMechanic || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.cowboyClose || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.soiBarber || ped.yaoPhoto || ped.panicT > 0) continue;
     if (ped.social || ped.isMugger || ped.isTarget || ped.motosaiRider || ped.motosaiWait) continue;
     const w = nearestWalkway(ped.mesh.position.x, ped.mesh.position.z);
     if (!w) continue;

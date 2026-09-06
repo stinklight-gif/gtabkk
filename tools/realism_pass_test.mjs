@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -2912,6 +2912,37 @@ async function main() {
     });
     assert(fox.flag && fox.n >= 5 && fox.wings >= 5 && fox.nearWat && fox.aloft, `flying foxes roost the wat (${fox.n})`);
     assert(fox.day && fox.night && fox.circled && fox.flapped, 'they hide by day and circle after dusk');
+
+    console.log('\n[88] Yaowarat photo tourists');
+    const snap = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const poi = G.world && G.world.poi && G.world.poi.yaowarat;
+      G.time.dayT = 12 / 24;
+      main.updateYaoPhotos(0.05);
+      const day = (G._yaoPhotos || []).filter(p => p && p.yaoPhoto).length;
+      G.time.dayT = 21.2 / 24;
+      main.updateYaoPhotos(0.05);
+      const night = (G._yaoPhotos || []).filter(p => p && p.yaoPhoto && p.mesh).length;
+      const phones = (G._yaoPhotos || []).filter(p => p && p._yaoPhone && p._yaoPhone.name === 'yao-phone').length;
+      const p0 = (G._yaoPhotos || [])[0];
+      const near = !!(p0 && poi && p0.mesh && Math.hypot(p0.mesh.position.x - poi.x, p0.mesh.position.z - poi.z) < 40);
+      G._yaoPhotoT = 0.1;
+      main.updateYaoPhotos(0.05);
+      const e0 = p0 && p0._yaoPhone ? p0._yaoPhone.material.emissiveIntensity : 0;
+      G._yaoPhotoT = Math.PI / 14;
+      main.updateYaoPhotos(0.05);
+      const e1 = p0 && p0._yaoPhone ? p0._yaoPhone.material.emissiveIntensity : 0;
+      const flashed = Math.abs(e1 - e0) > 0.05;
+      G.time.dayT = 12 / 24;
+      main.updateYaoPhotos(0.05);
+      const gone = (G._yaoPhotos || []).length === 0;
+      return {
+        flag: !!(G.gameplay && G.gameplay.yaoPhotos),
+        day, night, phones, near, flashed, gone,
+      };
+    });
+    assert(snap.flag && snap.day === 0 && snap.night >= 4 && snap.phones >= 4 && snap.near, `tourists snap Yaowarat after dark (${snap.night})`);
+    assert(snap.flashed && snap.gone, 'the phones flash and they clear by day');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

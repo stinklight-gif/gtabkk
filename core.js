@@ -314,6 +314,7 @@ export const GAMEPLAY = {
   stallIncense: true,     // mosquito coils hang under stall parasols; glow after dusk
   mangoSticky: true,      // khao niao mamuang cart at Asok BTS; evening, E for a plate
   watBats: true,          // flying foxes circle the wat after dusk
+  yaoPhotos: true,        // tourists stop to snap Yaowarat after 18:00
 };
 G.gameplay = GAMEPLAY;
 
