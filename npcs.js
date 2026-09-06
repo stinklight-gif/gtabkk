@@ -2270,6 +2270,19 @@ export function updateRunwayLights(dt) {
   }
 }
 
+export function updateTowerBeacon(dt) {
+  if (!GAMEPLAY.airport || !G.towerBeacon) return;
+  const c = G.towerBeacon;
+  c.t = (c.t || 0) + dt;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const night = h >= 18.5 || h < 6.2;
+  const mesh = c.mesh;
+  if (!mesh) return;
+  mesh.visible = true;
+  mesh.rotation.y = c.t * 1.8;
+  if (mesh.material) mesh.material.emissiveIntensity = night ? 0.7 + Math.sin(c.t * 8.4) * 0.45 : 0.12;
+}
+
 export function updateMallFood(dt) {
   if (!GAMEPLAY.mallFood || !G.mallFood) return;
   const c = G.mallFood;

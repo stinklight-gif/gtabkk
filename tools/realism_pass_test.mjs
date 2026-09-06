@@ -6017,6 +6017,39 @@ async function main() {
     });
     assert(edges.flag && edges.n >= 8 && edges.near >= 8, `runway edge lights line the Suvarnabhumi strip (${edges.n})`);
     assert(edges.brighter && edges.pulsed, 'they glow after dark and pulse');
+
+    console.log('\n[170] Suvarnabhumi tower beacon');
+    const beacon = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.towerBeacon;
+      const named = !!(c && c.mesh && c.mesh.name === 'tower-beacon');
+      const tower = G.world && G.world.poi && G.world.poi.airportTower;
+      const near = !!(c && tower && Math.hypot(c.x - tower.x, c.z - tower.z) < 4);
+      const high = !!(c && c.mesh && c.mesh.position.y > 30);
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updateTowerBeacon(0.05);
+      const day = c && c.mesh && c.mesh.material ? c.mesh.material.emissiveIntensity : 1;
+      const y0 = c && c.mesh ? c.mesh.rotation.y : 0;
+      if (c) c.t = 0.2 + Math.PI / 1.8;
+      main.updateTowerBeacon(0.05);
+      const spun = !!(c && c.mesh && Math.abs(c.mesh.rotation.y - y0) > 0.04);
+      G.time.dayT = 21 / 24;
+      if (c) c.t = 0.2;
+      main.updateTowerBeacon(0.05);
+      const night0 = c && c.mesh && c.mesh.material ? c.mesh.material.emissiveIntensity : 0;
+      if (c) c.t = 0.2 + Math.PI / 8.4;
+      main.updateTowerBeacon(0.05);
+      const night1 = c && c.mesh && c.mesh.material ? c.mesh.material.emissiveIntensity : 0;
+      return {
+        flag: !!(G.gameplay && G.gameplay.airport),
+        named, near, high, spun, day, night0,
+        pulsed: Math.abs(night1 - night0) > 0.04,
+        brighter: night0 > day + 0.3,
+      };
+    });
+    assert(beacon.flag && beacon.named && beacon.near && beacon.high, 'a red beacon sits on the Suvarnabhumi tower');
+    assert(beacon.spun && beacon.brighter && beacon.pulsed, 'it turns and glows after dark');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

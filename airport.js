@@ -70,6 +70,16 @@ export function buildAirport(scene, world) {
   solid(new THREE.Vector3(212, 16, 96), new THREE.Vector3(5.5, 32, 5.5), concrete);
   const cab = new THREE.Mesh(new THREE.BoxGeometry(7, 4, 7), glass);
   cab.position.set(212, 33, 96); scene.add(cab);
+  const beacon = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.22, 0.28, 0.55, 8),
+    new THREE.MeshStandardMaterial({
+      color: 0xc03030, roughness: 0.35, metalness: 0.25,
+      emissive: 0xff2020, emissiveIntensity: 0.2,
+    })
+  );
+  beacon.name = 'tower-beacon';
+  beacon.position.set(212, 35.4, 96); scene.add(beacon);
+  G.towerBeacon = { mesh: beacon, x: 212, z: 96, t: 0 };
   solid(new THREE.Vector3(209, 4, -118), new THREE.Vector3(12, 8, 22), concrete);
 
   const stripe = new THREE.Mesh(new THREE.BoxGeometry(10.3, 1.2, 52), purple);

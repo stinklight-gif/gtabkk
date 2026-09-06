@@ -247,7 +247,7 @@ export const GAMEPLAY = {
   btsHijack: true,
   fireAtTen: true,
   allRed: true,
-  airport: true,          // Suvarnabhumi pocket; windsock and runway edge lights after dark
+  airport: true,          // Suvarnabhumi pocket; windsock, runway lights, tower beacon after dark
   btsRide: true,
   talkChase: true,
   yaowaratNight: true,
