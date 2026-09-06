@@ -2146,6 +2146,32 @@ export function updateSengClerk(dt) {
       if (tray) tray.rotation.z = Math.sin(c.t * 4.2) * 0.35;
     }
   }
+  const shop = G.sengShopper;
+  if (shop) {
+    shop.t = (shop.t || 0) + dt;
+    const sp = shop.ped;
+    if (sp && sp.mesh) {
+      sp.sengClerk = true;
+      sp.sengShop = true;
+      sp.mesh.visible = open;
+      if (!open) {
+        sp.speed = 0;
+        sp.state = 'idle';
+      } else {
+        const slot = sp.anchor && sp.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(shop.t * 2.2) * 0.05;
+          sp.mesh.position.set(slot.x, 0, slot.z + bob);
+          sp.heading = sp.anchor.facing;
+          sp.mesh.rotation.y = sp.heading;
+        }
+        sp.speed = 0;
+        sp.state = 'idle';
+        const chain = sp.mesh.getObjectByName('seng-chain');
+        if (chain) chain.rotation.z = Math.sin(shop.t * 4.2) * 0.35;
+      }
+    }
+  }
 }
 
 export function updateAirportCrew(dt) {

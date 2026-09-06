@@ -6254,6 +6254,41 @@ async function main() {
     });
     assert(stationSit.flag && stationSit.n >= 2 && stationSit.phones >= 2 && stationSit.near, `passengers sit the Hua Lamphong platform (${stationSit.n})`);
     assert(stationSit.late >= 2 && stationSit.day >= 2 && stationSit.seated >= 2 && stationSit.folded && stationSit.glowed, 'they hide late, sit with phones, and the screens glow');
+
+    console.log('\n[177] Uncle Seng gold-shop window shopper');
+    const sengShop = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.sengShopper;
+      const ped = c && c.ped;
+      const chain = !!(ped && ped.mesh && ped.mesh.getObjectByName('seng-chain'));
+      const clerk = G.sengClerk;
+      const near = !!(c && clerk && Math.hypot(c.x - clerk.x, c.z - clerk.z) < 4);
+      G.time.dayT = 21 / 24;
+      main.updateSengClerk(0.05);
+      const night = !!(ped && ped.mesh && ped.mesh.visible === false);
+      G.time.dayT = 12.5 / 24;
+      if (c) c.t = 0.2;
+      main.updateSengClerk(0.05);
+      const day = !!(ped && ped.sengClerk && ped.sengShop && ped.mesh && ped.mesh.visible);
+      const z0 = ped && ped.mesh ? ped.mesh.position.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateSengClerk(0.05);
+      const shifted = !!(ped && ped.mesh && Math.abs(ped.mesh.position.z - z0) > 0.02);
+      const tool = ped && ped.mesh && ped.mesh.getObjectByName('seng-chain');
+      if (c) c.t = 0.2;
+      main.updateSengClerk(0.05);
+      const r0 = tool ? tool.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 4.2;
+      main.updateSengClerk(0.05);
+      const swung = !!(tool && Math.abs(tool.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.sengClerk),
+        rec: !!(ped && ped.sengClerk && ped.sengShop),
+        chain, near, night, day, shifted, swung,
+      };
+    });
+    assert(sengShop.flag && sengShop.rec && sengShop.chain && sengShop.near, "a window shopper waits at Uncle Seng's gold-shop door");
+    assert(sengShop.night && sengShop.day && sengShop.shifted && sengShop.swung, 'they hide after 20:00 and the gold chain turns');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
