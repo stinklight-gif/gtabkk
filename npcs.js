@@ -3466,32 +3466,34 @@ export function updateSevenSlush(dt) {
 }
 
 export function updateSevenAtm(dt) {
-  if (!GAMEPLAY.sevenAtm || !G.sevenAtm) return;
-  const c = G.sevenAtm;
-  c.t = (c.t || 0) + dt;
+  if (!GAMEPLAY.sevenAtm) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const open = h >= 6 && h < 22;
-  for (let i = 0; i < (c.queue || []).length; i++) {
-    const ped = c.queue[i];
-    if (!ped || ped.dead || !ped.mesh) continue;
-    ped.sevenAtm = true;
-    ped.mesh.visible = open;
-    if (!open) {
+  for (const c of [G.sevenAtm, G.southSevenAtm]) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    for (let i = 0; i < (c.queue || []).length; i++) {
+      const ped = c.queue[i];
+      if (!ped || ped.dead || !ped.mesh) continue;
+      ped.sevenAtm = true;
+      ped.mesh.visible = open;
+      if (!open) {
+        ped.speed = 0;
+        ped.state = 'idle';
+        continue;
+      }
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        const bob = i === 0 ? Math.sin(c.t * 2.4) * 0.06 : 0;
+        ped.mesh.position.set(slot.x, 0, slot.z + bob);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
       ped.speed = 0;
       ped.state = 'idle';
-      continue;
+      const parts = ped.mesh.userData && ped.mesh.userData.parts;
+      if (i === 0 && parts && parts.armR) parts.armR.rotation.x = -0.85 + Math.sin(c.t * 3.1) * 0.12;
     }
-    const slot = ped.anchor && ped.anchor.slot;
-    if (slot) {
-      const bob = i === 0 ? Math.sin(c.t * 2.4) * 0.06 : 0;
-      ped.mesh.position.set(slot.x, 0, slot.z + bob);
-      ped.heading = ped.anchor.facing;
-      ped.mesh.rotation.y = ped.heading;
-    }
-    ped.speed = 0;
-    ped.state = 'idle';
-    const parts = ped.mesh.userData && ped.mesh.userData.parts;
-    if (i === 0 && parts && parts.armR) parts.armR.rotation.x = -0.85 + Math.sin(c.t * 3.1) * 0.12;
   }
 }
 

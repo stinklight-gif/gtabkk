@@ -320,7 +320,7 @@ export const GAMEPLAY = {
   songthaewRiders: true,  // passengers sit the BTS songthaew bench; hop off when you take it
   watSweep: true,         // monks sweep the wat courtyard at dawn
   yaoGold: true,          // gold-shop window on Yaowarat; shoppers after dark
-  sevenAtm: true,         // a short queue at the walk-in 7-Eleven ATM
+  sevenAtm: true,         // ATM queues at the walk-in interior and south 7-Eleven door
   btsBusker: true,        // guitar buskers at the Asok and Phrom Phong BTS exits; E tips ฿20
   watRobes: true,         // saffron robes dry on a line in the wat courtyard
   btsPigeons: true,       // pigeons loaf the Asok platform by day and scatter

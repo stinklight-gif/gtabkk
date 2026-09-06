@@ -3976,37 +3976,54 @@ export function spawnGymBag(scene) {
 
 export function spawnSevenAtm(scene) {
   if (!GAMEPLAY.sevenAtm) return;
-  const seven = G.world && G.world.sevenWalkIn;
-  if (!seven || !seven.atm) return;
-  const ax = seven.atm.x, az = seven.atm.z;
-  const queue = [];
-  for (let i = 0; i < 2; i++) {
-    const x = ax + 1.05 + i * 0.8;
-    const z = az + i * 0.18;
-    const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), i === 0 ? 'office' : 'local');
-    ped.sevenAtm = true;
-    ped.speed = 0;
-    ped.state = 'idle';
-    ped.heading = -PI / 2;
-    ped.anchor = { slot: new THREE.Vector3(x, 0, z), facing: -PI / 2 };
-    if (ped.mesh) {
-      ped.mesh.rotation.y = -PI / 2;
-      ped.mesh.visible = false;
-    }
-    if (i === 0 && ped.mesh) {
-      const card = new THREE.Mesh(
-        new THREE.BoxGeometry(0.08, 0.05, 0.004),
-        new THREE.MeshStandardMaterial({ color: 0xc45a18, roughness: 0.45, metalness: 0.2 })
+  const pack = (ax, az, machineName) => {
+    if (ax == null || az == null) return null;
+    let machine = null;
+    if (machineName) {
+      machine = new THREE.Mesh(
+        new THREE.BoxGeometry(0.7, 1.5, 0.45),
+        new THREE.MeshStandardMaterial({ color: 0x1a3a6a, roughness: 0.4, metalness: 0.3 })
       );
-      card.name = 'seven-atm-card';
-      const parts = ped.mesh.userData && ped.mesh.userData.parts;
-      if (parts && parts.foreR) { card.position.set(0.02, -0.28, 0.06); parts.foreR.add(card); }
-      else { card.position.set(0.22, 1.05, 0.12); ped.mesh.add(card); }
-      ped._atmCard = card;
+      machine.name = machineName;
+      machine.position.set(ax, 0.85, az);
+      scene.add(machine);
     }
-    queue.push(ped);
+    const queue = [];
+    for (let i = 0; i < 2; i++) {
+      const x = ax + 1.05 + i * 0.8;
+      const z = az + i * 0.18;
+      const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), i === 0 ? 'office' : 'local');
+      ped.sevenAtm = true;
+      ped.speed = 0;
+      ped.state = 'idle';
+      ped.heading = -PI / 2;
+      ped.anchor = { slot: new THREE.Vector3(x, 0, z), facing: -PI / 2 };
+      if (ped.mesh) {
+        ped.mesh.rotation.y = -PI / 2;
+        ped.mesh.visible = false;
+      }
+      if (i === 0 && ped.mesh) {
+        const card = new THREE.Mesh(
+          new THREE.BoxGeometry(0.08, 0.05, 0.004),
+          new THREE.MeshStandardMaterial({ color: 0xc45a18, roughness: 0.45, metalness: 0.2 })
+        );
+        card.name = 'seven-atm-card';
+        const parts = ped.mesh.userData && ped.mesh.userData.parts;
+        if (parts && parts.foreR) { card.position.set(0.02, -0.28, 0.06); parts.foreR.add(card); }
+        else { card.position.set(0.22, 1.05, 0.12); ped.mesh.add(card); }
+        ped._atmCard = card;
+      }
+      queue.push(ped);
+    }
+    return { queue, ax, az, t: 0, machine };
+  };
+  const walk = G.world && G.world.sevenWalkIn;
+  G.sevenAtm = walk && walk.atm ? pack(walk.atm.x, walk.atm.z, null) : null;
+  const south = (G.world.sevenElevens || []).find(s => s && s.pos && Math.abs(s.pos.x) < 8 && s.pos.z < -80);
+  if (south && south.pos) {
+    const hz = south.hz || 4;
+    G.southSevenAtm = pack(south.pos.x + 4.2, south.pos.z + hz + 1.4, 'south-seven-atm');
   }
-  G.sevenAtm = { queue, ax, az, t: 0 };
 }
 
 export function spawnSevenShoppers(scene) {
