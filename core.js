@@ -329,6 +329,7 @@ export const GAMEPLAY = {
   sevenShoppers: true,    // people walk in and out of the walk-in 7-Eleven
   watFeed: true,          // pellet tin at the wat pond; E feeds the turtles
   btsPaper: true,         // newspaper rack at Asok BTS; morning papers, E for a copy
+  yaoDuck: true,          // roast-duck window on Yaowarat; hanging birds after dark, E for a plate
 };
 G.gameplay = GAMEPLAY;
 

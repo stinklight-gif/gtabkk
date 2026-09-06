@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.sevenShop || ped.btsPaper || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.sevenShop || ped.btsPaper || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -1755,6 +1755,101 @@ export function spawnYaoGold(scene) {
     shoppers.push(ped);
   }
   G.yaoGold = { mesh, shoppers, x, z, t: 0, goldMat: mesh.userData.goldMat, signMat: mesh.userData.signMat };
+}
+
+function makeYaoDuckMesh() {
+  const g = new THREE.Group();
+  g.name = 'yao-duck';
+  const frame = new THREE.Mesh(
+    new THREE.BoxGeometry(2.2, 2.15, 0.16),
+    new THREE.MeshStandardMaterial({ color: 0x2a1810, roughness: 0.75 })
+  );
+  frame.position.y = 1.15;
+  g.add(frame);
+  const glass = new THREE.Mesh(
+    new THREE.PlaneGeometry(1.9, 1.65),
+    new THREE.MeshStandardMaterial({ color: 0x8899aa, transparent: true, opacity: 0.22, metalness: 0.35, roughness: 0.22 })
+  );
+  glass.position.set(0, 1.15, 0.09);
+  g.add(glass);
+  const rod = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.018, 0.018, 1.7, 6),
+    new THREE.MeshStandardMaterial({ color: 0x888890, metalness: 0.55, roughness: 0.4 })
+  );
+  rod.rotation.z = PI / 2;
+  rod.position.set(0, 1.92, 0.02);
+  g.add(rod);
+  const duckMat = new THREE.MeshStandardMaterial({
+    color: 0x7a2410, roughness: 0.45, metalness: 0.15, emissive: 0xc04010, emissiveIntensity: 0.18,
+  });
+  g.userData.duckMat = duckMat;
+  for (let i = 0; i < 5; i++) {
+    const duck = new THREE.Group();
+    duck.name = 'yao-duck-body';
+    const hook = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.008, 0.008, 0.26, 4),
+      new THREE.MeshStandardMaterial({ color: 0x777780, metalness: 0.55, roughness: 0.4 })
+    );
+    hook.position.y = -0.13;
+    duck.add(hook);
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), duckMat);
+    body.scale.set(0.85, 1.4, 0.7);
+    body.position.y = -0.4;
+    duck.add(body);
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.032, 0.11, 6), duckMat);
+    neck.position.set(0, -0.26, 0.03);
+    neck.rotation.x = 0.45;
+    duck.add(neck);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.038, 6, 5), duckMat);
+    head.position.set(0, -0.2, 0.08);
+    duck.add(head);
+    duck.position.set(-0.64 + i * 0.32, 1.92, 0.02);
+    g.add(duck);
+  }
+  const lamp = new THREE.Mesh(
+    new THREE.BoxGeometry(1.6, 0.06, 0.08),
+    new THREE.MeshStandardMaterial({ color: 0xffcc66, roughness: 0.4, emissive: 0xffaa33, emissiveIntensity: 0.2 })
+  );
+  lamp.name = 'yao-duck-lamp';
+  lamp.position.set(0, 2.08, 0.04);
+  g.add(lamp);
+  g.userData.lampMat = lamp.material;
+  const sign = new THREE.Mesh(
+    new THREE.BoxGeometry(1.5, 0.26, 0.08),
+    new THREE.MeshStandardMaterial({ color: 0xa8261f, roughness: 0.6, emissive: 0xff2233, emissiveIntensity: 0.2 })
+  );
+  sign.name = 'yao-duck-sign';
+  sign.position.set(0, 2.38, 0.06);
+  g.add(sign);
+  g.userData.signMat = sign.material;
+  return g;
+}
+
+export function spawnYaoDuck(scene) {
+  if (!GAMEPLAY.yaoDuck) return;
+  const poi = G.world && G.world.poi && G.world.poi.yaowarat;
+  if (!poi) return;
+  const x = poi.x + 8.2, z = poi.z - 22;
+  const mesh = makeYaoDuckMesh();
+  mesh.position.set(x, 0, z);
+  mesh.rotation.y = -PI / 2;
+  scene.add(mesh);
+  const shoppers = [];
+  for (let i = 0; i < 2; i++) {
+    const px = x - 1.15, pz = z + (i - 0.5) * 0.8;
+    const ped = spawnPed(scene, new THREE.Vector3(px, 0, pz), i === 0 ? 'tourist' : 'local');
+    ped.yaoDuck = true;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = PI / 2;
+    ped.anchor = { slot: new THREE.Vector3(px, 0, pz), facing: PI / 2 };
+    if (ped.mesh) {
+      ped.mesh.rotation.y = PI / 2;
+      ped.mesh.visible = false;
+    }
+    shoppers.push(ped);
+  }
+  G.yaoDuck = { mesh, shoppers, x, z, t: 0, duckMat: mesh.userData.duckMat, lampMat: mesh.userData.lampMat, signMat: mesh.userData.signMat };
 }
 
 export function makeCoconutCartMesh() {
