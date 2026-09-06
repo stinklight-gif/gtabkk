@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -3961,6 +3961,63 @@ export function spawnBoatNoodle(scene) {
   vendor.speed = 0;
   vendor.state = 'idle';
   G.boatNoodle = { mesh: g, vendor, x, z0: z, t: 0.5, dir: 1 };
+}
+
+export function spawnPierWait(scene) {
+  if (!GAMEPLAY.pierWait) return;
+  const pier = G.world && G.world.poi && G.world.poi.pier;
+  if (!pier) return;
+  const x = pier.x + 2.6, z = pier.z;
+  const post = new THREE.Group();
+  post.name = 'pier-wait';
+  const pole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.04, 0.045, 1.15, 6),
+    new THREE.MeshStandardMaterial({ color: 0x3a3a40, roughness: 0.55, metalness: 0.2 })
+  );
+  pole.position.y = 0.58;
+  post.add(pole);
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(0.16, 0.045, 8, 14),
+    new THREE.MeshStandardMaterial({ color: 0xe24a1a, roughness: 0.55 })
+  );
+  ring.name = 'pier-ring';
+  ring.position.set(0, 1.05, 0.08);
+  ring.rotation.x = PI / 2;
+  post.add(ring);
+  const stripe = new THREE.Mesh(
+    new THREE.TorusGeometry(0.16, 0.02, 6, 14),
+    new THREE.MeshStandardMaterial({ color: 0xf5f0e4, roughness: 0.6 })
+  );
+  stripe.position.copy(ring.position);
+  stripe.rotation.x = PI / 2;
+  post.add(stripe);
+  post.position.set(x, 0, z + 2.2);
+  scene.add(post);
+  const waiters = [];
+  for (let i = 0; i < 3; i++) {
+    const px = x + (i - 1) * 0.15, pz = z - 0.4 + i * 0.95;
+    const ped = spawnPed(scene, new THREE.Vector3(px, 0, pz), i === 1 ? 'office' : 'local');
+    ped.pierWait = true;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = -PI / 2;
+    ped.anchor = { slot: new THREE.Vector3(px, 0, pz), facing: -PI / 2 };
+    if (ped.mesh) {
+      ped.mesh.rotation.y = -PI / 2;
+      ped.mesh.visible = false;
+    }
+    const bag = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.18, 0.08),
+      new THREE.MeshStandardMaterial({ color: pick([0xff5a23, 0x2a4a8a, 0xf5f0e4]), roughness: 0.7 })
+    );
+    bag.name = 'pier-bag';
+    const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+    if (parts && parts.foreL) { bag.position.set(0.02, -0.28, 0.04); parts.foreL.add(bag); }
+    else if (ped.mesh) { bag.position.set(-0.16, 0.95, 0.08); ped.mesh.add(bag); }
+    ped._pierBag = bag;
+    waiters.push(ped);
+  }
+  G.pierWait = { mesh: post, waiters, x, z, t: 0 };
 }
 
 export function spawnBoat(scene) {

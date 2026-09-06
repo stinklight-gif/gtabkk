@@ -332,6 +332,7 @@ export const GAMEPLAY = {
   yaoDuck: true,          // roast-duck window on Yaowarat; hanging birds after dark, E for a plate
   sevenSlush: true,       // slushie machine inside the walk-in 7-Eleven; tanks spin, E for a cup
   phromFruit: true,       // fruit smoothie cart at Phrom Phong BTS; blender spins, E for a cup
+  pierWait: true,         // ferry passengers wait on the pier; E for a ฿15 express-boat ticket
 };
 G.gameplay = GAMEPLAY;
 
