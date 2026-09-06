@@ -2736,6 +2736,44 @@ export function updateWatSweep(dt) {
   }
 }
 
+export function updateWatCats(dt) {
+  if (!GAMEPLAY.watCats || !G.watCats) return;
+  const temple = G.world && G.world.poi && G.world.poi.temple;
+  const pp = G.player.inVehicle ? G.player.inVehicle.pos : G.player.group.position;
+  for (const c of G.watCats) {
+    if (!c.mesh) continue;
+    c.t = (c.t || 0) + dt;
+    const d = Math.hypot(c.mesh.position.x - pp.x, c.mesh.position.z - pp.z);
+    if (d < 3.2) c.state = 'bolt';
+    else if (c.state === 'bolt' && d > 7) c.state = 'return';
+    if (c.state === 'loaf') {
+      c.heading += Math.sin(c.t * 0.7) * dt * 0.4;
+      c.mesh.position.x += Math.sin(c.heading) * 0.22 * dt;
+      c.mesh.position.z += Math.cos(c.heading) * 0.22 * dt;
+    } else if (c.state === 'bolt') {
+      const dx = c.mesh.position.x - pp.x, dz = c.mesh.position.z - pp.z;
+      const len = Math.hypot(dx, dz) || 1;
+      c.heading = Math.atan2(dx, dz);
+      c.mesh.position.x += dx / len * 3.2 * dt;
+      c.mesh.position.z += dz / len * 3.2 * dt;
+    } else {
+      const dx = c.home.x - c.mesh.position.x, dz = c.home.z - c.mesh.position.z;
+      const len = Math.hypot(dx, dz) || 1;
+      if (len < 0.45) c.state = 'loaf';
+      else {
+        c.heading = Math.atan2(dx, dz);
+        c.mesh.position.x += dx / len * 1.3 * dt;
+        c.mesh.position.z += dz / len * 1.3 * dt;
+      }
+    }
+    if (temple) {
+      c.mesh.position.x = clamp(c.mesh.position.x, temple.x - 12, temple.x + 12);
+      c.mesh.position.z = clamp(c.mesh.position.z, temple.z - 12, temple.z + 12);
+    }
+    c.mesh.rotation.y = c.heading;
+  }
+}
+
 export function updateWatLotus(dt) {
   if (!GAMEPLAY.watLotus || !G.watLotus) return;
   const c = G.watLotus;

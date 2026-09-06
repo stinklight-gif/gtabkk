@@ -2857,6 +2857,33 @@ export function spawnWatLotus(scene) {
   G.watLotus = { mesh: g, vendor, x, z, t: 0 };
 }
 
+export function spawnWatCats(scene) {
+  if (!GAMEPLAY.watCats) return;
+  const temple = G.world && G.world.poi && G.world.poi.temple;
+  if (!temple) return;
+  const homes = [
+    { x: temple.x - 6.2, z: temple.z - 3.8 },
+    { x: temple.x - 9.4, z: temple.z - 4.2 },
+    { x: temple.x + 4.4, z: temple.z - 5.6 },
+    { x: temple.x + 7.2, z: temple.z - 8.8 },
+  ];
+  G.watCats = [];
+  for (let i = 0; i < homes.length; i++) {
+    const home = homes[i];
+    const mesh = makeCatMesh();
+    mesh.name = 'wat-cat';
+    mesh.position.set(home.x, 0, home.z);
+    scene.add(mesh);
+    G.watCats.push({
+      mesh,
+      home: { x: home.x, z: home.z },
+      heading: (i * 1.4) % TAU,
+      state: 'loaf',
+      t: i * 0.5,
+    });
+  }
+}
+
 export function makeChaYenMesh() {
   const g = new THREE.Group();
   g.name = 'chayen-cart';

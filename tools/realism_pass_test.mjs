@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes','btsPigeons','watLotus']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes','btsPigeons','watLotus','watCats']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -3343,6 +3343,28 @@ async function main() {
     });
     assert(lotus.flag && lotus.named && lotus.blooms >= 5 && lotus.nearWat, `a lotus stall waits at the wat (${lotus.blooms})`);
     assert(lotus.night && lotus.day && lotus.bobbed && lotus.paid && lotus.offered && lotus.cooled, 'E buys a lotus; the shrine takes it for extra heat cool');
+
+    console.log('\n[99] temple cats at the wat');
+    const templeCats = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = G.watCats || [];
+      const n = list.filter(c => c && c.mesh && c.mesh.name === 'wat-cat').length;
+      const temple = G.world && G.world.poi && G.world.poi.temple;
+      const nearWat = list.filter(c => c && c.home && temple && Math.hypot(c.home.x - temple.x, c.home.z - temple.z) < 16).length;
+      const c = list[0];
+      if (!c || !c.mesh) return { flag: !!(G.gameplay && G.gameplay.watCats), n, nearWat };
+      G.player.inVehicle = null;
+      G.player.group.position.set(c.mesh.position.x + 1.1, 0, c.mesh.position.z);
+      const start = { x: c.mesh.position.x, z: c.mesh.position.z };
+      for (let i = 0; i < 20; i++) main.updateWatCats(0.1);
+      const moved = Math.hypot(c.mesh.position.x - start.x, c.mesh.position.z - start.z);
+      return {
+        flag: !!(G.gameplay && G.gameplay.watCats),
+        n, nearWat, bolted: c.state === 'bolt' || c.state === 'return', moved,
+      };
+    });
+    assert(templeCats.flag && templeCats.n >= 4 && templeCats.nearWat >= 4, `temple cats loaf the wat (${templeCats.n})`);
+    assert(templeCats.bolted && templeCats.moved > 0.8, `they bolt when you get close (${templeCats.moved && templeCats.moved.toFixed(1)}m)`);
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

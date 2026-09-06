@@ -325,6 +325,7 @@ export const GAMEPLAY = {
   watRobes: true,         // saffron robes dry on a line in the wat courtyard
   btsPigeons: true,       // pigeons loaf the Asok platform by day and scatter
   watLotus: true,         // lotus stall at the wat; E buys a bloom, shrine offering cools extra
+  watCats: true,          // temple cats loaf the wat courtyard and bolt when you get close
 };
 G.gameplay = GAMEPLAY;
 
