@@ -5679,6 +5679,42 @@ async function main() {
     });
     assert(westShop.flag && westShop.n >= 3 && westShop.bags >= 3 && westShop.near && westShop.farWalk, `shoppers work the west 7-Eleven door (${westShop.n})`);
     assert(westShop.late >= 3 && westShop.day >= 3 && westShop.walked && westShop.bagOut, 'they hide late, walk the door, and leave with a bag');
+
+    console.log('\n[161] east 7-Eleven shoppers');
+    const eastShop = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const rec = G.eastSevenShoppers;
+      const list = (rec && rec.shoppers) || [];
+      const n = list.filter(p => p && p.sevenShop && p.mesh).length;
+      const bags = list.filter(p => p && p.mesh && p.mesh.getObjectByName('seven-bag')).length;
+      const east = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x > 100 && s.pos.z < 0 && s.pos.z > -80);
+      const walk = G.world && G.world.sevenWalkIn;
+      const near = !!(rec && east && east.pos && Math.hypot(rec.x - east.pos.x, rec.z - east.pos.z) < 8);
+      const farWalk = !!(rec && walk && walk.pos && Math.hypot(rec.x - walk.pos.x, rec.z - walk.pos.z) > 80);
+      G.time.dayT = 3 / 24;
+      main.updateSevenShoppers(0.05);
+      const late = list.filter(p => p && p.mesh && p.mesh.visible === false).length;
+      G.time.dayT = 12 / 24;
+      const p0 = list[0];
+      if (p0) { p0._shopT = 0.15; p0._shopDir = 1; }
+      main.updateSevenShoppers(0.05);
+      const day = list.filter(p => p && p.sevenShop && p.mesh && p.mesh.visible).length;
+      const z0 = p0 && p0.mesh ? p0.mesh.position.z : 0;
+      if (p0) { p0._shopT = 0.15; p0._shopDir = 1; }
+      main.updateSevenShoppers(0.05);
+      const sz = p0 && p0.mesh ? p0.mesh.position.z : 0;
+      for (let i = 0; i < 20; i++) main.updateSevenShoppers(0.1);
+      const walked = !!(p0 && p0.mesh && Math.abs(p0.mesh.position.z - sz) > 0.4);
+      if (p0) { p0._shopT = 0.8; p0._shopDir = -1; }
+      main.updateSevenShoppers(0.05);
+      const bagOut = !!(p0 && p0._sevenBag && p0._sevenBag.visible);
+      return {
+        flag: !!(G.gameplay && G.gameplay.sevenShoppers),
+        n, bags, near, farWalk, late, day, walked, bagOut,
+      };
+    });
+    assert(eastShop.flag && eastShop.n >= 3 && eastShop.bags >= 3 && eastShop.near && eastShop.farWalk, `shoppers work the east 7-Eleven door (${eastShop.n})`);
+    assert(eastShop.late >= 3 && eastShop.day >= 3 && eastShop.walked && eastShop.bagOut, 'they hide late, walk the door, and leave with a bag');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

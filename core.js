@@ -326,7 +326,7 @@ export const GAMEPLAY = {
   btsPigeons: true,       // pigeons loaf the Asok platform by day and scatter
   watLotus: true,         // lotus stall at the wat; E buys a bloom, shrine offering cools extra
   watCats: true,          // temple cats loaf the wat courtyard and bolt when you get close
-  sevenShoppers: true,    // people walk in and out of the walk-in, south, and west 7-Elevens
+  sevenShoppers: true,    // people walk in and out of all four 7-Elevens
   watFeed: true,          // pellet tin at the wat pond; E feeds the turtles
   btsPaper: true,         // newspaper racks at Asok and Phrom Phong BTS; morning papers, E for a copy
   yaoDuck: true,          // roast-duck window on Yaowarat; hanging birds after dark, E for a plate

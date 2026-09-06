@@ -4030,6 +4030,8 @@ export function spawnSevenShoppers(scene) {
   G.southSevenShoppers = pack(south);
   const west = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x < -50 && s.pos.z > 0 && s.pos.z < 60);
   G.westSevenShoppers = pack(west);
+  const east = (G.world.sevenElevens || []).find(s => s && s.pos && s.pos.x > 100 && s.pos.z < 0 && s.pos.z > -80);
+  G.eastSevenShoppers = pack(east);
 }
 
 export function spawnSevenSlush(scene) {
