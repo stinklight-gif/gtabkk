@@ -280,7 +280,7 @@ export function updatePeds(dt) {
     const ped = G.peds[pedIdx];
     if (ped.dead) continue;
     if (ped.pillion) continue;
-    if (ped.btsSit || ped.sevenGuard || ped.mallGuard || ped.bankGuard || ped.mallFood || ped.mallManga || ped.homeAuntie || ped.soiDrink) {
+    if (ped.btsSit || ped.sevenGuard || ped.mallGuard || ped.bankGuard || ped.mallFood || ped.mallManga || ped.homeAuntie || ped.soiDrink || ped.stationSit) {
       const slot = ped.anchor && ped.anchor.slot;
       if (slot) {
         ped.mesh.position.x = slot.x;
@@ -2035,6 +2035,28 @@ export function updateStationPorter(dt) {
     ped.state = 'idle';
     const bag = ped.mesh.getObjectByName('station-bag');
     if (bag) bag.rotation.z = Math.sin(c.t * 3.2 + i) * 0.22;
+  }
+  const sit = G.stationSit;
+  if (sit) {
+    sit.t = (sit.t || 0) + dt;
+    for (const ped of sit.sitters || []) {
+      if (!ped || ped.dead || !ped.mesh) continue;
+      ped.stationPorter = true;
+      ped.stationSit = true;
+      ped.mesh.visible = open;
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        ped.mesh.position.set(slot.x, slot.y || 0.42, slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+      const phone = ped.mesh.getObjectByName('station-phone');
+      if (phone && phone.material && open) {
+        phone.material.emissiveIntensity = 0.22 + Math.sin(sit.t * 3.4) * 0.12;
+      }
+    }
   }
 }
 

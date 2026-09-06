@@ -357,7 +357,7 @@ export const GAMEPLAY = {
   gymBag: true,           // a pad man hits the heavy bag at the Muay Thai gym; they hide after 21:00
   starterClerk: true,     // clerk behind the Hua Lamphong starter gun counter; they hide after 21:00
   homeAuntie: true,       // neighbor sits a plastic chair beside the safehouse door; they hide after 22:00
-  stationPorter: true,    // red-vest porters with bags under the Hua Lamphong canopy; they hide after 22:00
+  stationPorter: true,    // red-vest porters and seated passengers under the Hua Lamphong canopy; they hide after 22:00
   garageMech: true,       // mechanic at the U-Spray bay mouth; they hide after 19:00
   klongDock: true,        // dockhands at the Klong Toey container yard; they hide after 19:00
   sengClerk: true,        // clerk at Uncle Seng's gold-shop door; they hide after 20:00

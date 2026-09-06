@@ -6220,6 +6220,40 @@ async function main() {
     });
     assert(bankAtm.flag && bankAtm.n >= 2 && bankAtm.card && bankAtm.named && bankAtm.near, `a queue waits at the Krung Thep Bank ATM (${bankAtm.n})`);
     assert(bankAtm.late >= 2 && bankAtm.day >= 2 && bankAtm.shifted, 'they hide late and shift weight at the bank machine');
+
+    console.log('\n[176] Hua Lamphong platform sitters');
+    const stationSit = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.stationSit;
+      const list = (c && c.sitters) || [];
+      const n = list.filter(p => p && p.stationSit && p.stationPorter && p.mesh).length;
+      const phones = list.filter(p => p && p.mesh && p.mesh.getObjectByName('station-phone')).length;
+      const spawn = G.world && G.world.spawns && G.world.spawns.player;
+      const near = !!(c && spawn && Math.hypot(c.x - spawn.x, c.z - spawn.z) < 8);
+      G.time.dayT = 3 / 24;
+      main.updateStationPorter(0.05);
+      const late = list.filter(p => p && p.mesh && p.mesh.visible === false).length;
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updatePeds(0.05);
+      main.updateStationPorter(0.05);
+      const day = list.filter(p => p && p.stationSit && p.mesh && p.mesh.visible).length;
+      const seated = list.filter(p => p && p.mesh && p.mesh.position.y >= 0.3).length;
+      const p0 = list[0];
+      const parts = p0 && p0.mesh && p0.mesh.userData && p0.mesh.userData.parts;
+      const folded = !!(parts && parts.legL && parts.legL.rotation.x > 0.8);
+      const phone = p0 && p0.mesh && p0.mesh.getObjectByName('station-phone');
+      const e0 = phone && phone.material ? phone.material.emissiveIntensity : 0;
+      if (c) c.t = 0.2 + Math.PI / 3.4;
+      main.updateStationPorter(0.05);
+      const glowed = !!(phone && phone.material && Math.abs(phone.material.emissiveIntensity - e0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.stationPorter),
+        n, phones, near, late, day, seated, folded, glowed,
+      };
+    });
+    assert(stationSit.flag && stationSit.n >= 2 && stationSit.phones >= 2 && stationSit.near, `passengers sit the Hua Lamphong platform (${stationSit.n})`);
+    assert(stationSit.late >= 2 && stationSit.day >= 2 && stationSit.seated >= 2 && stationSit.folded && stationSit.glowed, 'they hide late, sit with phones, and the screens glow');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
