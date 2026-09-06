@@ -354,6 +354,7 @@ export const GAMEPLAY = {
   mallThreads: true,      // clerk and a customer at London Threads on Terminal 21 floor 2; they hide after 21:00
   mallSeven: true,        // clerk and a customer at the Terminal 21 7-Eleven; they hide after 21:00
   mallArcade: true,       // two players at Akihabara Arcade cabinets on Terminal 21 floor 1; they hide after 21:00
+  gymBag: true,           // a pad man hits the heavy bag at the Muay Thai gym; they hide after 21:00
 };
 G.gameplay = GAMEPLAY;
 

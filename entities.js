@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -3489,6 +3489,53 @@ export function spawnMallArcade(scene) {
     players.push(ped);
   }
   G.mallArcade = { players, x, z, y, t: 0 };
+}
+
+export function spawnGymBag(scene) {
+  if (!GAMEPLAY.gymBag) return;
+  const gym = G.world && G.world.poi && G.world.poi.gym;
+  if (!gym) return;
+  const x = gym.x, z = gym.z;
+  const bag = new THREE.Group();
+  bag.name = 'gym-heavy-bag';
+  bag.position.set(x - 1.6, 0, z - 1.35);
+  const hook = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.02, 0.02, 0.7, 6),
+    new THREE.MeshStandardMaterial({ color: 0x888890, roughness: 0.4, metalness: 0.4 })
+  );
+  hook.position.y = 2.15;
+  bag.add(hook);
+  const body = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.22, 0.24, 1.1, 10),
+    new THREE.MeshStandardMaterial({ color: 0xc45a18, roughness: 0.7 })
+  );
+  body.position.y = 1.15;
+  bag.add(body);
+  scene.add(bag);
+  const fighter = spawnPed(scene, new THREE.Vector3(x - 1.6, 0, z - 0.35), 'laborer');
+  recolorTorso(fighter.mesh.userData.parts, 0x1a1a22, 0.75);
+  fighter.gymBag = true;
+  fighter.gymRole = 'pad';
+  fighter.speed = 0;
+  fighter.state = 'idle';
+  fighter.heading = PI;
+  fighter.anchor = { slot: new THREE.Vector3(x - 1.6, 0, z - 0.35), facing: PI };
+  if (fighter.mesh) {
+    fighter.mesh.rotation.y = PI;
+    fighter.mesh.visible = false;
+  }
+  const trainer = spawnPed(scene, new THREE.Vector3(x + 1.5, 0, z + 1.2), 'office');
+  trainer.gymBag = true;
+  trainer.gymRole = 'watch';
+  trainer.speed = 0;
+  trainer.state = 'idle';
+  trainer.heading = -PI / 2;
+  trainer.anchor = { slot: new THREE.Vector3(x + 1.5, 0, z + 1.2), facing: -PI / 2 };
+  if (trainer.mesh) {
+    trainer.mesh.rotation.y = -PI / 2;
+    trainer.mesh.visible = false;
+  }
+  G.gymBag = { bag, fighter, trainer, x, z, t: 0 };
 }
 
 export function spawnSevenAtm(scene) {
