@@ -433,6 +433,9 @@ export function updatePeds(dt) {
     if (ped.bankQueue) {
       continue;
     }
+    if (ped.bankTeller) {
+      continue;
+    }
     if (ped.mallFood) {
       continue;
     }
@@ -1961,6 +1964,30 @@ export function updateBankQueue(dt) {
       ped.state = 'idle';
       const parts = ped.mesh.userData && ped.mesh.userData.parts;
       if (i === 0 && parts && parts.armR) parts.armR.rotation.x = -0.85 + Math.sin(c.t * 3.1) * 0.12;
+    }
+  }
+  const teller = G.bankTeller;
+  if (teller) {
+    teller.t = (teller.t || 0) + dt;
+    const open = h >= 9 && h < 16;
+    const ped = teller.ped;
+    if (ped && ped.mesh) {
+      ped.bankQueue = true;
+      ped.bankTeller = true;
+      ped.mesh.visible = open;
+      if (open) {
+        const slot = ped.anchor && ped.anchor.slot;
+        if (slot) {
+          const bob = Math.sin(teller.t * 2.2) * 0.05;
+          ped.mesh.position.set(slot.x, 0, slot.z + bob);
+          ped.heading = ped.anchor.facing;
+          ped.mesh.rotation.y = ped.heading;
+        }
+        const stamp = ped.mesh.getObjectByName('bank-stamp');
+        if (stamp) stamp.rotation.z = Math.sin(teller.t * 4.2) * 0.35;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
     }
   }
 }
