@@ -2424,6 +2424,45 @@ export function spawnWatBell(scene) {
   G.watBell = { mesh: g, bell, striker, x, z, ringT: 0 };
 }
 
+function makeBatMesh() {
+  const g = new THREE.Group();
+  g.name = 'wat-bat';
+  const hide = new THREE.MeshStandardMaterial({ color: 0x2a2218, roughness: 0.9 });
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 5), hide);
+  body.scale.set(0.7, 0.55, 1.15);
+  g.add(body);
+  const wingL = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.02, 0.16), hide);
+  wingL.name = 'bat-wing';
+  wingL.position.set(-0.22, 0, 0);
+  g.add(wingL);
+  const wingR = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.02, 0.16), hide);
+  wingR.name = 'bat-wing';
+  wingR.position.set(0.22, 0, 0);
+  g.add(wingR);
+  return g;
+}
+
+export function spawnWatBats(scene) {
+  if (!GAMEPLAY.watBats) return;
+  const temple = G.world && G.world.poi && G.world.poi.temple;
+  if (!temple) return;
+  G.watBats = [];
+  for (let i = 0; i < 6; i++) {
+    const mesh = makeBatMesh();
+    mesh.visible = false;
+    scene.add(mesh);
+    G.watBats.push({
+      mesh,
+      cx: temple.x,
+      cz: temple.z,
+      r: 4.5 + i * 0.85,
+      y: 7.2 + (i % 3) * 0.7,
+      t: i * 0.9,
+      spin: 0.55 + i * 0.08,
+    });
+  }
+}
+
 export function makeChaYenMesh() {
   const g = new THREE.Group();
   g.name = 'chayen-cart';

@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -2882,6 +2882,36 @@ async function main() {
     assert(mango.flag && mango.named && mango.rice && mango.halves >= 3 && mango.nearBts, 'a mango sticky-rice cart waits at Asok');
     assert(mango.dayVendor && mango.duskVendor && mango.dayGlow < mango.duskGlow, 'the vendor works evenings and the cream warms up');
     assert(mango.paid && mango.hp > 40 && mango.stam > 10, 'E buys mango sticky rice for ฿60');
+
+    console.log('\n[87] flying foxes at the wat');
+    const fox = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const list = G.watBats || [];
+      const n = list.filter(b => b && b.mesh && b.mesh.name === 'wat-bat').length;
+      const wings = list.filter(b => b && b.mesh && b.mesh.children.filter(ch => ch && ch.name === 'bat-wing').length >= 2).length;
+      const b0 = list[0];
+      const temple = G.world && G.world.poi && G.world.poi.temple;
+      G.time.dayT = 12 / 24;
+      main.updateWatBats(0.05);
+      const day = !!(b0 && b0.mesh && b0.mesh.visible === false);
+      G.time.dayT = 19.6 / 24;
+      if (b0) b0.t = 0.4;
+      main.updateWatBats(0.05);
+      const start = b0 && b0.mesh ? { x: b0.mesh.position.x, z: b0.mesh.position.z, flap: b0.mesh.children.find(ch => ch && ch.name === 'bat-wing') } : null;
+      const flap0 = start && start.flap ? start.flap.rotation.z : 0;
+      for (let i = 0; i < 20; i++) main.updateWatBats(0.1);
+      const night = !!(b0 && b0.mesh && b0.mesh.visible);
+      const circled = !!(b0 && start && Math.hypot(b0.mesh.position.x - start.x, b0.mesh.position.z - start.z) > 0.4);
+      const flapped = !!(start && start.flap && Math.abs(start.flap.rotation.z - flap0) > 0.05);
+      const nearWat = !!(b0 && temple && Math.hypot(b0.cx - temple.x, b0.cz - temple.z) < 4);
+      const aloft = !!(b0 && b0.mesh && b0.mesh.position.y > 5);
+      return {
+        flag: !!(G.gameplay && G.gameplay.watBats),
+        n, wings, day, night, circled, flapped, nearWat, aloft,
+      };
+    });
+    assert(fox.flag && fox.n >= 5 && fox.wings >= 5 && fox.nearWat && fox.aloft, `flying foxes roost the wat (${fox.n})`);
+    assert(fox.day && fox.night && fox.circled && fox.flapped, 'they hide by day and circle after dusk');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

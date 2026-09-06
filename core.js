@@ -313,6 +313,7 @@ export const GAMEPLAY = {
   watBell: true,          // temple bell at the wat; E rings it and cools last-seen
   stallIncense: true,     // mosquito coils hang under stall parasols; glow after dusk
   mangoSticky: true,      // khao niao mamuang cart at Asok BTS; evening, E for a plate
+  watBats: true,          // flying foxes circle the wat after dusk
 };
 G.gameplay = GAMEPLAY;
 

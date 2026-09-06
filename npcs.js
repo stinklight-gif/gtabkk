@@ -2395,6 +2395,27 @@ export function updateMonitors(dt) {
   }
 }
 
+export function updateWatBats(dt) {
+  if (!GAMEPLAY.watBats || !G.watBats) return;
+  const h = ((G.time.dayT % 1) + 1) % 1 * 24;
+  const night = h >= 18.2 || h < 5.6;
+  for (const b of G.watBats) {
+    if (!b.mesh) continue;
+    b.mesh.visible = night;
+    if (!night) continue;
+    b.t = (b.t || 0) + dt * (b.spin || 0.6);
+    const x = b.cx + Math.sin(b.t) * b.r;
+    const z = b.cz + Math.cos(b.t) * b.r;
+    const y = b.y + Math.sin(b.t * 2.4) * 0.35;
+    b.mesh.position.set(x, y, z);
+    b.mesh.rotation.y = b.t + PI / 2;
+    const flap = Math.sin(b.t * 18) * 0.45;
+    const wings = b.mesh.children.filter(ch => ch && ch.name === 'bat-wing');
+    if (wings[0]) wings[0].rotation.z = flap;
+    if (wings[1]) wings[1].rotation.z = -flap;
+  }
+}
+
 export function updateWatTurtles(dt) {
   if (!GAMEPLAY.watTurtles || !G.watTurtles) return;
   for (const t of G.watTurtles) {
