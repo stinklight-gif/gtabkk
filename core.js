@@ -363,6 +363,7 @@ export const GAMEPLAY = {
   sengClerk: true,        // clerk at Uncle Seng's gold-shop door; they hide after 20:00
   airportCrew: true,      // marshallers on the Suvarnabhumi apron; they hide after 21:00
   airportCargo: true,     // cargo hands at the south Suvarnabhumi shed; they hide after 19:00
+  airportTower: true,     // controller at the Suvarnabhumi tower base; they hide after 22:00
 };
 G.gameplay = GAMEPLAY;
 

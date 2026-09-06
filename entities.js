@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.homeAuntie || ped.stationPorter || ped.garageMech || ped.klongDock || ped.sengClerk || ped.airportCrew || ped.airportCargo || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.homeAuntie || ped.stationPorter || ped.garageMech || ped.klongDock || ped.sengClerk || ped.airportCrew || ped.airportCargo || ped.airportTower || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -3141,6 +3141,44 @@ export function spawnAirportCargo(scene) {
     hands.push(ped);
   }
   G.airportCargo = { hands, x: sx, z: sz, t: 0 };
+}
+
+export function spawnAirportTower(scene) {
+  if (!GAMEPLAY.airportTower) return;
+  const poi = G.world && G.world.poi && G.world.poi.airportTower;
+  if (!poi) return;
+  const x = poi.x + 4.8, z = poi.z;
+  const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'office');
+  recolorTorso(ped.mesh.userData.parts, 0x1a3a6a, 0.7);
+  ped.airportTower = true;
+  ped.speed = 0;
+  ped.state = 'idle';
+  ped.heading = PI / 2;
+  ped.anchor = { slot: new THREE.Vector3(x, 0, z), facing: PI / 2 };
+  if (ped.mesh) {
+    ped.mesh.rotation.y = PI / 2;
+    ped.mesh.visible = false;
+  }
+  const binocs = new THREE.Group();
+  binocs.name = 'tower-binocs';
+  const mat = new THREE.MeshStandardMaterial({ color: 0x2a2a32, roughness: 0.45, metalness: 0.35 });
+  for (const ox of [-0.035, 0.035]) {
+    const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.026, 0.16, 8), mat);
+    tube.rotation.x = PI / 2;
+    tube.position.x = ox;
+    binocs.add(tube);
+  }
+  const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.018, 0.03), mat);
+  binocs.add(bridge);
+  const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+  if (parts && parts.foreR) {
+    binocs.position.set(0.02, -0.22, 0.1);
+    parts.foreR.add(binocs);
+  } else if (ped.mesh) {
+    binocs.position.set(0.22, 1.15, 0.12);
+    ped.mesh.add(binocs);
+  }
+  G.towerCtl = { ped, x, z, t: 0 };
 }
 
 export function spawnMallDirectory(scene) {
