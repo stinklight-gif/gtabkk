@@ -7771,6 +7771,55 @@ async function main() {
     });
     assert(northDir.flag && northDir.named && northDir.screen && northDir.near && northDir.other, 'a second directory board waits north in Terminal 21');
     assert(northDir.night && northDir.day && northDir.glowed && northDir.asked, 'the north clerk works the desk and E names a shop');
+
+    console.log('\n[218] slushie machine at the south 7-Eleven');
+    const southSlush = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.southSevenSlush;
+      const first = G.sevenSlush;
+      const named = !!(c && c.mesh && c.mesh.name === 'south-seven-slush');
+      const n = c && c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'seven-slush-tank').length : 0;
+      const cup = !!(c && c.customer && (c.customer._slushCup || (c.customer.mesh && c.customer.mesh.getObjectByName('seven-slush-cup'))));
+      const south = (G.world.sevenElevens || []).find(s => s && s.pos && Math.abs(s.pos.x) < 8 && s.pos.z < -80);
+      const near = !!(c && south && south.pos && Math.hypot(c.x - south.pos.x, c.z - south.pos.z) < 8);
+      const other = !!(c && first && Math.hypot(c.x - first.x, c.z - first.z) > 40);
+      G.time.dayT = 23 / 24;
+      main.updateSevenSlush(0.05);
+      const late = !!(c && c.customer && c.customer.mesh && c.customer.mesh.visible === false);
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updateSevenSlush(0.05);
+      const day = !!(c && c.customer && c.customer.sevenSlush && c.customer.mesh && c.customer.mesh.visible);
+      const t0 = c && c.mesh && c.mesh.children.find(ch => ch && ch.name === 'seven-slush-tank');
+      const r0 = t0 ? t0.rotation.y : 0;
+      if (c) c.t = 0.2 + 0.4;
+      main.updateSevenSlush(0.05);
+      const spun = !!(t0 && Math.abs(t0.rotation.y - r0) > 0.4);
+      G.player.inVehicle = null;
+      G._eating = null;
+      if (c && c.mesh) G.player.group.position.copy(c.mesh.position);
+      G.cash = 50;
+      G._sevenSlush = 0;
+      const stam0 = G.player.stam;
+      G.player.stam = Math.max(0, (G.player.stamMax || 100) * 0.2);
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let paid = false;
+      for (let i = 0; i < 4 && !paid; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateSevenSlush(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        paid = G.cash === 25 && (G._sevenSlush || 0) >= 1 && G.player.stam === G.player.stamMax;
+      }
+      G.player.stam = stam0;
+      return {
+        flag: !!(G.gameplay && G.gameplay.sevenSlush),
+        named, n, cup, near, other, late, day, spun, paid,
+      };
+    });
+    assert(southSlush.flag && southSlush.named && southSlush.n >= 2 && southSlush.cup && southSlush.near && southSlush.other, `a slushie machine waits inside the south 7-Eleven (${southSlush.n})`);
+    assert(southSlush.late && southSlush.day && southSlush.spun && southSlush.paid, 'the south tanks spin and E buys a slushie for ฿25');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

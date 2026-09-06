@@ -3784,41 +3784,43 @@ export function updateSevenShoppers(dt) {
 }
 
 export function updateSevenSlush(dt) {
-  if (!GAMEPLAY.sevenSlush || !G.sevenSlush) return;
-  const c = G.sevenSlush;
-  c.t = (c.t || 0) + dt;
+  if (!GAMEPLAY.sevenSlush) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const open = h >= 6 && h < 22;
-  const tanks = c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'seven-slush-tank') : [];
-  for (let i = 0; i < tanks.length; i++) {
-    tanks[i].rotation.y = c.t * 2.8 + i;
-    if (tanks[i].material) tanks[i].material.emissiveIntensity = open ? 0.28 + Math.sin(c.t * 3.2 + i) * 0.1 : 0.08;
-  }
-  const ped = c.customer;
-  if (ped && ped.mesh) {
-    ped.sevenSlush = true;
-    ped.mesh.visible = open;
-    const slot = ped.anchor && ped.anchor.slot;
-    if (slot) {
-      ped.mesh.position.set(slot.x, 0, slot.z);
-      ped.heading = ped.anchor.facing;
-      ped.mesh.rotation.y = ped.heading;
-    }
-    ped.speed = 0;
-    ped.state = 'idle';
-  }
-  if (!open || G.player.inVehicle || G._eating) return;
   const pp = G.player.group.position;
-  if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) return;
-  G.hud.showPrompt('Press <b>E</b> for a slushie · ฿25', 0.4);
-  if (!G.input.pressed('KeyE')) return;
-  if (G.cash < 25) { G.hud.showNotif('Need ฿25 for a slushie'); return; }
-  G.cash -= 25;
-  G.player.stam = G.player.stamMax;
-  if (G.hud.setCash) G.hud.setCash(G.cash);
-  G._sevenSlush = (G._sevenSlush || 0) + 1;
-  G.hud.showNotif('Slushie — สเลอปี้');
-  if (G.audio && G.audio.chime) G.audio.chime();
+  for (const c of [G.sevenSlush, G.southSevenSlush]) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    const tanks = c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'seven-slush-tank') : [];
+    for (let i = 0; i < tanks.length; i++) {
+      tanks[i].rotation.y = c.t * 2.8 + i;
+      if (tanks[i].material) tanks[i].material.emissiveIntensity = open ? 0.28 + Math.sin(c.t * 3.2 + i) * 0.1 : 0.08;
+    }
+    const ped = c.customer;
+    if (ped && ped.mesh) {
+      ped.sevenSlush = true;
+      ped.mesh.visible = open;
+      const slot = ped.anchor && ped.anchor.slot;
+      if (slot) {
+        ped.mesh.position.set(slot.x, 0, slot.z);
+        ped.heading = ped.anchor.facing;
+        ped.mesh.rotation.y = ped.heading;
+      }
+      ped.speed = 0;
+      ped.state = 'idle';
+    }
+    if (!open || G.player.inVehicle || G._eating) continue;
+    if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) continue;
+    G.hud.showPrompt('Press <b>E</b> for a slushie · ฿25', 0.4);
+    if (!G.input.pressed('KeyE')) continue;
+    if (G.cash < 25) { G.hud.showNotif('Need ฿25 for a slushie'); continue; }
+    G.cash -= 25;
+    G.player.stam = G.player.stamMax;
+    if (G.hud.setCash) G.hud.setCash(G.cash);
+    G._sevenSlush = (G._sevenSlush || 0) + 1;
+    G.hud.showNotif('Slushie — สเลอปี้');
+    if (G.audio && G.audio.chime) G.audio.chime();
+  }
 }
 
 export function updateSevenAtm(dt) {
