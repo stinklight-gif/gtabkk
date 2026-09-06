@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -2277,6 +2277,60 @@ async function main() {
     assert(papaya.flag && papaya.n >= 1 && papaya.onSoi && papaya.mortar && papaya.pestle && papaya.vendor, `a som tam cart works a soi (${papaya.n})`);
     assert(papaya.moved && papaya.pounded, 'the cart rolls the soi and the pestle pounds');
     assert(papaya.paid && papaya.healed, 'E buys som tam for ฿45');
+
+    console.log('\n[72] phuang malai at Asok');
+    const malai = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const stand = G.btsMalai;
+      const bts = G.world && G.world.bts;
+      const strands = stand && stand.mesh ? stand.mesh.children.filter(c => c && c.name === 'malai-strand').length : 0;
+      const near = !!(stand && stand.mesh && bts && Math.hypot(stand.mesh.position.x - bts.x, stand.mesh.position.z - (bts.z || 0)) < 28);
+      G.player.inVehicle = null;
+      G._btsRide = null;
+      G._eating = null;
+      G.player.group.visible = true;
+      G._malai = false;
+      G._malaiOffered = 0;
+      if (stand) G.player.group.position.set(stand.x, 0, stand.z);
+      G.cash = 80;
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let paid = false;
+      for (let i = 0; i < 4 && !paid; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateBtsMalai(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        paid = G.cash === 60 && G._malai === true;
+      }
+      const s = (G.world.shrines || [])[0];
+      let offered = false, cooled = false;
+      if (s && s.pos) {
+        G.player.group.position.set(s.pos.x, 0, s.pos.z);
+        G.wanted.stars = 2;
+        G.wanted.lastSeenAt = performance.now() + 30000;
+        s.readyAt = 1;
+        const seen0 = G.wanted.lastSeenAt;
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        for (let i = 0; i < 4 && !offered; i++) {
+          window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+          main.updateShrines(0.016);
+          window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+          if (G.input && G.input.endFrame) G.input.endFrame();
+          offered = (G._malaiOffered || 0) >= 1 && G._malai === false;
+        }
+        cooled = G.wanted.lastSeenAt < seen0 - 18000;
+      }
+      return {
+        flag: !!(G.gameplay && G.gameplay.btsMalai),
+        named: !!(stand && stand.mesh && stand.mesh.name === 'malai-stand'),
+        strands, near, paid, offered, cooled,
+        vendor: !!(stand && stand.vendor && stand.vendor.btsMalai),
+      };
+    });
+    assert(malai.flag && malai.named && malai.strands >= 4 && malai.near && malai.vendor, `a malai stand waits at Asok (${malai.strands} strands)`);
+    assert(malai.paid && malai.offered && malai.cooled, 'E buys a malai and the shrine takes it for extra heat cool');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
