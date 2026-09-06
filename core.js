@@ -337,7 +337,7 @@ export const GAMEPLAY = {
   watAmulet: true,        // amulet board at the wat; E buys one, shrine offering cools extra
   yaoFortune: true,       // fortune teller on Yaowarat after dark; E for a reading that cools last-seen
   watDrum: true,          // temple drum opposite the bell; E beats it and cools last-seen
-  mallGuard: true,        // plastic-chair security at the Terminal 21 entrance; torch after dark
+  mallGuard: true,        // plastic-chair security on both sides of the Terminal 21 entrance; torch after dark
   bankGuard: true,        // plastic-chair security at Krung Thep Bank; torch after dark
   mallDir: true,          // directory clerk at the Terminal 21 desk; E names a shop and floor
   officeSmoke: true,      // office smokers on the north-west Asok and Phrom Phong sidewalks at lunch; ember tips

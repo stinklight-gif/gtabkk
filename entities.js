@@ -2701,45 +2701,48 @@ export function spawnMallGuard(scene) {
   if (!GAMEPLAY.mallGuard) return;
   const mall = G.world && G.world.poi && G.world.poi.terminal21;
   if (!mall) return;
-  const x = mall.x - 3.4, z = mall.z + 0.4;
-  const chair = new THREE.Group();
-  chair.name = 'mall-chair';
-  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.04, 0.42), new THREE.MeshStandardMaterial({ color: 0xd8d0c0, roughness: 0.7 }));
-  seat.position.y = 0.42; chair.add(seat);
-  const back = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.46, 0.04), seat.material);
-  back.position.set(0, 0.65, -0.2); chair.add(back);
-  for (const [sx, sz] of [[-0.16, -0.16], [0.16, -0.16], [-0.16, 0.16], [0.16, 0.16]]) {
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.42, 5), new THREE.MeshStandardMaterial({ color: 0x888890, roughness: 0.5, metalness: 0.3 }));
-    leg.position.set(sx, 0.21, sz); chair.add(leg);
-  }
-  chair.position.set(x, 0, z);
-  scene.add(chair);
-  const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'laborer');
-  recolorTorso(ped.mesh.userData.parts, 0x1a3a6a, 0.7);
-  ped.mallGuard = true;
-  ped.anchor = { slot: new THREE.Vector3(x, 0.42, z), facing: PI };
-  ped.speed = 0;
-  ped.state = 'idle';
-  ped.heading = PI;
-  ped.mesh.position.set(x, 0.42, z);
-  ped.mesh.rotation.y = PI;
-  const torch = new THREE.Group();
-  torch.name = 'flashlight';
-  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.16, 6), new THREE.MeshStandardMaterial({ color: 0x1a1a1e, roughness: 0.45 }));
-  handle.rotation.x = PI / 2; torch.add(handle);
-  const beam = new THREE.Mesh(
-    new THREE.ConeGeometry(0.35, 1.6, 8, 1, true),
-    new THREE.MeshBasicMaterial({ color: 0xffe6a0, transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide })
-  );
-  beam.name = 'flashlight-beam';
-  beam.rotation.x = PI / 2; beam.position.z = 0.95; torch.add(beam);
-  const light = new THREE.PointLight(0xffe0a0, 0, 10, 2);
-  light.position.z = 0.2; torch.add(light);
-  const pp = ped.mesh.userData.parts;
-  if (pp && pp.foreR) { torch.position.set(0.02, -0.2, 0.08); pp.foreR.add(torch); }
-  else { torch.position.set(0.2, 0.9, 0.15); ped.mesh.add(torch); }
-  beam.visible = false;
-  G.mallGuard = { ped, chair, light, beam, x, z };
+  const pack = (x, z, chairName) => {
+    const chair = new THREE.Group();
+    chair.name = chairName;
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.04, 0.42), new THREE.MeshStandardMaterial({ color: 0xd8d0c0, roughness: 0.7 }));
+    seat.position.y = 0.42; chair.add(seat);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.46, 0.04), seat.material);
+    back.position.set(0, 0.65, -0.2); chair.add(back);
+    for (const [sx, sz] of [[-0.16, -0.16], [0.16, -0.16], [-0.16, 0.16], [0.16, 0.16]]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.42, 5), new THREE.MeshStandardMaterial({ color: 0x888890, roughness: 0.5, metalness: 0.3 }));
+      leg.position.set(sx, 0.21, sz); chair.add(leg);
+    }
+    chair.position.set(x, 0, z);
+    scene.add(chair);
+    const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'laborer');
+    recolorTorso(ped.mesh.userData.parts, 0x1a3a6a, 0.7);
+    ped.mallGuard = true;
+    ped.anchor = { slot: new THREE.Vector3(x, 0.42, z), facing: PI };
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = PI;
+    ped.mesh.position.set(x, 0.42, z);
+    ped.mesh.rotation.y = PI;
+    const torch = new THREE.Group();
+    torch.name = 'flashlight';
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.16, 6), new THREE.MeshStandardMaterial({ color: 0x1a1a1e, roughness: 0.45 }));
+    handle.rotation.x = PI / 2; torch.add(handle);
+    const beam = new THREE.Mesh(
+      new THREE.ConeGeometry(0.35, 1.6, 8, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0xffe6a0, transparent: true, opacity: 0.14, depthWrite: false, side: THREE.DoubleSide })
+    );
+    beam.name = 'flashlight-beam';
+    beam.rotation.x = PI / 2; beam.position.z = 0.95; torch.add(beam);
+    const light = new THREE.PointLight(0xffe0a0, 0, 10, 2);
+    light.position.z = 0.2; torch.add(light);
+    const pp = ped.mesh.userData.parts;
+    if (pp && pp.foreR) { torch.position.set(0.02, -0.2, 0.08); pp.foreR.add(torch); }
+    else { torch.position.set(0.2, 0.9, 0.15); ped.mesh.add(torch); }
+    beam.visible = false;
+    return { ped, chair, light, beam, x, z };
+  };
+  G.mallGuard = pack(mall.x - 3.4, mall.z + 0.4, 'mall-chair');
+  G.mallGuardB = pack(mall.x + 3.4, mall.z + 0.4, 'east-mall-chair');
 }
 
 export function spawnBankGuard(scene) {

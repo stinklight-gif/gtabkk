@@ -7057,6 +7057,31 @@ async function main() {
     });
     assert(towerB.flag && towerB.rec && towerB.binocs && towerB.near && towerB.other, 'a second controller waits at the Suvarnabhumi tower');
     assert(towerB.night && towerB.day && towerB.shifted && towerB.swung, 'they hide after 22:00 and the binoculars tilt');
+
+    console.log('\n[199] east mall guard at Terminal 21');
+    const booth21B = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const g = G.mallGuardB;
+      const first = G.mallGuard;
+      const mall = G.world && G.world.poi && G.world.poi.terminal21;
+      main.updatePeds(0.05);
+      main.updateMallGuard(0.05);
+      const ped = g && g.ped;
+      const seated = !!(ped && ped.mallGuard && ped.mesh && ped.mesh.position.y >= 0.3);
+      const chair = !!(g && g.chair && g.chair.name === 'east-mall-chair');
+      const near = !!(mall && ped && ped.mesh && Math.hypot(ped.mesh.position.x - mall.x, ped.mesh.position.z - mall.z) < 8);
+      const other = !!(g && first && Math.hypot(g.x - first.x, g.z - first.z) > 2);
+      const torch = !!(ped && ped.mesh && ped.mesh.getObjectByName('flashlight'));
+      G.time.dayT = 12 / 24;
+      main.updateMallGuard(0.05);
+      const dayOff = !!(g && g.beam && g.beam.visible === false && g.light && g.light.intensity === 0);
+      G.time.dayT = 21.5 / 24;
+      main.updateMallGuard(0.05);
+      const nightOn = !!(g && g.beam && g.beam.visible && g.light && g.light.intensity > 0.4);
+      return { flag: !!(G.gameplay && G.gameplay.mallGuard), seated, chair, near, other, torch, dayOff, nightOn };
+    });
+    assert(booth21B.flag && booth21B.seated && booth21B.chair && booth21B.near && booth21B.other, 'a second guard sits outside Terminal 21');
+    assert(booth21B.torch && booth21B.dayOff && booth21B.nightOn, 'the east mall guard torch only comes on at night');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
