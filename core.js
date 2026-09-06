@@ -336,6 +336,7 @@ export const GAMEPLAY = {
   btsShine: true,         // shoe-shine box on the north side of Asok BTS; E for a polish
   watAmulet: true,        // amulet board at the wat; E buys one, shrine offering cools extra
   yaoFortune: true,       // fortune teller on Yaowarat after dark; E for a reading that cools last-seen
+  watDrum: true,          // temple drum opposite the bell; E beats it and cools last-seen
 };
 G.gameplay = GAMEPLAY;
 

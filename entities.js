@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -3065,6 +3065,60 @@ export function spawnWatBell(scene) {
   g.position.set(x, 0, z);
   scene.add(g);
   G.watBell = { mesh: g, bell, striker, x, z, ringT: 0 };
+}
+
+export function spawnWatDrum(scene) {
+  if (!GAMEPLAY.watDrum) return;
+  const temple = G.world && G.world.poi && G.world.poi.temple;
+  if (!temple) return;
+  const x = temple.x + 5.4, z = temple.z + 4.8;
+  const g = new THREE.Group();
+  g.name = 'wat-drum-frame';
+  const wood = new THREE.MeshStandardMaterial({ color: 0x6a4a28, roughness: 0.8 });
+  for (const sx of [-0.55, 0.55]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.2, 0.12), wood);
+    post.position.set(sx, 1.1, 0);
+    g.add(post);
+  }
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.12, 0.12), wood);
+  beam.position.y = 2.15;
+  g.add(beam);
+  const hide = new THREE.MeshStandardMaterial({ color: 0x5a2a14, roughness: 0.75 });
+  const drum = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 0.55, 12), hide);
+  drum.name = 'wat-drum';
+  drum.rotation.z = PI / 2;
+  drum.position.y = 1.55;
+  g.add(drum);
+  const skin = new THREE.MeshStandardMaterial({ color: 0xe8d8b0, roughness: 0.7 });
+  for (const sx of [-0.28, 0.28]) {
+    const head = new THREE.Mesh(new THREE.CircleGeometry(0.32, 12), skin);
+    head.rotation.y = PI / 2;
+    head.position.set(sx, 1.55, 0);
+    g.add(head);
+  }
+  const beater = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.025, 0.035, 0.62, 5),
+    new THREE.MeshStandardMaterial({ color: 0x4a3a22, roughness: 0.75 })
+  );
+  beater.name = 'wat-drum-beater';
+  beater.position.set(0.55, 1.35, 0.15);
+  beater.rotation.z = 0.55;
+  g.add(beater);
+  g.position.set(x, 0, z);
+  scene.add(g);
+  const monk = spawnPed(scene, new THREE.Vector3(x + 0.85, 0, z + 0.1), 'monk');
+  monk.watDrum = true;
+  monk.anchor = { slot: monk.mesh.position.clone(), facing: -PI / 2 };
+  monk.speed = 0;
+  monk.state = 'idle';
+  monk.heading = -PI / 2;
+  if (monk.mesh) {
+    monk.mesh.rotation.y = -PI / 2;
+    monk.mesh.visible = false;
+    const bowl = monk.mesh.getObjectByName('alms-bowl');
+    if (bowl) bowl.visible = false;
+  }
+  G.watDrum = { mesh: g, drum, beater, monk, x, z, t: 0, beatT: 0 };
 }
 
 function makeBatMesh() {
