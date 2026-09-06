@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -2816,6 +2816,38 @@ export function spawnGunClerk(scene) {
     ped.mesh.add(cloth);
   }
   G.gunClerk = { ped, cloth, x, z, t: 0 };
+}
+
+export function spawnStarterClerk(scene) {
+  if (!GAMEPLAY.starterClerk) return;
+  const shop = (G.world && G.world.gunShops || []).find(s => s && s.id === 'starter');
+  if (!shop || !shop.pos) return;
+  const x = shop.pos.x, z = shop.pos.z + 1.7;
+  const ped = spawnPed(scene, new THREE.Vector3(x, 0, z), 'laborer');
+  recolorTorso(ped.mesh.userData.parts, 0x3a2a22, 0.7);
+  ped.starterClerk = true;
+  ped.anchor = { slot: new THREE.Vector3(x, 0, z), facing: PI };
+  ped.speed = 0;
+  ped.state = 'idle';
+  ped.heading = PI;
+  if (ped.mesh) {
+    ped.mesh.rotation.y = PI;
+    ped.mesh.visible = false;
+  }
+  const cloth = new THREE.Mesh(
+    new THREE.BoxGeometry(0.12, 0.02, 0.16),
+    new THREE.MeshStandardMaterial({ color: 0x8a6a40, roughness: 0.85 })
+  );
+  cloth.name = 'starter-gun-cloth';
+  const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+  if (parts && parts.foreR) {
+    cloth.position.set(0.02, -0.22, 0.08);
+    parts.foreR.add(cloth);
+  } else if (ped.mesh) {
+    cloth.position.set(0.22, 1.05, 0.12);
+    ped.mesh.add(cloth);
+  }
+  G.starterClerk = { ped, cloth, x, z, t: 0 };
 }
 
 export function spawnMallDirectory(scene) {
