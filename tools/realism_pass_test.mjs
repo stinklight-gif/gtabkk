@@ -467,7 +467,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes','btsPigeons','watLotus','watCats','sevenShoppers','watFeed','btsPaper','yaoDuck','sevenSlush','phromFruit','pierWait','btsShine','watAmulet','yaoFortune','watDrum','mallGuard','bankGuard','mallDir','officeSmoke','bankQueue','mallFood','gunClerk','mallTech','mallPharm','mallRoma','mallWatch','mallManga','mallSushi','mallCafe','mallThreads','mallSeven','mallArcade','gymBag','starterClerk','homeAuntie']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky','watBats','yaoPhotos','kanomKrok','squidGrill','songthaewRiders','watSweep','yaoGold','sevenAtm','btsBusker','watRobes','btsPigeons','watLotus','watCats','sevenShoppers','watFeed','btsPaper','yaoDuck','sevenSlush','phromFruit','pierWait','btsShine','watAmulet','yaoFortune','watDrum','mallGuard','bankGuard','mallDir','officeSmoke','bankQueue','mallFood','gunClerk','mallTech','mallPharm','mallRoma','mallWatch','mallManga','mallSushi','mallCafe','mallThreads','mallSeven','mallArcade','gymBag','starterClerk','homeAuntie','stationPorter']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -476,7 +476,7 @@ async function main() {
     const peds = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
       const ways = (G.world.walkways || []).length;
-      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart && !p.songthaewRide && !p.watSweep && !p.yaoGold && !p.yaoDuck && !p.yaoFortune && !p.sevenAtm && !p.btsBusker && !p.watLotus && !p.watAmulet && !p.watDrum && !p.sevenShop && !p.sevenSlush && !p.btsPaper && !p.phromFruit && !p.pierWait && !p.btsShine && !p.mallGuard && !p.bankGuard && !p.mallDir && !p.gunClerk && !p.officeSmoke && !p.bankQueue && !p.mallFood && !p.mallTech && !p.mallPharm && !p.mallRoma && !p.mallWatch && !p.mallManga && !p.mallSushi && !p.mallCafe && !p.mallThreads && !p.mallSeven && !p.mallArcade && !p.gymBag && !p.starterClerk && !p.homeAuntie);
+      const wanderer = G.peds.find(p => !p.dead && !p.anchor && !p.gang && !p.isMugger && !p.isTarget && !p.pillion && !p.motosaiRider && !p.motosaiWait && !p.school && !p.btsWait && !p.commute && !p.crossingGuard && !p.iceCart && !p.football && !p.mallShop && !p.lottery && !p.coconutCart && !p.songthaewRide && !p.watSweep && !p.yaoGold && !p.yaoDuck && !p.yaoFortune && !p.sevenAtm && !p.btsBusker && !p.watLotus && !p.watAmulet && !p.watDrum && !p.sevenShop && !p.sevenSlush && !p.btsPaper && !p.phromFruit && !p.pierWait && !p.btsShine && !p.mallGuard && !p.bankGuard && !p.mallDir && !p.gunClerk && !p.officeSmoke && !p.bankQueue && !p.mallFood && !p.mallTech && !p.mallPharm && !p.mallRoma && !p.mallWatch && !p.mallManga && !p.mallSushi && !p.mallCafe && !p.mallThreads && !p.mallSeven && !p.mallArcade && !p.gymBag && !p.starterClerk && !p.homeAuntie && !p.stationPorter);
       const b = G.world.buildings.find(x => x.size.y > 8 && x.size.x > 4 && x.size.z > 4) || G.world.buildings[0];
       const insideBefore = wanderer && b && Math.abs(wanderer.mesh.position.x - b.pos.x) < b.size.x / 2 && Math.abs(wanderer.mesh.position.z - b.pos.z) < b.size.z / 2;
       if (wanderer && b) {
@@ -950,11 +950,26 @@ async function main() {
     const city = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
       G.player.inVehicle = null;
-      G.player.group.position.set(0, 0, -50);
+      G._inMall = false;
       G.player.group.visible = true;
-      let cop = G.cops.find(c => c && !c.dead);
-      if (!cop) cop = main.spawnCop(G.scene, new G.THREE.Vector3(0, 0, -72));
-      cop.mesh.position.set(0, 0, -72);
+      // Pin on the open intersection used by the weight probe. (0,-50) sits on a
+      // grid road but leftover cop cars / traffic from earlier probes can fill the
+      // 22 m sightline and flip the haze LOS band.
+      G.player.group.position.set(0, 0, -150);
+      for (const c of G.cops) {
+        if (!c || !c.mesh) continue;
+        c.mesh.position.set(-220, 0, -220);
+        c.state = 'bribed';
+        c.dead = false;
+      }
+      for (const v of G.vehicles) {
+        if (!v || !v.isCop) continue;
+        v.pos.set(-230, 0, -230);
+        if (v.mesh) v.mesh.position.copy(v.pos);
+        v.driver = null;
+      }
+      let cop = main.spawnCop(G.scene, new G.THREE.Vector3(0, 0, -172));
+      cop.mesh.position.set(0, 0, -172);
       cop.dead = false;
       cop.state = 'seeking';
       G.wanted.stars = 1;
@@ -964,12 +979,14 @@ async function main() {
       main.updateDayNight(0.05);
       G.wanted.lastSeenAt = 0;
       cop._losT = 0;
+      cop._losOk = undefined;
       main.updateWanted(0.25);
       const clearSeen = G.wanted.lastSeenAt > 0;
       G.time.weather = 'haze';
       main.updateDayNight(0.05);
       G.wanted.lastSeenAt = 0;
       cop._losT = 0;
+      cop._losOk = undefined;
       main.updateWanted(0.25);
       const hazeSeen = G.wanted.lastSeenAt > 0;
       const tag = document.getElementById('weather-tag').textContent;
@@ -5076,6 +5093,42 @@ async function main() {
     });
     assert(auntie.flag && auntie.rec && auntie.paper && auntie.chair && auntie.near, 'a neighbor sits beside the safehouse');
     assert(auntie.night && auntie.day && auntie.folded && auntie.flipped, 'they hide after 22:00 and turn pages on the plastic chair');
+
+    console.log('\n[144] Hua Lamphong station porters');
+    const porters = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.stationPorter;
+      const list = (c && c.porters) || [];
+      const n = list.filter(p => p && p.stationPorter && p.mesh).length;
+      const bags = list.filter(p => p && p.mesh && p.mesh.getObjectByName('station-bag')).length;
+      const spawn = G.world && G.world.spawns && G.world.spawns.player;
+      const near = !!(c && spawn && Math.hypot(c.x - spawn.x, c.z - spawn.z) < 8);
+      G.time.dayT = 23 / 24;
+      main.updateStationPorter(0.05);
+      const night = list.filter(p => p && p.mesh && p.mesh.visible === false).length;
+      G.time.dayT = 12.5 / 24;
+      if (c) c.t = 0.2;
+      main.updateStationPorter(0.05);
+      const day = list.filter(p => p && p.stationPorter && p.mesh && p.mesh.visible).length;
+      const p0 = list[0];
+      const x0 = p0 && p0.mesh ? p0.mesh.position.x : 0;
+      if (c) c.t = 0.2 + Math.PI / 2.2;
+      main.updateStationPorter(0.05);
+      const shifted = !!(p0 && p0.mesh && Math.abs(p0.mesh.position.x - x0) > 0.02);
+      const bag = p0 && p0.mesh && p0.mesh.getObjectByName('station-bag');
+      if (c) c.t = 0.2;
+      main.updateStationPorter(0.05);
+      const r0 = bag ? bag.rotation.z : 0;
+      if (c) c.t = 0.2 + Math.PI / 3.2;
+      main.updateStationPorter(0.05);
+      const swung = !!(bag && Math.abs(bag.rotation.z - r0) > 0.04);
+      return {
+        flag: !!(G.gameplay && G.gameplay.stationPorter),
+        n, bags, near, night, day, shifted, swung,
+      };
+    });
+    assert(porters.flag && porters.n >= 2 && porters.bags >= 2 && porters.near, `porters wait under the Hua Lamphong canopy (${porters.n})`);
+    assert(porters.night >= 2 && porters.day >= 2 && porters.shifted && porters.swung, 'they hide after 22:00 and the bags swing');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.homeAuntie || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.gunClerk || ped.starterClerk || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.mallTech || ped.mallPharm || ped.mallRoma || ped.mallWatch || ped.mallManga || ped.mallSushi || ped.mallCafe || ped.mallThreads || ped.mallSeven || ped.mallArcade || ped.gymBag || ped.homeAuntie || ped.stationPorter || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -2903,6 +2903,55 @@ export function spawnHomeAuntie(scene) {
     ped.mesh.add(paper);
   }
   G.homeAuntie = { ped, chair, x, z, t: 0 };
+}
+
+export function spawnStationPorter(scene) {
+  if (!GAMEPLAY.stationPorter) return;
+  const spawn = G.world && G.world.spawns && G.world.spawns.player;
+  if (!spawn) return;
+  const porters = [];
+  const slots = [
+    { x: spawn.x - 5.2, z: spawn.z - 2.8, facing: 0, kind: 'laborer' },
+    { x: spawn.x + 5.6, z: spawn.z - 2.6, facing: 0, kind: 'laborer' },
+  ];
+  for (let i = 0; i < slots.length; i++) {
+    const slot = slots[i];
+    const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
+    recolorTorso(ped.mesh.userData.parts, 0xc03030, 0.7);
+    ped.stationPorter = true;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = slot.facing;
+    ped.anchor = { slot: new THREE.Vector3(slot.x, 0, slot.z), facing: slot.facing };
+    if (ped.mesh) {
+      ped.mesh.rotation.y = slot.facing;
+      ped.mesh.visible = false;
+    }
+    const bag = new THREE.Group();
+    bag.name = 'station-bag';
+    const body = new THREE.Mesh(
+      new THREE.BoxGeometry(0.18, 0.22, 0.12),
+      new THREE.MeshStandardMaterial({ color: i === 0 ? 0x2a4a8a : 0xffcf4a, roughness: 0.65 })
+    );
+    bag.add(body);
+    const handle = new THREE.Mesh(
+      new THREE.BoxGeometry(0.1, 0.04, 0.02),
+      new THREE.MeshStandardMaterial({ color: 0x2a2a32, roughness: 0.5 })
+    );
+    handle.position.y = 0.14;
+    bag.add(handle);
+    const parts = ped.mesh && ped.mesh.userData && ped.mesh.userData.parts;
+    if (parts && parts.foreR) {
+      bag.position.set(0.02, -0.22, 0.08);
+      parts.foreR.add(bag);
+    } else if (ped.mesh) {
+      bag.position.set(0.22, 1.05, 0.12);
+      ped.mesh.add(bag);
+    }
+    ped._bag = bag;
+    porters.push(ped);
+  }
+  G.stationPorter = { porters, x: spawn.x, z: spawn.z, t: 0 };
 }
 
 export function spawnMallDirectory(scene) {

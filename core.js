@@ -357,6 +357,7 @@ export const GAMEPLAY = {
   gymBag: true,           // a pad man hits the heavy bag at the Muay Thai gym; they hide after 21:00
   starterClerk: true,     // clerk behind the Hua Lamphong starter gun counter; they hide after 21:00
   homeAuntie: true,       // neighbor sits a plastic chair beside the safehouse door; they hide after 22:00
+  stationPorter: true,    // red-vest porters with bags under the Hua Lamphong canopy; they hide after 22:00
 };
 G.gameplay = GAMEPLAY;
 
