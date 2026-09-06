@@ -2259,8 +2259,8 @@ export function updateKlongDock(dt) {
     const crate = ped.mesh.getObjectByName('dock-crate');
     if (crate) crate.rotation.z = Math.sin(c.t * 3.4 + i) * 0.22;
   }
-  const check = G.klongCheck;
-  if (check) {
+  for (const check of [G.klongCheck, G.klongCheckB]) {
+    if (!check) continue;
     check.t = (check.t || 0) + dt;
     const ped = check.ped;
     if (ped && ped.mesh) {

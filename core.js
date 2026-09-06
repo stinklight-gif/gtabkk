@@ -359,7 +359,7 @@ export const GAMEPLAY = {
   homeAuntie: true,       // neighbor sits a plastic chair beside the safehouse door; they hide after 22:00
   stationPorter: true,    // red-vest porters and seated passengers under the Hua Lamphong canopy; they hide after 22:00
   garageMech: true,       // mechanics on both sides of the U-Spray bay mouth, plus waiting customers; they hide after 19:00
-  klongDock: true,        // dockhands and a checker at the Klong Toey container yard; they hide after 19:00
+  klongDock: true,        // dockhands and checkers at the Klong Toey container yard; they hide after 19:00
   sengClerk: true,        // clerk and a window shopper at Uncle Seng's gold-shop door; they hide after 20:00
   airportCrew: true,      // marshallers on the Suvarnabhumi apron; they hide after 21:00
   airportCargo: true,     // cargo hands at the south Suvarnabhumi shed; they hide after 19:00
