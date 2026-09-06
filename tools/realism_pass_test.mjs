@@ -1731,7 +1731,7 @@ async function main() {
     const sit = await page.evaluate(() => {
       const G = window.GAME, main = window.__REALISM_MAIN;
       main.updatePeds(0.05);
-      const list = G.btsSitters || [];
+      const list = (G.btsSitters || []).filter(p => p && (p.stop === 'asok' || !p.stop));
       const n = list.filter(p => p && p.btsSit && p.mesh).length;
       const bts = G.world && G.world.bts;
       const sx = bts ? bts.x : -50;
@@ -3937,6 +3937,24 @@ async function main() {
     });
     assert(booth21.flag && booth21.seated && booth21.chair && booth21.near, 'a guard sits outside Terminal 21');
     assert(booth21.torch && booth21.dayOff && booth21.nightOn, 'the mall guard torch only comes on at night');
+
+    console.log('\n[113] Phrom Phong escalator sitters');
+    const phromSit = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      main.updatePeds(0.05);
+      const list = (G.btsSitters || []).filter(p => p && (p.stop === 'phrom'));
+      const n = list.filter(p => p && p.btsSit && p.mesh).length;
+      const atPhrom = list.filter(p => p && p.mesh && Math.abs(p.mesh.position.x - 100) < 8).length;
+      const onStairs = list.filter(p => p && p.mesh && p.mesh.position.y > 2).length;
+      const folded = list.filter(p => {
+        const parts = p && p.mesh && p.mesh.userData && p.mesh.userData.parts;
+        return !!(parts && parts.legL && parts.legL.rotation.x > 0.8);
+      }).length;
+      const still = list.filter(p => p && p.speed === 0).length;
+      return { flag: !!(G.gameplay && G.gameplay.btsSitters), n, atPhrom, onStairs, folded, still };
+    });
+    assert(phromSit.flag && phromSit.n >= 3 && phromSit.atPhrom >= 3, `people sit the Phrom Phong escalator (${phromSit.n})`);
+    assert(phromSit.onStairs >= 1 && phromSit.folded >= 3 && phromSit.still >= 3, 'at least one is up the stairs, legs folded');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

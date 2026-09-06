@@ -282,7 +282,7 @@ export const GAMEPLAY = {
   nightCheckpoint: true,  // night cones + flashlight cop; blow through and you get a star
   sevenBikes: true,       // parked motorbike cluster outside the walk-in 7-Eleven
   hyacinth: true,         // water hyacinth mats drift on the khlong
-  btsSitters: true,       // people sit on the Asok BTS escalator with their phones
+  btsSitters: true,       // people sit the Asok and Phrom Phong BTS escalators with their phones
   mooPing: true,          // grilled-pork cart on a soi; E for a skewer
   watTurtles: true,       // turtles paddle the pond at the wat
   sevenGuard: true,       // plastic-chair security at the walk-in 7-Eleven

@@ -2974,16 +2974,21 @@ export function spawnBtsSitters(scene) {
   const bts = G.world && G.world.bts;
   const sx = bts ? bts.x : -50;
   const PY = (bts && bts.platformY) || 13.9;
-  const yAt = (z) => ((z + 25) / 20) * PY;
+  const yAtAsok = (z) => ((z + 25) / 20) * PY;
+  const yAtPhrom = (z) => ((z + 22) / 17) * PY;
   const slots = [
-    { x: sx - 3.2, z: -24.4, y: 0.42, facing: PI / 2, kind: 'office' },
-    { x: sx - 2.15, z: -17.2, y: yAt(-17.2) + 0.42, facing: PI / 2, kind: 'tourist' },
-    { x: sx + 2.15, z: -11.4, y: yAt(-11.4) + 0.42, facing: -PI / 2, kind: 'office' },
+    { x: sx - 3.2, z: -24.4, y: 0.42, facing: PI / 2, kind: 'office', stop: 'asok' },
+    { x: sx - 2.15, z: -17.2, y: yAtAsok(-17.2) + 0.42, facing: PI / 2, kind: 'tourist', stop: 'asok' },
+    { x: sx + 2.15, z: -11.4, y: yAtAsok(-11.4) + 0.42, facing: -PI / 2, kind: 'office', stop: 'asok' },
+    { x: 100 - 2.0, z: -21.6, y: 0.42, facing: PI / 2, kind: 'tourist', stop: 'phrom' },
+    { x: 100 + 1.9, z: -14.8, y: yAtPhrom(-14.8) + 0.42, facing: -PI / 2, kind: 'office', stop: 'phrom' },
+    { x: 100 - 1.9, z: -9.6, y: yAtPhrom(-9.6) + 0.42, facing: PI / 2, kind: 'local', stop: 'phrom' },
   ];
   G.btsSitters = [];
   for (const slot of slots) {
     const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
     ped.btsSit = true;
+    ped.stop = slot.stop;
     ped.anchor = { slot: new THREE.Vector3(slot.x, slot.y, slot.z), facing: slot.facing };
     ped.speed = 0;
     ped.state = 'idle';
