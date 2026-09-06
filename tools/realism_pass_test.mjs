@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell','stallIncense','mangoSticky']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -2835,6 +2835,53 @@ async function main() {
     });
     assert(coil.flag && coil.n >= 3 && coil.named && coil.atStall, `mosquito coils hang under stall parasols (${coil.n})`);
     assert(coil.dayGlow < 0.3 && coil.nightGlow > 0.4 && coil.daySmoke && coil.nightSmoke, 'the coils glow and smoke after dusk');
+
+    console.log('\n[86] mango sticky rice at Asok');
+    const mango = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.mangoSticky;
+      const named = !!(c && c.mesh && c.mesh.name === 'mango-cart');
+      const rice = !!(c && c.mesh && c.mesh.getObjectByName('sticky-rice'));
+      const halves = c && c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'mango-half').length : 0;
+      const cream = c && c.mesh && c.mesh.getObjectByName('coconut-cream');
+      const bts = G.world && G.world.bts;
+      const nearBts = !!(c && bts && Math.hypot(c.x - bts.x, c.z - (bts.z || 0)) < 28);
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updateMangoSticky(0.05);
+      const dayGlow = cream && cream.material ? cream.material.emissiveIntensity : 9;
+      const dayVendor = !!(c && c.vendor && c.vendor.mesh && c.vendor.mesh.visible === false);
+      G.time.dayT = 18.4 / 24;
+      if (c) c.t = Math.PI / 16;
+      main.updateMangoSticky(0.05);
+      const duskGlow = cream && cream.material ? cream.material.emissiveIntensity : 0;
+      const duskVendor = !!(c && c.vendor && c.vendor.mango && c.vendor.mesh && c.vendor.mesh.visible);
+      G.player.inVehicle = null;
+      G._eating = null;
+      if (c && c.mesh) G.player.group.position.copy(c.mesh.position);
+      G.cash = 120;
+      G.player.hp = 40;
+      G.player.stam = 10;
+      G._mangoSticky = 0;
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let paid = false;
+      for (let i = 0; i < 4 && !paid; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateMangoSticky(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        paid = G.cash === 60 && (G._mangoSticky || 0) >= 1;
+      }
+      return {
+        flag: !!(G.gameplay && G.gameplay.mangoSticky),
+        named, rice, halves, nearBts, dayGlow, duskGlow, dayVendor, duskVendor, paid,
+        hp: G.player.hp, stam: G.player.stam,
+      };
+    });
+    assert(mango.flag && mango.named && mango.rice && mango.halves >= 3 && mango.nearBts, 'a mango sticky-rice cart waits at Asok');
+    assert(mango.dayVendor && mango.duskVendor && mango.dayGlow < mango.duskGlow, 'the vendor works evenings and the cream warms up');
+    assert(mango.paid && mango.hp > 40 && mango.stam > 10, 'E buys mango sticky rice for ฿60');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

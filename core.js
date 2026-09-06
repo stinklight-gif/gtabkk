@@ -312,6 +312,7 @@ export const GAMEPLAY = {
   bikeSeatCover: true,    // plastic seat covers on parked 7-Eleven bikes in the rain
   watBell: true,          // temple bell at the wat; E rings it and cools last-seen
   stallIncense: true,     // mosquito coils hang under stall parasols; glow after dusk
+  mangoSticky: true,      // khao niao mamuang cart at Asok BTS; evening, E for a plate
 };
 G.gameplay = GAMEPLAY;
 

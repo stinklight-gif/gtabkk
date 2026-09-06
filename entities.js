@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.soiBarber || ped.yaowaratNight || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.soiBarber || ped.yaowaratNight || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -2835,6 +2835,73 @@ export function spawnBtsMalai(scene) {
   vendor.heading = PI / 2;
   if (vendor.mesh) vendor.mesh.rotation.y = PI / 2;
   G.btsMalai = { mesh: g, vendor, x, z };
+}
+
+export function makeMangoStickyMesh() {
+  const g = new THREE.Group();
+  g.name = 'mango-cart';
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.5, 1.2), new THREE.MeshStandardMaterial({ color: 0x2a6a38, roughness: 0.8 }));
+  box.position.y = 0.48; g.add(box);
+  const rice = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.16, 0.18, 0.16, 8),
+    new THREE.MeshStandardMaterial({ color: 0xf4eee0, roughness: 0.7 })
+  );
+  rice.name = 'sticky-rice';
+  rice.position.set(-0.18, 0.82, 0.08);
+  g.add(rice);
+  const cream = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.07, 0.08, 0.14, 6),
+    new THREE.MeshStandardMaterial({ color: 0xfff4d8, roughness: 0.45, emissive: 0xffcc88, emissiveIntensity: 0.12 })
+  );
+  cream.name = 'coconut-cream';
+  cream.position.set(0.22, 0.84, -0.12);
+  g.add(cream);
+  const mangoMat = new THREE.MeshStandardMaterial({ color: 0xffb020, roughness: 0.55 });
+  for (let i = 0; i < 3; i++) {
+    const half = new THREE.Mesh(new THREE.SphereGeometry(0.09, 7, 5, 0, TAU, 0, PI / 2), mangoMat);
+    half.name = 'mango-half';
+    half.rotation.x = PI / 2;
+    half.position.set(0.08 + i * 0.16, 0.8, 0.18);
+    g.add(half);
+  }
+  const plate = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.12, 0.12, 0.03, 8),
+    new THREE.MeshStandardMaterial({ color: 0xf0e8d8, roughness: 0.6 })
+  );
+  plate.name = 'mango-plate';
+  plate.position.set(0.28, 0.78, 0.08);
+  g.add(plate);
+  const umb = new THREE.Mesh(
+    new THREE.ConeGeometry(0.72, 0.26, 8),
+    new THREE.MeshStandardMaterial({ color: 0xffcf4a, roughness: 0.7, side: THREE.DoubleSide })
+  );
+  umb.position.y = 1.92; umb.rotation.x = PI; g.add(umb);
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.05, 5), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+  pole.position.y = 1.38; g.add(pole);
+  const tire = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+  for (const z of [-0.4, 0.4]) for (const x of [-0.32, 0.32]) {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 0.08, 8), tire);
+    w.rotation.z = PI / 2; w.position.set(x, 0.12, z); g.add(w);
+  }
+  return g;
+}
+
+export function spawnMangoSticky(scene) {
+  if (!GAMEPLAY.mangoSticky) return;
+  const bts = G.world && G.world.bts;
+  if (!bts) return;
+  const x = bts.x - 8.8, z = -22.4;
+  const mesh = makeMangoStickyMesh();
+  mesh.position.set(x, 0, z);
+  scene.add(mesh);
+  const vendor = spawnPed(scene, new THREE.Vector3(x + 0.7, 0, z + 0.15), 'vendor');
+  vendor.mango = true;
+  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI / 2 };
+  vendor.speed = 0;
+  vendor.state = 'idle';
+  vendor.heading = PI / 2;
+  if (vendor.mesh) vendor.mesh.rotation.y = PI / 2;
+  G.mangoSticky = { mesh, vendor, x, z, t: 0 };
 }
 
 export function spawnBtsGates(scene) {

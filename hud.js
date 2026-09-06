@@ -236,6 +236,11 @@ export function bindHud() {
     if (G.btsMalai && G.btsMalai.mesh) {
       out.push({ name: 'Malai at Asok', status: G._malai ? 'garland in hand' : 'พวงมาลัย · ฿20', dist: d(G.btsMalai.mesh.position) });
     }
+    if (G.mangoSticky && G.mangoSticky.mesh) {
+      const hh = ((G.time.dayT % 1) + 1) % 1 * 24;
+      const open = hh >= 16 && hh < 22.5;
+      out.push({ name: 'Mango sticky rice', status: open ? 'ข้าวเหนียวมะม่วง · ฿60' : 'opens 16:00', dist: d(G.mangoSticky.mesh.position) });
+    }
     if (poi.yaowarat) out.push({ name: 'Yaowarat', status: 'night market', dist: d(poi.yaowarat) });
     if (poi.cowboy || (G.soiCowboy && G.soiCowboy.origin)) {
       const loc = poi.cowboy || G.soiCowboy.origin;
