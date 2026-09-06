@@ -303,6 +303,7 @@ export const GAMEPLAY = {
   plaKat: true,           // fighting-fish bags hanging on a soi; E buys a bag
   chaYen: true,           // Thai iced-tea cart on a soi; E for a cup
   soiBarber: true,        // plastic-chair barber on a soi; E for a cut
+  btsGates: true,         // Asok ticket gates + Rabbit machine; hop is 1★
 };
 G.gameplay = GAMEPLAY;
 

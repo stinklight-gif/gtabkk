@@ -2484,6 +2484,62 @@ export function spawnBtsMalai(scene) {
   G.btsMalai = { mesh: g, vendor, x, z };
 }
 
+export function spawnBtsGates(scene) {
+  if (!GAMEPLAY.btsGates) return;
+  const bts = G.world && G.world.bts;
+  if (!bts) return;
+  const sx = bts.x, PY = bts.platformY || 13.9;
+  const zGate = -4.85;
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xe8d24a, roughness: 0.45 });
+  const teal = new THREE.MeshStandardMaterial({ color: 0x2a7d8e, roughness: 0.5 });
+  const gates = [];
+  for (let i = 0; i < 3; i++) {
+    const g = new THREE.Group();
+    g.name = 'bts-gate';
+    const x = sx - 1.2 + i * 1.2;
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.42, 1.05, 0.55), bodyMat);
+    body.position.y = 0.52;
+    g.add(body);
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.44, 0.08, 0.56), teal);
+    stripe.position.y = 0.95;
+    g.add(stripe);
+    const flap = new THREE.Mesh(
+      new THREE.BoxGeometry(0.04, 0.7, 0.38),
+      new THREE.MeshStandardMaterial({ color: 0xf4f0e0, roughness: 0.4 })
+    );
+    flap.name = 'bts-flap';
+    flap.position.set(0.22, 0.55, 0);
+    g.add(flap);
+    g.position.set(x, PY, zGate);
+    scene.add(g);
+    gates.push({ mesh: g, flap, x, z: zGate });
+  }
+  const machine = new THREE.Group();
+  machine.name = 'bts-ticket-machine';
+  const kiosk = new THREE.Mesh(
+    new THREE.BoxGeometry(0.55, 1.35, 0.4),
+    new THREE.MeshStandardMaterial({ color: 0x2a7d8e, roughness: 0.5 })
+  );
+  kiosk.position.y = 0.68;
+  machine.add(kiosk);
+  const screen = new THREE.Mesh(
+    new THREE.BoxGeometry(0.36, 0.28, 0.04),
+    new THREE.MeshStandardMaterial({ color: 0x88e0ff, emissive: 0x226688, emissiveIntensity: 0.4, roughness: 0.3 })
+  );
+  screen.name = 'bts-ticket-screen';
+  screen.position.set(0, 1.15, 0.22);
+  machine.add(screen);
+  const slot = new THREE.Mesh(
+    new THREE.BoxGeometry(0.18, 0.04, 0.06),
+    new THREE.MeshStandardMaterial({ color: 0x111111 })
+  );
+  slot.position.set(0, 0.72, 0.22);
+  machine.add(slot);
+  machine.position.set(sx + 5.2, 0, -24.5);
+  scene.add(machine);
+  G.btsGates = { gates, machine, sx, zGate, py: PY, openT: 0, _pz: null };
+}
+
 export function spawnBtsSongthaew(scene) {
   if (!GAMEPLAY.btsSongthaew) return;
   const bts = G.world && G.world.bts;

@@ -391,6 +391,12 @@ export function updateInteraction(dt) {
     for (const c of G.chaYen) if (c.mesh && dist2(c.mesh.position, pp0) < 2.2 * 2.2) return;
   }
   if (GAMEPLAY.soiBarber && G.soiBarber && dist2({ x: G.soiBarber.x, z: G.soiBarber.z }, pp0) < 2.6 * 2.6) return;
+  if (GAMEPLAY.btsGates && G.btsGates) {
+    if (G.btsGates.machine && dist2(G.btsGates.machine.position, pp0) < 2.4 * 2.4) return;
+    if (G.btsGates.gates) {
+      for (const g of G.btsGates.gates) if (g.mesh && dist2(g.mesh.position, pp0) < 2.2 * 2.2) return;
+    }
+  }
   if (GAMEPLAY.dawnAlms && G._alms) {
     for (const ped of G._alms) {
       if (ped && ped.mesh && !ped.dead && dist2(ped.mesh.position, pp0) < 2.2 * 2.2) return;

@@ -225,6 +225,13 @@ export function bindHud() {
     if (poi.gym) out.push({ name: 'Muay Thai gym', status: `melee ${((G.econ.upgrades && G.econ.upgrades.melee) || 0)}/3`, dist: d(poi.gym) });
     if (poi.suvarnabhumi) out.push({ name: 'Suvarnabhumi', status: 'taxi an airliner', dist: d(poi.suvarnabhumi) });
     if (G.world && G.world.bts) out.push({ name: 'BTS Asok', status: 'ride the skytrain', dist: d({ x: G.world.bts.x, z: G.world.bts.z || 0 }) });
+    if (G.btsGates && G.btsGates.machine) {
+      out.push({
+        name: 'BTS ticket',
+        status: G._btsTicket ? 'rabbit in wallet' : (G._btsHopped ? 'hopped the gate' : 'แรบบิท · ฿50'),
+        dist: d(G.btsGates.machine.position),
+      });
+    }
     if (G.btsMalai && G.btsMalai.mesh) {
       out.push({ name: 'Malai at Asok', status: G._malai ? 'garland in hand' : 'พวงมาลัย · ฿20', dist: d(G.btsMalai.mesh.position) });
     }

@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -2495,6 +2495,67 @@ async function main() {
     assert(fade.flag && fade.chair && fade.pole && fade.cape && fade.clip && fade.onSoi && fade.vendor, 'a plastic-chair barber works a soi');
     assert(fade.spun && fade.buzzed, 'the pole spins and the clippers buzz');
     assert(fade.paid && fade.cut && fade.hairY < 0.4 && fade.cooled, 'E buys a ฿80 fade and cools last-seen');
+
+    console.log('\n[77] BTS ticket gates');
+    const tap = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const st = G.btsGates;
+      const n = st && st.gates ? st.gates.filter(g => g && g.mesh && g.mesh.name === 'bts-gate').length : 0;
+      const flaps = st && st.gates ? st.gates.filter(g => g && g.flap && g.flap.name === 'bts-flap').length : 0;
+      const machine = !!(st && st.machine && st.machine.name === 'bts-ticket-machine');
+      const screen = !!(st && st.machine && st.machine.getObjectByName('bts-ticket-screen'));
+      G.player.inVehicle = null;
+      G._btsRide = null;
+      G._eating = null;
+      G._barberCut = null;
+      G._btsTicket = false;
+      G._btsHopped = 0;
+      G._btsTapped = 0;
+      G.policeOff = false;
+      G.wanted.stars = 0;
+      G.wanted.crime = 0;
+      if (st && st.machine) G.player.group.position.set(st.machine.position.x, 0, st.machine.position.z);
+      G.cash = 100;
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let paid = false;
+      for (let i = 0; i < 4 && !paid; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateBtsGates(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        paid = G.cash === 50 && !!G._btsTicket;
+      }
+      G._btsTicket = false;
+      st.openT = 0;
+      st._pz = st.zGate - 1.2;
+      G.player.group.position.set(st.sx, st.py, st.zGate - 1.2);
+      main.updateBtsGates(0.016);
+      G.player.group.position.set(st.sx, st.py, st.zGate + 0.8);
+      main.updateBtsGates(0.016);
+      const hopped = (G._btsHopped || 0) >= 1 && G.wanted.stars >= 1;
+      const hopStars = G.wanted.stars;
+      G.wanted.stars = 0;
+      G.wanted.crime = 0;
+      G._btsHopped = 0;
+      G._btsTicket = true;
+      st.openT = 0;
+      st._pz = st.zGate - 1.2;
+      G.player.group.position.set(st.sx, st.py, st.zGate - 1.2);
+      main.updateBtsGates(0.016);
+      G.player.group.position.set(st.sx, st.py, st.zGate + 0.8);
+      main.updateBtsGates(0.016);
+      const flap = st.gates && st.gates[0] && st.gates[0].flap;
+      const opened = !!(flap && flap.rotation.y > 0.5);
+      const tapped = (G._btsTapped || 0) >= 1 && G.wanted.stars === 0;
+      return {
+        flag: !!(G.gameplay && G.gameplay.btsGates),
+        n, flaps, machine, screen, paid, hopped, hopStars, opened, tapped,
+      };
+    });
+    assert(tap.flag && tap.n >= 3 && tap.flaps >= 3 && tap.machine && tap.screen, `Asok ticket gates (${tap.n})`);
+    assert(tap.paid, 'E buys a Rabbit card for ฿50');
+    assert(tap.hopped && tap.opened && tap.tapped, 'hopping is a star; a tap opens the flaps');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

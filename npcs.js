@@ -1396,6 +1396,48 @@ export function updateSoiBarber(dt) {
   if (G.audio && G.audio.blip) G.audio.blip({ freq: 180, dur: 0.08, type: 'square', gain: 0.08 });
 }
 
+export function updateBtsGates(dt) {
+  if (!GAMEPLAY.btsGates || !G.btsGates) return;
+  const st = G.btsGates;
+  if (G._btsRide || (G.player && G.player.inVehicle)) {
+    if (st.openT > 0) st.openT = Math.max(0, st.openT - dt);
+    return;
+  }
+  const pp = G.player.group.position;
+  const prev = st._pz;
+  st._pz = pp.z;
+  const onPlat = pp.y > 12 && Math.abs(pp.x - st.sx) < 7;
+  if (onPlat && prev != null && prev < st.zGate && pp.z >= st.zGate) {
+    if (G._btsTicket) {
+      st.openT = 1.4;
+      G._btsTapped = (G._btsTapped || 0) + 1;
+      if (G.audio && G.audio.btsChime) G.audio.btsChime();
+      else if (G.hud) G.hud.showNotif('Tap in — แรบบิท');
+    } else {
+      st.openT = 0.35;
+      G._btsHopped = (G._btsHopped || 0) + 1;
+      raiseWanted(1, 2);
+      if (G.hud) G.hud.showNotif('Jumped the gate');
+    }
+  }
+  const open = st.openT > 0;
+  for (const g of st.gates || []) {
+    if (g.flap) g.flap.rotation.y = open ? 1.15 : 0;
+  }
+  if (st.openT > 0) st.openT = Math.max(0, st.openT - dt);
+  if (G._eating || G._barberCut) return;
+  if (st.machine && dist2(st.machine.position, pp) < 2.4 * 2.4) {
+    G.hud.showPrompt(G._btsTicket ? 'Rabbit card ready' : 'Press <b>E</b> for a Rabbit card · ฿50', 0.4);
+    if (G._btsTicket || !G.input.pressed('KeyE')) return;
+    if (G.cash < 50) { G.hud.showNotif('Need ฿50 for a Rabbit'); return; }
+    G.cash -= 50;
+    if (G.hud.setCash) G.hud.setCash(G.cash);
+    G._btsTicket = true;
+    G.hud.showNotif('Rabbit card — แรบบิท');
+    if (G.audio && G.audio.chime) G.audio.chime();
+  }
+}
+
 export function updateSoiMechanic(dt) {
   if (!GAMEPLAY.soiMechanic || !G.soiMechanic) return;
   const shop = G.soiMechanic;
