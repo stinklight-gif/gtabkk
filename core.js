@@ -342,6 +342,7 @@ export const GAMEPLAY = {
   mallDir: true,          // directory clerk at the Terminal 21 desk; E names a shop and floor
   officeSmoke: true,      // office smokers on the north-west Asok sidewalk at lunch; ember tips
   bankQueue: true,        // two customers wait at the Krung Thep Bank teller with a passbook; they hide after hours
+  mallFood: true,         // eaters sit Pier 21 Food Court at Terminal 21; trays, they hide after 21:00
 };
 G.gameplay = GAMEPLAY;
 

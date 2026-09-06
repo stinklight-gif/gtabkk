@@ -370,7 +370,7 @@ export function updateEntityLod() {
   for (const ped of G.peds) {
     if (!ped || ped.dead || !ped.mesh) continue;
     const d2 = dist2(ped.mesh.position, viewer);
-    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.officeSmoke || ped.bankQueue || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
+    const special = ped.gang || ped.isTarget || ped.isMugger || ped.anchor || ped.alms || ped.cowboy || ped.boatNoodle || ped.pierWait || ped.somTam || ped.btsMalai || ped.plaKat || ped.chaYen || ped.roti || ped.mango || ped.phromFruit || ped.kanom || ped.squid || ped.songthaewRide || ped.watSweep || ped.yaoGold || ped.yaoDuck || ped.yaoFortune || ped.sevenAtm || ped.btsBusker || ped.watLotus || ped.watAmulet || ped.watDrum || ped.sevenShop || ped.sevenSlush || ped.btsPaper || ped.btsShine || ped.mallGuard || ped.bankGuard || ped.mallDir || ped.officeSmoke || ped.bankQueue || ped.mallFood || ped.soiBarber || ped.yaowaratNight || ped.yaoPhoto || ped.btsWait;
     if (d2 < pedNear) stats.nearPeds++;
     let mode = ped.mesh.userData.lod && ped.mesh.userData.lod.state || 'high';
     if (special) mode = 'high';
@@ -2817,6 +2817,68 @@ export function spawnMallDirectory(scene) {
   clerk.heading = PI;
   if (clerk.mesh) clerk.mesh.rotation.y = PI;
   G.mallDir = { mesh: g, screen, clerk, x, z, t: 0, idx: 0 };
+}
+
+export function spawnMallFood(scene) {
+  if (!GAMEPLAY.mallFood) return;
+  const mall = G.world && G.world.mall;
+  const shop = mall && (mall.shops || []).find(s => s && s.name === 'Pier 21 Food Court');
+  if (!shop || !shop.pos) return;
+  const x = shop.pos.x, z = shop.pos.z;
+  const table = new THREE.Group();
+  table.name = 'mall-food-table';
+  const top = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.55, 0.55, 0.05, 10),
+    new THREE.MeshStandardMaterial({ color: 0xd8c8b0, roughness: 0.7 })
+  );
+  top.position.y = 0.72;
+  table.add(top);
+  const pole = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.04, 0.05, 0.7, 8),
+    new THREE.MeshStandardMaterial({ color: 0x888890, roughness: 0.5, metalness: 0.3 })
+  );
+  pole.position.y = 0.35;
+  table.add(pole);
+  table.position.set(x, 0, z);
+  scene.add(table);
+  const slots = [
+    { x: x - 0.7, z: z + 0.15, facing: PI / 2, kind: 'office' },
+    { x: x + 0.7, z: z - 0.1, facing: -PI / 2, kind: 'tourist' },
+    { x: x + 0.05, z: z - 0.75, facing: 0, kind: 'local' },
+  ];
+  const eaters = [];
+  for (let i = 0; i < slots.length; i++) {
+    const slot = slots[i];
+    const ped = spawnPed(scene, new THREE.Vector3(slot.x, 0, slot.z), slot.kind);
+    ped.mallFood = true;
+    ped.speed = 0;
+    ped.state = 'idle';
+    ped.heading = slot.facing;
+    ped.anchor = { slot: new THREE.Vector3(slot.x, 0.42, slot.z), facing: slot.facing };
+    if (ped.mesh) {
+      ped.mesh.position.set(slot.x, 0.42, slot.z);
+      ped.mesh.rotation.y = slot.facing;
+      ped.mesh.visible = false;
+    }
+    if (i === 0 && ped.mesh) {
+      const tray = new THREE.Mesh(
+        new THREE.BoxGeometry(0.16, 0.02, 0.22),
+        new THREE.MeshStandardMaterial({ color: 0xf0ead8, roughness: 0.6 })
+      );
+      tray.name = 'mall-food-tray';
+      const bowl = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.045, 0.04, 0.04, 8),
+        new THREE.MeshStandardMaterial({ color: 0xff5a3a, roughness: 0.55 })
+      );
+      bowl.position.y = 0.03;
+      tray.add(bowl);
+      const parts = ped.mesh.userData && ped.mesh.userData.parts;
+      if (parts && parts.foreL) { tray.position.set(0.02, -0.22, 0.08); parts.foreL.add(tray); }
+      else { tray.position.set(-0.18, 0.95, 0.12); ped.mesh.add(tray); }
+    }
+    eaters.push(ped);
+  }
+  G.mallFood = { table, eaters, x, z, t: 0 };
 }
 
 export function spawnSevenAtm(scene) {
