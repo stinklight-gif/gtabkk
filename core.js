@@ -324,7 +324,7 @@ export const GAMEPLAY = {
   btsBusker: true,        // guitar buskers at the Asok and Phrom Phong BTS exits; E tips ฿20
   watRobes: true,         // saffron robes dry on a line in the wat courtyard
   btsPigeons: true,       // pigeons loaf the Asok platform by day and scatter
-  watLotus: true,         // lotus stall and a merit-box attendant at the wat; they hide after 18:00
+  watLotus: true,         // lotus stall and merit-box attendants at the wat gates; they hide after 18:00
   watCats: true,          // temple cats loaf the wat courtyard and bolt when you get close
   sevenShoppers: true,    // people walk in and out of all four 7-Elevens
   watFeed: true,          // pellet tin at the wat pond; E feeds the turtles

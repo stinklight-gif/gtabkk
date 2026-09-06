@@ -5075,48 +5075,51 @@ export function spawnWatLotus(scene) {
   vendor.heading = PI;
   if (vendor.mesh) vendor.mesh.rotation.y = PI;
   G.watLotus = { mesh: g, vendor, x, z, t: 0 };
-  const mx = temple.x + 3.4, mz = temple.z - 11.6;
-  const box = new THREE.Group();
-  box.name = 'wat-merit-box';
-  const gold = new THREE.MeshStandardMaterial({ color: 0xd9a134, roughness: 0.45, metalness: 0.55 });
-  const body = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.7, 0.32), gold);
-  body.position.y = 0.55;
-  box.add(body);
-  const slot = new THREE.Mesh(
-    new THREE.BoxGeometry(0.16, 0.04, 0.04),
-    new THREE.MeshStandardMaterial({ color: 0x3a2a12, roughness: 0.7 })
-  );
-  slot.position.y = 0.92;
-  box.add(slot);
-  box.position.set(mx + 0.45, 0, mz - 0.15);
-  scene.add(box);
-  const attendant = spawnPed(scene, new THREE.Vector3(mx, 0, mz), 'monk');
-  attendant.watLotus = true;
-  attendant.watMerit = true;
-  attendant.speed = 0;
-  attendant.state = 'idle';
-  attendant.heading = PI;
-  attendant.anchor = { slot: new THREE.Vector3(mx, 0, mz), facing: PI };
-  if (attendant.mesh) {
-    attendant.mesh.rotation.y = PI;
-    attendant.mesh.visible = false;
-    const bowl = attendant.mesh.getObjectByName('alms-bowl');
-    if (bowl) bowl.visible = false;
-  }
-  const tray = new THREE.Mesh(
-    new THREE.BoxGeometry(0.14, 0.02, 0.1),
-    new THREE.MeshStandardMaterial({ color: 0xffcf4a, metalness: 0.55, roughness: 0.35 })
-  );
-  tray.name = 'wat-merit-tray';
-  const parts = attendant.mesh && attendant.mesh.userData && attendant.mesh.userData.parts;
-  if (parts && parts.foreR) {
-    tray.position.set(0.02, -0.22, 0.06);
-    parts.foreR.add(tray);
-  } else if (attendant.mesh) {
-    tray.position.set(0.22, 1.05, 0.12);
-    attendant.mesh.add(tray);
-  }
-  G.watMerit = { ped: attendant, box, x: mx, z: mz, t: 0 };
+  const packMerit = (mx, mz, facing, boxName) => {
+    const box = new THREE.Group();
+    box.name = boxName;
+    const gold = new THREE.MeshStandardMaterial({ color: 0xd9a134, roughness: 0.45, metalness: 0.55 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.7, 0.32), gold);
+    body.position.y = 0.55;
+    box.add(body);
+    const slot = new THREE.Mesh(
+      new THREE.BoxGeometry(0.16, 0.04, 0.04),
+      new THREE.MeshStandardMaterial({ color: 0x3a2a12, roughness: 0.7 })
+    );
+    slot.position.y = 0.92;
+    box.add(slot);
+    box.position.set(mx + 0.45, 0, mz - 0.15);
+    scene.add(box);
+    const attendant = spawnPed(scene, new THREE.Vector3(mx, 0, mz), 'monk');
+    attendant.watLotus = true;
+    attendant.watMerit = true;
+    attendant.speed = 0;
+    attendant.state = 'idle';
+    attendant.heading = facing;
+    attendant.anchor = { slot: new THREE.Vector3(mx, 0, mz), facing };
+    if (attendant.mesh) {
+      attendant.mesh.rotation.y = facing;
+      attendant.mesh.visible = false;
+      const bowl = attendant.mesh.getObjectByName('alms-bowl');
+      if (bowl) bowl.visible = false;
+    }
+    const tray = new THREE.Mesh(
+      new THREE.BoxGeometry(0.14, 0.02, 0.1),
+      new THREE.MeshStandardMaterial({ color: 0xffcf4a, metalness: 0.55, roughness: 0.35 })
+    );
+    tray.name = 'wat-merit-tray';
+    const parts = attendant.mesh && attendant.mesh.userData && attendant.mesh.userData.parts;
+    if (parts && parts.foreR) {
+      tray.position.set(0.02, -0.22, 0.06);
+      parts.foreR.add(tray);
+    } else if (attendant.mesh) {
+      tray.position.set(0.22, 1.05, 0.12);
+      attendant.mesh.add(tray);
+    }
+    return { ped: attendant, box, x: mx, z: mz, t: 0 };
+  };
+  G.watMerit = packMerit(temple.x + 3.4, temple.z - 11.6, PI, 'wat-merit-box');
+  G.watMeritB = packMerit(temple.x + 11.6, temple.z - 2.2, PI / 2, 'east-wat-merit-box');
 }
 
 export function spawnWatAmulet(scene) {

@@ -4506,8 +4506,8 @@ export function updateWatLotus(dt) {
     ped.speed = 0;
     ped.state = 'idle';
   }
-  const merit = G.watMerit;
-  if (merit) {
+  for (const merit of [G.watMerit, G.watMeritB]) {
+    if (!merit) continue;
     merit.t = (merit.t || 0) + dt;
     const mp = merit.ped;
     if (mp && mp.mesh) {
