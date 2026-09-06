@@ -308,6 +308,7 @@ export const GAMEPLAY = {
   rainFrogs: true,        // frogs hop flooded sois while it rains
   soiCctv: true,          // soi pole cameras; a shot in view is a ping and 1★
   rotiCart: true,         // banana roti cart on a soi; E for a fold
+  rainPoncho: true,       // plastic rain capes on motorbike riders when it pours
 };
 G.gameplay = GAMEPLAY;
 

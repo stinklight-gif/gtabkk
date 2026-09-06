@@ -1325,6 +1325,23 @@ export function makeSeatedBikeRider(opts = {}) {
     arm.rotation.z = sx * 0.35;
     g.add(arm);
   }
+  if (GAMEPLAY.rainPoncho) {
+    const cape = new THREE.Mesh(
+      new THREE.ConeGeometry(0.28, 0.5, 6, 1, true),
+      new THREE.MeshStandardMaterial({
+        color: pick([0xffcf4a, 0x2a6aad, 0xe8e8e0]),
+        roughness: 0.35,
+        transparent: true,
+        opacity: 0.78,
+        side: THREE.DoubleSide,
+      })
+    );
+    cape.name = 'rain-poncho';
+    cape.visible = false;
+    cape.position.set(0, 1.12, 0.04);
+    cape.rotation.x = 0.18;
+    g.add(cape);
+  }
   g.position.set(0, 0.02, 0.12);
   return g;
 }
@@ -1377,6 +1394,22 @@ export function attachTrafficPillion(bike) {
   ped.mesh.position.set(0, 0.02, -0.42);
   ped.mesh.rotation.set(0.16, 0, 0);
   wearBikeHelmet(ped, pick([0x1a1a1e, 0xb03030, 0xffcf2a, 0x2a5a8a]));
+  if (GAMEPLAY.rainPoncho && ped.mesh && !ped.mesh.getObjectByName('rain-poncho')) {
+    const cape = new THREE.Mesh(
+      new THREE.ConeGeometry(0.26, 0.55, 6, 1, true),
+      new THREE.MeshStandardMaterial({
+        color: pick([0xffcf4a, 0x2a6aad, 0xe8e8e0]),
+        roughness: 0.35,
+        transparent: true,
+        opacity: 0.78,
+        side: THREE.DoubleSide,
+      })
+    );
+    cape.name = 'rain-poncho';
+    cape.visible = false;
+    cape.position.set(0, 1.22, 0.04);
+    ped.mesh.add(cape);
+  }
   bike.pillionPed = ped;
   return ped;
 }

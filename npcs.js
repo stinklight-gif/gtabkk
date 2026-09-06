@@ -1775,6 +1775,19 @@ export function updateSeekShade(dt) {
   }
 }
 
+export function updateRainPoncho(dt) {
+  if (!GAMEPLAY.rainPoncho) return;
+  const wet = (G.time.rainStrength || 0) > 0.4;
+  for (const v of G.vehicles || []) {
+    if (!v || v.dead || !v.spec || v.spec.kind !== 'bike') continue;
+    const cape = v.bikeRider && v.bikeRider.getObjectByName('rain-poncho');
+    if (cape) cape.visible = !!(wet && v.bikeRider.visible);
+    const p = v.pillionPed;
+    const pc = p && p.mesh && p.mesh.getObjectByName('rain-poncho');
+    if (pc) pc.visible = wet;
+  }
+}
+
 export function updateRainPack(dt) {
   if (!GAMEPLAY.rainPack) return;
   const fs = G.world && G.world.foodStalls;

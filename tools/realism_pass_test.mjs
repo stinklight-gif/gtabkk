@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -2713,6 +2713,33 @@ async function main() {
     assert(fold.flag && fold.n >= 1 && fold.onSoi && fold.pan && fold.vendor, `a roti cart works a soi (${fold.n})`);
     assert(fold.moved && fold.flipped, 'the cart rolls the soi and the spatula flips');
     assert(fold.paid && fold.hp > 40 && fold.stam > 10, 'E buys banana roti for ฿35');
+
+    console.log('\n[82] rain ponchos on bikes');
+    const cape = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      let bike = G.vehicles.find(v => v && v.spec && v.spec.kind === 'bike' && !v.dead);
+      if (!bike) bike = main.makeVehicle('bike', G.scene);
+      bike.dead = false;
+      bike.motosaiStand = false;
+      bike.driver = 'npc';
+      bike.npc = bike.npc || { cruiseSpeed: 8 };
+      if (main.syncBikeRider) main.syncBikeRider(bike);
+      const poncho = bike.bikeRider && bike.bikeRider.getObjectByName('rain-poncho');
+      G.time.rainStrength = 0;
+      main.updateRainPoncho(0.05);
+      const dry = !!(poncho && poncho.visible === false);
+      G.time.rainStrength = 0.85;
+      main.updateRainPoncho(0.05);
+      const wet = !!(poncho && poncho.visible === true);
+      return {
+        flag: !!(G.gameplay && G.gameplay.rainPoncho),
+        rider: !!(bike.bikeRider && bike.bikeRider.visible),
+        named: !!(poncho && poncho.name === 'rain-poncho'),
+        dry, wet,
+      };
+    });
+    assert(cape.flag && cape.rider && cape.named, 'bike riders wear a plastic poncho mesh');
+    assert(cape.dry && cape.wet, 'the poncho only comes out in the rain');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
