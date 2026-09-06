@@ -2350,6 +2350,44 @@ export function spawnWatTurtles(scene) {
   G.watPond = pond;
 }
 
+export function spawnWatBell(scene) {
+  if (!GAMEPLAY.watBell) return;
+  const temple = G.world && G.world.poi && G.world.poi.temple;
+  if (!temple) return;
+  const x = temple.x - 5.4, z = temple.z + 4.8;
+  const g = new THREE.Group();
+  g.name = 'wat-bell-frame';
+  const wood = new THREE.MeshStandardMaterial({ color: 0x6a4a28, roughness: 0.8 });
+  for (const sx of [-0.55, 0.55]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.4, 0.12), wood);
+    post.position.set(sx, 1.2, 0);
+    g.add(post);
+  }
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(1.35, 0.12, 0.12), wood);
+  beam.position.y = 2.35;
+  g.add(beam);
+  const bronze = new THREE.MeshStandardMaterial({ color: 0xb08a3a, roughness: 0.4, metalness: 0.55 });
+  const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 0.55, 10), bronze);
+  bell.name = 'wat-bell';
+  bell.position.y = 1.85;
+  g.add(bell);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.03, 6, 12), bronze);
+  rim.position.y = 1.58;
+  rim.rotation.x = PI / 2;
+  bell.add(rim);
+  const striker = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.03, 0.04, 0.55, 5),
+    new THREE.MeshStandardMaterial({ color: 0x4a3a22, roughness: 0.75 })
+  );
+  striker.name = 'wat-bell-striker';
+  striker.position.set(0.42, 1.55, 0);
+  striker.rotation.z = 0.35;
+  g.add(striker);
+  g.position.set(x, 0, z);
+  scene.add(g);
+  G.watBell = { mesh: g, bell, striker, x, z, ringT: 0 };
+}
+
 export function makeChaYenMesh() {
   const g = new THREE.Group();
   g.name = 'chayen-cart';

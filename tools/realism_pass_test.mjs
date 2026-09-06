@@ -453,7 +453,7 @@ async function main() {
       const g = window.GAME.gameplay || {};
       return g;
     });
-    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover']) {
+    for (const k of ['pedWalkways','pedBuildingCollision','pedCrosswalks','monkHeat','dogRoadLife','trafficDensity','trafficDestinations','bikeFilterWide','vehicleKindFeel','fakeRpm','vehicleLimp','kerbScrub','sois','yaowaratCarHostility','floodPatches','heatHaze','spatialSiren','districtBeds','watHeatSink','honestAmmo','speedo','gamepad','tach','bikeLowside','coverVehicles','gltf','cover','clinch','btsHijack','fireAtTen','allRed','airport','btsRide','talkChase','yaowaratNight','boatHijack','sevenInterior','motosai','motosaiStands','burningHaze','schoolKids','seekShade','stallSit','spiritWai','soiCats','btsPlatform','bikeHelmets','officeCommute','afternoonStorm','crossingGuard','btsMotosai','rainPack','btsSongthaew','iceCart','btsTuktuk','khlongMonitor','stallGecko','soiFootball','mallShoppers','lottery','watChant','coconutCart','soiLaundry','nightCheckpoint','sevenBikes','hyacinth','btsSitters','mooPing','watTurtles','sevenGuard','soiPa','soiChairs','soiMechanic','copSoiBlock','floodSois','dawnAlms','soiCowboy','phonePlaces','longtailChase','boatNoodle','twoAmCheckpoint','somTam','btsMalai','cowboyClose','plaKat','chaYen','soiBarber','btsGates','soiWires','rainFrogs','soiCctv','rotiCart','rainPoncho','bikeSeatCover','watBell']) {
       assert(flags[k] === true, `GAMEPLAY.${k} defaults on`);
     }
     assert(flags.rapier === false, 'GAMEPLAY.rapier stays off until arcade bands are matched');
@@ -2768,6 +2768,47 @@ async function main() {
     });
     assert(seat.flag && seat.n >= 4 && seat.named, `parked 7-Eleven bikes wear seat covers (${seat.n})`);
     assert(seat.dry && seat.wet && seat.taken, 'covers come out in the rain and come off when you take the bike');
+
+    console.log('\n[84] wat bell');
+    const gong = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const b = G.watBell;
+      const named = !!(b && b.bell && b.bell.name === 'wat-bell');
+      const frame = !!(b && b.mesh && b.mesh.name === 'wat-bell-frame');
+      const temple = G.world && G.world.poi && G.world.poi.temple;
+      const nearWat = !!(b && temple && Math.hypot(b.x - temple.x, b.z - temple.z) < 14);
+      G.player.inVehicle = null;
+      G._eating = null;
+      G._barberCut = null;
+      G._bellRung = 0;
+      if (b) {
+        b.readyAt = 0;
+        b.ringT = 0;
+        G.player.group.position.set(b.x, 0, b.z);
+      }
+      const seen0 = performance.now() + 30000;
+      G.wanted.lastSeenAt = seen0;
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let rang = false;
+      for (let i = 0; i < 4 && !rang; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updateWatBell(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        rang = (G._bellRung || 0) >= 1 && b.ringT > 0;
+      }
+      const z0 = b && b.bell ? b.bell.rotation.z : 0;
+      for (let i = 0; i < 8; i++) main.updateWatBell(0.08);
+      const swung = !!(b && b.bell && Math.abs(b.bell.rotation.z - z0) > 0.02);
+      return {
+        flag: !!(G.gameplay && G.gameplay.watBell),
+        named, frame, nearWat, rang, swung,
+        cooled: G.wanted.lastSeenAt <= seen0 - 8000,
+      };
+    });
+    assert(gong.flag && gong.named && gong.frame && gong.nearWat, 'a bronze bell hangs at the wat');
+    assert(gong.rang && gong.swung && gong.cooled, 'E rings the bell and cools last-seen');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {

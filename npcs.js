@@ -1775,6 +1775,34 @@ export function updateSeekShade(dt) {
   }
 }
 
+export function updateWatBell(dt) {
+  if (!GAMEPLAY.watBell || !G.watBell) return;
+  const b = G.watBell;
+  if (b.ringT > 0) {
+    b.ringT = Math.max(0, b.ringT - dt);
+    const swing = Math.sin(b.ringT * 14) * Math.min(1, b.ringT) * 0.28;
+    if (b.bell) b.bell.rotation.z = swing;
+    if (b.striker) b.striker.rotation.z = 0.35 - swing * 0.8;
+  } else {
+    if (b.bell) b.bell.rotation.z = 0;
+    if (b.striker) b.striker.rotation.z = 0.35;
+  }
+  if (G.player.inVehicle || G._eating || G._barberCut) return;
+  const pp = G.player.group.position;
+  if (dist2({ x: b.x, z: b.z }, pp) > 2.8 * 2.8) return;
+  G.hud.showPrompt('Press <b>E</b> to ring the bell', 0.4);
+  if (!G.input.pressed('KeyE')) return;
+  const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : 0;
+  if (b.readyAt && now < b.readyAt) { G.hud.showNotif('The bell is still ringing'); return; }
+  b.readyAt = now + 9000;
+  b.ringT = 1.8;
+  G._bellRung = (G._bellRung || 0) + 1;
+  G.wanted.lastSeenAt = Math.max(0, (G.wanted.lastSeenAt || now) - 12000);
+  G.hud.showNotif('The bell carries — ระฆังวัด');
+  if (G.audio && G.audio.bell) G.audio.bell();
+  else if (G.audio && G.audio.chime) G.audio.chime();
+}
+
 export function updateBikeSeatCover(dt) {
   if (!GAMEPLAY.bikeSeatCover || !G.sevenBikes) return;
   const wet = (G.time.rainStrength || 0) > 0.4;
