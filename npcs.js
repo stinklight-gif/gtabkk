@@ -3717,43 +3717,45 @@ export function updateMangoSticky(dt) {
 }
 
 export function updatePhromFruit(dt) {
-  if (!GAMEPLAY.phromFruit || !G.phromFruit) return;
-  const c = G.phromFruit;
-  c.t = (c.t || 0) + dt;
+  if (!GAMEPLAY.phromFruit) return;
   const h = ((G.time.dayT % 1) + 1) % 1 * 24;
   const open = h >= 10 && h < 20;
-  const blender = c.mesh && c.mesh.getObjectByName('phrom-blender');
-  if (blender) {
-    blender.rotation.y = open ? c.t * 8.5 : blender.rotation.y;
-    if (blender.material) blender.material.emissiveIntensity = open ? 0.22 + Math.sin(c.t * 10) * 0.1 : 0.06;
+  const pp = G.player && G.player.group && G.player.group.position;
+  for (const c of [G.phromFruit, G.asokFruit]) {
+    if (!c) continue;
+    c.t = (c.t || 0) + dt;
+    const blender = c.mesh && c.mesh.getObjectByName('phrom-blender');
+    if (blender) {
+      blender.rotation.y = open ? c.t * 8.5 : blender.rotation.y;
+      if (blender.material) blender.material.emissiveIntensity = open ? 0.22 + Math.sin(c.t * 10) * 0.1 : 0.06;
+    }
+    const fruits = c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'phrom-fruit-piece') : [];
+    for (let i = 0; i < fruits.length; i++) {
+      fruits[i].position.y = 0.82 + (open ? Math.sin(c.t * 3.2 + i) * 0.02 : 0);
+    }
+    const ped = c.vendor;
+    if (ped && ped.mesh && ped.anchor && ped.anchor.slot) {
+      ped.phromFruit = true;
+      ped.mesh.visible = open;
+      ped.mesh.position.set(ped.anchor.slot.x, 0, ped.anchor.slot.z);
+      ped.heading = ped.anchor.facing;
+      ped.mesh.rotation.y = ped.heading;
+      ped.speed = 0;
+      ped.state = 'idle';
+    }
+    if (!open || G.player.inVehicle || G._eating || !pp) continue;
+    if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) continue;
+    G.hud.showPrompt('Press <b>E</b> for a fruit smoothie · ฿40', 0.4);
+    if (!G.input.pressed('KeyE')) continue;
+    if (G.cash < 40) { G.hud.showNotif('Need ฿40 for a smoothie'); continue; }
+    G.cash -= 40;
+    G.player.hp = Math.min(G.player.hpMax, G.player.hp + 18);
+    G.player.stam = G.player.stamMax;
+    if (G.hud.setCash) G.hud.setCash(G.cash);
+    G._phromFruit = (G._phromFruit || 0) + 1;
+    G.hud.showNotif('Fruit smoothie — น้ำปั่น');
+    if (G.audio && G.audio.chime) G.audio.chime();
   }
-  const fruits = c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'phrom-fruit-piece') : [];
-  for (let i = 0; i < fruits.length; i++) {
-    fruits[i].position.y = 0.82 + (open ? Math.sin(c.t * 3.2 + i) * 0.02 : 0);
-  }
-  const ped = c.vendor;
-  if (ped && ped.mesh && ped.anchor && ped.anchor.slot) {
-    ped.phromFruit = true;
-    ped.mesh.visible = open;
-    ped.mesh.position.set(ped.anchor.slot.x, 0, ped.anchor.slot.z);
-    ped.heading = ped.anchor.facing;
-    ped.mesh.rotation.y = ped.heading;
-    ped.speed = 0;
-    ped.state = 'idle';
-  }
-  if (!open || G.player.inVehicle || G._eating) return;
-  const pp = G.player.group.position;
-  if (!c.mesh || dist2(c.mesh.position, pp) > 2.4 * 2.4) return;
-  G.hud.showPrompt('Press <b>E</b> for a fruit smoothie · ฿40', 0.4);
-  if (!G.input.pressed('KeyE')) return;
-  if (G.cash < 40) { G.hud.showNotif('Need ฿40 for a smoothie'); return; }
-  G.cash -= 40;
-  G.player.hp = Math.min(G.player.hpMax, G.player.hp + 18);
-  G.player.stam = G.player.stamMax;
-  if (G.hud.setCash) G.hud.setCash(G.cash);
-  G._phromFruit = (G._phromFruit || 0) + 1;
-  G.hud.showNotif('Fruit smoothie — น้ำปั่น');
-  if (G.audio && G.audio.chime) G.audio.chime();
 }
 
 export function updateBtsMalai(dt) {

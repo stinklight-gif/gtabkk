@@ -331,7 +331,7 @@ export const GAMEPLAY = {
   btsPaper: true,         // newspaper racks at Asok and Phrom Phong BTS; morning papers, E for a copy
   yaoDuck: true,          // roast-duck window on Yaowarat; hanging birds after dark, E for a plate
   sevenSlush: true,       // slushie machine inside the walk-in 7-Eleven; tanks spin, E for a cup
-  phromFruit: true,       // fruit smoothie cart at Phrom Phong BTS; blender spins, E for a cup
+  phromFruit: true,       // fruit smoothie carts at Asok and Phrom Phong BTS; blender spins, E for a cup
   pierWait: true,         // ferry passengers wait on the pier; E for a ฿15 express-boat ticket
   btsShine: true,         // shoe-shine boxes north of Asok and Phrom Phong BTS; E for a polish
   watAmulet: true,        // amulet board at the wat; E buys one, shrine offering cools extra

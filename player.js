@@ -447,7 +447,11 @@ export function updateInteraction(dt) {
   if (GAMEPLAY.yaoDuck && G.yaoDuck && G.yaoDuck.mesh && dist2(G.yaoDuck.mesh.position, pp0) < 2.4 * 2.4) return;
   if (GAMEPLAY.yaoFortune && G.yaoFortune && G.yaoFortune.mesh && dist2(G.yaoFortune.mesh.position, pp0) < 2.4 * 2.4) return;
   if (GAMEPLAY.sevenSlush && G.sevenSlush && G.sevenSlush.mesh && dist2(G.sevenSlush.mesh.position, pp0) < 2.4 * 2.4) return;
-  if (GAMEPLAY.phromFruit && G.phromFruit && G.phromFruit.mesh && dist2(G.phromFruit.mesh.position, pp0) < 2.4 * 2.4) return;
+  if (GAMEPLAY.phromFruit) {
+    for (const c of [G.phromFruit, G.asokFruit]) {
+      if (c && c.mesh && dist2(c.mesh.position, pp0) < 2.4 * 2.4) return;
+    }
+  }
   if (GAMEPLAY.btsShine) {
     for (const c of [G.btsShine, G.phromShine]) {
       if (c && c.mesh && dist2(c.mesh.position, pp0) < 2.4 * 2.4) return;

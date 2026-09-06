@@ -5340,21 +5340,26 @@ export function makePhromFruitMesh() {
 
 export function spawnPhromFruit(scene) {
   if (!GAMEPLAY.phromFruit) return;
-  const x = 100 - 8.2, z = -24.8;
-  const mesh = makePhromFruitMesh();
-  mesh.position.set(x, 0, z);
-  scene.add(mesh);
-  const vendor = spawnPed(scene, new THREE.Vector3(x + 0.7, 0, z + 0.12), 'vendor');
-  vendor.phromFruit = true;
-  vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI / 2 };
-  vendor.speed = 0;
-  vendor.state = 'idle';
-  vendor.heading = PI / 2;
-  if (vendor.mesh) {
-    vendor.mesh.rotation.y = PI / 2;
-    vendor.mesh.visible = false;
-  }
-  G.phromFruit = { mesh, vendor, x, z, t: 0 };
+  const cart = (x, z, stop) => {
+    const mesh = makePhromFruitMesh();
+    mesh.position.set(x, 0, z);
+    scene.add(mesh);
+    const vendor = spawnPed(scene, new THREE.Vector3(x + 0.7, 0, z + 0.12), 'vendor');
+    vendor.phromFruit = true;
+    vendor.stop = stop;
+    vendor.anchor = { slot: vendor.mesh.position.clone(), facing: PI / 2 };
+    vendor.speed = 0;
+    vendor.state = 'idle';
+    vendor.heading = PI / 2;
+    if (vendor.mesh) {
+      vendor.mesh.rotation.y = PI / 2;
+      vendor.mesh.visible = false;
+    }
+    return { mesh, vendor, x, z, t: 0, stop };
+  };
+  G.phromFruit = cart(100 - 8.2, -24.8, 'phrom');
+  const bts = G.world && G.world.bts;
+  G.asokFruit = bts ? cart(bts.x - 8.8, 8.8, 'asok') : null;
 }
 
 export function spawnBtsGates(scene) {

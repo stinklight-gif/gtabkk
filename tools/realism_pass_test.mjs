@@ -6143,6 +6143,54 @@ async function main() {
     });
     assert(eastAtm.flag && eastAtm.n >= 2 && eastAtm.card && eastAtm.named && eastAtm.near && eastAtm.farWalk, `a queue waits at the east 7-Eleven ATM (${eastAtm.n})`);
     assert(eastAtm.late >= 2 && eastAtm.day >= 2 && eastAtm.shifted, 'they hide late and shift weight at the east machine');
+
+    console.log('\n[174] fruit smoothie at Asok');
+    const asokSmoothie = await page.evaluate(() => {
+      const G = window.GAME, main = window.__REALISM_MAIN;
+      const c = G.asokFruit;
+      const named = !!(c && c.mesh && c.mesh.name === 'phrom-fruit');
+      const n = c && c.mesh ? c.mesh.children.filter(ch => ch && ch.name === 'phrom-fruit-piece').length : 0;
+      const blender = !!(c && c.mesh && c.mesh.getObjectByName('phrom-blender'));
+      const bts = G.world && G.world.bts;
+      const near = !!(c && bts && Math.hypot(c.x - bts.x, c.z - (bts.z || 0)) < 40);
+      const farPhrom = !!(c && Math.hypot(c.x - 100, c.z) > 80);
+      G.time.dayT = 21.2 / 24;
+      main.updatePhromFruit(0.05);
+      const night = !!(c && c.vendor && c.vendor.mesh && c.vendor.mesh.visible === false);
+      G.time.dayT = 12 / 24;
+      if (c) c.t = 0.2;
+      main.updatePhromFruit(0.05);
+      const day = !!(c && c.vendor && c.vendor.phromFruit && c.vendor.mesh && c.vendor.mesh.visible);
+      const b = c && c.mesh && c.mesh.getObjectByName('phrom-blender');
+      const r0 = b ? b.rotation.y : 0;
+      if (c) c.t = 0.2 + 0.4;
+      main.updatePhromFruit(0.05);
+      const spun = !!(b && Math.abs(b.rotation.y - r0) > 1);
+      G.player.inVehicle = null;
+      G._eating = null;
+      if (c && c.mesh) G.player.group.position.copy(c.mesh.position);
+      G.cash = 80;
+      G._phromFruit = 0;
+      const stam0 = G.player.stam;
+      G.player.stam = Math.max(0, (G.player.stamMax || 100) * 0.2);
+      window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+      if (G.input && G.input.endFrame) G.input.endFrame();
+      let paid = false;
+      for (let i = 0; i < 4 && !paid; i++) {
+        window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' }));
+        main.updatePhromFruit(0.016);
+        window.dispatchEvent(new KeyboardEvent('keyup', { code: 'KeyE' }));
+        if (G.input && G.input.endFrame) G.input.endFrame();
+        paid = G.cash === 40 && (G._phromFruit || 0) >= 1 && G.player.stam === G.player.stamMax;
+      }
+      G.player.stam = stam0;
+      return {
+        flag: !!(G.gameplay && G.gameplay.phromFruit),
+        named, n, blender, near, farPhrom, night, day, spun, paid,
+      };
+    });
+    assert(asokSmoothie.flag && asokSmoothie.named && asokSmoothie.n >= 4 && asokSmoothie.blender && asokSmoothie.near && asokSmoothie.farPhrom, `a fruit smoothie cart waits at Asok (${asokSmoothie.n})`);
+    assert(asokSmoothie.night && asokSmoothie.day && asokSmoothie.spun && asokSmoothie.paid, 'the Asok blender spins by day and E buys a smoothie for ฿40');
   } catch (err) {
     errors.push(`harness: ${err.message}`);
   } finally {
